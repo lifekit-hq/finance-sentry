@@ -42,4 +42,7 @@ public enum CompanionEventKind
     /// closed. Digest material - one line, never a wake.
     /// </summary>
     ConnectionDormant,
+
+    /// <summary>A bank account was retired (absent from its provider's list, or replaced by a reissue): one digest line, never a wake.</summary>
+    AccountRetired,
 }

@@ -4,7 +4,19 @@ using FinanceSentry.Core.Utils;
 
 public interface IBankingAccountsReader
 {
+    /// <summary>
+    /// The accounts whose balance counts in live totals. A retired account, and one that has been absent from its
+    /// provider's list for 24 h or more, is left out (docs/money-semantics.md, "Closed and vanished accounts"), so a sum
+    /// over these never counts a balance that moved to a replacement card.
+    /// </summary>
     Task<IReadOnlyList<BankingAccountSummary>> GetAccountSummariesAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The accounts <see cref="GetAccountSummariesAsync"/> leaves out (retired or vanished), for readers that label
+    /// history with an account's currency and provider. Never sum their balances. Empty unless the reader knows them.
+    /// </summary>
+    Task<IReadOnlyList<BankingAccountSummary>> GetNonLiveAccountSummariesAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<BankingAccountSummary>>([]);
 
     /// <summary>
     /// Returns the distinct set of user IDs that have at least one active bank account.

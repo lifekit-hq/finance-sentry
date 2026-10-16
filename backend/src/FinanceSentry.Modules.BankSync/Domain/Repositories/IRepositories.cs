@@ -74,6 +74,14 @@ public interface IBankAccountRepository
     Task SaveProviderIdentifiersUnscopedAsync(BankAccount account, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Stores the account's lifecycle marks (<see cref="BankAccount.ClosedAt"/>, reason, closer, predecessor and
+    /// <see cref="BankAccount.AbsentSince"/>) alone, straight to the row, for the same reason as
+    /// <see cref="SaveProviderIdentifiersUnscopedAsync"/>. For the no-person discovery and the reopen of a row the
+    /// request already found under the Owner query filter; opts out of that filter.
+    /// </summary>
+    Task SaveLifecycleUnscopedAsync(BankAccount account, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Delete bank account (soft delete by setting IsActive = false).
     /// </summary>
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
@@ -106,7 +114,8 @@ public interface IBankAccountRepository
     Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get every user's active (IsActive=true) accounts regardless of sync status, except fake
+    /// Get every user's active (IsActive=true) accounts regardless of sync status, except retired ones
+    /// (<see cref="BankAccount.ClosedAt"/> set: nothing syncs them) and fake
     /// <see cref="BankAccount.SeededProvider"/> accounts, so a seeded user is invisible to the scheduler, the
     /// cross-user jobs and the cross-module readers. Opts out of the Owner query filter.
     /// </summary>

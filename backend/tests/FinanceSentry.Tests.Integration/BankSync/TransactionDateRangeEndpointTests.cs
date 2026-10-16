@@ -97,6 +97,7 @@ public sealed class TransactionDateRangeEndpointTests : IAsyncLifetime
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,
+            new Mock<IAccountLifecycle>().Object,
             new Mock<IHostEnvironment>().Object);
 
         controller.ControllerContext = new ControllerContext

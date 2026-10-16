@@ -129,6 +129,7 @@ public class TrueLayerCallbackStateBindingTests
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,
+            new Mock<IAccountLifecycle>().Object,
             Mock.Of<IHostEnvironment>(e => e.EnvironmentName == Environments.Development));
 
         var httpContext = new DefaultHttpContext();

@@ -25,6 +25,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         [AlertType.LowBalance] = TimeSpan.FromHours(24),
         [AlertType.SyncFailure] = TimeSpan.FromHours(12),
         [AlertType.ThesisBroken] = TimeSpan.FromHours(24),
+        // An account reopened by its reappearance and retired again must not repeat the notice within the week.
+        [AlertType.AccountRetired] = TimeSpan.FromDays(7),
         [AlertType.MarketStructure] = TimeSpan.FromHours(24),
         [AlertType.PolicyViolation] = TimeSpan.FromHours(24),
         [AlertType.Opportunity] = TimeSpan.FromHours(24),
@@ -162,6 +164,21 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveConnectionDormantAlertAsync(
         Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.ConnectionDormant, SyncFailureReferenceId(provider, accountId), ct);
+
+    public Task GenerateAccountRetiredAlertAsync(
+        Guid userId, Guid accountId, string accountName, string? replacedBy, CancellationToken ct = default)
+        => EmitAsync(
+            userId,
+            new AlertDraft(
+                AlertType.AccountRetired, AlertSeverity.Info, accountId, accountName,
+                replacedBy is null ? $"{accountName} was retired" : $"{accountName} was replaced",
+                replacedBy is null
+                    ? $"{accountName} is no longer listed by your bank and has stopped syncing. Its history stays, and its balance no longer counts in your totals. If it is still open, reopen it from Accounts."
+                    : $"{accountName} was replaced by {replacedBy}. Its history stays, and its balance no longer counts in your totals; the new account carries the balance.")
+            {
+                Dedup = AlertDedup.SilenceOnly,
+            },
+            ct);
 
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
         => _alerts.DeleteByReferenceIdAsync(accountId, ct);

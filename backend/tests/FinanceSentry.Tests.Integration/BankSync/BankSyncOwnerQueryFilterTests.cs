@@ -167,6 +167,41 @@ public sealed class BankSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Lifecycle_save_with_no_person_updates_only_the_named_account_and_the_scheduler_skips_a_closed_one()
+    {
+        var closing = NewAccount(_userA);
+        var bystander = NewAccount(_userB);
+        await SeedAsync(closing, bystander);
+        var closedAt = DateTimeOffset.UtcNow;
+        closing.Retire(closedAt, AccountClosedReasons.AbsentFromList);
+        closing.AbsentSince = closedAt.AddDays(-2);
+
+        await using (var ctx = CreateContext())
+        {
+            var accounts = new BankAccountRepository(ctx);
+            await accounts.SaveLifecycleUnscopedAsync(closing);
+
+            (await accounts.GetAllActiveUnscopedAsync()).Select(x => x.Id).Should()
+                .Contain(bystander.Id).And.NotContain(closing.Id, "a closed account is not scheduled");
+        }
+
+        await using var read = CreateContext();
+        var stored = await read.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(a => a.UserId == _userA || a.UserId == _userB).ToListAsync();
+        var closed = stored.Single(a => a.Id == closing.Id);
+        closed.ClosedAt.Should().BeCloseTo(closedAt, TimeSpan.FromSeconds(1));
+        closed.ClosedReason.Should().Be(AccountClosedReasons.AbsentFromList);
+        closed.ClosedBy.Should().Be(AccountClosedReasons.BySystem);
+        closed.IsActive.Should().BeTrue();
+        stored.Single(a => a.Id == bystander.Id).ClosedAt.Should().BeNull("the write is bound to the named account");
+
+        // The person's own scoped read still sees their retired account (the Accounts list shows it) and not the other's.
+        await using var asA = CreateContext(_userA);
+        (await new BankAccountRepository(asA).GetByUserIdAsync(_userA)).Select(x => x.Id).Should().Equal(closing.Id);
+        (await new BankAccountRepository(asA).GetByIdAsync(bystander.Id)).Should().BeNull();
+    }
+
+    [DockerRequiredFact]
     public async Task Filtered_sync_reads_follow_the_acting_person_and_see_nothing_without_one()
     {
         var accountA = NewAccount(_userA);

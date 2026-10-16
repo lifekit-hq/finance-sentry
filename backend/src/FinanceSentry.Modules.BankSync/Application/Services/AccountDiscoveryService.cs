@@ -1,6 +1,5 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
-using FinanceSentry.Core.Connections;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -25,9 +24,10 @@ using Microsoft.Extensions.Logging;
 /// <c>ConnectionHealth:ActiveProviders</c> (in shadow mode it only records). For a listed provider the listing also
 /// keeps the Dormant cadence: a Dormant connection is listed at most once per <c>ConnectionHealth:DormantSyncInterval</c>.
 ///
-/// Existing accounts only have their provider identifiers refreshed (IBAN, PANs, last four, card expiry); nothing else
-/// about them changes. A log-only detector names an account the provider no longer lists while its own health says
-/// Dormant/ResourceGone ("would retire"), so production shows the signal before anything acts on it. On SCA-strict banks (e.g. AIB)
+/// Existing accounts have their provider identifiers refreshed (IBAN, PANs, last four, card expiry), and the same read
+/// drives the account lifecycle (<see cref="IAccountLifecycle"/>): an account the list stops naming is marked absent,
+/// retired once its own health also says Dormant/ResourceGone, and restored if the list names it again; a new account
+/// whose IBAN equals a failing or absent account's is stored as its reissue. A failed read changes none of it. On SCA-strict banks (e.g. AIB)
 /// a discovered account stays balance-only until a user-present reconnect re-establishes the SCA
 /// session needed to pull transaction history in the background (see the inline-sync comment in
 /// <c>FinalizeTrueLayerConnectCommand</c>).
@@ -49,6 +49,7 @@ public class AccountDiscoveryService(
     IBankAccountRepository accounts,
     IBackgroundJobClient backgroundJobs,
     IBankConnectionHealth connectionHealth,
+    IAccountLifecycle lifecycle,
     ILogger<AccountDiscoveryService> logger) : IAccountDiscoveryService
 {
     /// <summary>What a Monobank connection is called in its alert: the bank name its accounts carry.</summary>
@@ -140,8 +141,10 @@ public class AccountDiscoveryService(
     {
         var created = 0;
         var known = await KnownAccountsAsync(connection.UserId, ct);
+        var held = known.Values.Where(a => a.TrueLayerConnectionId == connection.Id).ToList();
 
         var providerAccounts = await trueLayerClient.ListAccountsAsync(accessToken, ct);
+        var listedIds = providerAccounts.Select(a => a.AccountId).ToHashSet();
         foreach (var pa in providerAccounts)
         {
             if (await RefreshExistingAsync(known, pa.AccountId, pa.Iban, null, pa.AccountNumberLast4, null, ct))
@@ -161,7 +164,7 @@ public class AccountDiscoveryService(
             }
 
             var account = TrueLayerAccountFactory.CreateAccount(connection, pa, currentBalance);
-            await accounts.AddAsync(account, ct);
+            await lifecycle.AddDiscoveredAsync(account, held, listedIds, ct);
             backgroundJobs.Enqueue<ScheduledSyncJob>(job => job.ExecuteSyncAsync(account.Id));
             created++;
         }
@@ -180,6 +183,7 @@ public class AccountDiscoveryService(
                 connection.Id, ex.Message);
         }
 
+        listedIds.UnionWith(providerCards.Select(c => c.AccountId));
         foreach (var card in providerCards)
         {
             if (await RefreshExistingAsync(known, card.AccountId, null, null, card.AccountNumberLast4, card.ValidTo, ct))
@@ -201,16 +205,14 @@ public class AccountDiscoveryService(
             }
 
             var cardAccount = TrueLayerAccountFactory.CreateCardAccount(connection, card, owed, creditLimit);
-            await accounts.AddAsync(cardAccount, ct);
+            await lifecycle.AddDiscoveredAsync(cardAccount, held, listedIds, ct);
             backgroundJobs.Enqueue<ScheduledSyncJob>(job => job.ExecuteSyncAsync(cardAccount.Id));
             created++;
         }
 
-        // A failed /cards read would make every card look absent, so the detector skips it.
+        // A failed /cards read would make every card look absent, so the lifecycle skips it.
         if (cardsListed)
-            LogWouldRetire(
-                known.Values.Where(a => a.TrueLayerConnectionId == connection.Id),
-                [.. providerAccounts.Select(a => a.AccountId), .. providerCards.Select(c => c.AccountId)]);
+            await lifecycle.ReconcileAsync(held, listedIds, ct);
 
         return created;
     }
@@ -243,6 +245,8 @@ public class AccountDiscoveryService(
                 await connectionHealth.RecordConnectionSuccessAsync(health, ct);
 
                 var known = await KnownAccountsAsync(credential.UserId, ct);
+                var held = known.Values.Where(a => a.MonobankCredentialId == credential.Id).ToList();
+                var listedIds = clientInfo.Accounts.Select(a => a.Id).ToHashSet();
                 foreach (var pa in clientInfo.Accounts)
                 {
                     monobankBalanceCache.Set(token, pa.Id, MonobankAdapter.ToBankAccountInfo(pa, clientInfo.Name));
@@ -253,14 +257,12 @@ public class AccountDiscoveryService(
                         continue;
 
                     var account = MonobankAccountFactory.CreateAccount(credential.UserId, credential.Id, pa);
-                    await accounts.AddAsync(account, ct);
+                    await lifecycle.AddDiscoveredAsync(account, held, listedIds, ct);
                     backgroundJobs.Enqueue<ScheduledSyncJob>(job => job.ExecuteSyncAsync(account.Id));
                     created++;
                 }
 
-                LogWouldRetire(
-                    known.Values.Where(a => a.MonobankCredentialId == credential.Id),
-                    [.. clientInfo.Accounts.Select(a => a.Id)]);
+                await lifecycle.ReconcileAsync(held, listedIds, ct);
             }
             catch (Exception ex)
             {
@@ -309,23 +311,5 @@ public class AccountDiscoveryService(
         }
 
         return true;
-    }
-
-    // Log-only (PR 1 of the card lifecycle): nothing here may change a row. Needs a sibling still listed so one empty
-    // or truncated answer cannot flag everything.
-    private void LogWouldRetire(IEnumerable<BankAccount> connectionAccounts, HashSet<string> listedIds)
-    {
-        var held = connectionAccounts.ToList();
-        if (!held.Any(a => listedIds.Contains(a.ExternalAccountId)))
-            return;
-
-        foreach (var account in held.Where(a => !listedIds.Contains(a.ExternalAccountId)
-            && a.Health.State == ConnectionHealthState.Dormant
-            && a.Health.LastFailureClass == FailureClass.ResourceGone))
-        {
-            logger.LogWarning(
-                "would retire account {AccountId} ({Provider} {ExternalAccountId} ···{Last4}) (absent from list, health Dormant/ResourceGone).",
-                account.Id, account.Provider, account.ExternalAccountId, account.AccountNumberLast4);
-        }
     }
 }

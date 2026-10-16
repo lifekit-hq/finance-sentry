@@ -28,6 +28,12 @@ public class TransactionSyncCoordinator(
     /// <summary>The result code of a scheduled sync the Dormant cadence held back.</summary>
     public const string DormantCode = "SYNC_DORMANT";
 
+    /// <summary>The result code of a sync of a retired account: nothing syncs it until it is reopened.</summary>
+    public const string ClosedCode = "ACCOUNT_CLOSED";
+
+    private static readonly SyncResult ClosedResult =
+        new(false, 0, 0, ClosedCode, "The account is retired; reopen it to sync again.");
+
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly IScheduledSyncService _syncService = syncService;
     private readonly IBackgroundJobClient _backgroundJobs = backgroundJobs;
@@ -39,6 +45,9 @@ public class TransactionSyncCoordinator(
         // reconnects. Skip it in the recurring scheduler so it stops failing every cycle; the reconnect
         // flow clears the state via MarkActive. Manual syncs are unaffected.
         var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
+        if (account?.IsClosed == true)
+            return ClosedResult;
+
         if (account?.SyncStatus == "reauth_required")
             return new SyncResult(false, 0, 0, "ITEM_LOGIN_REQUIRED", "Account requires reconnection; scheduled sync skipped.");
 
@@ -56,6 +65,11 @@ public class TransactionSyncCoordinator(
     /// <inheritdoc />
     public async Task<SyncResult> TriggerManualSyncAsync(Guid accountId, CancellationToken ct = default)
     {
+        // A retired account is not synced on request either: the provider no longer serves it, and a failed run would
+        // raise the alerts the retirement resolved.
+        if ((await _accounts.GetByIdUnscopedAsync(accountId, ct))?.IsClosed == true)
+            return ClosedResult;
+
         return ChaseWithDetection(await _syncService.PerformFullSyncAsync(accountId, ct: ct));
     }
 

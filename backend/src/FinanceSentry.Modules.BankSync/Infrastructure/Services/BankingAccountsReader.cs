@@ -8,15 +8,34 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 public class BankingAccountsReader(
     IBankAccountRepository accounts,
     ISyncJobRepository syncJobs,
-    IClosedAccountsReader closedAccounts) : IBankingAccountsReader
+    IClosedAccountsReader closedAccounts,
+    TimeProvider? clock = null) : IBankingAccountsReader
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly IBankAccountRepository _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly ISyncJobRepository _syncJobs = syncJobs ?? throw new ArgumentNullException(nameof(syncJobs));
     private readonly IClosedAccountsReader _closedAccounts = closedAccounts;
 
+    // Only accounts whose balance counts in live totals: every consumer sums these, and a retired or vanished
+    // account's balance has moved on (to its successor, or to nothing).
     public async Task<IReadOnlyList<BankingAccountSummary>> GetAccountSummariesAsync(Guid userId, CancellationToken ct = default)
     {
-        var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
+        var now = _clock.GetUtcNow();
+        return await SummariesAsync(userId, a => a.CountsInLiveTotals(now), ct);
+    }
+
+    // The retired and vanished accounts, which keep their history: a reader labelling old transactions needs their
+    // currency and provider, and must never sum their balance.
+    public async Task<IReadOnlyList<BankingAccountSummary>> GetNonLiveAccountSummariesAsync(Guid userId, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        return await SummariesAsync(userId, a => !a.CountsInLiveTotals(now), ct);
+    }
+
+    private async Task<IReadOnlyList<BankingAccountSummary>> SummariesAsync(
+        Guid userId, Func<Domain.BankAccount, bool> include, CancellationToken ct)
+    {
+        var list = (await _accounts.GetByUserIdUnscopedAsync(userId, ct)).Where(include).ToList();
         var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserUnscopedAsync(userId, ct);
 
         return list.Select(a =>
@@ -55,8 +74,10 @@ public class BankingAccountsReader(
 
     public async Task<IReadOnlyList<AccountBalanceSnapshot>> GetActiveAccountSnapshotsAsync(Guid userId, CancellationToken ct = default)
     {
+        var now = _clock.GetUtcNow();
         var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return list
+            .Where(a => a.CountsInLiveTotals(now))
             .Select(a => new AccountBalanceSnapshot(a.Id, a.BankName, a.AccountType, a.AccountNumberLast4, a.Currency, a.CurrentBalance))
             .ToList();
     }

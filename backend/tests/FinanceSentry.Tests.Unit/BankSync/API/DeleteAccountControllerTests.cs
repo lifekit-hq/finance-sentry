@@ -24,6 +24,8 @@ public class DeleteAccountControllerTests
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Mock<IBankAccountRepository> _accounts = new();
     private readonly Mock<IRecurringJobManager> _recurringJobs = new();
+    private readonly Mock<IAccountLifecycle> _lifecycle = new();
+    private readonly Mock<IBackgroundJobClient> _jobs = new();
 
     private BankSyncController Controller()
     {
@@ -39,11 +41,12 @@ public class DeleteAccountControllerTests
             NullLogger<BankSyncController>.Instance,
             _accounts.Object,
             new Mock<ITransactionRepository>().Object,
-            new Mock<IBackgroundJobClient>().Object,
+            _jobs.Object,
             _recurringJobs.Object,
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,
+            _lifecycle.Object,
             new Mock<IHostEnvironment>().Object);
 
         controller.ControllerContext = new ControllerContext
@@ -78,5 +81,57 @@ public class DeleteAccountControllerTests
 
         Assert.IsType<NotFoundObjectResult>(result);
         _recurringJobs.Verify(m => m.RemoveIfExists(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reopening_a_retired_account_restores_it_and_syncs_it_now()
+    {
+        var account = new BankAccount { UserId = _userId };
+        account.Retire(DateTimeOffset.UtcNow, AccountClosedReasons.AbsentFromList);
+        _accounts.Setup(a => a.GetByIdAsync(account.Id, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var result = await Controller().ReopenAccount(account.Id, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        _lifecycle.Verify(l => l.ReopenAsync(account, It.IsAny<CancellationToken>()), Times.Once);
+        _jobs.Verify(j => j.Create(It.IsAny<Hangfire.Common.Job>(), It.IsAny<Hangfire.States.IState>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reopening_an_account_that_is_not_retired_is_a_conflict()
+    {
+        var account = new BankAccount { UserId = _userId };
+        _accounts.Setup(a => a.GetByIdAsync(account.Id, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var result = await Controller().ReopenAccount(account.Id, CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+        _lifecycle.Verify(l => l.ReopenAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reopening_someone_elses_account_is_not_found()
+    {
+        var account = new BankAccount { UserId = Guid.NewGuid() };
+        account.Retire(DateTimeOffset.UtcNow, AccountClosedReasons.AbsentFromList);
+        _accounts.Setup(a => a.GetByIdAsync(account.Id, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var result = await Controller().ReopenAccount(account.Id, CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        _lifecycle.Verify(l => l.ReopenAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Triggering_a_sync_on_a_retired_account_is_a_conflict()
+    {
+        var account = new BankAccount { UserId = _userId };
+        account.Retire(DateTimeOffset.UtcNow, AccountClosedReasons.AbsentFromList);
+        _accounts.Setup(a => a.GetByIdAsync(account.Id, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var result = await Controller().TriggerSync(account.Id, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Contains("ACCOUNT_CLOSED", System.Text.Json.JsonSerializer.Serialize(conflict.Value));
     }
 }

@@ -95,4 +95,28 @@ public class ConnectionHealthAlertsTests
 
         _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
     }
+
+    [Fact]
+    public async Task A_retired_account_gets_one_info_notice_linking_to_the_accounts_list()
+    {
+        await _service.GenerateAccountRetiredAlertAsync(_userId, _accountId, "Monobank ···1234", replacedBy: null);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.AccountRetired
+            && a.Severity == AlertSeverity.Info
+            && a.ReferenceId == _accountId
+            && a.AppPath == "/accounts/list"
+            && a.Title == "Monobank ···1234 was retired"), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_replaced_account_says_what_replaced_it()
+    {
+        await _service.GenerateAccountRetiredAlertAsync(_userId, _accountId, "Monobank ···1234", "Monobank ···9999");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.AccountRetired
+            && a.Title == "Monobank ···1234 was replaced"
+            && a.Message.Contains("Monobank ···9999")), default), Times.Once);
+    }
 }

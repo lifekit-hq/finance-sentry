@@ -285,6 +285,30 @@ A failed balance fetch **keeps the prior stored balance** — never zeroes it. B
 Monobank path (rate-limit) and the TrueLayer path (`ScheduledSyncService`) follow this;
 zeroing recorded phantom net-worth drops.
 
+### Closed and vanished accounts
+
+An account leaves every **live** balance in two steps (`BankAccount.CountsInLiveTotals`, one rule for every reader):
+
+1. **Vanished** - the provider's successful account-list read has not named it for 24 h or more
+   (`AbsentSince`, written only while a sibling of the same connection is still listed). Its balance is excluded from
+   live net worth, Accounts totals, aggregation and Liquidity even though it is not retired yet; the list naming it
+   again clears the mark and restores the balance. This stops a reissued card's balance counting twice (the balance of
+   a reissued card migrates to its successor).
+2. **Retired** - `ClosedAt` is set (Dormant 7 days with `ResourceGone` **and** absent from the list, or an exact-IBAN
+   reissue). From `ClosedAt` the balance is excluded for good; reopening (one tap, or reappearing in the list) restores
+   it.
+
+What does not change:
+
+- **History keeps its currency.** A closed account stays `IsActive = true` (that flag is the person's removal), so its
+  transactions still convert at the account's own currency (a UAH card's history converts as UAH). Readers that
+  label history use `GetNonLiveAccountSummariesAsync`; they never sum its balance.
+- **Past snapshots are unchanged.** Net-worth snapshots written before `ClosedAt` keep the balance they recorded; only
+  snapshots from `ClosedAt` on omit it.
+- **Transactions are kept** in the ledger and in flow windows.
+- The Accounts list still shows the account (with `closedAt`, `closedReason`, `predecessorAccountId`, `absentSince`)
+  and its `currencyTotals` skip it.
+
 ## 2. Liability sign convention
 
 `FinanceSentry.Core.Utils.AccountBalanceMath` is the single authority:

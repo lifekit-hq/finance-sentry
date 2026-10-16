@@ -199,6 +199,7 @@ public class ConnectMonobankContractTests
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,
+            new Mock<IAccountLifecycle>().Object,
             new Mock<IHostEnvironment>().Object);
 
         var identity = new ClaimsIdentity(

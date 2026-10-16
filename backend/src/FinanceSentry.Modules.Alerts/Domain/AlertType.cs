@@ -20,6 +20,11 @@ public static class AlertType
     /// </summary>
     public const string ConnectionDormant = "ConnectionDormant";
     /// <summary>
+    /// A bank account was retired (the provider stopped listing it, or a reissued card replaced it): the one info notice,
+    /// raised at the retirement. It rides the digest and never pushes.
+    /// </summary>
+    public const string AccountRetired = "AccountRetired";
+    /// <summary>
     /// The operational-alert type. Failing jobs no longer raise it (the Grafana rule on
     /// <c>finance_job_consecutive_failures</c> replaced that, #935); the silent-detector alert still does, and
     /// rows already stored under it keep resolving to a known type.

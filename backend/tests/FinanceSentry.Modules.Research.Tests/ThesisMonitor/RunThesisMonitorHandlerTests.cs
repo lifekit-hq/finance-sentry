@@ -450,6 +450,9 @@ public class RunThesisMonitorHandlerTests
         public Task ResolveSyncFailureAlertAsync(Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateAccountRetiredAlertAsync(Guid userId, Guid accountId, string accountName, string? replacedBy, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
             => Task.CompletedTask;
 

@@ -17,13 +17,15 @@ using Hangfire;
 using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
 /// <summary>
-/// Card lifecycle PR 1 against real Postgres: discovery stores the provider identifiers on rows it already holds
-/// through a targeted column write (so a sync that finishes while discovery is mid-call is not reverted), and the
-/// log-only detector names an absent Dormant/ResourceGone account without changing any row.
+/// Card lifecycle against real Postgres, with a context that has no principal (as the scheduler's discovery does):
+/// discovery stores the provider identifiers on rows it already holds through a targeted column write (so a sync that
+/// finishes while discovery is mid-call is not reverted), marks an account the list stops naming absent, retires it
+/// once its own health also says Dormant/ResourceGone, and reopens it when the list names it again.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
@@ -31,6 +33,8 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
     private const string AccessToken = "access";
     private readonly Guid _userId = Guid.NewGuid();
     private TestDatabase? _database;
+    private readonly AdjustableClock _clock = new(new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.Zero));
+    private readonly Mock<IAlertGeneratorService> _alerts = new();
 
     public async Task InitializeAsync()
     {
@@ -100,7 +104,7 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         var sut = new AccountDiscoveryService(
             connections, client.Object, refresh, monobankCredentials.Object, monobank.Object,
             new MonobankBalanceCache(TimeProvider.System), encryption.Object, accounts, jobs.Object,
-            connectionHealth, log);
+            connectionHealth, new AccountLifecycle(accounts, _alerts.Object, _clock, NullLogger<AccountLifecycle>.Instance), log);
         return (sut, client, monobank, monobankCredentials, log);
     }
 
@@ -156,18 +160,22 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         storedCard.IsActive.Should().BeTrue();
     }
 
+    private static readonly ConnectionHealth DormantGone = new()
+    {
+        State = ConnectionHealthState.Dormant,
+        LastFailureClass = FailureClass.ResourceGone,
+        LastFailureCode = "account_not_found",
+        LastFailureAt = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero),
+    };
+
     [DockerRequiredFact]
-    public async Task Detector_logs_an_absent_dormant_resource_gone_card_and_changes_nothing()
+    public async Task Discovery_without_a_principal_marks_absent_retires_on_both_signals_and_reopens_on_reappearance()
     {
         var connection = LinkedConnection(_userId);
         var listed = CardOn(_userId, connection, "card-listed");
         var gone = CardOn(_userId, connection, "card-gone", "9999");
-        gone.ApplyHealth(new ConnectionHealth
-        {
-            State = ConnectionHealthState.Dormant,
-            LastFailureClass = FailureClass.ResourceGone,
-            LastFailureCode = "account_not_found",
-        });
+        gone.Currency = "UAH";
+        gone.ApplyHealth(DormantGone);
         var absentButHealthy = CardOn(_userId, connection, "card-healthy", "8888");
         await using (var seed = CreateContext())
         {
@@ -176,31 +184,64 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         }
 
         await using var context = CreateContext();
-        var (sut, client, _, _, log) = BuildSut(context);
+        var (sut, client, _, _, _) = BuildSut(context);
         client.Setup(c => c.ListCardsAsync(AccessToken, It.IsAny<CancellationToken>()))
             .ReturnsAsync([new TrueLayerAccountInfo("card-listed", "Card", "EUR", "Sandbox", "credit", null, "1111")]);
 
+        // First run: absent with a listed sibling is only marked.
         await sut.DiscoverNewAccountsAsync();
+        (await ReloadAsync(gone.Id)).AbsentSince.Should().Be(_clock.GetUtcNow());
+        (await ReloadAsync(gone.Id)).ClosedAt.Should().BeNull();
+        (await ReloadAsync(listed.Id)).AbsentSince.Should().BeNull();
 
-        log.Messages(LogLevel.Warning).Should().ContainSingle(m => m.Contains("would retire account") && m.Contains(gone.Id.ToString()))
-            .Which.Should().Contain("absent from list, health Dormant/ResourceGone");
-        log.Messages(LogLevel.Warning).Should().NotContain(m => m.Contains(absentButHealthy.Id.ToString()));
-        foreach (var id in new[] { listed.Id, gone.Id, absentButHealthy.Id })
+        // Past the window: the Dormant/ResourceGone card retires, the merely-absent healthy one does not.
+        _clock.Advance(TimeSpan.FromHours(25));
+        await using (var again = CreateContext())
         {
-            var stored = await ReloadAsync(id);
-            stored.IsActive.Should().BeTrue();
-            stored.ClosedAt.Should().BeNull();
-            stored.ClosedReason.Should().BeNull();
+            var (sut2, client2, _, _, _) = BuildSut(again);
+            client2.Setup(c => c.ListCardsAsync(AccessToken, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new TrueLayerAccountInfo("card-listed", "Card", "EUR", "Sandbox", "credit", null, "1111")]);
+            await sut2.DiscoverNewAccountsAsync();
         }
+
+        var retired = await ReloadAsync(gone.Id);
+        retired.ClosedAt.Should().Be(_clock.GetUtcNow());
+        retired.ClosedReason.Should().Be(AccountClosedReasons.AbsentFromList);
+        retired.IsActive.Should().BeTrue("a closed account keeps IsActive so its history converts at its own currency");
+        retired.Currency.Should().Be("UAH");
+        var healthy = await ReloadAsync(absentButHealthy.Id);
+        healthy.ClosedAt.Should().BeNull();
+        healthy.AbsentSince.Should().NotBeNull();
+        _alerts.Verify(a => a.GenerateAccountRetiredAlertAsync(
+            _userId, gone.Id, It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+
+        // The provider lists it again: it reopens by itself.
+        await using (var back = CreateContext())
+        {
+            var (sut3, client3, _, _, _) = BuildSut(back);
+            client3.Setup(c => c.ListCardsAsync(AccessToken, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
+                    new TrueLayerAccountInfo("card-listed", "Card", "EUR", "Sandbox", "credit", null, "1111"),
+                    new TrueLayerAccountInfo("card-gone", "Card", "UAH", "Sandbox", "credit", null, "9999"),
+                ]);
+            await sut3.DiscoverNewAccountsAsync();
+        }
+
+        var reopened = await ReloadAsync(gone.Id);
+        reopened.ClosedAt.Should().BeNull();
+        reopened.ClosedReason.Should().BeNull();
+        reopened.AbsentSince.Should().BeNull();
+        reopened.Health.LastFailureAt.Should().BeNull();
     }
 
     [DockerRequiredFact]
-    public async Task Detector_stays_silent_when_the_cards_read_fails()
+    public async Task Lifecycle_stays_silent_when_the_cards_read_fails()
     {
         var connection = LinkedConnection(_userId);
         var listed = CardOn(_userId, connection, "card-listed");
         var gone = CardOn(_userId, connection, "card-gone", "9999");
-        gone.ApplyHealth(new ConnectionHealth { State = ConnectionHealthState.Dormant, LastFailureClass = FailureClass.ResourceGone });
+        gone.ApplyHealth(DormantGone);
         await using (var seed = CreateContext())
         {
             seed.AddRange(connection, listed, gone);
@@ -208,14 +249,56 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         }
 
         await using var context = CreateContext();
-        var (sut, client, _, _, log) = BuildSut(context);
-        client.Setup(c => c.ListAccountsAsync(AccessToken, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var (sut, client, _, _, _) = BuildSut(context);
+        client.Setup(c => c.ListAccountsAsync(AccessToken, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("card-listed", "Card", "EUR", "Sandbox", "credit", null, "1111")]);
         client.Setup(c => c.ListCardsAsync(AccessToken, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new TrueLayerException("TRUELAYER_API_ERROR", "cards unavailable", 503));
 
         await sut.DiscoverNewAccountsAsync();
 
-        log.Messages(LogLevel.Warning).Should().NotContain(m => m.Contains("would retire"));
+        var stored = await ReloadAsync(gone.Id);
+        stored.AbsentSince.Should().BeNull();
+        stored.ClosedAt.Should().BeNull();
+    }
+
+    [DockerRequiredFact]
+    public async Task Exact_iban_handover_without_a_principal_retires_the_old_account_and_links_the_new_one()
+    {
+        const string iban = "UA213223130000026007233566777";
+        var credential = new MonobankCredential(_userId, [1], [2], [3], 1);
+        var live = new BankAccount(_userId, "mono-live", "Monobank", "checking", "1111", "Owner", "UAH", _userId, "monobank")
+        { CurrentBalance = 5m, MonobankCredentialId = credential.Id };
+        var old = new BankAccount(_userId, "mono-old", "Monobank", "checking", "2222", "Owner", "UAH", _userId, "monobank")
+        { CurrentBalance = 9m, MonobankCredentialId = credential.Id, Iban = iban };
+        old.ApplyHealth(new ConnectionHealth { State = ConnectionHealthState.Degraded });
+        await using (var seed = CreateContext())
+        {
+            seed.AddRange(credential, live, old);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        var (sut, _, monobank, credentials, _) = BuildSut(context);
+        credentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([credential]);
+        monobank.Setup(m => m.GetClientInfoAsync("token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankClientInfo("client", "Owner",
+            [
+                new MonobankAccountInfo("mono-live", "Black", "black", "537541******1111", 980, 100_00, 0),
+                new MonobankAccountInfo("mono-new", "Black", "black", "537541******3333", 980, 100_00, 0, "black", iban, ["537541******3333"]),
+            ]));
+
+        var created = await sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
+        var oldStored = await ReloadAsync(old.Id);
+        oldStored.ClosedAt.Should().Be(_clock.GetUtcNow());
+        oldStored.ClosedReason.Should().Be(AccountClosedReasons.Reissued);
+        await using var read = CreateContext();
+        var fresh = await read.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking().SingleAsync(a => a.ExternalAccountId == "mono-new");
+        fresh.PredecessorAccountId.Should().Be(old.Id);
+        fresh.Iban.Should().Be(iban);
     }
 
     [DockerRequiredFact]
@@ -236,7 +319,7 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         }
 
         await using var context = CreateContext();
-        var (sut, _, monobank, credentials, log) = BuildSut(context);
+        var (sut, _, monobank, credentials, _) = BuildSut(context);
         credentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([credential]);
         monobank.Setup(m => m.GetClientInfoAsync("token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankClientInfo("client", "Owner",
@@ -253,8 +336,19 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         stored.AccountNumberLast4.Should().Be("4321");
         stored.SyncStatus.Should().Be("active");
         stored.CurrentBalance.Should().Be(5m);
-        log.Messages(LogLevel.Warning).Should().ContainSingle(m => m.Contains("would retire account") && m.Contains(gone.Id.ToString()));
-        (await ReloadAsync(gone.Id)).IsActive.Should().BeTrue();
+        var absent = await ReloadAsync(gone.Id);
+        absent.IsActive.Should().BeTrue();
+        absent.AbsentSince.Should().Be(_clock.GetUtcNow());
+        absent.ClosedAt.Should().BeNull();
+    }
+
+    private sealed class AdjustableClock(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset _now = start;
+
+        public void Advance(TimeSpan by) => _now += by;
+
+        public override DateTimeOffset GetUtcNow() => _now;
     }
 
     private sealed class CapturingLogger : ILogger<AccountDiscoveryService>
