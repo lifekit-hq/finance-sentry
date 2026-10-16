@@ -44,20 +44,6 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// The sync-failure alert of a connection the connection-health policy has just made Failing (a provider in
-    /// <c>ConnectionHealth:ActiveProviders</c>): as <see cref="GenerateSyncFailureAlertAsync"/>, marked with its health
-    /// state so Companion holds it for the digest as an outage, not as a reconnect ask.
-    /// </summary>
-    Task GenerateFailingSyncFailureAlertAsync(
-        Guid userId,
-        string provider,
-        Guid? accountId,
-        string? accountName,
-        string? errorCode,
-        SyncFailureClass failureClass,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Records the sync-failure alert for a confirmed credential loss, with the reconnect copy: an open alert on the
     /// same provider or account (an outage or a neutral one) is superseded and the silence window does not apply, so
     /// the reconnect ask is always seen. The caller raises it once, on the escalation. Only the connection-health policy

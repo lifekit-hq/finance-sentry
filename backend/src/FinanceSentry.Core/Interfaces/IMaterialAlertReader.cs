@@ -18,8 +18,8 @@ public interface IMaterialAlertReader
 
 /// <summary>
 /// A lightweight projection of an alert for companion capture. <paramref name="AppPath"/> is where the alert opens in the
-/// app; <paramref name="HealthState"/> is the connection-health state that raised it (<c>Failing</c>,
-/// <c>ActionRequired</c>, <c>Dormant</c>) when the connection-health policy did, else null.
+/// app; <paramref name="HealthState"/> is the connection-health state that raised it
+/// (<c>ActionRequired</c>, <c>Dormant</c>) when the connection-health policy did, else null.
 /// </summary>
 public sealed record MaterialAlertRecord(
     Guid AlertId,

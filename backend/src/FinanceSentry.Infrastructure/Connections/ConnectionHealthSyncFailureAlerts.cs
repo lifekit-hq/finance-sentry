@@ -57,7 +57,7 @@ public static class ConnectionHealthSyncFailureAlerts
             if (raised == SyncFailureClass.Credential)
                 await alerts.EscalateSyncFailureAlertAsync(userId, provider, null, null, errorCode);
             else
-                await alerts.GenerateFailingSyncFailureAlertAsync(userId, provider, null, null, errorCode, raised);
+                await alerts.GenerateSyncFailureAlertAsync(userId, provider, null, null, errorCode, raised);
         }
         catch (Exception ex)
         {

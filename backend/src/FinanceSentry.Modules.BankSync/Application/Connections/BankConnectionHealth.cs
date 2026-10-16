@@ -421,7 +421,7 @@ public sealed class BankConnectionHealth(
             if (escalate)
                 await alerts.EscalateSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, ct);
             else
-                await alerts.GenerateFailingSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, failureClass, ct);
+                await alerts.GenerateSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, failureClass, ct);
             logger.LogInformation(
                 "Connection health: raised the {SyncFailureClass} sync-failure alert for {Provider} {ReferenceId} of user {UserId}",
                 failureClass, provider, referenceId, userId);

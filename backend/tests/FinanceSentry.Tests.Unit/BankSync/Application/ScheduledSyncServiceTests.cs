@@ -1278,4 +1278,94 @@ public class ScheduledSyncServiceTests
             s => s.AcquireAccessTokenAsync(h.Connection.Id, It.IsAny<CancellationToken>()),
             Times.Once);
     }
+    // ── The Dormant notice (slice S5): once, and only for a provider the policy drives ──
+
+    /// <summary>The account has failed on its own for seven days while its connection kept working.</summary>
+    private static Harness AccountFailingAloneForAWeek(bool policyDriven)
+    {
+        var h = FailingWith(new TrueLayerException("TRUELAYER_BAD_REQUEST", "TrueLayer API error (400)", 400), policyDriven: policyDriven);
+        var now = h.Time.GetUtcNow();
+        h.Account.AccountNumberLast4 = "4321";
+        h.Account.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Failing,
+            ConsecutiveFailures = 300,
+            FirstFailureAt = now - TimeSpan.FromDays(7),
+            LastFailureAt = now - Cycle,
+            LastFailureClass = FailureClass.ResourceGone,
+        });
+        h.Connection.ApplyHealth(ConnectionHealthPolicy.RecordSuccess(h.Connection.Health, now - TimeSpan.FromMinutes(10)).Health);
+        return h;
+    }
+
+    private static void VerifyNoDormantNotice(Harness h) =>
+        h.Alerts.Verify(a => a.GenerateConnectionDormantAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(),
+            It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+
+    [Fact]
+    public async Task OneAccountFailingForAWeek_WhileItsConnectionWorks_GetsTheOneDormantNotice()
+    {
+        var h = AccountFailingAloneForAWeek(policyDriven: true);
+
+        await SyncAsync(h);
+
+        h.Account.Health.State.Should().Be(ConnectionHealthState.Dormant);
+        h.Alerts.Verify(a => a.GenerateConnectionDormantAlertAsync(
+            UserId, "truelayer", h.Account.Id, "Test Bank ···4321", TimeSpan.FromDays(7), true,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Shadow_OneAccountGoingDormant_RaisesNoNotice()
+    {
+        var h = AccountFailingAloneForAWeek(policyDriven: false);
+
+        await SyncAsync(h);
+
+        h.Account.Health.State.Should().Be(ConnectionHealthState.Dormant, "shadow still records the would-be state");
+        VerifyNoDormantNotice(h);
+    }
+
+    [Fact]
+    public async Task AConnectionFailingForAWeek_GetsTheNoticeOnTheConnection_WithoutNamingSiblings()
+    {
+        var h = FailingWith(new TrueLayerException("TRUELAYER_ERROR", "TrueLayer API error (503)", 503));
+        var now = h.Time.GetUtcNow();
+        h.Connection.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Failing,
+            ConsecutiveFailures = 300,
+            FirstFailureAt = now - TimeSpan.FromDays(7),
+            LastFailureAt = now - Cycle,
+            LastFailureClass = FailureClass.Transient,
+        });
+
+        await SyncAsync(h);
+
+        h.Connection.Health.State.Should().Be(ConnectionHealthState.Dormant);
+        h.Alerts.Verify(a => a.GenerateConnectionDormantAlertAsync(
+            UserId, "truelayer", h.Connection.Id, "Test Bank", TimeSpan.FromDays(7), false,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ADormantAccountThatSyncsAgain_ResolvesItsNotice()
+    {
+        var h = BuildSut(new Mock<IAlertGeneratorService>(), SyncFailureAlertsOn(), policyDriven: true);
+        SucceedFromProvider(h);
+        h.Account.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Dormant,
+            ConsecutiveFailures = 400,
+            FirstFailureAt = h.Time.GetUtcNow() - TimeSpan.FromDays(9),
+            LastFailureAt = h.Time.GetUtcNow() - TimeSpan.FromDays(1),
+        });
+
+        await SyncAsync(h);
+
+        h.Account.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        h.Alerts.Verify(a => a.ResolveConnectionDormantAlertAsync(
+            UserId, "truelayer", h.Account.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

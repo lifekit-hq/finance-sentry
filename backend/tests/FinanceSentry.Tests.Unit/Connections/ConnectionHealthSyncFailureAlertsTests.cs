@@ -88,14 +88,73 @@ public class ConnectionHealthSyncFailureAlertsTests
 
     [Theory]
     [InlineData(ConnectionHealthOutcome.None)]
-    [InlineData(ConnectionHealthOutcome.GoDormant)]
     [InlineData(ConnectionHealthOutcome.Resolve)]
     public async Task AnyOtherOutcome_RaisesNothing(ConnectionHealthOutcome outcome)
     {
         await RaiseAsync(Evaluation(outcome));
 
         VerifyNothingRaised();
+        VerifyNoDormantNotice();
     }
+
+    [Fact]
+    public async Task GoDormant_RaisesTheOneNoticeThatItMayBeClosed_AndNoNewSyncFailureAlert()
+    {
+        var first = new DateTimeOffset(2026, 10, 1, 6, 0, 0, TimeSpan.Zero);
+        var evaluation = new ConnectionHealthEvaluation(
+            new ConnectionHealth { State = ConnectionHealthState.Failing },
+            new ConnectionHealth
+            {
+                State = ConnectionHealthState.Dormant, FirstFailureAt = first, LastFailureAt = first.AddDays(7).AddHours(1),
+            },
+            ConnectionHealthOutcome.GoDormant);
+
+        await RaiseAsync(evaluation);
+
+        VerifyNothingRaised();
+        _alerts.Verify(a => a.GenerateConnectionDormantAlertAsync(
+            _userId, Provider, null, null, TimeSpan.FromDays(7).Add(TimeSpan.FromHours(1)), false,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GoDormant_WithSyncFailureAlertsOff_RaisesNoNotice()
+    {
+        GivenSyncFailureAlerts(false);
+
+        await RaiseAsync(Evaluation(ConnectionHealthOutcome.GoDormant));
+
+        VerifyNoDormantNotice();
+    }
+
+    [Fact]
+    public async Task SuccessThatHealsADormantConnection_ResolvesTheDormantNoticeToo()
+    {
+        await ResolveAsync(new ConnectionHealthEvaluation(
+            new ConnectionHealth { State = ConnectionHealthState.Dormant },
+            new ConnectionHealth { State = ConnectionHealthState.Healthy },
+            ConnectionHealthOutcome.Resolve));
+
+        _alerts.Verify(a => a.ResolveConnectionDormantAlertAsync(_userId, Provider, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ASuccessThatLeavesTheConnectionDormant_KeepsTheDormantNotice()
+    {
+        // A probe proves the credential, not the resource: the connection stays Dormant (RecordProbeSuccess).
+        await ResolveAsync(new ConnectionHealthEvaluation(
+            new ConnectionHealth { State = ConnectionHealthState.Dormant },
+            new ConnectionHealth { State = ConnectionHealthState.Dormant },
+            ConnectionHealthOutcome.None));
+
+        _alerts.Verify(a => a.ResolveConnectionDormantAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void VerifyNoDormantNotice() =>
+        _alerts.Verify(a => a.GenerateConnectionDormantAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(),
+            It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
 
     [Fact]
     public async Task AnAttemptThePolicyCouldNotRecord_RaisesNothing()

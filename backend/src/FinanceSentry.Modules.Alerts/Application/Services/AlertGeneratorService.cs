@@ -98,15 +98,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
         => EmitAsync(userId, SyncFailureDraft(provider, accountId, accountName, errorCode, failureClass), ct);
 
-    public Task GenerateFailingSyncFailureAlertAsync(
-        Guid userId, string provider, Guid? accountId, string? accountName,
-        string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
-        => EmitAsync(
-            userId,
-            SyncFailureDraft(provider, accountId, accountName, errorCode, failureClass)
-                with { HealthState = nameof(ConnectionHealthState.Failing) },
-            ct);
-
     public Task EscalateSyncFailureAlertAsync(
         Guid userId, string provider, Guid? accountId, string? accountName,
         string? errorCode, CancellationToken ct = default)

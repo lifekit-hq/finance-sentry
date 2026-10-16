@@ -434,11 +434,6 @@ public class RunThesisMonitorHandlerTests
             Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateFailingSyncFailureAlertAsync(
-            Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode,
-            SyncFailureClass failureClass, CancellationToken ct = default)
-            => Task.CompletedTask;
-
         public Task EscalateSyncFailureAlertAsync(
             Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode, CancellationToken ct = default)
             => Task.CompletedTask;

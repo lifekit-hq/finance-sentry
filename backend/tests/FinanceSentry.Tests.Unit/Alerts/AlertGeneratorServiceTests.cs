@@ -1292,7 +1292,7 @@ public class AlertGeneratorServiceTests
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
         // Deduped once per reference, ever — no silence window applies.
-        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased };
+        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.ConnectionDormant };
         // The silent-detector alert is the only generator left on JobFailure and sets its own window per draft.
         var windowPerDraft = new[] { AlertType.JobFailure };
 
