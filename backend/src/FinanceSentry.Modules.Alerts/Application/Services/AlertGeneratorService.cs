@@ -142,16 +142,16 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         var label = accountName ?? provider;
         var days = Math.Max(1, (int)failingFor.TotalDays);
         var period = days == 1 ? "a day" : $"{days} days";
-        var since = othersSyncing
-            ? $"{label} has not synced for {period}, while your other accounts with the same bank sync fine."
-            : $"{label} has not synced for {period}.";
+        var body = othersSyncing
+            ? $"It has been failing for {period} while your other accounts sync fine."
+            : $"It has been failing for {period}.";
 
         return EmitAsync(
             userId,
             new AlertDraft(
                 AlertType.ConnectionDormant, AlertSeverity.Info, SyncFailureReferenceId(provider, accountId), accountName,
                 $"{label} may be closed",
-                $"{since} It may be closed. We now try it once a day and will clear this if it syncs again.")
+                body)
             {
                 Dedup = AlertDedup.OncePerReference,
                 HealthState = nameof(ConnectionHealthState.Dormant),

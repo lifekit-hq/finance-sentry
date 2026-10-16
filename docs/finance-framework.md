@@ -828,12 +828,11 @@ accounts; IBKR and Flex credentials; exchange credentials), and labels it with o
 | Degraded | none (told only once Failing) | nothing | nothing | `ok`, health `healthy` |
 | Failing | Retrying, quietly | the `SyncFailure` alert (S2/S3) | digest; escalates once open > 24 h (existing reconciler) | `error` |
 | ActionRequired | Reconnect needed (error colour, attention row) | the reconnect alert, linking `/accounts/list?reconnect=<provider>` | relayed at once in every mode, Quiet included | `error`, "Reconnection required." |
-| Dormant | Dormant, quietly (neutral dot) on the account or connection | one info notice, "… may be closed" | one digest line | `error` |
+| Dormant | Dormant, quietly (neutral dot) on the account or connection | one info notice, titled "… may be closed", body "It has been failing for <period>[ while your other accounts sync fine]." | one digest line | `error` |
 
 An account shows its connection's state while the person is told about it (Failing, ActionRequired, Dormant), else its own sub-state; a group (an institution,
 a provider) shows its most urgent member, and a Dormant member is quiet beside working siblings, so one closed
-account does not mark the rest. A Dormant account still marks its institution's balance as a stale source in the
-headline: the balance behind the total is frozen. A failure the policy does not count (one of ours, a sync we
+account does not mark the rest, and a Dormant account never marks the headline (it is a quiet state). A failure the policy does not count (one of ours, a sync we
 cancelled) is not shown as a failure at all. The reconnect link opens the provider's existing reconnect flow where
 the app has one (TrueLayer, Inzhur) and otherwise lands on the Accounts list, whose row asks for the reconnect; no
 new sign-in flow is started from it. The Dormant notice (`ConnectionDormant` alert) is raised on the transition,

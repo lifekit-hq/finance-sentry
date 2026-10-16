@@ -44,7 +44,7 @@ public class WealthAggregationService(
         new(StringComparer.OrdinalIgnoreCase)
         {
             "stale", "failed", "reauth_required",
-            ConnectionHealthSurface.Retrying, ConnectionHealthSurface.ReconnectNeeded, ConnectionHealthSurface.Dormant,
+            ConnectionHealthSurface.Retrying, ConnectionHealthSurface.ReconnectNeeded,
         };
 
     private readonly IBankingAccountsReader _bankingAccounts = bankingAccounts ?? throw new ArgumentNullException(nameof(bankingAccounts));
@@ -170,9 +170,7 @@ public class WealthAggregationService(
     }
 
     // Institutions that are not current (stale, failed, needing re-auth) make the total degraded, each named
-    // as its own source; so does one holding a Dormant account, which its working siblings keep off the
-    // institution's own status but whose balance is still frozen. The oldest successful sync behind the total
-    // is its as-of.
+    // as its own source. The oldest successful sync behind the total is its as-of.
     private static Headline BuildHeadline(
         decimal totalUsd, IReadOnlyList<CategorySummaryDto> categories, FxStatus fx, string? category, string? provider)
     {
@@ -180,8 +178,7 @@ public class WealthAggregationService(
         var signals = new HeadlineSignals
         {
             StaleSources = [.. institutions
-                .Where(i => NotCurrentStatuses.Contains(i.SyncStatus)
-                    || i.Accounts.Any(a => a.SyncStatus == ConnectionHealthSurface.Dormant))
+                .Where(i => NotCurrentStatuses.Contains(i.SyncStatus))
                 .Select(i => i.Provider)
                 .Distinct(StringComparer.OrdinalIgnoreCase)],
             Fx = fx,

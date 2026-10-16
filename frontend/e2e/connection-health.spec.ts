@@ -207,8 +207,7 @@ test.describe('connection-health alerts', () => {
         severity: 'Info',
         title: 'Monobank ···4321 may be closed',
         message:
-          'Monobank ···4321 has not synced for 7 days, while your other accounts with the same bank sync fine. ' +
-          'It may be closed. We now try it once a day and will clear this if it syncs again.',
+          'It has been failing for 7 days while your other accounts sync fine.',
         appPath: '/accounts/list',
       }),
     ];

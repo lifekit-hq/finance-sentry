@@ -173,9 +173,23 @@ public class WealthConnectionHealthLabelsTests
         monobank.SyncStatus.Should().Be("synced");
         monobank.Accounts.Single(a => a.AccountId == closed).SyncStatus.Should().Be("dormant");
         monobank.Accounts.Single(a => a.AccountId == working).SyncStatus.Should().Be("synced");
-        summary.Headline!.Reasons.Should().Contain(
+        summary.Headline!.Reasons.Should().NotContain(
             r => r.Code == HeadlineReasonCode.StaleSource && r.Source == "monobank",
-            "the Dormant account's balance is still frozen behind the total");
+            "a Dormant account is a quiet state and does not degrade the headline");
+    }
+
+    [Fact]
+    public async Task An_institution_that_is_Dormant_as_a_whole_does_not_degrade_the_headline()
+    {
+        var closed = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(closed, "failed")],
+            [Connection("monobank", ConnectionHealthState.Healthy, Token), Account(closed, ConnectionHealthState.Dormant)],
+            HealthOptions.With("monobank"));
+
+        Institution(summary, "monobank").SyncStatus.Should().Be("dormant");
+        summary.Headline!.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.StaleSource && r.Source == "monobank");
     }
 
     [Fact]

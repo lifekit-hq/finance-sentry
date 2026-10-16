@@ -832,10 +832,9 @@ are closed periods.
   worst FX status behind the total becomes `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1`. The wealth summary, the
   crypto and brokerage holdings and net-worth history (`changeHeadline`, first to last point, percent
   withheld with `SCOPE_CHANGED` when an account was linked or removed inside the window; a window with a
-  single point is UNAVAILABLE with `SHORT_HISTORY`, never a zero change) carry the same record. In the wealth
-  summary, an account of a provider in `ConnectionHealth:ActiveProviders` that has gone Dormant names its provider
-  as `STALE_SOURCE` even while its working siblings keep the institution's own status current: its balance behind
-  the total is frozen (connection-health S5; finance-framework "What the person is told"). The untyped fields are unchanged.
+  single point is UNAVAILABLE with `SHORT_HISTORY`, never a zero change) carry the same record. A Dormant
+  account is a quiet state and never marks the headline (connection-health S5; finance-framework "What the person
+  is told"). The untyped fields are unchanged.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point

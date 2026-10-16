@@ -58,8 +58,7 @@ public class ConnectionHealthAlertsTests
             && a.HealthState == "Dormant"
             && a.AppPath == "/accounts/list"
             && a.Title == "Monobank ···1234 may be closed"
-            && a.Message.Contains("has not synced for 7 days, while your other accounts with the same bank sync fine")
-            && a.Message.Contains("It may be closed.")), default), Times.Once);
+            && a.Message == "It has been failing for 7 days while your other accounts sync fine."), default), Times.Once);
     }
 
     [Fact]
@@ -71,7 +70,7 @@ public class ConnectionHealthAlertsTests
         _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
             a.Type == AlertType.ConnectionDormant
             && a.Title == "ibkr may be closed"
-            && a.Message.StartsWith("ibkr has not synced for 8 days. It may be closed.", StringComparison.Ordinal)), default), Times.Once);
+            && a.Message == "It has been failing for 8 days."), default), Times.Once);
     }
 
     [Fact]
