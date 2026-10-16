@@ -147,7 +147,7 @@ describe('AccountsListComponent net worth breakdown', () => {
     percent,
   });
 
-  it('shows a negative category as a plain negative amount, never as "Owes"', () => {
+  it('shows a negative category as a plain negative amount', () => {
     const fixture = setupFixture(false, {}, [], {
       hasData: true,
       totalNetWorth: 9185.73,
@@ -156,7 +156,6 @@ describe('AccountsListComponent net worth breakdown', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('-$93.23');
-    expect(text).not.toContain('Owes $93.23');
   });
 });
 

@@ -116,7 +116,7 @@
           class="shrink-0 font-medium tabular-nums"
           cmnListSectionAside
           data-testid="section-subtotal"
-          >{{ section.summary.totalInBaseCurrency | netBalance: store.baseCurrency() }}</span
+          >{{ section.summary.totalInBaseCurrency | money: store.baseCurrency() }}</span
         >
         @for (inst of section.summary.institutions; track inst.institutionId + inst.provider) {
           @if (section.category === 'banking') {
@@ -161,7 +161,7 @@
                 class="tabular-nums font-medium text-right min-w-[5.5rem]"
                 status
               >
-                {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
+                {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
               </div>
 
               <div class="flex items-center gap-cmn-2" actions>
@@ -196,7 +196,7 @@
                           card.displayName
                         }}</span>
                         <span class="tabular-nums text-cmn-xs text-text-secondary">{{
-                          card.totalInBaseCurrency | netBalance: store.baseCurrency()
+                          card.totalInBaseCurrency | money: store.baseCurrency()
                         }}</span>
                       </div>
                       @for (account of card.accounts; track account.accountId) {
@@ -260,7 +260,7 @@
                   [class.text-text-primary]="inst.totalInBaseCurrency >= 0"
                   class="shrink-0 text-right text-cmn-sm font-medium tabular-nums"
                   data-testid="institution-nav-total"
-                  >{{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}</span
+                  >{{ inst.totalInBaseCurrency | money: store.baseCurrency() }}</span
                 >
                 <cmn-icon class="shrink-0 text-text-secondary" name="ChevronRight" />
               </a>

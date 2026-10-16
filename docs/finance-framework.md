@@ -411,7 +411,7 @@ The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection car
 | Rule | What it says |
 |---|---|
 | D1 | One label, one numerator. "Change" is always M1, "Growth" is always M2, and "Return" always names its method in a secondary label. An amount and a percent on the same line share the same numerator. |
-| D2 | Never hide a sign. Show + and −, and normalise −0 to 0. |
+| D2 | Never hide a sign. Show + and −, and normalise −0 to 0. A liability reads `-$917.82`, never "Owes". |
 | D3 | All-time on a holding means gain vs cost (M6). A bounded period means value change over the start value (M1) or a named return (M3/M4). Never mix them on one line. |
 | D4 | A figure with mixed scope is never labelled TWR. A percentage appears only when coverage is coherent: the whole scope is measured, or the unmeasured part is named. |
 | D5 | Missing cost basis shows "N/A" with its reason, never 0%. |
