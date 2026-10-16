@@ -292,11 +292,20 @@ public class AccountDiscoveryService(
         var previousLast4 = account.AccountNumberLast4;
         if (account.RefreshProviderIdentifiers(iban, pans, last4 == "0000" ? null : last4, validTo))
         {
+            try
+            {
+                await accounts.SaveProviderIdentifiersUnscopedAsync(account, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Could not store provider identifiers for account {AccountId}.", account.Id);
+                return true;
+            }
+
             if (account.AccountNumberLast4 != previousLast4)
                 logger.LogInformation(
                     "Account {AccountId} ({Provider}) card digits changed ···{Previous} -> ···{Current}.",
                     account.Id, account.Provider, previousLast4, account.AccountNumberLast4);
-            await accounts.UpdateAsync(account, ct);
         }
 
         return true;

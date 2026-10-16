@@ -109,6 +109,24 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
             .ExecuteUpdateAsync(s => s.SetConnectionHealth(ba => ba.Health, health), cancellationToken);
     }
 
+    public async Task SaveProviderIdentifiersUnscopedAsync(BankAccount account, CancellationToken cancellationToken = default)
+    {
+        account.ValidateInvariants();
+        var iban = account.Iban;
+        var maskedPans = account.MaskedPans;
+        var cardValidTo = account.CardValidTo;
+        var last4 = account.AccountNumberLast4;
+        await AllUsersIncludingRemoved
+            .Where(ba => ba.Id == account.Id)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.Iban, iban)
+                    .SetProperty(ba => ba.MaskedPans, maskedPans)
+                    .SetProperty(ba => ba.CardValidTo, cardValidTo)
+                    .SetProperty(ba => ba.AccountNumberLast4, last4)
+                    .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+    }
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var account = await OwnedIncludingRemoved.FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);

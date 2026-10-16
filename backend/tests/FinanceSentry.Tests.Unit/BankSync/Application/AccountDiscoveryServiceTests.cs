@@ -502,7 +502,25 @@ public class AccountDiscoveryServiceTests
         row.Iban.Should().Be("UA733220010000026201234567890");
         row.MaskedPans.Should().Equal("537541******1234", "516875******9876");
         row.AccountNumberLast4.Should().Be("9876");
-        h.Accounts.Verify(r => r.UpdateAsync(row, It.IsAny<CancellationToken>()), Times.Once);
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(row, It.IsAny<CancellationToken>()), Times.Once);
+        h.Accounts.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_FailedIdentifierSave_DoesNotAbortTheConnection()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-1", "black UAH", "checking", "516875******9876", 980, 100, 0, Iban: "UA1"),
+            new MonobankAccountInfo("mono-2", "white UAH", "checking", "537541******1234", 980, 100, 0));
+        SeedOwned(h, "mono-1", monobankCredentialId: credential.Id);
+        h.Accounts.Setup(r => r.SaveProviderIdentifiersUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("value too long"));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
+        h.Accounts.Verify(r => r.AddAsync(It.Is<BankAccount>(a => a.ExternalAccountId == "mono-2"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -516,6 +534,7 @@ public class AccountDiscoveryServiceTests
         await h.Sut.DiscoverNewAccountsAsync();
 
         row.AccountNumberLast4.Should().Be("4321");
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Accounts.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -553,6 +572,7 @@ public class AccountDiscoveryServiceTests
         gone.IsActive.Should().BeTrue();
         gone.ClosedAt.Should().BeNull();
         gone.Health.Should().Be(DormantGone);
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
         h.Accounts.Verify(r => r.UpdateAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
     }
 
