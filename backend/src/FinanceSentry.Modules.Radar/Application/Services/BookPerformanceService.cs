@@ -73,7 +73,7 @@ public sealed class BookPerformanceService(
         IReadOnlyList<Domain.DailyBar> spyBars,
         IReadOnlyList<DailyPortfolioValue> portfolioSnapshots,
         IReadOnlyList<HoldingsCapture> captures,
-        BrokerageFlowReading flows)
+        SleeveFlowReading flows)
     {
         var book = ComputeBookTwr(portfolioSnapshots, flows, since, today);
         var bookTwr = Round(book?.Twr.Return.Value);
@@ -135,7 +135,7 @@ public sealed class BookPerformanceService(
     // bridged series does not cover the period within the edge allowance (the same rule the invested figure
     // keeps) or the chain cannot be measured.
     private static BookTwrWindow? ComputeBookTwr(
-        IReadOnlyList<DailyPortfolioValue> snapshots, BrokerageFlowReading flows, DateOnly since, DateOnly today)
+        IReadOnlyList<DailyPortfolioValue> snapshots, SleeveFlowReading flows, DateOnly since, DateOnly today)
     {
         var totals = snapshots
             .Where(s => s.BrokerageTotalUsd is not null && s.Date >= since && s.Date <= today)
@@ -245,7 +245,7 @@ public sealed class BookPerformanceService(
     // change and withholds the percent (ZERO_BASE), and so does a provider linked inside the window (SCOPE_CHANGED).
     private static Headline BookHeadline(
         (SplitDay Start, SplitDay End)? window, DateOnly since, DateOnly today, bool splitWithheld,
-        BrokerageFlowReading flows)
+        SleeveFlowReading flows)
     {
         if (window is not { } w)
         {

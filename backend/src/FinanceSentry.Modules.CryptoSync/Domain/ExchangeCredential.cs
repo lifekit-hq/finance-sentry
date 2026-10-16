@@ -27,6 +27,13 @@ public sealed class ExchangeCredential : IUserOwned
     public string? LastSyncError { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>
+    /// How far the venue's money movements (<see cref="CryptoFlowEvent"/>) have been read; null until the first walk
+    /// succeeds, which starts at <see cref="CreatedAt"/>. Non-null also says the venue's flows are known from the link
+    /// day on.
+    /// </summary>
+    public DateTime? FlowsWalkedTo { get; private set; }
+
     private ExchangeCredential() { }
 
     public static ExchangeCredential Create(
@@ -65,6 +72,11 @@ public sealed class ExchangeCredential : IUserOwned
         LastSyncError = null;
     }
 
+    public void MarkFlowsWalked(DateTime walkedTo)
+    {
+        FlowsWalkedTo = walkedTo;
+    }
+
     private const int MaxSyncErrorLength = 1000;
 
     public void MarkSyncFailed(string error)
@@ -93,6 +105,7 @@ public sealed class ExchangeCredential : IUserOwned
         IsActive = true;
         LastSyncAt = null;
         LastSyncError = null;
+        FlowsWalkedTo = null;
         CreatedAt = DateTime.UtcNow;
         Health = Health with { LastFailureAt = null };
     }

@@ -28,6 +28,27 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         "USDT", "USDC", "BUSD", "FDUSD", "DAI",
     };
 
+    // fiat/orders weighs UID 90000 per call against a 180000-per-minute UID budget, so a run reads one window of
+    // deposits and one of withdrawals; a walk further behind catches up over the next runs.
+    private const long FlowWindowMs = 30L * 24 * 60 * 60 * 1000;
+    private const int FlowPageRows = 500;
+    private const int MaxFlowPages = 20;
+    private const int FiatIn = 0;
+    private const int FiatOut = 1;
+    private const string FiatSuccessCode = "000000";
+
+    private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
+
+    private static readonly HashSet<string> CompletedFiatStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Successful", "Finished", "Completed",
+    };
+
+    private static readonly HashSet<string> PendingFiatStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Processing", "Pending",
+    };
+
     public string ExchangeName => CryptoExchangeProvider.Binance;
 
     public bool TradeHistoryStartsAtConnect => false;
@@ -159,6 +180,168 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
         return new CryptoTradePage(trades, BinanceTradeCursor.Format(nextFromIds));
     }
+
+    /// <summary>
+    /// The completed fiat legs created in one window from <see cref="CryptoFlowWalk.From"/>: deposits and withdrawals
+    /// (<c>fiat/orders</c>) and crypto bought or sold for fiat (<c>fiat/payments</c>), each with its fee. A deposit is
+    /// the amount the bank or card paid (<c>indicatedAmount</c>), a withdrawal the amount paid out after the fee
+    /// (<c>amount</c>), a buy or sell its fiat side (<c>sourceAmount</c>); the method is the counterparty. Unlike the
+    /// holdings sources there is no fallback: a refused call throws, so the walk resumes from the same point.
+    /// </summary>
+    // shortcut: on-chain, P2P and Pay legs are not read, so Binance's flows stay unknown to the reader; S2b reads them.
+    public async Task<CryptoFlowPage> GetFlowsAsync(
+        string apiKey,
+        string apiSecret,
+        CryptoFlowWalk walk,
+        CancellationToken ct = default)
+    {
+        var beginMs = ToUnixMs(walk.From);
+        var endMs = Math.Min(beginMs + FlowWindowMs - 1, ToUnixMs(walk.AsOf));
+        if (beginMs > endMs)
+        {
+            return new CryptoFlowPage([], walk.From.AddMilliseconds(-1));
+        }
+
+        var flows = new List<CryptoFlow>();
+        var holdBelowMs = long.MaxValue;
+        var holdSinceMs = ToUnixMs(walk.AsOf - MaxPendingHold);
+
+        foreach (var type in new[] { FiatIn, FiatOut })
+        {
+            var orders = await ReadFiatPagesAsync(
+                (page, c) => _httpClient.GetFiatOrdersAsync(apiKey, apiSecret, type, beginMs, endMs, page, FlowPageRows, c), ct);
+            foreach (var order in orders)
+            {
+                holdBelowMs = Hold(holdBelowMs, holdSinceMs, order.Status, order.CreateTimeMs);
+                if (IsCompleted(order.Status)
+                    && FiatOrderFlow(order, type) is { } flow)
+                {
+                    flows.Add(flow);
+                }
+            }
+
+            var payments = await ReadFiatPagesAsync(
+                (page, c) => _httpClient.GetFiatPaymentsAsync(apiKey, apiSecret, type, beginMs, endMs, page, FlowPageRows, c), ct);
+            foreach (var payment in payments)
+            {
+                holdBelowMs = Hold(holdBelowMs, holdSinceMs, payment.Status, payment.CreateTimeMs);
+                if (IsCompleted(payment.Status)
+                    && FiatPaymentFlow(payment, type) is { } flow)
+                {
+                    flows.Add(flow);
+                }
+            }
+        }
+
+        var resumeMs = Math.Max(Math.Min(endMs, holdBelowMs - 1), beginMs - 1);
+        return new CryptoFlowPage(
+            [.. flows.OrderBy(f => f.OccurredAt).ThenBy(f => f.EventId, StringComparer.Ordinal)],
+            DateTimeOffset.FromUnixTimeMilliseconds(resumeMs).UtcDateTime);
+    }
+
+    private static async Task<IReadOnlyList<T>> ReadFiatPagesAsync<T>(
+        Func<int, CancellationToken, Task<BinanceFiatPage<T>>> fetch,
+        CancellationToken ct)
+    {
+        var rows = new List<T>();
+        for (var page = 1; ; page++)
+        {
+            if (page > MaxFlowPages)
+            {
+                throw new BinanceException($"Binance returned more than {MaxFlowPages} pages of fiat history for one window.");
+            }
+
+            var response = await fetch(page, ct);
+            if (!response.Success || !string.Equals(response.Code, FiatSuccessCode, StringComparison.Ordinal))
+            {
+                throw new BinanceException(response.Message ?? $"Binance fiat history refused with code {response.Code}.");
+            }
+
+            var data = response.Data ?? [];
+            rows.AddRange(data);
+            if (data.Count < FlowPageRows || rows.Count >= response.Total)
+            {
+                return rows;
+            }
+        }
+    }
+
+    private static bool IsCompleted(string? status) => status is not null && CompletedFiatStatuses.Contains(status.Trim());
+
+    // A pending leg holds the walk just before it, so it is read again once it settles; one pending longer than
+    // MaxPendingHold no longer does, so a stuck row cannot pin the walk.
+    private static long Hold(long holdBelowMs, long holdSinceMs, string? status, long createTimeMs) =>
+        status is not null && PendingFiatStatuses.Contains(status.Trim()) && createTimeMs >= holdSinceMs
+            ? Math.Min(holdBelowMs, createTimeMs)
+            : holdBelowMs;
+
+    private CryptoFlow? FiatOrderFlow(BinanceFiatOrder order, int type)
+    {
+        var amount = ParseAmount(type == FiatIn ? order.IndicatedAmount : order.Amount);
+        return FiatFlow(
+            order.OrderNo,
+            type == FiatIn ? CryptoFlowTypes.FiatDeposit : CryptoFlowTypes.FiatWithdrawal,
+            order.CreateTimeMs,
+            amount,
+            order.FiatCurrency,
+            order.TotalFee,
+            order.Method,
+            order.Status);
+    }
+
+    private CryptoFlow? FiatPaymentFlow(BinanceFiatPayment payment, int type) =>
+        FiatFlow(
+            payment.OrderNo,
+            type == FiatIn ? CryptoFlowTypes.CardBuy : CryptoFlowTypes.CardSell,
+            payment.CreateTimeMs,
+            ParseAmount(payment.SourceAmount),
+            payment.FiatCurrency,
+            payment.TotalFee,
+            payment.PaymentMethod,
+            payment.Status);
+
+    private CryptoFlow? FiatFlow(
+        string? eventId,
+        string providerType,
+        long createTimeMs,
+        decimal? amount,
+        string? currency,
+        string? fee,
+        string? counterparty,
+        string? status)
+    {
+        var unit = currency?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(eventId) || amount is not > 0m || string.IsNullOrEmpty(unit))
+        {
+            // Left out rather than guessed; the warning makes the gap findable.
+            _logger.LogWarning("Binance {ProviderType} {EventId} is unreadable and was skipped.", providerType, eventId);
+            return null;
+        }
+
+        var feeAmount = ParseAmount(fee);
+        return new CryptoFlow(
+            EventId: eventId,
+            ProviderType: providerType,
+            OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(createTimeMs).UtcDateTime,
+            Amount: amount.Value,
+            Unit: unit,
+            IsFiat: true,
+            UnitPriceUsd: null,
+            Fee: feeAmount is > 0m ? feeAmount : null,
+            FeeUnit: feeAmount is > 0m ? unit : null,
+            CounterpartyRef: string.IsNullOrWhiteSpace(counterparty) ? null : counterparty.Trim(),
+            Status: status?.Trim() ?? string.Empty);
+    }
+
+    private static long ToUnixMs(DateTime utc) =>
+        new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+
+    // A plain decimal string only, invariant culture.
+    private static decimal? ParseAmount(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
 
     private async Task<T> SafeFetchAsync<T>(Func<Task<T>> fetcher, string label, T fallback)
     {

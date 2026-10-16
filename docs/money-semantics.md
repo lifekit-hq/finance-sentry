@@ -980,6 +980,33 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
+- **Crypto contributions vs growth** (S2a; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
+  and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
+  (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
+  source's own staleness reaching the headline (scope `sleeve:crypto`).
+  - **Flows.** The venues' money movements are walked during the holdings sync (at most hourly, from a cursor
+    on the exchange credential that starts at the link day; a pending movement holds the cursor so it is read
+    again once settled; a refused walk leaves the cursor and the holdings sync succeeds) and stored raw as
+    `CryptoFlowEvents`, insert-only and unique per venue event. Binance: completed fiat deposits and
+    withdrawals (`fiat/orders`, a deposit at its indicated amount, a withdrawal at what left) and card buys and
+    sells (`fiat/payments`, at the fiat source amount), each with its fee. Revolut X: completed `receive` and
+    `send` transfers (`/transactions`), with the other side's account type kept (`revolut` = the owner's own
+    Revolut app, `external_*` = outside).
+  - **Classification** (`CryptoFlowClassifier`, at read time): fiat in, a card buy and a transfer in are
+    external inflows; fiat out, a sell for fiat and a transfer out are external outflows; the fee is a fee
+    (return). A buy paid from Binance's own fiat balance (`Cash Balance`) moves nothing across the sleeve's
+    edge, so only its fee counts. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
+    EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. Whether the other side is the
+    owner's own account (`IsOwnersOwnAccount`) is recorded for an umbrella scope that also holds the bank
+    account; the sleeve itself reads both as external.
+  - **Valuation.** A fiat movement converts at its own date's rate, as brokerage cash does. A crypto transfer
+    is valued at the venue price taken when it was read: exact when read on its own day, `FX_TODAY_RATE`
+    otherwise (a catch-up walk over older transfers). A transfer the venue could not price leaves its venue's
+    flows unknown.
+  - **Withheld.** Binance's flows stay unknown (`sourcesWithoutFlows`, `UNKNOWN_FLOW binance`) until its
+    on-chain deposits and withdrawals are read (S2b) - its fiat legs alone would read a crypto deposit as
+    growth - so the split is withheld for anyone with Binance linked. Revolut X counts once a walk has
+    succeeded.
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,

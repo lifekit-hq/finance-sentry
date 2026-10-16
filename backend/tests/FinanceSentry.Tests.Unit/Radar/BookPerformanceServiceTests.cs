@@ -28,7 +28,7 @@ public sealed class BookPerformanceServiceTests
         _holdings.Setup(h => h.GetBrokerageCapturesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
             .ReturnsAsync([]);
         _flows.Setup(f => f.ReadAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
-            .ReturnsAsync(BrokerageFlowReading.Empty);
+            .ReturnsAsync(SleeveFlowReading.Empty);
     }
 
     private BookPerformanceService CreateSut() => new(_bars.Object, _portfolio.Object, _holdings.Object, _flows.Object);
@@ -699,7 +699,7 @@ public sealed class BookPerformanceServiceTests
 
     private void SetupFlows((string Source, DateOnly LinkedOn, bool Recorded)[] sources, SourceFlow[] flows)
         => _flows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), default))
-            .ReturnsAsync(new BrokerageFlowReading(
+            .ReturnsAsync(new SleeveFlowReading(
                 [.. sources.Select(s => new FlowSourceCoverage(s.Source, s.LinkedOn, s.Recorded))], flows));
 
     private static DailyPortfolioValue Total(DateOnly date, decimal total, decimal? invested = null)

@@ -47,7 +47,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             summary.Object,
             Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
-            Mock.Of<IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -103,7 +103,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
             Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
             fire.Object,
-            Mock.Of<IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -145,15 +145,15 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.AnnualSpend.Should().Be(43.2m);
     }
 
-    private static async Task<BrokerageGrowthResponse> GetGrowth(string? profileCurrency)
+    private static async Task<SleeveGrowthResponse> GetGrowth(string? profileCurrency)
     {
         var from = new DateOnly(2026, 7, 1);
         var to = new DateOnly(2026, 10, 14);
         var headline = HeadlineFactory.Growth(
             108m, MeasuredRate.Of(0.1m), HeadlineScope.Sleeve(WealthSourceIds.Brokerage), from, to, HeadlineSignals.None);
-        var growth = new Mock<IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse>>();
-        growth.Setup(h => h.Handle(It.IsAny<GetBrokerageGrowthQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BrokerageGrowthResponse(
+        var growth = new Mock<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>();
+        growth.Setup(h => h.Handle(It.IsAny<GetSleeveGrowthQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SleeveGrowthResponse(
                 from, from, to, 1080m, 1296m, 108m, 0m, 108m, 10.8m, 0m, 0m, 0.1m, [], headline));
         var reader = new Mock<IUserBaseCurrencyReader>();
         reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
@@ -175,7 +175,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         };
 
         var ok = (OkObjectResult)await controller.GetBrokerageGrowth(CancellationToken.None);
-        return (BrokerageGrowthResponse)ok.Value!;
+        return (SleeveGrowthResponse)ok.Value!;
     }
 
     [Fact]

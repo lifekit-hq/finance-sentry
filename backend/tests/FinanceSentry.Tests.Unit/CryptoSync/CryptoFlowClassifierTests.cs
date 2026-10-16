@@ -1,0 +1,64 @@
+using FinanceSentry.Core.Measures;
+using FinanceSentry.Modules.CryptoSync.Application.Services;
+using FinanceSentry.Modules.CryptoSync.Domain;
+using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
+using FluentAssertions;
+using Xunit;
+
+namespace FinanceSentry.Tests.Unit.CryptoSync;
+
+public class CryptoFlowClassifierTests
+{
+    private static CryptoFlowEvent Flow(
+        string provider, string type, decimal amount, string unit, string? counterparty, decimal? fee = null, bool isFiat = true) =>
+        CryptoFlowEvent.Create(Guid.NewGuid(), provider,
+            new CryptoFlow("e-1", type, DateTime.UtcNow, amount, unit, isFiat, isFiat ? null : 60000m, fee, fee is null ? null : unit,
+                counterparty, "completed"),
+            DateTime.UtcNow);
+
+    [Fact]
+    public void Fixture19_TheRevolutReceiveAndTheCardBuy_EnterTheSleeve_AndTheBuysFeeIsAFee()
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.Receive, 500m, "EUR", "revolut"))
+            .Should().Equal(new CryptoFlowLeg(FlowClass.ExternalInflow, 500m, "EUR"));
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, CryptoFlowTypes.CardBuy, 100m, "EUR", "Credit Card", fee: 2m))
+            .Should().Equal(new CryptoFlowLeg(FlowClass.ExternalInflow, 100m, "EUR"), new CryptoFlowLeg(FlowClass.Fee, 2m, "EUR"));
+    }
+
+    [Fact]
+    public void Fixture19CashBalanceVariant_ABuyFromTheVenuesOwnBalance_LeavesOnlyItsFee()
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, CryptoFlowTypes.CardBuy, 100m, "EUR", "Cash Balance", fee: 2m))
+            .Should().Equal(new CryptoFlowLeg(FlowClass.Fee, 2m, "EUR"));
+    }
+
+    [Theory]
+    [InlineData(CryptoFlowTypes.FiatDeposit, FlowClass.ExternalInflow)]
+    [InlineData(CryptoFlowTypes.FiatWithdrawal, FlowClass.ExternalOutflow)]
+    [InlineData(CryptoFlowTypes.CardSell, FlowClass.ExternalOutflow)]
+    [InlineData(CryptoFlowTypes.Send, FlowClass.ExternalOutflow)]
+    public void EachMovement_CrossesTheSleevesEdge(string type, FlowClass expected)
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, type, 10m, "EUR", null))
+            .Should().Equal(new CryptoFlowLeg(expected, 10m, "EUR"));
+    }
+
+    [Fact]
+    public void AnUnknownType_ContributesNothing()
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, "airdrop", 10m, "EUR", null)).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(CryptoExchangeProvider.RevolutX, "revolut", true)]
+    [InlineData(CryptoExchangeProvider.RevolutX, "external_crypto_wallet", false)]
+    [InlineData(CryptoExchangeProvider.RevolutX, "external_bank_account", false)]
+    [InlineData(CryptoExchangeProvider.RevolutX, "something_new", null)]
+    [InlineData(CryptoExchangeProvider.RevolutX, null, null)]
+    [InlineData(CryptoExchangeProvider.Binance, "BankAccount", null)]
+    public void TheOwnersOwnAccount_IsKnownOnlyWhereTheVenueSaysSo(string provider, string? counterparty, bool? expected)
+    {
+        CryptoFlowClassifier.IsOwnersOwnAccount(Flow(provider, CryptoFlowTypes.Receive, 1m, "EUR", counterparty))
+            .Should().Be(expected);
+    }
+}

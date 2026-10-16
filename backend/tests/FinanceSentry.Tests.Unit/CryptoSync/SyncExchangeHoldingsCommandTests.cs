@@ -53,6 +53,10 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
                 .Setup(a => a.GetTradesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
                 .Returns<string, string, string, string?, CryptoTradeWalk, CancellationToken>((_, _, _, cursor, _, _) =>
                     Task.FromResult(new CryptoTradePage([], cursor)));
+            adapter
+                .Setup(a => a.GetFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+                .Returns<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) =>
+                    Task.FromResult(new CryptoFlowPage([], walk.AsOf)));
         }
 
         _revolutX.SetupGet(a => a.TradeHistoryStartsAtConnect).Returns(true);
@@ -65,6 +69,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
             new ExchangeCredentialRepository(_db),
             new InMemoryUpsertHoldings(_db),
             new CryptoTradeRepository(_db),
+            new CryptoFlowEventRepository(_db),
             new CryptoExchangeAdapterRegistry([_binance.Object, _revolutX.Object]),
             _encryption.Object,
             new CostBasisCalculator(),
@@ -160,6 +165,81 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         await act.Should().ThrowAsync<RevolutXException>();
         revolutX.LastSyncError.Should().Contain("whitelisted IP");
         binance.LastSyncError.Should().BeNull();
+    }
+
+    private static CryptoFlow ReceiveFromRevolut(string id) =>
+        new(id, CryptoFlowTypes.Receive, Now.UtcDateTime.AddDays(-1), 500m, "EUR", true, null, null, null, "revolut", "completed");
+
+    [Fact]
+    public async Task FlowWalk_StartsAtConnect_RecordsTheMovements_AndAdvancesTheCursor()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX);
+        CryptoFlowWalk? seen = null;
+        var walkedTo = Now.UtcDateTime.AddMinutes(-5);
+        _revolutX
+            .Setup(a => a.GetFlowsAsync("api-key", "api-secret", It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) => seen = walk)
+            .ReturnsAsync(new CryptoFlowPage([ReceiveFromRevolut("tx-1")], walkedTo));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        seen.Should().Be(new CryptoFlowWalk(credential.CreatedAt, Now.UtcDateTime));
+        credential.FlowsWalkedTo.Should().Be(walkedTo);
+        var row = (await _db.CryptoFlowEvents.AsNoTracking().ToListAsync()).Should().ContainSingle().Subject;
+        (row.UserId, row.Provider, row.EventId, row.ProviderType, row.Amount, row.Unit, row.CounterpartyRef)
+            .Should().Be((_userId, CryptoExchangeProvider.RevolutX, "tx-1", CryptoFlowTypes.Receive, 500m, "EUR", "revolut"));
+        row.RecordedAt.Should().Be(Now.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task FlowWalk_WithinAnHourOfTheCursor_IsNotRepeated()
+    {
+        await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX);
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        _revolutX.Verify(
+            a => a.GetFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task FlowWalk_ResumesAfterTheCursor_AndRewalkedMovementsAreNotDuplicated()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX);
+        var walkedTo = Now.UtcDateTime.AddHours(-2);
+        var walks = new List<CryptoFlowWalk>();
+        _revolutX
+            .Setup(a => a.GetFlowsAsync("api-key", "api-secret", It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) => walks.Add(walk))
+            .ReturnsAsync(new CryptoFlowPage([ReceiveFromRevolut("tx-1")], walkedTo));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        walks.Select(w => w.From).Should().Equal(credential.CreatedAt, walkedTo.AddMilliseconds(1));
+        (await _db.CryptoFlowEvents.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task FlowWalkRefused_KeepsTheCursor_AndTheHoldingsSyncSucceeds()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX, new CryptoAssetBalance("BTC", 0.1m, 0m, 6_000m));
+        _revolutX
+            .Setup(a => a.GetFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RevolutXException("Revolut X API error (HTTP 403): forbidden"));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        credential.FlowsWalkedTo.Should().BeNull();
+        credential.LastSyncError.Should().BeNull();
+        (await _db.CryptoHoldings.CountAsync()).Should().Be(1);
+        (await _db.CryptoFlowEvents.CountAsync()).Should().Be(0);
     }
 
     [Fact]

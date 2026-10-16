@@ -113,7 +113,11 @@ public sealed class RevolutXHoldingsAggregator
         return (ParseAmount(balance.Total) ?? 0m, staked);
     }
 
-    private static bool IsFiat(string asset, IReadOnlyDictionary<string, RevolutXCurrency> currencies)
+    /// <summary>USD per unit of a crypto <paramref name="asset"/> by the same rules a holding is valued by; null when unpriced.</summary>
+    public static decimal? UnitPriceUsd(string asset, IReadOnlyList<RevolutXTicker> tickers) =>
+        UsdValue(asset, 1m, BuildPriceIndex(tickers));
+
+    internal static bool IsFiat(string asset, IReadOnlyDictionary<string, RevolutXCurrency> currencies)
     {
         if (currencies.TryGetValue(asset, out var config) && !string.IsNullOrWhiteSpace(config.AssetType))
         {

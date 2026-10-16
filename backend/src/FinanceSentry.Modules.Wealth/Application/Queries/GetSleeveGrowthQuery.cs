@@ -5,22 +5,25 @@ using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Ports;
+using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 /// <summary>
-/// M2 and M4 for the brokerage sleeve (IBKR + Inzhur, idle broker cash included) from the first close that holds
-/// brokerage value (<see cref="SeriesStart"/>; the daily value series begins there) to the latest one, in USD until
+/// M2 and M4 for one sleeve - brokerage (IBKR + Inzhur, idle broker cash included) or crypto (the venues, fiat held on
+/// them included) - from the first close that holds the sleeve's value (<see cref="SeriesStart"/>; the daily value
+/// series begins there) to the latest one, in USD until
 /// the controller applies the base currency. <see cref="From"/> / <see cref="To"/> are the closes the measures
 /// run between (a provider linked on the first close moves <see cref="From"/> past it).
-/// <see cref="Contributed"/> is the deposits less the withdrawals the brokers report; <see cref="NewlyLinked"/> the
+/// <see cref="Contributed"/> is the deposits less the withdrawals the providers report; <see cref="NewlyLinked"/> the
 /// value that entered with a newly connected provider (its link day's change, market moves of that day included);
 /// <see cref="Growth"/> the rest of the change, split into <see cref="Income"/>, <see cref="Fees"/>,
 /// <see cref="Taxes"/> and the market remainder. <see cref="MoneyWeightedReturn"/> is Modified Dietz over the
-/// window (a rate, not annualised). <see cref="SourcesWithoutFlows"/> are providers that have never reported a
-/// deposit or withdrawal: while any is listed the split cannot be made (its deposits would read as growth), so
+/// window (a rate, not annualised). <see cref="SourcesWithoutFlows"/> are providers whose deposits and withdrawals
+/// are not known (a broker that has never reported one, a venue whose movements are not read or not yet walked): while any is listed the split cannot be made (its deposits would read as growth), so
 /// the amounts are null and <see cref="Headline"/> is unavailable with <c>UNKNOWN_FLOW</c> naming each one.
 /// </summary>
-public record BrokerageGrowthResponse(
+public record SleeveGrowthResponse(
     DateOnly? SeriesStart,
     DateOnly? From,
     DateOnly? To,
@@ -37,27 +40,36 @@ public record BrokerageGrowthResponse(
     Headline Headline,
     string Currency = "USD");
 
-public record GetBrokerageGrowthQuery(Guid UserId) : IQuery<BrokerageGrowthResponse>;
+/// <summary>The growth split for <paramref name="Sleeve"/>: <see cref="WealthSourceIds.Brokerage"/> or <see cref="WealthSourceIds.Crypto"/>.</summary>
+public record GetSleeveGrowthQuery(Guid UserId, string Sleeve = WealthSourceIds.Brokerage) : IQuery<SleeveGrowthResponse>;
 
-public class GetBrokerageGrowthQueryHandler(
+public class GetSleeveGrowthQueryHandler(
     IBrokerageValueHistoryReader history,
-    IBrokerageFlowReader flowReader)
-    : IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse>
+    IBrokerageFlowReader flowReader,
+    INetWorthSnapshotRepository snapshots,
+    ICryptoFlowReader cryptoFlowReader)
+    : IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>
 {
     private const int RateDecimals = 6;
 
-    public async Task<BrokerageGrowthResponse> Handle(GetBrokerageGrowthQuery query, CancellationToken cancellationToken)
+    public async Task<SleeveGrowthResponse> Handle(GetSleeveGrowthQuery query, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var daily = await history.GetDailyAsync(query.UserId, DateOnly.MinValue, today, cancellationToken);
-        var flows = await flowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken);
-        var seriesStart = daily.FirstOrDefault(d => d.BrokerageTotalUsd > 0m)?.Date;
+        var (daily, flows) = query.Sleeve switch
+        {
+            WealthSourceIds.Brokerage => (await BrokerageDailyAsync(query.UserId, today, cancellationToken),
+                await flowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
+            WealthSourceIds.Crypto => (await CryptoDailyAsync(query.UserId, today, cancellationToken),
+                await cryptoFlowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
+            _ => throw new ArgumentOutOfRangeException(nameof(query), query.Sleeve, "No growth split for this sleeve."),
+        };
+        var seriesStart = daily.FirstOrDefault(d => d.TotalUsd > 0m)?.Date;
 
         var bridge = ScopeLinks.Bridge(
-            [.. daily.Select(d => new ValuePoint(d.Date, d.BrokerageTotalUsd))],
+            [.. daily.Select(d => new ValuePoint(d.Date, d.TotalUsd))],
             flows.ClassifiedFlows,
             flows.Sources.Select(s => s.LinkedOn));
-        var scope = HeadlineScope.Sleeve(WealthSourceIds.Brokerage);
+        var scope = HeadlineScope.Sleeve(query.Sleeve);
         if (bridge.Opening is not { ValueUsd: { } start } opening
             || bridge.Closing is not { ValueUsd: { } end } closing
             || opening.Date >= closing.Date)
@@ -65,14 +77,14 @@ public class GetBrokerageGrowthQueryHandler(
             var missing = HeadlineFactory.Growth(
                 null, MeasuredRate.Fails(MeasureFailure.InsufficientData), scope,
                 seriesStart ?? today, today, HeadlineSignals.None);
-            return new BrokerageGrowthResponse(
+            return new SleeveGrowthResponse(
                 seriesStart, null, null, null, null, null, null, null, null, null, null, null,
                 flows.SourcesWithoutFlows(today), missing);
         }
 
         var unknown = flows.SourcesWithoutFlows(closing.Date);
         var edges = daily.Where(d => d.Date == opening.Date || d.Date == closing.Date)
-            .Select(d => d.Signals ?? HeadlineSignals.None)
+            .Select(d => d.Signals)
             .Aggregate(HeadlineSignals.None, (merged, s) => merged.Merge(s));
         var signals = edges with
         {
@@ -91,7 +103,7 @@ public class GetBrokerageGrowthQueryHandler(
         var headline = HeadlineFactory.Growth(
             measured.Value?.GrowthUsd, dietz, scope, opening.Date, closing.Date, signals);
 
-        return new BrokerageGrowthResponse(
+        return new SleeveGrowthResponse(
             seriesStart,
             opening.Date,
             closing.Date,
@@ -107,4 +119,25 @@ public class GetBrokerageGrowthQueryHandler(
             unknown,
             headline);
     }
+
+    private async Task<IReadOnlyList<SleeveDay>> BrokerageDailyAsync(Guid userId, DateOnly today, CancellationToken ct)
+        => [.. (await history.GetDailyAsync(userId, DateOnly.MinValue, today, ct))
+            .Select(d => new SleeveDay(d.Date, d.BrokerageTotalUsd, d.Signals ?? HeadlineSignals.None))];
+
+    // Read like BrokerageValueHistoryReader: only the crypto source's own STALE_SOURCE reaches the sleeve's signals.
+    private async Task<IReadOnlyList<SleeveDay>> CryptoDailyAsync(Guid userId, DateOnly today, CancellationToken ct)
+    {
+        var raw = await snapshots.GetByUserIdUnscopedAsync(userId, DateOnly.MinValue, today, ct);
+        var withSources = SnapshotSources.OfEach(
+            raw, await snapshots.GetSourcesUnscopedAsync(userId, [.. raw.Select(s => s.Id)], ct));
+        return [.. withSources.Select(x => new SleeveDay(
+            x.Snapshot.SnapshotDate,
+            x.Snapshot.CryptoTotal,
+            x.Sources.Signals(x.Snapshot) with
+            {
+                StaleSources = x.Sources.IsStale(WealthSourceIds.Crypto) ? [WealthSourceIds.Crypto] : [],
+            }))];
+    }
+
+    private sealed record SleeveDay(DateOnly Date, decimal TotalUsd, HeadlineSignals Signals);
 }

@@ -19,11 +19,11 @@ public sealed class BrokerageFlowReader(BrokerageSyncDbContext db, IHistoricalEx
 {
     private const string UsdCode = "USD";
 
-    public async Task<BrokerageFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
+    public async Task<SleeveFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
     {
         var links = await LinkDaysAsync(userId, ct);
         if (links.Count == 0)
-            return BrokerageFlowReading.Empty;
+            return SleeveFlowReading.Empty;
 
         var rows = await db.BrokerageCashTransactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.UserId == userId)
@@ -69,7 +69,7 @@ public sealed class BrokerageFlowReader(BrokerageSyncDbContext db, IHistoricalEx
             flows.Add(new SourceFlow(row.Source, new ClassifiedFlow(row.Date, row.Class!.Value, usd.Amount), usd.Status));
         }
 
-        return new BrokerageFlowReading(sources, flows);
+        return new SleeveFlowReading(sources, flows);
     }
 
     private static string NormalizeCurrency(string currency) => currency.Trim().ToUpperInvariant();

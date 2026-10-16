@@ -22,6 +22,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
     IExchangeCredentialRepository credentialRepository,
     ICryptoHoldingRepository holdingRepository,
     ICryptoTradeRepository tradeRepository,
+    ICryptoFlowEventRepository flowRepository,
     CryptoExchangeAdapterRegistry adapters,
     ICredentialEncryptionService encryption,
     CostBasisCalculator costBasisCalculator,
@@ -32,6 +33,9 @@ public sealed class SyncExchangeHoldingsCommandHandler(
 {
     private const decimal QuantityTolerance = 0.01m;
     private const decimal MaximumTrustedCostToValueRatio = 20m;
+
+    // The fiat history Binance serves is heavily weighted; the flows of the last hour can wait for the next walk.
+    private static readonly TimeSpan MinFlowWalkInterval = TimeSpan.FromHours(1);
 
     public async Task<SyncExchangeHoldingsResult> Handle(SyncExchangeHoldingsCommand request, CancellationToken ct)
     {
@@ -111,6 +115,8 @@ public sealed class SyncExchangeHoldingsCommandHandler(
 
             var justClosed = stale.Select(h => h.Asset).ToHashSet(StringComparer.Ordinal);
 
+            await WalkFlowsAsync(adapter, credential, apiKey, apiSecret, walk.AsOf, ct);
+
             if (adapter.TradeHistoryStartsAtConnect)
             {
                 await UpdateForwardLedgerAsync(adapter, request, apiKey, apiSecret, walk, justClosed, ct);
@@ -134,6 +140,45 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             await credentialRepository.SaveChangesAsync(ct);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Reads the venue's money movements since the last walk (since connect, the first time) and records them with
+    /// the new cursor in one save. Best-effort: a refused call leaves the cursor where it was and the holdings sync
+    /// carries on, so the movements are read again next run rather than lost.
+    /// </summary>
+    private async Task WalkFlowsAsync(
+        ICryptoExchangeAdapter adapter,
+        ExchangeCredential credential,
+        string apiKey,
+        string apiSecret,
+        DateTime asOf,
+        CancellationToken ct)
+    {
+        if (credential.FlowsWalkedTo is { } walkedTo && asOf - walkedTo < MinFlowWalkInterval)
+        {
+            return;
+        }
+
+        var from = credential.FlowsWalkedTo?.AddMilliseconds(1) ?? credential.CreatedAt;
+        CryptoFlowPage page;
+        try
+        {
+            page = await adapter.GetFlowsAsync(apiKey, apiSecret, new CryptoFlowWalk(from, asOf), ct);
+        }
+        catch (CryptoExchangeException ex)
+        {
+            logger.LogWarning(ex,
+                "Flow history fetch failed on {Provider} (user {UserId}); the walk resumes from {From} next run.",
+                credential.Provider, credential.UserId, from);
+            return;
+        }
+
+        await flowRepository.AddNewUnscopedAsync(
+            credential.UserId, credential.Provider, page.Flows, timeProvider.GetUtcNow().UtcDateTime, ct);
+        credential.MarkFlowsWalked(page.WalkedTo);
+        credentialRepository.Update(credential);
+        await credentialRepository.SaveChangesAsync(ct);
     }
 
     /// <summary>

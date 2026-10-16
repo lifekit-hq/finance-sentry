@@ -423,6 +423,9 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
             adapter
                 .Setup(a => a.GetHoldingsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync([]);
+            adapter
+                .Setup(a => a.GetFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string _, string _, CryptoFlowWalk walk, CancellationToken _) => new CryptoFlowPage([], walk.AsOf));
         }
 
         HoldingRepoMock

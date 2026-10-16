@@ -31,6 +31,19 @@ public sealed class RevolutXAdapter(
     private const string BuySide = "buy";
     private const string SellSide = "sell";
 
+    // The transactions endpoint serves at most 30 days per call; the walk widens each window by 1 ms on both sides.
+    private const long FlowWindowMs = 30L * 24 * 60 * 60 * 1000 - 2;
+    private const int MaxFlowWindowsPerCall = 12;
+    private const int FlowPageLimit = 1900;
+    private const string FlowTypes = "receive,send";
+    private const string CompletedStatus = "completed";
+    private const string PendingStatus = "pending";
+    private const string ReceiveType = "receive";
+    private const string SendType = "send";
+
+    // A transfer pending longer than this stops holding the walk back, so a stuck row cannot pin it forever.
+    private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
+
     private static readonly string[] UsdStablecoins = ["USDC", "USDT"];
 
     private readonly decimal _dustThresholdUsd = decimal.TryParse(
@@ -160,6 +173,137 @@ public sealed class RevolutXAdapter(
             trades,
             RevolutXTradeCursor.Format(walkedToMs),
             IsComplete: walkedToMs >= asOfMs);
+    }
+
+    /// <summary>
+    /// The account's completed <c>receive</c> and <c>send</c> transactions created in the walk, window by window (one
+    /// millisecond wider on both sides, filtered back, as the fills walk does). Each leg's account type is what makes a
+    /// transfer readable: the leg that is not <c>revolut_x</c> is the counterparty (<c>revolut</c>: the owner's own
+    /// Revolut app; <c>external_*</c>: outside it). The amount is the venue-side leg, credited for a receive and
+    /// debited for a send, net of any fee, so the sleeve's value change is explained without the fee.
+    /// </summary>
+    // shortcut: no fee, network or on-chain hash (the per-id details call); read them when S2b matches txIds.
+    public async Task<CryptoFlowPage> GetFlowsAsync(
+        string apiKey,
+        string apiSecret,
+        CryptoFlowWalk walk,
+        CancellationToken ct = default)
+    {
+        var credentials = RevolutXSigner.ParseCredentials(apiKey, apiSecret);
+        var asOfMs = ToUnixMs(walk.AsOf);
+        var windowStart = ToUnixMs(walk.From);
+        var walkedToMs = windowStart - 1;
+        var holdBelowMs = long.MaxValue;
+        var holdSinceMs = ToUnixMs(walk.AsOf - MaxPendingHold);
+        var completed = new Dictionary<string, RevolutXTransaction>(StringComparer.Ordinal);
+
+        for (var windows = 0; windowStart <= asOfMs && windows < MaxFlowWindowsPerCall; windows++)
+        {
+            var windowEnd = Math.Min(windowStart + FlowWindowMs - 1, asOfMs);
+            await foreach (var row in TransactionsInWindowAsync(credentials, windowStart, windowEnd, ct))
+            {
+                var status = row.Status?.Trim().ToLowerInvariant();
+                if (status == CompletedStatus)
+                {
+                    completed.TryAdd(row.Id, row);
+                }
+                else if (status == PendingStatus && row.CreatedDateMs >= holdSinceMs)
+                {
+                    holdBelowMs = Math.Min(holdBelowMs, row.CreatedDateMs);
+                }
+            }
+
+            walkedToMs = windowEnd;
+            windowStart = windowEnd + 1;
+        }
+
+        IReadOnlyList<CryptoFlow> flows = completed.Count == 0 ? [] : await ToFlowsAsync(credentials, completed.Values, ct);
+        var resumeMs = Math.Min(walkedToMs, holdBelowMs - 1);
+        return new CryptoFlowPage(
+            flows,
+            DateTimeOffset.FromUnixTimeMilliseconds(Math.Max(resumeMs, ToUnixMs(walk.From) - 1)).UtcDateTime);
+    }
+
+    private async IAsyncEnumerable<RevolutXTransaction> TransactionsInWindowAsync(
+        RevolutXCredentials credentials,
+        long startMs,
+        long endMs,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        string? pageCursor = null;
+        for (var page = 0; ; page++)
+        {
+            if (page == MaxPagesPerWindow)
+            {
+                throw new RevolutXException(
+                    $"Revolut X returned more than {MaxPagesPerWindow} pages of transactions for one window.");
+            }
+
+            var response = await httpClient.GetTransactionsAsync(
+                credentials, FlowTypes, startMs - 1, endMs + 1, pageCursor, FlowPageLimit, ct);
+
+            foreach (var row in response.Data ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(row.Id) && row.CreatedDateMs >= startMs && row.CreatedDateMs <= endMs)
+                {
+                    yield return row;
+                }
+            }
+
+            pageCursor = response.Metadata?.NextCursor;
+            if (string.IsNullOrEmpty(pageCursor))
+            {
+                yield break;
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<CryptoFlow>> ToFlowsAsync(
+        RevolutXCredentials credentials,
+        IEnumerable<RevolutXTransaction> rows,
+        CancellationToken ct)
+    {
+        var currenciesTask = httpClient.GetCurrenciesAsync(credentials, ct);
+        var tickersTask = httpClient.GetTickersAsync(credentials, ct);
+        await Task.WhenAll(currenciesTask, tickersTask);
+
+        var flows = new List<CryptoFlow>();
+        foreach (var row in rows.OrderBy(r => r.CreatedDateMs).ThenBy(r => r.Id, StringComparer.Ordinal))
+        {
+            var type = row.Type?.Trim().ToLowerInvariant();
+            var (own, other) = type switch
+            {
+                ReceiveType => (row.Destination, row.Source),
+                SendType => (row.Source, row.Destination),
+                _ => (null, null),
+            };
+            var unit = own?.Currency?.Trim().ToUpperInvariant();
+            var amount = ParseAmount(own?.Amount);
+
+            if (own is null || string.IsNullOrEmpty(unit) || amount is not > 0m)
+            {
+                // A row the reader cannot value is left out rather than guessed; the sleeve's change then reads as
+                // growth, which the warning makes findable.
+                logger.LogWarning("Revolut X transaction {TransactionId} is unreadable and was skipped.", row.Id);
+                continue;
+            }
+
+            var isFiat = RevolutXHoldingsAggregator.IsFiat(unit, currenciesTask.Result);
+            flows.Add(new CryptoFlow(
+                EventId: row.Id,
+                ProviderType: type == ReceiveType ? CryptoFlowTypes.Receive : CryptoFlowTypes.Send,
+                OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(row.ProcessedDateMs ?? row.CreatedDateMs).UtcDateTime,
+                Amount: amount.Value,
+                Unit: unit,
+                IsFiat: isFiat,
+                UnitPriceUsd: isFiat ? null : RevolutXHoldingsAggregator.UnitPriceUsd(unit, tickersTask.Result.Data),
+                Fee: null,
+                FeeUnit: null,
+                CounterpartyRef: other?.Account?.Type?.Trim().ToLowerInvariant(),
+                Status: CompletedStatus));
+        }
+
+        return flows;
     }
 
     private async Task WalkWindowAsync(
