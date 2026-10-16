@@ -24,7 +24,13 @@ public interface IMaterialityPolicy
     /// Time since the event's source last synced successfully, or null when unknown (no account
     /// reference, or never synced). Only consulted for <see cref="CompanionEventKind.SyncFailure"/>.
     /// </param>
-    EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null);
+    /// <param name="healthState">
+    /// The connection-health state that raised the alert (<c>MaterialAlertRecord.HealthState</c>), set only for a
+    /// provider the policy drives; null keeps the kind's own rule. A sync failure raised as <c>ActionRequired</c> - a
+    /// confirmed credential loss only the person can fix - is relayed at once in every mode, Quiet included.
+    /// </param>
+    EventDisposition DispositionFor(
+        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null);
 
     /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest:
     /// at capture the source's time since its last successful sync, at delivery (<c>ISyncFailureReconciler</c>) how long

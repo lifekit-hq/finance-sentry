@@ -44,9 +44,25 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The sync-failure alert of a connection the connection-health policy has just made Failing (a provider in
+    /// <c>ConnectionHealth:ActiveProviders</c>): as <see cref="GenerateSyncFailureAlertAsync"/>, marked with its health
+    /// state so Companion holds it for the digest as an outage, not as a reconnect ask.
+    /// </summary>
+    Task GenerateFailingSyncFailureAlertAsync(
+        Guid userId,
+        string provider,
+        Guid? accountId,
+        string? accountName,
+        string? errorCode,
+        SyncFailureClass failureClass,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Records the sync-failure alert for a confirmed credential loss, with the reconnect copy: an open alert on the
     /// same provider or account (an outage or a neutral one) is superseded and the silence window does not apply, so
-    /// the reconnect ask is always seen. The caller raises it once, on the escalation.
+    /// the reconnect ask is always seen. The caller raises it once, on the escalation. Only the connection-health policy
+    /// raises it, so it is marked ActionRequired (Companion relays it in every mode) and links to the provider's
+    /// reconnect (<c>AlertAppPath.ForReconnect</c>).
     /// </summary>
     Task EscalateSyncFailureAlertAsync(
         Guid userId,
@@ -57,6 +73,28 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     Task ResolveSyncFailureAlertAsync(
+        Guid userId,
+        string provider,
+        Guid? accountId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The one notice that a connection, or one account, has gone Dormant (failing for <paramref name="failingFor"/>)
+    /// and may be closed: info only, raised once per reference ever, so a dismissed notice stays dismissed. With
+    /// <paramref name="othersSyncing"/> the copy says the provider's other accounts still sync, which is what makes a
+    /// closed account the likely reading.
+    /// </summary>
+    Task GenerateConnectionDormantAlertAsync(
+        Guid userId,
+        string provider,
+        Guid? accountId,
+        string? accountName,
+        TimeSpan failingFor,
+        bool othersSyncing,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the Dormant notice once the connection or account syncs again.</summary>
+    Task ResolveConnectionDormantAlertAsync(
         Guid userId,
         string provider,
         Guid? accountId,

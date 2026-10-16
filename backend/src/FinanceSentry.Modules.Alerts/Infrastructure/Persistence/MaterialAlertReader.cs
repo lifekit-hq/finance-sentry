@@ -24,9 +24,7 @@ public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader, IPu
             .Take(effective)
             .ToListAsync(ct);
         return rows
-            .Select(a => new MaterialAlertRecord(
-                a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt,
-                AlertAppPaths.For(a)))
+            .Select(ToRecord)
             .ToList();
     }
 
@@ -71,5 +69,6 @@ public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader, IPu
     }
 
     private static MaterialAlertRecord ToRecord(Alert a) => new(
-        a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt, AlertAppPaths.For(a));
+        a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt, AlertAppPaths.For(a),
+        a.HealthState);
 }

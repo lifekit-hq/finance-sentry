@@ -1,18 +1,22 @@
 namespace FinanceSentry.Modules.Wealth.Application.Services;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain.Services;
+using Microsoft.Extensions.Options;
 
 public class WealthAggregationService(
     IBankingAccountsReader bankingAccounts,
     IBankingTransactionReader bankingTransactions,
     ICryptoHoldingsReader? cryptoReader = null,
     IBrokerageHoldingsReader? brokerageReader = null,
-    IBrokerageConnectionStatusReader? brokerageConnections = null) : IWealthAggregationService
+    IBrokerageConnectionStatusReader? brokerageConnections = null,
+    IEnumerable<IConnectionHealthReader>? healthReaders = null,
+    IOptionsMonitor<ConnectionHealthOptions>? healthOptions = null) : IWealthAggregationService
 {
     private static readonly HashSet<string> AllowedCategories =
         new(StringComparer.OrdinalIgnoreCase) { "banking", "crypto", "brokerage", "other" };
@@ -21,20 +25,27 @@ public class WealthAggregationService(
     // longer window before we call a bank account "stale". Matches the net-worth snapshot job.
     private static readonly TimeSpan BankingStaleThreshold = TimeSpan.FromHours(36);
 
+    // A Dormant account is not ranked: it is quiet beside its working siblings (WorstSyncStatus).
     private static readonly IReadOnlyDictionary<string, int> SyncStatusPriority =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["reauth_required"] = 0,
+            [ConnectionHealthSurface.ReconnectNeeded] = 0,
             ["failed"] = 1,
-            ["stale"] = 2,
-            ["pending"] = 3,
-            ["syncing"] = 4,
-            ["synced"] = 5,
-            ["active"] = 5,
+            [ConnectionHealthSurface.Retrying] = 2,
+            ["stale"] = 3,
+            ["pending"] = 4,
+            ["syncing"] = 5,
+            ["synced"] = 6,
+            ["active"] = 6,
         };
 
     private static readonly HashSet<string> NotCurrentStatuses =
-        new(StringComparer.OrdinalIgnoreCase) { "stale", "failed", "reauth_required" };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "stale", "failed", "reauth_required",
+            ConnectionHealthSurface.Retrying, ConnectionHealthSurface.ReconnectNeeded, ConnectionHealthSurface.Dormant,
+        };
 
     private readonly IBankingAccountsReader _bankingAccounts = bankingAccounts ?? throw new ArgumentNullException(nameof(bankingAccounts));
     private readonly IBankingTransactionReader _bankingTransactions = bankingTransactions ?? throw new ArgumentNullException(nameof(bankingTransactions));
@@ -48,6 +59,9 @@ public class WealthAggregationService(
             throw new ArgumentException($"Invalid category '{category}'.", nameof(category));
 
         var bankAccounts = await _bankingAccounts.GetAccountSummariesAsync(userId, ct);
+        var labels = healthReaders is null || healthOptions is null
+            ? ConnectionHealthLabels.None
+            : await ConnectionHealthLabels.ReadAsync(healthReaders, healthOptions.CurrentValue, userId, ct);
 
         IEnumerable<BankingAccountSummary> filtered = bankAccounts;
 
@@ -64,7 +78,7 @@ public class WealthAggregationService(
             .Select(g =>
             {
                 var summaries = g.ToList();
-                var institutions = BuildBankingInstitutions(summaries);
+                var institutions = BuildBankingInstitutions(summaries, labels);
                 return new CategorySummaryDto(
                     g.Key,
                     institutions.Sum(i => i.TotalInBaseCurrency),
@@ -96,7 +110,7 @@ public class WealthAggregationService(
                         Name: DisplayNameFor(pg.Key),
                         Category: "crypto",
                         TotalInBaseCurrency: pg.Sum(h => h.UsdValue),
-                        SyncStatus: "synced",
+                        SyncStatus: labels.ForInstitution(pg.Key) ?? "synced",
                         LastSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         LastSuccessfulSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         Accounts: accounts.Where(a => string.Equals(a.Provider, pg.Key, StringComparison.OrdinalIgnoreCase)).ToList()))
@@ -137,7 +151,8 @@ public class WealthAggregationService(
                         Name: DisplayNameFor(pg.Key),
                         Category: "brokerage",
                         TotalInBaseCurrency: pg.Sum(h => h.UsdValue),
-                        SyncStatus: BrokerageSyncStatus(pg.Key, pg.Max(h => h.SyncedAt), now, connectionStatuses),
+                        SyncStatus: labels.ForInstitution(pg.Key)
+                            ?? BrokerageSyncStatus(pg.Key, pg.Max(h => h.SyncedAt), now, connectionStatuses),
                         LastSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         LastSuccessfulSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         Accounts: accounts.Where(a => string.Equals(a.Provider, pg.Key, StringComparison.OrdinalIgnoreCase)).ToList()))
@@ -155,7 +170,9 @@ public class WealthAggregationService(
     }
 
     // Institutions that are not current (stale, failed, needing re-auth) make the total degraded, each named
-    // as its own source; the oldest successful sync behind the total is its as-of.
+    // as its own source; so does one holding a Dormant account, which its working siblings keep off the
+    // institution's own status but whose balance is still frozen. The oldest successful sync behind the total
+    // is its as-of.
     private static Headline BuildHeadline(
         decimal totalUsd, IReadOnlyList<CategorySummaryDto> categories, FxStatus fx, string? category, string? provider)
     {
@@ -163,7 +180,8 @@ public class WealthAggregationService(
         var signals = new HeadlineSignals
         {
             StaleSources = [.. institutions
-                .Where(i => NotCurrentStatuses.Contains(i.SyncStatus))
+                .Where(i => NotCurrentStatuses.Contains(i.SyncStatus)
+                    || i.Accounts.Any(a => a.SyncStatus == ConnectionHealthSurface.Dormant))
                 .Select(i => i.Provider)
                 .Distinct(StringComparer.OrdinalIgnoreCase)],
             Fx = fx,
@@ -178,7 +196,8 @@ public class WealthAggregationService(
         return HeadlineFactory.Value(totalUsd, scope, DateOnly.FromDateTime(DateTime.UtcNow), signals, asOf);
     }
 
-    private static IReadOnlyList<InstitutionDto> BuildBankingInstitutions(IReadOnlyList<BankingAccountSummary> summaries)
+    private static IReadOnlyList<InstitutionDto> BuildBankingInstitutions(
+        IReadOnlyList<BankingAccountSummary> summaries, ConnectionHealthLabels labels)
     {
         var buckets = new Dictionary<string, List<BankingAccountSummary>>();
         foreach (var s in summaries)
@@ -199,7 +218,7 @@ public class WealthAggregationService(
                 a.AccountId, a.BankName, a.AccountType, a.AccountNumberLast4,
                 a.Provider, ProviderCategoryMapper.GetCategory(a.Provider),
                 a.Currency, a.CurrentBalance, a.BalanceUsd,
-                EffectiveBankingStatus(a.SyncStatus, a.LastSuccessfulSyncTimestamp), a.LastSyncTimestamp,
+                AccountSyncStatus(a, labels), a.LastSyncTimestamp,
                 a.ProductType)).ToList();
 
             // Monobank returns one account per card × currency. Group them into physical cards
@@ -215,7 +234,7 @@ public class WealthAggregationService(
                 Name: first.BankName,
                 Category: ProviderCategoryMapper.GetCategory(first.Provider),
                 TotalInBaseCurrency: accountDtos.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceInBaseCurrency ?? 0m)),
-                SyncStatus: WorstSyncStatus(list.Select(a => EffectiveBankingStatus(a.SyncStatus, a.LastSuccessfulSyncTimestamp))),
+                SyncStatus: WorstSyncStatus(accountDtos.Select(a => a.SyncStatus)),
                 LastSyncTimestamp: list.Max(a => a.LastSyncTimestamp),
                 LastSuccessfulSyncTimestamp: list.Max(a => a.LastSuccessfulSyncTimestamp),
                 Accounts: accountDtos,
@@ -282,9 +301,44 @@ public class WealthAggregationService(
         return isStale ? "stale" : status;
     }
 
+    /// <summary>
+    /// A bank account's status: its health label when its provider is listed in
+    /// <see cref="ConnectionHealthOptions.ActiveProviders"/> and the connection is not Healthy, else the sync's own
+    /// status aged by <see cref="EffectiveBankingStatus"/>. A listed provider's account that the policy holds Healthy
+    /// shows no failure (one the policy does not count - our own, or a sync we cancelled - is not the person's to see),
+    /// and its parked account reads as the reconnect the policy asked for.
+    /// </summary>
+    private static string AccountSyncStatus(BankingAccountSummary account, ConnectionHealthLabels labels)
+    {
+        if (labels.ForAccount(account.AccountId, account.Provider, account.MonobankCredentialId ?? account.TrueLayerConnectionId)
+            is { } label)
+        {
+            return label;
+        }
+
+        var status = account.SyncStatus;
+        if (labels.IsActive(account.Provider))
+        {
+            status = status switch
+            {
+                "failed" => "synced",
+                "reauth_required" => ConnectionHealthSurface.ReconnectNeeded,
+                _ => status,
+            };
+        }
+
+        return EffectiveBankingStatus(status, account.LastSuccessfulSyncTimestamp);
+    }
+
+    // The most urgent status; a Dormant member counts only when every member is Dormant.
     private static string WorstSyncStatus(IEnumerable<string> statuses)
     {
-        var min = statuses
+        var all = statuses.ToList();
+        var awake = all.Where(s => s != ConnectionHealthSurface.Dormant).ToList();
+        if (awake.Count == 0)
+            return all[0];
+
+        var min = awake
             .Select(s => (Status: s, Priority: SyncStatusPriority.TryGetValue(s, out var p) ? p : int.MaxValue))
             .OrderBy(t => t.Priority)
             .First();

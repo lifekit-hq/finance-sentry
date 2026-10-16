@@ -13,8 +13,10 @@ public sealed class SyncFailureReconciler(
     public async Task<IReadOnlyList<CompanionEvent>> ReconcileAsync(
         IReadOnlyList<CompanionEvent> candidates, CancellationToken ct = default)
     {
+        // A Dormant notice is about a failure too: once the connection syncs again its alert resolves and the line is dropped.
         var syncFailures = candidates
-            .Where(e => e.Kind == CompanionEventKind.SyncFailure && policy.AlertIdFromDedupKey(e.DedupKey) is not null)
+            .Where(e => e.Kind is CompanionEventKind.SyncFailure or CompanionEventKind.ConnectionDormant
+                && policy.AlertIdFromDedupKey(e.DedupKey) is not null)
             .ToList();
         if (syncFailures.Count == 0)
         {

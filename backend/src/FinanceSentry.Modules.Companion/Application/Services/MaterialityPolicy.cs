@@ -1,12 +1,16 @@
 namespace FinanceSentry.Modules.Companion.Application.Services;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Modules.Companion.Domain;
 
 /// <summary>
 /// Default materiality policy (feature 031). An alert is already "worth surfacing" (the alerts module
 /// decided so) — we map its type to a companion kind and skip types we don't surface. Disposition
 /// follows the mode: quiet suppresses, digest holds, scan/realtime queue as pending. Sync failures are
-/// the one kind demoted below the mode: they ride the digest unless the source is genuinely stale.
+/// demoted below the mode: they ride the digest unless the source is genuinely stale. For a provider the
+/// connection-health policy drives, the class the alert was raised with decides instead (slice S5): a confirmed
+/// credential loss (ActionRequired) is relayed at once in every mode, Quiet included; a Failing outage keeps the
+/// sync-failure rule; a Dormant notice is one digest line.
 /// </summary>
 public sealed class MaterialityPolicy : IMaterialityPolicy
 {
@@ -45,6 +49,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "RelativeUnderperformance" => CompanionEventKind.RelativeUnderperformance,
         "MacroEventAhead" => CompanionEventKind.MacroEventAhead,
         "MacroEventReleased" => CompanionEventKind.MacroEventReleased,
+        "ConnectionDormant" => CompanionEventKind.ConnectionDormant,
         _ => null,
     };
 
@@ -57,8 +62,18 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         _ => EventDisposition.Pending,
     };
 
-    public EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null)
+    public EventDisposition DispositionFor(
+        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null)
     {
+        // Only the person can fix a lost credential, so the reconnect ask is never held or silenced (decided 2026-10-06:
+        // a confirmed credential loss goes out proactively, and Quiet still surfaces it).
+        if (kind == CompanionEventKind.SyncFailure && healthState == nameof(ConnectionHealthState.ActionRequired))
+            return EventDisposition.Pending;
+
+        // A Dormant connection is told once, in the digest; Quiet keeps it silent like any other digest line.
+        if (kind == CompanionEventKind.ConnectionDormant)
+            return mode == NotificationMode.Quiet ? EventDisposition.SuppressedByMode : EventDisposition.HeldForDigest;
+
         // Operational failures must reach the operator even under a quiet mode — surface instead of
         // suppressing. Digest still batches them; the other modes already queue as pending.
         if (kind == CompanionEventKind.OperationalFailure && mode == NotificationMode.Quiet)

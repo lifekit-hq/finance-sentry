@@ -31,6 +31,7 @@ public class AlertsDbContext(DbContextOptions<AlertsDbContext> options, ICurrent
         ab.Property(a => a.Message).IsRequired().HasMaxLength(1000);
         ab.Property(a => a.ReferenceLabel).HasMaxLength(200);
         ab.Property(a => a.AppPath).HasMaxLength(500);
+        ab.Property(a => a.HealthState).HasMaxLength(32);
         ab.Property(a => a.IsRead).HasDefaultValue(false);
         ab.Property(a => a.IsResolved).HasDefaultValue(false);
         ab.Property(a => a.IsDismissed).HasDefaultValue(false);

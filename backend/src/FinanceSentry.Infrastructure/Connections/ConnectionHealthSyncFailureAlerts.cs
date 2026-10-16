@@ -13,16 +13,16 @@ using Microsoft.Extensions.Logging;
 /// holds it back: a confirmed credential loss is always told.</item>
 /// <item><see cref="ConnectionHealthOutcome.NotifyFailing"/> raises it with the outage copy when the last
 /// failure was transient, else the neutral one.</item>
-/// <item>A success after any failure resolves it.</item>
-/// <item><see cref="ConnectionHealthOutcome.GoDormant"/> raises nothing new: the Failing alert stays open,
-/// and the one ask to hide the connection is not built yet.</item>
+/// <item>A success after any failure resolves it, and the Dormant notice when the connection was Dormant.</item>
+/// <item><see cref="ConnectionHealthOutcome.GoDormant"/> raises the one notice that the connection may be closed
+/// (info, once per connection ever); the Failing alert stays open.</item>
 /// </list>
-/// The user's <see cref="UserAlertPreferences.SyncFailureAlerts"/> gates both. Best-effort: a failure here is
+/// The user's <see cref="UserAlertPreferences.SyncFailureAlerts"/> gates all of them. Best-effort: a failure here is
 /// logged and never reaches the sync.
 /// </summary>
 public static class ConnectionHealthSyncFailureAlerts
 {
-    /// <summary>Raises the alert when this failure just made the connection Failing or ActionRequired.</summary>
+    /// <summary>Raises the alert when this failure just made the connection Failing, ActionRequired or Dormant.</summary>
     public static async Task RaiseIfDueAsync(
         IAlertGeneratorService alerts,
         IUserAlertPreferencesReader preferences,
@@ -32,6 +32,12 @@ public static class ConnectionHealthSyncFailureAlerts
         ConnectionHealthEvaluation? evaluation,
         string? errorCode)
     {
+        if (evaluation is { Outcome: ConnectionHealthOutcome.GoDormant })
+        {
+            await RaiseDormantAsync(alerts, preferences, logger, userId, provider, evaluation.Health);
+            return;
+        }
+
         SyncFailureClass? failureClass = evaluation?.Outcome switch
         {
             ConnectionHealthOutcome.NotifyActionRequired => SyncFailureClass.Credential,
@@ -51,7 +57,7 @@ public static class ConnectionHealthSyncFailureAlerts
             if (raised == SyncFailureClass.Credential)
                 await alerts.EscalateSyncFailureAlertAsync(userId, provider, null, null, errorCode);
             else
-                await alerts.GenerateSyncFailureAlertAsync(userId, provider, null, null, errorCode, raised);
+                await alerts.GenerateFailingSyncFailureAlertAsync(userId, provider, null, null, errorCode, raised);
         }
         catch (Exception ex)
         {
@@ -81,10 +87,37 @@ public static class ConnectionHealthSyncFailureAlerts
             var prefs = await preferences.GetAsync(userId);
             if (prefs is null || !prefs.SyncFailureAlerts) return;
             await alerts.ResolveSyncFailureAlertAsync(userId, provider, null);
+            if (evaluation is { Previous.State: ConnectionHealthState.Dormant, Health.State: not ConnectionHealthState.Dormant })
+                await alerts.ResolveConnectionDormantAlertAsync(userId, provider, null);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not resolve the {Provider} sync-failure alert for user {UserId}", provider, userId);
         }
     }
+
+    private static async Task RaiseDormantAsync(
+        IAlertGeneratorService alerts,
+        IUserAlertPreferencesReader preferences,
+        ILogger logger,
+        Guid userId,
+        string provider,
+        ConnectionHealth health)
+    {
+        try
+        {
+            var prefs = await preferences.GetAsync(userId);
+            if (prefs is null || !prefs.SyncFailureAlerts) return;
+            await alerts.GenerateConnectionDormantAlertAsync(
+                userId, provider, null, null, FailingFor(health), othersSyncing: false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not raise the {Provider} Dormant notice for user {UserId}", provider, userId);
+        }
+    }
+
+    /// <summary>How long a connection has been failing, by its streak: what the Dormant notice tells.</summary>
+    public static TimeSpan FailingFor(ConnectionHealth health) =>
+        health is { FirstFailureAt: { } first, LastFailureAt: { } last } ? last - first : TimeSpan.Zero;
 }

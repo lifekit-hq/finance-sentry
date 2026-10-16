@@ -18,6 +18,12 @@ public class Alert : IHasUpdatedAt, IUserOwned
     /// alerts stored before it existed; <see cref="AlertAppPaths.For"/> resolves those from type, reference and label.
     /// </summary>
     public string? AppPath { get; set; }
+    /// <summary>
+    /// The connection-health state that raised the alert (<c>Failing</c>, <c>ActionRequired</c>, <c>Dormant</c>), for a
+    /// sync-failure or Dormant alert the connection-health policy raised for a provider it drives; null on every other
+    /// alert. Companion reads it to tell a reconnect ask from an outage it may hold for the digest.
+    /// </summary>
+    public string? HealthState { get; set; }
     public bool IsRead { get; set; }
     public bool IsResolved { get; set; }
     public bool IsDismissed { get; set; }

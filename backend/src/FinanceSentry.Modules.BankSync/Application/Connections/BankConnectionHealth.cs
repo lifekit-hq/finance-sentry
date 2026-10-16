@@ -136,8 +136,10 @@ public sealed class BankConnectionHealth(
 
     public async Task RecordSyncSuccessAsync(BankAccount account, CancellationToken ct = default)
     {
-        await recorder.RecordSuccessAsync(
+        var evaluation = await recorder.RecordSuccessAsync(
             AccountSubject(account), account.Health, (health, c) => SaveAccountHealthAsync(account, health, c), ct);
+        if (Healed(evaluation))
+            await ResolveDormantAsync(account.UserId, account.Provider, account.Id, ct);
 
         // Resolve unconditionally, not only on the policy's Resolve: it is one lookup, and it also clears an alert raised
         // before the policy drove them (keyed on the account) or one whose raise raced this success. In shadow mode this is
@@ -222,8 +224,17 @@ public sealed class BankConnectionHealth(
                 failure = ProviderFailure.ResourceGone(failure.Code);
 
             var evaluation = await RecordOnAccountAsync(account, failure, ct);
-            if (evaluation is { Outcome: ConnectionHealthOutcome.NotifyFailing })
-                await RaiseAsync(account.UserId, account.Provider, account.Id, account.BankName, failure, FailingClass(failure), ct);
+            switch (evaluation?.Outcome)
+            {
+                case ConnectionHealthOutcome.NotifyFailing:
+                    await RaiseAsync(account.UserId, account.Provider, account.Id, account.BankName, failure, FailingClass(failure), ct);
+                    break;
+                case ConnectionHealthOutcome.GoDormant:
+                    // One account failing for days while its connection works: most likely closed, so the notice says so.
+                    await RaiseDormantAsync(
+                        account.UserId, account.Provider, account.Id, AccountLabel(account), evaluation.Health, othersSyncing: true, ct);
+                    break;
+            }
 
             return new BankHealthVerdict(failure, null);
         }
@@ -241,8 +252,10 @@ public sealed class BankConnectionHealth(
         var stored = await ReadAsync(connection, ct);
         if (stored is not null)
         {
-            await recorder.RecordSuccessAsync(
+            var evaluation = await recorder.RecordSuccessAsync(
                 ConnectionSubject(connection), stored.Health, (health, c) => StoreOf(connection).SaveHealthUnscopedAsync(connection.Id, health, c), ct);
+            if (Healed(evaluation))
+                await ResolveDormantAsync(connection.UserId, connection.Provider, connection.Id, ct);
         }
 
         if (IsActive(connection.Provider))
@@ -311,9 +324,11 @@ public sealed class BankConnectionHealth(
             case ConnectionHealthOutcome.NotifyFailing:
                 await RaiseAsync(connection.UserId, connection.Provider, connection.Id, connection.Label, failure, FailingClass(failure), ct);
                 break;
-            default:
-                // Resolve fires only on a success. GoDormant raises nothing new (its one ask to hide the connection is a
-                // later slice): the alert raised when it went Failing stays open, and the sync slows (DormantSyncPausedUntilAsync).
+            case ConnectionHealthOutcome.GoDormant:
+                // The one notice that the connection may be closed; the alert raised when it went Failing stays open, and
+                // the sync slows (DormantSyncPausedUntilAsync). Resolve fires only on a success.
+                await RaiseDormantAsync(
+                    connection.UserId, connection.Provider, connection.Id, connection.Label, evaluation.Health, othersSyncing: false, ct);
                 break;
         }
 
@@ -406,7 +421,7 @@ public sealed class BankConnectionHealth(
             if (escalate)
                 await alerts.EscalateSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, ct);
             else
-                await alerts.GenerateSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, failureClass, ct);
+                await alerts.GenerateFailingSyncFailureAlertAsync(userId, provider, referenceId, label, failure.Code, failureClass, ct);
             logger.LogInformation(
                 "Connection health: raised the {SyncFailureClass} sync-failure alert for {Provider} {ReferenceId} of user {UserId}",
                 failureClass, provider, referenceId, userId);
@@ -416,6 +431,56 @@ public sealed class BankConnectionHealth(
             logger.LogWarning(ex, "Connection health: could not raise the sync-failure alert for {Provider} {ReferenceId}", provider, referenceId);
         }
     }
+
+    private async Task RaiseDormantAsync(
+        Guid userId, string provider, Guid referenceId, string label, ConnectionHealth health, bool othersSyncing,
+        CancellationToken ct)
+    {
+        if (!IsActive(provider))
+            return;
+
+        try
+        {
+            var prefs = await userPreferences.GetAsync(userId, ct);
+            if (prefs is null || !prefs.SyncFailureAlerts)
+                return;
+
+            await alerts.GenerateConnectionDormantAlertAsync(
+                userId, provider, referenceId, label, ConnectionHealthSyncFailureAlerts.FailingFor(health), othersSyncing, ct);
+            logger.LogInformation(
+                "Connection health: raised the Dormant notice for {Provider} {ReferenceId} of user {UserId}", provider, referenceId, userId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Connection health: could not raise the Dormant notice for {Provider} {ReferenceId}", provider, referenceId);
+        }
+    }
+
+    private async Task ResolveDormantAsync(Guid userId, string provider, Guid referenceId, CancellationToken ct)
+    {
+        if (!IsActive(provider))
+            return;
+
+        try
+        {
+            var prefs = await userPreferences.GetAsync(userId, ct);
+            if (prefs is null || !prefs.SyncFailureAlerts)
+                return;
+
+            await alerts.ResolveConnectionDormantAlertAsync(userId, provider, referenceId, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Connection health: could not resolve the Dormant notice for {Provider} {ReferenceId}", provider, referenceId);
+        }
+    }
+
+    // A success that ended a Dormant streak: the Dormant notice, if one went out, is resolved.
+    private static bool Healed(ConnectionHealthEvaluation? evaluation) =>
+        evaluation is { Previous.State: ConnectionHealthState.Dormant, Health.State: not ConnectionHealthState.Dormant };
+
+    // How the Dormant notice names one account: its bank and the last digits, as the account pickers do.
+    private static string AccountLabel(BankAccount account) => $"{account.BankName} ···{account.AccountNumberLast4}";
 
     private async Task ResolveAsync(Guid userId, string provider, Guid referenceId, CancellationToken ct)
     {

@@ -36,4 +36,10 @@ public enum CompanionEventKind
     RelativeUnderperformance,
     MacroEventAhead,
     MacroEventReleased,
+
+    /// <summary>
+    /// A connection, or one account, the connection-health policy drives has gone Dormant: the one notice that it may be
+    /// closed. Digest material - one line, never a wake.
+    /// </summary>
+    ConnectionDormant,
 }
