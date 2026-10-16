@@ -110,6 +110,9 @@ public class FinalizeTrueLayerReconnectAlertTests
 
         _account.TrueLayerConnectionId.Should().Be(_new.Id);
         _openAlerts.Should().BeEmpty();
+        _alerts.Verify(a => a.ResolveConnectionDormantAlertAsync(
+            _userId, "truelayer", _old.Id, It.IsAny<CancellationToken>()), Times.Once,
+            "a Dormant notice on the replaced consent would otherwise stay open for good");
     }
 
     [Fact]

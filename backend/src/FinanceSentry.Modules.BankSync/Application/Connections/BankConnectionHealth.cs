@@ -84,8 +84,8 @@ public interface IBankConnectionHealth
         BankConnectionRef connection, Exception exception, CancellationToken ct = default);
 
     /// <summary>
-    /// Resolves the sync-failure alerts keyed on connections a successful reconnect has replaced: their accounts now
-    /// belong to the new connection, so nothing would ever resolve the old connection's "reconnect" alert. A provider in
+    /// Resolves the sync-failure alerts, and any Dormant notice, keyed on connections a successful reconnect has replaced:
+    /// their accounts now belong to the new connection, so nothing would ever resolve the old connection's alerts. A provider in
     /// shadow mode raised no connection-keyed alert, so there is nothing to resolve and this does nothing.
     /// </summary>
     Task ResolveReplacedConnectionAlertsAsync(
@@ -289,7 +289,10 @@ public sealed class BankConnectionHealth(
             return;
 
         foreach (var connectionId in replacedConnectionIds)
+        {
             await ResolveAsync(userId, provider, connectionId, ct);
+            await ResolveDormantAsync(userId, provider, connectionId, ct);
+        }
     }
 
     private async Task<BankHealthVerdict> ChargeConnectionAsync(
