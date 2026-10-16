@@ -74,6 +74,13 @@ public sealed class ListTransactionsTool(
         {
             var accounts = await _accountsReader.GetAccountSummariesAsync(userIdVal, cancellationToken);
             accountMeta = accounts.ToDictionary(a => a.AccountId);
+
+            // A retired account's history is still listed: it keeps its currency and provider.
+            if (queryResult.Transactions.Any(t => !accountMeta.ContainsKey(t.AccountId)))
+            {
+                foreach (var retired in await _accountsReader.GetNonLiveAccountSummariesAsync(userIdVal, cancellationToken) ?? [])
+                    accountMeta.TryAdd(retired.AccountId, retired);
+            }
         }
         catch (Exception ex)
         {

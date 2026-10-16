@@ -840,7 +840,24 @@ cancelled) is not shown as a failure at all. The reconnect link opens the provid
 the app has one (TrueLayer, Inzhur) and otherwise lands on the Accounts list, whose row asks for the reconnect; no
 new sign-in flow is started from it. The Dormant notice (`ConnectionDormant` alert) is raised on the transition,
 once per connection or account ever (`AlertDedup.OncePerReference`), so a dismissed notice stays dismissed; it is
-resolved when the connection syncs again. It only asks: hiding a closed account is the owner's own action.
+resolved when the connection syncs again. The notice only asks; it does not retire anything. Retiring a closed account
+is the system's job when two independent signals agree (below), and the person's reversal is one tap, so it stays the
+person's account.
+
+**Retire and reopen (card and account lifecycle).** An account is retired automatically when (1) its own health is
+Dormant with class `ResourceGone` (failing for `DormantAfter`, 7 days) **and** (2) its provider's last successful
+account-list read no longer names it for 24 h or more while a sibling of the same connection is still listed. One
+signal alone never retires: a Dormant account the list still names stays as it is, and an absent account that is not
+Dormant (an empty or partial list) is only excluded from live totals. A failed list read changes nothing (a failed
+TrueLayer `/cards` read never makes cards look absent). Retiring sets `ClosedAt` / `ClosedReason` / `ClosedBy`, stops
+the sync, keeps every transaction as history, resolves the account's failure, Dormant, cash-shortfall and low-balance
+alerts (resolved, not deleted) and raises one info notice, `AccountRetired` (digest only, never a push). The notice
+is raised whether or not the provider drives the connection-health policy (Monobank is still in shadow mode). The
+person can reopen it in one tap (`POST /accounts/{id}/reopen`), and it reopens by itself when the provider lists it
+again, unless a reissue replaced it. A new account whose IBAN **exactly** equals that of a failing or absent account of
+the same connection is its reissue: the old one retires at once (reason `Reissued`, no 7-day wait) and the new one
+records it as `PredecessorAccountId`; a heuristic match without an IBAN (TrueLayer card: same type, currency and last
+four) only suggests and never links.
 
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
 settings the way Flex does in `BrokerageSyncModule`):

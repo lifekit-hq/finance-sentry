@@ -50,6 +50,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "MacroEventAhead" => CompanionEventKind.MacroEventAhead,
         "MacroEventReleased" => CompanionEventKind.MacroEventReleased,
         "ConnectionDormant" => CompanionEventKind.ConnectionDormant,
+        "AccountRetired" => CompanionEventKind.AccountRetired,
         _ => null,
     };
 
@@ -71,7 +72,8 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
             return EventDisposition.Pending;
 
         // A Dormant connection is told once, in the digest; Quiet keeps it silent like any other digest line.
-        if (kind == CompanionEventKind.ConnectionDormant)
+        // A retired account is told once, in the digest, the same way.
+        if (kind is CompanionEventKind.ConnectionDormant or CompanionEventKind.AccountRetired)
             return mode == NotificationMode.Quiet ? EventDisposition.SuppressedByMode : EventDisposition.HeldForDigest;
 
         // Operational failures must reach the operator even under a quiet mode — surface instead of

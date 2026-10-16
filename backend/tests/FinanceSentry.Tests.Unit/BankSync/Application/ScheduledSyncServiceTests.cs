@@ -1218,6 +1218,24 @@ public class ScheduledSyncServiceTests
             Times.Never);
     }
 
+    // A retired account is not synced by either path: the scheduler skips it and a manual trigger answers ACCOUNT_CLOSED.
+    [Fact]
+    public async Task TriggerSyncAsync_RetiredAccount_IsNotSynced()
+    {
+        var account = new BankAccount { Provider = "monobank" };
+        account.Retire(DateTimeOffset.UtcNow, AccountClosedReasons.AbsentFromList);
+        var accountRepo = new Mock<IBankAccountRepository>();
+        accountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        var syncService = new Mock<IScheduledSyncService>();
+        var coordinator = new TransactionSyncCoordinator(
+            accountRepo.Object, syncService.Object, Mock.Of<IBackgroundJobClient>(), Mock.Of<IBankConnectionHealth>());
+
+        (await coordinator.TriggerScheduledSyncAsync(AccountId)).ErrorCode.Should().Be(TransactionSyncCoordinator.ClosedCode);
+        (await coordinator.TriggerManualSyncAsync(AccountId)).ErrorCode.Should().Be(TransactionSyncCoordinator.ClosedCode);
+        syncService.Verify(
+            s => s.PerformFullSyncAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Never);
+    }
+
     // The provider asked for a wait (a rate limit's Retry-After): the scheduled run leaves the account alone until
     // then without calling the provider, and goes ahead once the wait is over.
     [Fact]

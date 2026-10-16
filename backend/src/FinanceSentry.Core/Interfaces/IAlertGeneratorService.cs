@@ -86,6 +86,18 @@ public interface IAlertGeneratorService
         Guid? accountId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// The one notice that an account was retired (the provider stopped listing it, or a reissued card replaced it):
+    /// info only, one line in the digest and never a push. <paramref name="replacedBy"/> names the successor of a
+    /// reissue. The account's failure, Dormant and cash-shortfall alerts are resolved by the caller, not deleted.
+    /// </summary>
+    Task GenerateAccountRetiredAlertAsync(
+        Guid userId,
+        Guid accountId,
+        string accountName,
+        string? replacedBy,
+        CancellationToken ct = default);
+
     Task DeleteAlertsForAccountAsync(
         Guid accountId,
         CancellationToken ct = default);

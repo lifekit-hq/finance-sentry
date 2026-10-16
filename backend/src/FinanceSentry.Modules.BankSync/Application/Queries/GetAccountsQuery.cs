@@ -43,7 +43,11 @@ public record BankAccountDto(
     DateTime? LastSyncTimestamp,
     DateTime? LastSuccessfulSyncTimestamp,
     DateTime CreatedAt,
-    string Provider
+    string Provider,
+    DateTimeOffset? ClosedAt = null,
+    string? ClosedReason = null,
+    Guid? PredecessorAccountId = null,
+    DateTimeOffset? AbsentSince = null
 );
 
 // ──────────────────────────────────────────────
@@ -52,10 +56,12 @@ public record BankAccountDto(
 
 public class GetAccountsQueryHandler(
     IBankAccountRepository accounts,
-    ISyncJobRepository syncJobs) : IQueryHandler<GetAccountsQuery, GetAccountsResult>
+    ISyncJobRepository syncJobs,
+    TimeProvider? clock = null) : IQueryHandler<GetAccountsQuery, GetAccountsResult>
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ISyncJobRepository _syncJobs = syncJobs;
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     public async Task<GetAccountsResult> Handle(
           GetAccountsQuery request, CancellationToken cancellationToken)
@@ -88,12 +94,18 @@ public class GetAccountsQueryHandler(
             a.UpdatedAt,
             lastSuccessful.TryGetValue(a.Id, out var lastOk) ? lastOk : null,
             a.CreatedAt,
-            a.Provider
+            a.Provider,
+            a.ClosedAt,
+            a.ClosedReason,
+            a.PredecessorAccountId,
+            a.AbsentSince
         )).ToList();
 
-        // Aggregate current balances by currency (only accounts with known balance)
+        // Aggregate current balances by currency (only accounts with known balance that count in live totals: a
+        // retired or vanished account is listed, but its balance is not added)
+        var now = _clock.GetUtcNow();
         var currencyTotals = list
-            .Where(a => a.CurrentBalance.HasValue)
+            .Where(a => a.CurrentBalance.HasValue && a.CountsInLiveTotals(now))
             .GroupBy(a => a.Currency)
             .ToDictionary(g => g.Key, g => g.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.CurrentBalance!.Value)));
 

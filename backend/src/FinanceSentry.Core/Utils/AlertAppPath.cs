@@ -61,7 +61,7 @@ public static partial class AlertAppPath
 
             // Reconnecting happens on the list, and there is no per-account page. A confirmed credential loss carries its
             // provider's reconnect link instead (ForReconnect), stored by its emitter.
-            "SyncFailure" or "ConsentExpiring" or "FamilyStatement" or "ConnectionDormant" => AccountsList,
+            "SyncFailure" or "ConsentExpiring" or "FamilyStatement" or "ConnectionDormant" or "AccountRetired" => AccountsList,
 
             "CategorySpike" => SpendIn(label, MonthStart(day), null),
             "BudgetBreach" => SpendIn(label, MonthStart(day), MonthEnd(day)),

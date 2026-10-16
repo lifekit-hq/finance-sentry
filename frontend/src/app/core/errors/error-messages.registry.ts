@@ -19,6 +19,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'You are the only owner. Make someone else an owner before closing your account.',
   ACCOUNT_NOT_CLOSED: 'This account is no longer closed, or its data has already been erased.',
   ACCOUNT_UPDATE_CONFLICT: 'Your account was changed elsewhere. Reload and try again.',
+  ACCOUNT_NOT_RETIRED: 'This account is not retired, so there is nothing to reopen.',
   MONOBANK_TOKEN_INVALID: 'Invalid Monobank token. Please check and try again.',
   MONOBANK_TOKEN_DUPLICATE: 'This Monobank token is already connected.',
   MONOBANK_RATE_LIMITED: 'Monobank rate limit reached. Please wait 60 seconds and try again.',

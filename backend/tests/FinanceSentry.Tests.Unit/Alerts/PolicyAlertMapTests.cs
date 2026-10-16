@@ -29,6 +29,7 @@ public class PolicyAlertMapTests
         AlertType.Opportunity,
         AlertType.ConsentExpiring,
         AlertType.ConnectionDormant,
+        AlertType.AccountRetired,
         AlertType.JobFailure,
         AlertType.PerformanceBrief,
         AlertType.PriceHike,

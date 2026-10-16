@@ -7,8 +7,10 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 public class BankingTotalsReader(
     IBankAccountRepository accounts,
     ISyncJobRepository syncJobs,
-    IClosedAccountsReader closedAccounts) : IBankingTotalsReader
+    IClosedAccountsReader closedAccounts,
+    TimeProvider? clock = null) : IBankingTotalsReader
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly IBankAccountRepository _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly ISyncJobRepository _syncJobs = syncJobs ?? throw new ArgumentNullException(nameof(syncJobs));
     private readonly IClosedAccountsReader _closedAccounts = closedAccounts;
@@ -22,16 +24,18 @@ public class BankingTotalsReader(
 
     public async Task<decimal> GetTotalUsdAsync(Guid userId, CancellationToken ct = default)
     {
+        var now = _clock.GetUtcNow();
         var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return accounts
-            .Where(a => a.CurrentBalance.HasValue)
+            .Where(a => a.CountsInLiveTotals(now) && a.CurrentBalance.HasValue)
             .Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, CurrencyConverter.ToUsd(a.CurrentBalance!.Value, a.Currency)));
     }
 
     public async Task<DateTime?> GetLatestSuccessfulSyncAsync(Guid userId, CancellationToken ct = default)
     {
+        var now = _clock.GetUtcNow();
         var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
-        var activeIds = accounts.Select(a => a.Id).ToHashSet();
+        var activeIds = accounts.Where(a => a.CountsInLiveTotals(now)).Select(a => a.Id).ToHashSet();
         if (activeIds.Count == 0)
             return null;
 

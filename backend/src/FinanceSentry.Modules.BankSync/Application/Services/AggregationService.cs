@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 /// <summary>
@@ -26,14 +27,22 @@ public interface IAggregationService
 }
 
 /// <inheritdoc />
-public class AggregationService(IBankAccountRepository accounts) : IAggregationService
+public class AggregationService(IBankAccountRepository accounts, TimeProvider? clock = null) : IAggregationService
 {
     private readonly IBankAccountRepository _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
+    // Balances and the count sum live accounts only: a retired or vanished account's balance has moved on.
+    private async Task<IEnumerable<BankAccount>> LiveAccountsAsync(Guid userId, CancellationToken ct)
+    {
+        var now = _clock.GetUtcNow();
+        return (await _accounts.GetByUserIdAsync(userId, ct)).Where(a => a.CountsInLiveTotals(now)).ToList();
+    }
 
     /// <inheritdoc />
     public async Task<Dictionary<string, decimal>> GetAggregatedBalanceAsync(Guid userId, CancellationToken ct = default)
     {
-        var accounts = await _accounts.GetByUserIdAsync(userId, ct);
+        var accounts = await LiveAccountsAsync(userId, ct);
 
         return accounts
             .Where(a => a.CurrentBalance.HasValue)
@@ -44,7 +53,7 @@ public class AggregationService(IBankAccountRepository accounts) : IAggregationS
     /// <inheritdoc />
     public async Task<decimal> GetTotalNetWorthUsdAsync(Guid userId, CancellationToken ct = default)
     {
-        var accounts = await _accounts.GetByUserIdAsync(userId, ct);
+        var accounts = await LiveAccountsAsync(userId, ct);
 
         return accounts
             .Where(a => a.CurrentBalance.HasValue)
@@ -54,7 +63,7 @@ public class AggregationService(IBankAccountRepository accounts) : IAggregationS
     /// <inheritdoc />
     public async Task<Dictionary<string, int>> GetAccountCountByTypeAsync(Guid userId, CancellationToken ct = default)
     {
-        var accounts = await _accounts.GetByUserIdAsync(userId, ct);
+        var accounts = await LiveAccountsAsync(userId, ct);
 
         return accounts
             .GroupBy(a => a.AccountType)

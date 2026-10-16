@@ -29,6 +29,7 @@ public sealed class MaterialityPolicyTests
     [InlineData("MacroEventAhead", CompanionEventKind.MacroEventAhead)]
     [InlineData("MacroEventReleased", CompanionEventKind.MacroEventReleased)]
     [InlineData("ConnectionDormant", CompanionEventKind.ConnectionDormant)]
+    [InlineData("AccountRetired", CompanionEventKind.AccountRetired)]
     public void Known_alert_types_map_to_kinds(string alertType, CompanionEventKind expected)
         => _policy.ClassifyAlert(alertType).Should().Be(expected);
 

@@ -29,6 +29,9 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AbsentSince")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("AccountNumberLast4")
                         .IsRequired()
                         .HasMaxLength(4)

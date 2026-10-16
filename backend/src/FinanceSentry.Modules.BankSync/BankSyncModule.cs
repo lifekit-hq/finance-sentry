@@ -200,6 +200,7 @@ public static class BankSyncModule
         services.AddScoped<IScheduledSyncService, ScheduledSyncService>();
         services.AddScoped<ITransactionSyncCoordinator, TransactionSyncCoordinator>();
         services.AddScoped<ITrueLayerTokenRefreshService, TrueLayerTokenRefreshService>();
+        services.AddScoped<IAccountLifecycle, AccountLifecycle>();
         services.AddScoped<IAccountDiscoveryService, AccountDiscoveryService>();
         services.AddConnectionHealthProbe<BankConnectionHealthProbe>();
         services.AddScoped<IConnectionHealthReader, BankConnectionHealthReader>();

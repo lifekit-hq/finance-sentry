@@ -127,6 +127,25 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
                 cancellationToken);
     }
 
+    public async Task SaveLifecycleUnscopedAsync(BankAccount account, CancellationToken cancellationToken = default)
+    {
+        var closedAt = account.ClosedAt;
+        var closedReason = account.ClosedReason;
+        var closedBy = account.ClosedBy;
+        var predecessor = account.PredecessorAccountId;
+        var absentSince = account.AbsentSince;
+        await AllUsersIncludingRemoved
+            .Where(ba => ba.Id == account.Id)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.ClosedAt, closedAt)
+                    .SetProperty(ba => ba.ClosedReason, closedReason)
+                    .SetProperty(ba => ba.ClosedBy, closedBy)
+                    .SetProperty(ba => ba.PredecessorAccountId, predecessor)
+                    .SetProperty(ba => ba.AbsentSince, absentSince)
+                    .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+    }
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var account = await OwnedIncludingRemoved.FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
@@ -193,7 +212,7 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<IEnumerable<BankAccount>> GetAllActiveUnscopedAsync(CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .Where(ba => ba.Provider != BankAccount.SeededProvider)
+            .Where(ba => ba.Provider != BankAccount.SeededProvider && ba.ClosedAt == null)
             .OrderBy(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
     }

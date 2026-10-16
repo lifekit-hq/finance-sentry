@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
 using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -13,6 +14,8 @@ using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -39,7 +42,9 @@ public class AccountDiscoveryServiceTests
         MonobankBalanceCache MonobankBalanceCache,
         Mock<ILogger<AccountDiscoveryService>> Logger,
         List<BankAccount> StoredAccounts,
-        List<BankAccount> AddedAccounts);
+        List<BankAccount> AddedAccounts,
+        Mock<IAlertGeneratorService> Alerts,
+        FakeTimeProvider Clock);
 
     private static Harness BuildSut()
     {
@@ -55,6 +60,9 @@ public class AccountDiscoveryServiceTests
         var connectionHealth = new Mock<IBankConnectionHealth>();
 
         var monobankBalanceCache = new MonobankBalanceCache(TimeProvider.System);
+        var alerts = new Mock<IAlertGeneratorService>();
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.Zero));
+        var lifecycle = new AccountLifecycle(accounts.Object, alerts.Object, clock, NullLogger<AccountLifecycle>.Instance);
 
         // Stateful fake: rows added by one run are visible to the existence check of the next.
         var storedAccounts = new List<BankAccount>();
@@ -95,11 +103,12 @@ public class AccountDiscoveryServiceTests
             accounts.Object,
             backgroundJobs.Object,
             connectionHealth.Object,
+            lifecycle,
             logger.Object);
 
         return new Harness(sut, trueLayerConnections, trueLayerClient, trueLayerTokenRefresh,
             monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, connectionHealth, monobankBalanceCache, logger,
-            storedAccounts, addedAccounts);
+            storedAccounts, addedAccounts, alerts, clock);
     }
 
     private static TrueLayerConnection MakeConnection()
@@ -462,19 +471,13 @@ public class AccountDiscoveryServiceTests
 
     // ── Card lifecycle PR 1: identifiers refreshed on existing rows; log-only "would retire" detector ──
 
-    private static void VerifyWouldRetireLogged(Harness h, Times times)
-        => h.Logger.Verify(l => l.Log(
-            LogLevel.Warning, It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, _) => $"{v}".Contains("would retire")),
-            null, It.IsAny<Func<It.IsAnyType, Exception?, string>>()), times);
-
     private static BankAccount SeedOwned(
         Harness h, string externalId, Guid? monobankCredentialId = null, Guid? trueLayerConnectionId = null,
-        ConnectionHealth? health = null)
+        ConnectionHealth? health = null, string provider = "x", string? iban = null)
     {
         var account = new BankAccount
         {
-            UserId = UserId, ExternalAccountId = externalId, Provider = "x", AccountNumberLast4 = "0000",
+            UserId = UserId, ExternalAccountId = externalId, Provider = provider, AccountNumberLast4 = "0000", Iban = iban,
             MonobankCredentialId = monobankCredentialId, TrueLayerConnectionId = trueLayerConnectionId,
         };
         if (health is not null) account.ApplyHealth(health);
@@ -558,68 +561,207 @@ public class AccountDiscoveryServiceTests
         card.AccountNumberLast4.Should().Be("4321");
     }
 
+    // ── Card lifecycle PR 2: absence, retire, reopen, reissue handover ──
+
+    private static readonly TimeSpan PastExclusion = TimeSpan.FromHours(25);
+
+    private static MonobankCredential SetupMonobankWithLiveSibling(Harness h, out BankAccount live)
+    {
+        var credential = SetupMonobank(h, new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0));
+        live = SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
+        return credential;
+    }
+
     [Fact]
-    public async Task DiscoverNewAccountsAsync_Monobank_LogsWouldRetire_ForAbsentDormantResourceGoneAccount_AndChangesNothing()
+    public async Task Reconcile_AbsentWithListedSibling_MarksAbsentSince_AndKeepsItOpen()
     {
         var h = BuildSut();
-        var credential = SetupMonobank(h, new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0));
-        SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
+        var credential = SetupMonobankWithLiveSibling(h, out _);
         var gone = SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
 
         await h.Sut.DiscoverNewAccountsAsync();
 
-        VerifyWouldRetireLogged(h, Times.Once());
-        gone.IsActive.Should().BeTrue();
-        gone.ClosedAt.Should().BeNull();
-        gone.Health.Should().Be(DormantGone);
-        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
-        h.Accounts.Verify(r => r.UpdateAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
+        gone.AbsentSince.Should().Be(h.Clock.GetUtcNow());
+        gone.IsClosed.Should().BeFalse();
+        gone.CountsInLiveTotals(h.Clock.GetUtcNow()).Should().BeTrue("the exclusion waits 24h");
+        h.Accounts.Verify(r => r.SaveLifecycleUnscopedAsync(gone, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_Monobank_DoesNotLogWouldRetire_ForListedOrHealthyOrOtherFailureAccounts()
+    public async Task Reconcile_AbsentPastTheWindowAndDormantResourceGone_RetiresWithNoticeAndResolvesAlerts()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobankWithLiveSibling(h, out _);
+        var gone = SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
+        gone.AbsentSince = h.Clock.GetUtcNow() - PastExclusion;
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        gone.ClosedAt.Should().Be(h.Clock.GetUtcNow());
+        gone.ClosedReason.Should().Be(AccountClosedReasons.AbsentFromList);
+        gone.ClosedBy.Should().Be(AccountClosedReasons.BySystem);
+        gone.IsActive.Should().BeTrue("a closed account keeps IsActive so its history still converts at its currency");
+        h.Accounts.Verify(r => r.SaveLifecycleUnscopedAsync(gone, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.ResolveSyncFailureAlertAsync(UserId, "x", gone.Id, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.ResolveConnectionDormantAlertAsync(UserId, "x", gone.Id, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.ResolveCashShortfallAlertAsync(UserId, gone.Id, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.ResolveLowBalanceAlertAsync(UserId, gone.Id, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.GenerateAccountRetiredAlertAsync(UserId, gone.Id, It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        h.Alerts.Verify(a => a.DeleteAlertsForAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reconcile_RetireNeedsBothSignals()
     {
         var h = BuildSut();
         var credential = SetupMonobank(h,
             new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0),
             new MonobankAccountInfo("mono-listed-dormant", "black UAH", "checking", "2222", 980, 100, 0));
         SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
-        SeedOwned(h, "mono-listed-dormant", monobankCredentialId: credential.Id, health: DormantGone);
-        SeedOwned(h, "mono-absent-healthy", monobankCredentialId: credential.Id);
-        SeedOwned(h, "mono-absent-transient", monobankCredentialId: credential.Id,
+        var listed = SeedOwned(h, "mono-listed-dormant", monobankCredentialId: credential.Id, health: DormantGone);
+        var healthy = SeedOwned(h, "mono-absent-healthy", monobankCredentialId: credential.Id);
+        var transient = SeedOwned(h, "mono-absent-transient", monobankCredentialId: credential.Id,
             health: new ConnectionHealth { State = ConnectionHealthState.Dormant, LastFailureClass = FailureClass.Transient });
+        var tooSoon = SeedOwned(h, "mono-absent-fresh", monobankCredentialId: credential.Id, health: DormantGone);
+        var past = h.Clock.GetUtcNow() - PastExclusion;
+        healthy.AbsentSince = past;
+        transient.AbsentSince = past;
+        tooSoon.AbsentSince = h.Clock.GetUtcNow() - TimeSpan.FromHours(2);
 
         await h.Sut.DiscoverNewAccountsAsync();
 
-        VerifyWouldRetireLogged(h, Times.Never());
+        new[] { listed, healthy, transient, tooSoon }.Should().OnlyContain(a => !a.IsClosed);
+        h.Alerts.Verify(a => a.GenerateAccountRetiredAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_Monobank_DoesNotLogWouldRetire_WhenNoSiblingIsListed()
+    public async Task Reconcile_TheAbsenceExclusionIsDueOnlyOnceAListedSiblingExists()
     {
         var h = BuildSut();
         var credential = SetupMonobank(h);
-        SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
+        var gone = SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
+        gone.AbsentSince = h.Clock.GetUtcNow() - PastExclusion;
 
         await h.Sut.DiscoverNewAccountsAsync();
 
-        VerifyWouldRetireLogged(h, Times.Never());
+        gone.IsClosed.Should().BeFalse();
+        h.Accounts.Verify(r => r.SaveLifecycleUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_TrueLayer_LogsWouldRetire_ForAbsentAccount_ButNotWhenCardsListingFailed()
+    public async Task Reconcile_TheExclusionIsUndoneByReappearance()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0),
+            new MonobankAccountInfo("mono-back", "black UAH", "checking", "2222", 980, 100, 0));
+        SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
+        var back = SeedOwned(h, "mono-back", monobankCredentialId: credential.Id);
+        back.AbsentSince = h.Clock.GetUtcNow() - PastExclusion;
+        back.IsVanished(h.Clock.GetUtcNow()).Should().BeTrue();
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        back.AbsentSince.Should().BeNull();
+        back.CountsInLiveTotals(h.Clock.GetUtcNow()).Should().BeTrue();
+        h.Accounts.Verify(r => r.SaveLifecycleUnscopedAsync(back, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reconcile_AReappearingAbsenceClosureReopens_ButAReissueClosureStays()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-back", "black UAH", "checking", "1111", 980, 100, 0),
+            new MonobankAccountInfo("mono-old", "black UAH", "checking", "2222", 980, 100, 0));
+        var back = SeedOwned(h, "mono-back", monobankCredentialId: credential.Id, health: DormantGone);
+        back.ApplyHealth(back.Health with { LastFailureAt = h.Clock.GetUtcNow().AddDays(-9) });
+        back.Retire(h.Clock.GetUtcNow().AddDays(-1), AccountClosedReasons.AbsentFromList);
+        var old = SeedOwned(h, "mono-old", monobankCredentialId: credential.Id);
+        old.Retire(h.Clock.GetUtcNow().AddDays(-1), AccountClosedReasons.Reissued);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        back.IsClosed.Should().BeFalse();
+        back.Health.LastFailureAt.Should().BeNull("the scheduler must try it on its next run");
+        h.Accounts.Verify(r => r.SaveHealthUnscopedAsync(back.Id, back.Health, It.IsAny<CancellationToken>()), Times.Once);
+        old.IsClosed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reconcile_TrueLayerCardsListingFailed_ChangesNothing()
     {
         var h = BuildSut();
         var connection = SetupTrueLayer(h, "tl-live");
         SeedOwned(h, "tl-live", trueLayerConnectionId: connection.Id);
-        SeedOwned(h, "tl-gone", trueLayerConnectionId: connection.Id, health: DormantGone);
-
-        await h.Sut.DiscoverNewAccountsAsync();
-        VerifyWouldRetireLogged(h, Times.Once());
-
+        var gone = SeedOwned(h, "tl-gone", trueLayerConnectionId: connection.Id, health: DormantGone);
+        gone.AbsentSince = h.Clock.GetUtcNow() - PastExclusion;
         h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new TrueLayerException("TRUELAYER_ERROR", "down", 503));
+
         await h.Sut.DiscoverNewAccountsAsync();
-        VerifyWouldRetireLogged(h, Times.Once());
+
+        gone.IsClosed.Should().BeFalse();
+        h.Accounts.Verify(r => r.SaveLifecycleUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handover_ExactIbanOfAnAbsentAccount_RetiresTheOldOneAtOnceAndLinksTheNewOne()
+    {
+        var h = BuildSut();
+        const string iban = "UA733220010000026201234567890";
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0),
+            new MonobankAccountInfo("mono-new", "black UAH", "checking", "9999", 980, 100, 0, Iban: iban));
+        SeedOwned(h, "mono-live", monobankCredentialId: credential.Id, provider: "monobank");
+        var old = SeedOwned(h, "mono-old", monobankCredentialId: credential.Id, provider: "monobank", iban: iban);
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
+        var added = h.AddedAccounts.Should().ContainSingle().Subject;
+        added.PredecessorAccountId.Should().Be(old.Id);
+        old.ClosedAt.Should().NotBeNull("no 7-day wait on an exact IBAN match");
+        old.ClosedReason.Should().Be(AccountClosedReasons.Reissued);
+        h.Alerts.Verify(a => a.GenerateAccountRetiredAlertAsync(
+            UserId, old.Id, It.IsAny<string>(), It.Is<string?>(r => r != null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handover_ExactIbanOfAHealthyListedAccount_IsNotAReissue()
+    {
+        var h = BuildSut();
+        const string iban = "UA733220010000026201234567890";
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-old", "black UAH", "checking", "1111", 980, 100, 0, Iban: iban),
+            new MonobankAccountInfo("mono-new", "black UAH", "checking", "9999", 980, 100, 0, Iban: iban));
+        var old = SeedOwned(h, "mono-old", monobankCredentialId: credential.Id, provider: "monobank", iban: iban);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        h.AddedAccounts.Should().ContainSingle().Which.PredecessorAccountId.Should().BeNull();
+        old.IsClosed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handover_AHeuristicTrueLayerMatch_OnlySuggests()
+    {
+        var h = BuildSut();
+        var connection = SetupTrueLayer(h, "tl-live");
+        h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeTrueLayerAccount("tl-live")]);
+        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("tl-new-card", "Credit", "EUR", "", "credit", null, "4321")]);
+        SeedOwned(h, "tl-live", trueLayerConnectionId: connection.Id, provider: "truelayer");
+        var old = SeedOwned(h, "tl-old-card", trueLayerConnectionId: connection.Id, provider: "truelayer", health: DormantGone);
+        old.AccountNumberLast4 = "4321";
+        old.AccountType = "credit";
+        old.Currency = "EUR";
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        h.AddedAccounts.Should().ContainSingle().Which.PredecessorAccountId.Should().BeNull();
+        old.IsClosed.Should().BeFalse();
     }
 }

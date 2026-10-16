@@ -76,14 +76,67 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     /// <summary>A TrueLayer card's optional <c>valid_to</c> as the provider sends it (year-month, e.g. "2027-01").</summary>
     public string? CardValidTo { get; set; }
 
-    // Closure and reissue bookkeeping: stored and read by later increments, written by nothing yet.
+    /// <summary>
+    /// When the account was retired (card lifecycle): the provider closed it, or a reissue replaced it. Distinct from
+    /// <see cref="IsActive"/> (a removal by the person): a closed account keeps its history and its currency, is not
+    /// synced, and drops out of every live balance from this instant.
+    /// </summary>
     public DateTimeOffset? ClosedAt { get; set; }
 
+    /// <summary>One of <see cref="AccountClosedReasons"/>.</summary>
     public string? ClosedReason { get; set; }
 
+    /// <summary><see cref="AccountClosedReasons.BySystem"/> when discovery retired it.</summary>
     public string? ClosedBy { get; set; }
 
+    /// <summary>The account this one replaced after a reissue (exact IBAN match); null otherwise.</summary>
     public Guid? PredecessorAccountId { get; set; }
+
+    /// <summary>
+    /// When successful list reads first stopped listing the account while a sibling of the same connection was still
+    /// listed; null while it is listed. After <see cref="AbsenceExclusionThreshold"/> the account's balance no longer
+    /// counts in live totals, ahead of the full retire (the balance of a reissued card migrates to its successor).
+    /// </summary>
+    public DateTimeOffset? AbsentSince { get; set; }
+
+    /// <summary>How long an account must stay absent from the provider's list before its balance leaves live totals.</summary>
+    public static readonly TimeSpan AbsenceExclusionThreshold = TimeSpan.FromHours(24);
+
+    public bool IsClosed => ClosedAt is not null;
+
+    /// <summary>
+    /// Whether the account's balance counts in live totals (net worth, Accounts totals, Liquidity): not closed, and not
+    /// absent from the provider's list for <see cref="AbsenceExclusionThreshold"/> or more.
+    /// </summary>
+    public bool CountsInLiveTotals(DateTimeOffset now)
+        => ClosedAt is null && (AbsentSince is null || now - AbsentSince.Value < AbsenceExclusionThreshold);
+
+    /// <summary>
+    /// Whether the account has vanished from its connection's list for long enough that its balance stays out of live
+    /// totals although it is not retired yet.
+    /// </summary>
+    public bool IsVanished(DateTimeOffset now)
+        => ClosedAt is null && AbsentSince is not null && now - AbsentSince.Value >= AbsenceExclusionThreshold;
+
+    public void Retire(DateTimeOffset at, string reason)
+    {
+        ClosedAt = at;
+        ClosedReason = reason;
+        ClosedBy = AccountClosedReasons.BySystem;
+    }
+
+    /// <summary>
+    /// Brings a retired account back: the closure and absence marks clear, and the last failure is forgotten so the
+    /// scheduler tries the account on its next run instead of keeping it on a Dormant account's slowed cadence.
+    /// </summary>
+    public void Reopen()
+    {
+        ClosedAt = null;
+        ClosedReason = null;
+        ClosedBy = null;
+        AbsentSince = null;
+        Health = Health with { LastFailureAt = null };
+    }
 
     public Guid? CreatedBy { get; set; }
 

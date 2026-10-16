@@ -40,6 +40,7 @@ public class BankSyncController(
     ISyncJobRepository syncJobs,
     ITransactionSyncCoordinator coordinator,
     FinanceSentry.Core.Interfaces.IAlertGeneratorService alerts,
+    IAccountLifecycle lifecycle,
     IHostEnvironment environment) : ControllerBase
 {
     private readonly IBankAccountRepository _accounts = accounts;
@@ -209,6 +210,9 @@ public class BankSyncController(
         if (account == null || account.UserId != userId)
             return NotFound(new ApiErrorBody("Account not found.", "ACCOUNT_NOT_FOUND"));
 
+        if (account.IsClosed)
+            return Conflict(new ApiErrorBody("The account is retired; reopen it to sync again.", TransactionSyncCoordinator.ClosedCode));
+
         if (account.SyncStatus == "syncing")
             return Conflict(new ApiErrorBody("A sync is already in progress for this account.", "SYNC_IN_PROGRESS"));
 
@@ -218,6 +222,32 @@ public class BankSyncController(
         return Accepted(new SyncEnqueuedResponse(
             hangfireJobId,
             "Sync enqueued. Use GET /api/accounts/{accountId}/sync-status to track progress."));
+    }
+
+    // ── POST /api/accounts/{accountId}/reopen ── card lifecycle ──────────────
+
+    /// <summary>
+    /// Undoes a retirement (the provider still serves the account, or the person knows better): clears the closure and
+    /// the absence mark so its balance counts again, and syncs it right away. The account's history was never removed.
+    /// </summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
+    [HttpPost("{accountId:guid}/reopen")]
+    public async Task<IActionResult> ReopenAccount(Guid accountId, CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+
+        var account = await _accounts.GetByIdAsync(accountId, ct);
+        if (account == null || account.UserId != userId)
+            return NotFound(new ApiErrorBody("Account not found.", "ACCOUNT_NOT_FOUND"));
+
+        if (!account.IsClosed && account.AbsentSince is null)
+            return Conflict(new ApiErrorBody("The account is not retired.", "ACCOUNT_NOT_RETIRED"));
+
+        await lifecycle.ReopenAsync(account, ct);
+        _backgroundJobs.Enqueue<Infrastructure.Jobs.ScheduledSyncJob>(job => job.ExecuteManualSyncAsync(accountId));
+
+        logger.LogInformation("Account {AccountId} reopened by its owner.", accountId);
+        return NoContent();
     }
 
     // ── GET /api/accounts/{accountId}/sync-status ── T309 ───────────────────
