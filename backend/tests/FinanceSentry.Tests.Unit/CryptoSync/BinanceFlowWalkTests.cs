@@ -231,16 +231,28 @@ public class BinanceFlowWalkTests
         page.WalkedTo.Should().Be(WindowEnd);
     }
 
-    [Fact]
-    public async Task ARejectedEarnSource_IsSkipped_AndTheWindowStillCompletes()
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""")]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"msg":"Unauthorized"}""")]
+    [InlineData(System.Net.HttpStatusCode.Forbidden, """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""")]
+    public async Task ARejectedEarnSource_IsSkipped_AndTheWindowStillCompletes(System.Net.HttpStatusCode status, string body)
     {
-        _handler.Respond("/sapi/v1/asset/dribblet", """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""",
-            System.Net.HttpStatusCode.Unauthorized);
+        _handler.Respond("/sapi/v1/asset/dribblet", body, status);
 
         var page = await WalkAsync(PaymentsOut);
 
         page.Flows.Should().BeEmpty();
         page.WalkedTo.Should().Be(WindowEnd);
+    }
+
+    [Fact]
+    public async Task AForbiddenEarnSourceWithoutTheKeyRejectedCode_Throws_SoTheWindowIsReadAgain()
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", """{"msg":"WAF Limit (Way Too Many Requests)"}""", System.Net.HttpStatusCode.Forbidden);
+
+        var act = () => WalkAsync(PaymentsOut);
+
+        await act.Should().ThrowAsync<BinanceException>();
     }
 
     [Theory]

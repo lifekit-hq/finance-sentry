@@ -1000,13 +1000,13 @@ are closed periods.
     (`txId`) and network kept: a deposit once credited (status 1, or 6 credited but locked), a withdrawal once
     completed (6), at its `amount` with the `transactionFee` as its fee; a pending one holds the cursor for up
     to 30 days; a transfer with another Binance account (`transferType` 1) is marked `binance_internal`.
-    Revolut X: completed `receive` and `send` transfers (`/transactions`) and `reward` (staking income, a separate request per window: a rejected one is skipped with a warning, so that income stays in the market remainder), with the other side's account type
+    Revolut X: completed `receive` and `send` transfers (`/transactions`) and `reward` (staking income, a separate request per window: a rejected one is skipped with a warning, so that income stays in the market remainder; rewards paid before this release are not fetched for a credential whose flow walk already passed them, and stay in the market remainder until a separate backfill), with the other side's account type
     kept (`revolut` = the owner's own Revolut app, `external_*` = outside); a coin transfer with an
     `external_crypto_wallet` also reads its details (`/transactions/{id}`) for the chain hash and network, and a
     send whose fee is named in the sent coin is stored at what went on chain with that fee apart.
     S2c adds Binance's earn and
     dust history, read with the window's last lane (one day, once per window, best-effort: a call the key is not
-    permitted to make is skipped with a warning, so its income stays in the market remainder): Simple Earn flexible
+    permitted to make (HTTP 401, or a 403 with Binance code -2015; any other failure, including another 403, throws and the window is read again) is skipped with a warning, so its income stays in the market remainder): Simple Earn flexible
     and locked rewards, `assetDividend` distributions and airdrops (rows whose text names Earn are skipped, as the
     Earn calls already count them; unverified against a live row), and `asset/dribblet` dust conversions to BNB.
   - **Classification** (`CryptoFlowClassifier`, at read time): fiat in, a card buy and a transfer in are
