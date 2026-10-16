@@ -35,7 +35,7 @@ public sealed class RevolutXAdapter(
     private const long FlowWindowMs = 30L * 24 * 60 * 60 * 1000 - 2;
     private const int MaxFlowWindowsPerCall = 12;
     private const int FlowPageLimit = 1900;
-    private const string FlowTypes = "receive,send,reward";
+    private const string TransferTypes = "receive,send";
     private const string CompletedStatus = "completed";
     private const string PendingStatus = "pending";
     private const string ReceiveType = "receive";
@@ -202,7 +202,15 @@ public sealed class RevolutXAdapter(
         for (var windows = 0; windowStart <= asOfMs && windows < MaxFlowWindowsPerCall; windows++)
         {
             var windowEnd = Math.Min(windowStart + FlowWindowMs - 1, asOfMs);
-            await foreach (var row in TransactionsInWindowAsync(credentials, windowStart, windowEnd, ct))
+            var rows = new List<RevolutXTransaction>();
+            await foreach (var row in TransactionsInWindowAsync(credentials, TransferTypes, windowStart, windowEnd, ct))
+            {
+                rows.Add(row);
+            }
+
+            rows.AddRange(await RewardsInWindowAsync(credentials, windowStart, windowEnd, ct));
+
+            foreach (var row in rows)
             {
                 var status = row.Status?.Trim().ToLowerInvariant();
                 if (status == CompletedStatus)
@@ -226,8 +234,32 @@ public sealed class RevolutXAdapter(
             DateTimeOffset.FromUnixTimeMilliseconds(Math.Max(resumeMs, ToUnixMs(walk.From) - 1)).UtcDateTime);
     }
 
+    private async Task<List<RevolutXTransaction>> RewardsInWindowAsync(
+        RevolutXCredentials credentials,
+        long startMs,
+        long endMs,
+        CancellationToken ct)
+    {
+        var rows = new List<RevolutXTransaction>();
+        try
+        {
+            await foreach (var row in TransactionsInWindowAsync(credentials, RewardType, startMs, endMs, ct))
+            {
+                rows.Add(row);
+            }
+        }
+        catch (RevolutXException ex) when (ex.VenueStatusCode is >= 400 and < 500 and not 429)
+        {
+            logger.LogWarning(ex, "Skipping Revolut X rewards - the request was rejected.");
+            return [];
+        }
+
+        return rows;
+    }
+
     private async IAsyncEnumerable<RevolutXTransaction> TransactionsInWindowAsync(
         RevolutXCredentials credentials,
+        string types,
         long startMs,
         long endMs,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
@@ -242,7 +274,7 @@ public sealed class RevolutXAdapter(
             }
 
             var response = await httpClient.GetTransactionsAsync(
-                credentials, FlowTypes, startMs - 1, endMs + 1, pageCursor, FlowPageLimit, ct);
+                credentials, types, startMs - 1, endMs + 1, pageCursor, FlowPageLimit, ct);
 
             foreach (var row in response.Data ?? [])
             {
