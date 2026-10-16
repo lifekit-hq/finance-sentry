@@ -7,6 +7,7 @@ export type AlertType =
   | 'PolicyViolation'
   | 'Opportunity'
   | 'ConsentExpiring'
+  | 'ConnectionDormant'
   | 'JobFailure'
   | 'PerformanceBrief'
   | 'CashShortfall'

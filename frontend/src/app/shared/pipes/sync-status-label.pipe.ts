@@ -10,6 +10,10 @@ const LABEL_MAP: Record<SyncStatus, string> = {
   failed: 'Failed',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   reauth_required: 'Reauth',
+  retrying: 'Retrying',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  reconnect_needed: 'Reconnect needed',
+  dormant: 'Dormant',
 };
 
 @Pipe({name: 'syncStatusLabel'})

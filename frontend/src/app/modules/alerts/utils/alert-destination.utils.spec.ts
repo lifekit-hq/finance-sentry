@@ -96,6 +96,7 @@ describe('AlertDestinationUtils.resolve', () => {
     ['SyncFailure', AppRoute.AccountsList],
     ['CashShortfall', AppRoute.AccountsList],
     ['ConsentExpiring', AppRoute.AccountsList],
+    ['ConnectionDormant', AppRoute.AccountsList],
     ['FamilyStatement', AppRoute.AccountsList],
     ['FireBrief', AppRoute.Dashboard],
     ['UnusualSpend', AppRoute.Transactions],

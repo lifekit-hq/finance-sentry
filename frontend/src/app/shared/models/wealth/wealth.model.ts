@@ -3,7 +3,20 @@ import {type MaybeHeadline} from '../headline/headline.model';
 
 export type AccountCategory = 'banking' | 'crypto' | 'brokerage' | 'other';
 
-export type SyncStatus = 'synced' | 'syncing' | 'pending' | 'stale' | 'failed' | 'reauth_required';
+/**
+ * `retrying`, `reconnect_needed` and `dormant` come from a connection's health, and only for a provider the
+ * connection-health policy drives (`ConnectionHealth:ActiveProviders`); every other provider keeps the rest.
+ */
+export type SyncStatus =
+  | 'synced'
+  | 'syncing'
+  | 'pending'
+  | 'stale'
+  | 'failed'
+  | 'reauth_required'
+  | 'retrying'
+  | 'reconnect_needed'
+  | 'dormant';
 
 export interface AccountBalanceItem extends AccountIdentity {
   provider: string;

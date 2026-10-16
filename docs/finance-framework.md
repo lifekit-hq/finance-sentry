@@ -815,6 +815,31 @@ rotates the refresh token) is never made otherwise: a Dormant bank connection is
 discovery pass, with these same calls. IBKR Flex and Inzhur have no probe: Flex's only call generates a statement,
 so its daily run and its own early re-checks (1 h, then 4 h; a suspect 1020's first look already confirms) are its looks.
 
+**What the person is told** (connection-health slice S5), again only for a provider in
+`ConnectionHealth:ActiveProviders`: a shadow provider's labels, alerts, Companion relay and MCP read stay exactly
+what its own sync path gives, and with the list empty nothing a person can see changes. Every surface reads the
+health its module stores, through one port per module (`IConnectionHealthReader`: bank tokens, consents and
+accounts; IBKR and Flex credentials; exchange credentials), and labels it with one map
+(`ConnectionHealthSurface`), so the app, Companion and the agent cannot disagree:
+
+| State | Label (Accounts page, MCP `health`) | In-app | Companion | MCP `get_sync_health` status |
+|---|---|---|---|---|
+| Healthy | none (the path's own "synced" / "stale") | nothing | nothing | `ok` |
+| Degraded | Retrying, quietly (muted text, warning dot) | nothing else | nothing | `ok` |
+| Failing | Retrying, quietly | the `SyncFailure` alert (S2/S3) | digest; escalates once open > 24 h (existing reconciler) | `error` |
+| ActionRequired | Reconnect needed (error colour, attention row) | the reconnect alert, linking `/accounts/list?reconnect=<provider>` | relayed at once in every mode, Quiet included | `error`, "Reconnection required." |
+| Dormant | Dormant, quietly (neutral dot) on the account or connection | one info notice, "… may be closed" | one digest line | `error` |
+
+An account shows its connection's state while that is not Healthy, else its own sub-state; a group (an institution,
+a provider) shows its most urgent member, and a Dormant member is quiet beside working siblings, so one closed
+account does not mark the rest. A Dormant account still marks its institution's balance as a stale source in the
+headline: the balance behind the total is frozen. A failure the policy does not count (one of ours, a sync we
+cancelled) is not shown as a failure at all. The reconnect link opens the provider's existing reconnect flow where
+the app has one (TrueLayer, Inzhur) and otherwise lands on the Accounts list, whose row asks for the reconnect; no
+new sign-in flow is started from it. The Dormant notice (`ConnectionDormant` alert) is raised on the transition,
+once per connection or account ever (`AlertDedup.OncePerReference`), so a dismissed notice stays dismissed; it is
+resolved when the connection syncs again. It only asks: hiding a closed account is the owner's own action.
+
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
 settings the way Flex does in `BrokerageSyncModule`):
 
