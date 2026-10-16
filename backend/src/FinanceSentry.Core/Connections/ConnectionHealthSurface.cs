@@ -41,12 +41,13 @@ public static class ConnectionHealthSurface
     }
 
     /// <summary>
-    /// The state one account shows: its connection's when the connection is not Healthy (the connection carries the
-    /// health that alerts, so a lost token is every account's problem), else the account's own sub-state (one account
-    /// failing while its connection works).
+    /// The state one account shows: its connection's when the person is told about the connection (Failing,
+    /// ActionRequired, Dormant - the connection carries the health that alerts, so a lost token is every account's
+    /// problem), else the account's own sub-state (one account failing while its connection works or flakes), falling
+    /// back to the connection's state when the account has none.
     /// </summary>
     public static ConnectionHealthState? Effective(ConnectionHealthState? connection, ConnectionHealthState? account) =>
-        connection is { } shared && shared != ConnectionHealthState.Healthy ? shared : account ?? connection;
+        connection is { } shared && StatusFor(shared) is not null ? shared : account ?? connection;
 
     /// <summary>
     /// The state a group of connections or accounts shows (an institution, a provider): the most urgent one, where a

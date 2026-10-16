@@ -92,7 +92,8 @@ public sealed class GetSyncHealthTool(
         string.Equals(ConnectionHealthSurface.InstitutionOf(rowProvider), entryProvider, StringComparison.OrdinalIgnoreCase);
 
     // The provider's state as its Accounts row shows it, from the rows of the listed providers: each account reads its
-    // connection's state while that is not Healthy, and one Dormant account stays quiet beside working siblings.
+    // connection's state while the person is told about it, else its own, and one Dormant account stays quiet beside
+    // working siblings.
     private static ConnectionHealthState? ProviderState(IReadOnlyList<ConnectionHealthEntry> rows, string provider)
     {
         var mine = rows.Where(r => IsInstitution(provider, r.Provider)).ToList();
@@ -100,8 +101,8 @@ public sealed class GetSyncHealthTool(
         var accounts = mine.Where(r => r.IsAccount).Select(r => ConnectionHealthSurface.Effective(
             r.ConnectionId is { } id && connections.TryGetValue(id, out var shared) ? shared : null, r.Health.State));
 
-        return ConnectionHealthSurface.Worst(
-            [.. connections.Values, .. accounts.OfType<ConnectionHealthState>()]);
+        var shown = accounts.OfType<ConnectionHealthState>().ToList();
+        return ConnectionHealthSurface.Worst(shown.Count > 0 ? shown : connections.Values);
     }
 
     private static SyncHealthEntry FromHealth(SyncHealthEntry entry, ConnectionHealthState state)

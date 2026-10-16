@@ -53,8 +53,8 @@ internal sealed class ConnectionHealthLabels
     public bool IsActive(string provider) => _options.IsActive(provider);
 
     /// <summary>
-    /// A bank account's label (<see cref="ConnectionHealthSurface.Effective"/>: its connection's state while that is not
-    /// Healthy, else its own), or null to keep the sync's status.
+    /// A bank account's label (<see cref="ConnectionHealthSurface.Effective"/>: its connection's state while the person is
+    /// told about it, else its own), or null to keep the sync's status.
     /// </summary>
     public string? ForAccount(Guid accountId, string provider, Guid? connectionId)
     {

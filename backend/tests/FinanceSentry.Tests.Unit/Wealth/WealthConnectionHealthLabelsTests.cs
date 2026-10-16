@@ -121,6 +121,26 @@ public class WealthConnectionHealthLabelsTests
     }
 
     [Fact]
+    public async Task A_Degraded_connection_does_not_hide_an_accounts_own_Dormant_label()
+    {
+        var closed = Guid.NewGuid();
+        var working = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(closed, "failed"), Monobank(working, "synced", "2222")],
+            [
+                Connection("monobank", ConnectionHealthState.Degraded, Token),
+                Account(closed, ConnectionHealthState.Dormant),
+                Account(working, ConnectionHealthState.Healthy),
+            ],
+            HealthOptions.With("monobank"));
+
+        var monobank = Institution(summary, "monobank");
+        monobank.Accounts.Single(a => a.AccountId == closed).SyncStatus.Should().Be("dormant");
+        monobank.Accounts.Single(a => a.AccountId == working).SyncStatus.Should().Be("synced");
+    }
+
+    [Fact]
     public async Task A_Failing_member_still_wins_over_a_Degraded_one()
     {
         BrokerageHoldingSummary[] holdings = [new("AAPL", "STK", 1m, 100m, DateTime.UtcNow, "ibkr")];

@@ -111,6 +111,34 @@ public sealed class GetSyncHealthConnectionHealthTests
         entry.Health.Should().Be(health);
     }
 
+    [Theory]
+    [InlineData(ConnectionHealthState.Dormant, "error", "dormant")]
+    [InlineData(ConnectionHealthState.Failing, "error", "retrying")]
+    public async Task A_Degraded_connection_does_not_hide_an_accounts_own_state(
+        ConnectionHealthState accountState, string status, string health)
+    {
+        await using var sp = BuildProvider("monobank");
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankSyncDbContext>();
+        var token = new FinanceSentry.Modules.BankSync.Domain.MonobankCredential(_userId, [1], [2], [3], 1);
+        token.ApplyHealth(new ConnectionHealth { State = ConnectionHealthState.Degraded });
+        var account = new FinanceSentry.Modules.BankSync.Domain.BankAccount(
+            _userId, "ext-1", "Monobank", "checking", "1111", "Owner", "UAH", _userId, "monobank")
+        {
+            MonobankCredentialId = token.Id,
+        };
+        account.ApplyHealth(new ConnectionHealth { State = accountState });
+        db.MonobankCredentials.Add(token);
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "monobank");
+
+        entry.Status.Should().Be(status);
+        entry.Health.Should().Be(health);
+    }
+
     [Fact]
     public async Task A_shadow_Flex_credentials_health_does_not_show_under_the_ibkr_entry()
     {

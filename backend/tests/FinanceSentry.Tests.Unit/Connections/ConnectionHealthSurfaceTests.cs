@@ -36,6 +36,8 @@ public class ConnectionHealthSurfaceTests
     [InlineData(ConnectionHealthState.Failing, ConnectionHealthState.Dormant, ConnectionHealthState.Failing)]
     [InlineData(ConnectionHealthState.Healthy, ConnectionHealthState.Dormant, ConnectionHealthState.Dormant)]
     [InlineData(ConnectionHealthState.Healthy, ConnectionHealthState.Degraded, ConnectionHealthState.Degraded)]
+    [InlineData(ConnectionHealthState.Degraded, ConnectionHealthState.Failing, ConnectionHealthState.Failing)]
+    [InlineData(ConnectionHealthState.Degraded, ConnectionHealthState.Dormant, ConnectionHealthState.Dormant)]
     public void An_account_shows_its_connection_while_that_is_not_Healthy_else_its_own_state(
         ConnectionHealthState connection, ConnectionHealthState account, ConnectionHealthState shown) =>
         ConnectionHealthSurface.Effective(connection, account).Should().Be(shown);
