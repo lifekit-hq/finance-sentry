@@ -40,7 +40,7 @@ rule or shape agreed but not implemented), **missing**.
 |---|---|---|
 | C6 | **Steam: whether and how to link.** | **Undecided.** Research comes first (report §5.5, the F1 list); no linking decision is made. The treatment in §5.5 below is the *valuation* rule for when it is decided, not a commitment to link. |
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
-| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. |
+| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers (G6). |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
 
 ---
@@ -103,7 +103,7 @@ Three rules keep the layers apart:
 | 5 | Book drawdown | `BookDrawdownCalculator` | Flow-neutral chained index from holdings snapshots, with split detection | null under two captures | M8 | none: the pattern to reuse |
 | 6 | Position returns | `PositionReturnCalculator` | Average-cost walk: unrealized, realized, dividends net of withholding, currency effect | `Coverage` = complete / partial / unavailable | M6 | the vocabulary is local (G5) |
 | 7 | 12-month projection tile | `dashboard.computed.ts` | Median monthly savings × 12, no market return | hidden under three complete months | M10 | G7 |
-| 4b | Contributed vs growth (Investments tab, `GET /wealth/brokerage/growth`) | `GetBrokerageGrowthQuery` | growth = end − start − newly linked − net deposits on the cash-inclusive brokerage total since the value series starts; Modified Dietz on the same window | UNAVAILABLE with `UNKNOWN_FLOW` while a provider has no deposits on record; `SCOPE_CHANGED` on a link | M2, M4 | IBKR flows wait on C1 |
+| 4b | Contributed vs growth (Investments tab, `GET /wealth/brokerage/growth`; crypto: `GET /wealth/crypto/growth`, no UI yet) | `GetSleeveGrowthQuery` | growth = end − start − newly linked − net deposits on the sleeve total since the value series starts (brokerage: cash-inclusive; crypto: the venues' `crypto_total`); Modified Dietz on the same window | UNAVAILABLE with `UNKNOWN_FLOW` while a provider has no deposits on record (Binance until S2b); `SCOPE_CHANGED` on a link | M2, M4 | IBKR flows wait on C1; Binance on-chain legs wait on S2b |
 | 8 | FIRE projection | `FireCalculator`; money-semantics §11 | Target = 12 × median outflow ÷ withdrawal rate (default 4%); 5% real return, compounding | `HasStaleSleeves`, `InsufficientHistory` | M10 | G7 |
 | 9 | Historical FX | `CachingHistoricalExchangeRateService` | `ConvertToUsdAsync` returns a `ConvertResult`: the published rate for the date (`EXACT`), the closest earlier published day (`NEAREST_PUBLISHED`), else today's rate (`TODAY_RATE`, or `SEED_TABLE` / `UNKNOWN_1TO1` when today's rate is itself the seed or absent) | `FxStatus` on the result (R4); the log line stays | valuation step 5 | G2 (closed for the live total) |
 
@@ -234,7 +234,7 @@ bridge yet.
 | Id | Measure | The question it answers | Method | Standard | Test oracle | Today |
 |---|---|---|---|---|---|---|
 | M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the `book` headline of `get_book_performance`. Engine: `ValueChange`, not wired |
-| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetBrokerageGrowthQuery`, flows from `BrokerageFlowReader`); no crypto flows feed it yet (G6) |
+| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetSleeveGrowthQuery`, flows from `BrokerageFlowReader`); the crypto sleeve's (flows from `CryptoFlowReader`: venue fiat legs and Revolut X transfers, S2a; withheld while Binance is linked, G6) |
 | M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | Book vs SPY's `bookTwr` (brokerage sleeve, cash-inclusive, `BookPerformanceService`) |
 | M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | Modified Dietz on the brokerage sleeve's "Contributed vs growth"; XIRR (ported from ExcelFinancialFunctions) not wired |
 | M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
@@ -356,6 +356,7 @@ reason (`NOT_MEASURABLE` when nothing else explains it). It is an additive field
 | `get_net_worth_history` | `headline` per point | each day's total |
 | `get_book_performance` | `book` per period | the change in invested value, M1 over `invested_brokerage` (`SHORT_HISTORY`, `ZERO_BASE` or `SCOPE_CHANGED` when there is no percent); the TWR's own reasons are in `bookTwrReasons` |
 | Brokerage growth (`GET /wealth/brokerage/growth`) | `headline` | M2's growth with the Modified Dietz percent, scope `sleeve:brokerage` (`UNKNOWN_FLOW` naming each provider with no deposits on record, `SCOPE_CHANGED` on a link) |
+| Crypto growth (`GET /wealth/crypto/growth`) | `headline` | the same, scope `sleeve:crypto` (`UNKNOWN_FLOW binance` until its on-chain legs are read, S2b) |
 | `get_allocation_vs_target` | `totalHeadline` | the total the drift weights are taken over |
 
 **Reasons are typed codes.** They become words through the frontend's existing registry pattern
@@ -381,7 +382,7 @@ A live total's stale source is a sleeve whose read failed (`BookFigures.StaleSou
 freshness window, or an institution whose sync status is stale, failed or needs re-authorisation. The
 `(new)` codes have their quality fixed (ESTIMATED for `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`,
 `PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`). `UNKNOWN_FLOW` is raised by
-the brokerage growth headline and Book vs SPY's TWR (C2(a)); the others wait on crypto flows (G6) and the source
+the brokerage and crypto growth headlines and Book vs SPY's TWR (C2(a)); the others wait on crypto flows (G6) and the source
 registry (R8).
 
 **Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
@@ -472,7 +473,7 @@ A source declares which facets it can supply; the engine computes only the measu
 | Identity | source id, economy kind, native unit(s) | yes | — | provider name strings |
 | Holdings | asset, quantity, native unit, exit price, price time, price source | yes | value, M1, M7 | `BankingAccountSummary`, `BrokerageHoldingSummary`, `CryptoHoldingSummary` |
 | Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource` |
-| Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | IBKR and Inzhur cash rows read by `BrokerageFlowReader`; none for crypto (G6) |
+| Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | IBKR and Inzhur cash rows read by `BrokerageFlowReader`; venue fiat legs and Revolut X transfers read by `CryptoFlowReader` (S2a; Binance on-chain legs open, G6) |
 | Income and costs | dividends, interest, rewards, fees, taxes | no | bridge lines, M6 | dividend and withholding rows read by `PositionReturnCalculator` |
 | History | past snapshots, or a way to rebuild them | no | windows longer than the link's age | daily snapshots; the banking backfill (#584) |
 | Cost basis | average cost per open position | no | M6 | nullable `CostBasisUsd` |
@@ -915,10 +916,10 @@ total or a return now carry the typed record beside these (§3.6), so MCP reads 
 fields stay for current consumers. The FIRE flag, the briefs and the per-thesis and flow tools are not yet
 covered (§3.6, "Not yet carrying the record").
 
-**G6. Investment flows land but nothing reads them.** *Partly closed (C2(a)): `BrokerageFlowReader` reads IBKR and Inzhur deposits, withdrawals, income, fees and taxes at each row's dated rate, feeding M2-M4 and Book vs SPY. Open: IBKR deposits still need C1; crypto flows (C2(b)).*
+**G6. Investment flows land but nothing reads them.** *Partly closed (C2(a)): `BrokerageFlowReader` reads IBKR and Inzhur deposits, withdrawals, income, fees and taxes at each row's dated rate, feeding M2-M4 and Book vs SPY. Open: IBKR deposits still need C1; crypto flows (C2(b)) partly closed by S2a: `CryptoFlowReader` reads Binance fiat deposits, withdrawals and card buys and sells and Revolut X transfers into the crypto sleeve's M2/M4 (`GET /wealth/crypto/growth`); Binance on-chain legs, cross-venue txId matching and in-transit handling (S2b) and earn, dust, airdrop and fee events (S2c) remain, and the split is withheld while Binance is linked.*
 IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"` and `BrokerageFlowReader`
 classifies them. No IBKR deposits or withdrawals arrive, because the Flex query does not include that type
-(C1). Crypto venues store no flows, so M2–M5 cannot be computed for a crypto scope.
+(C1). Crypto venues store their fiat legs and Revolut X's transfers (`crypto_sync."CryptoFlowEvents"`); without Binance's on-chain legs a crypto scope with Binance linked still cannot compute M2–M5.
 
 **G7. Two projections use two different assumptions.**
 The 12-month tile is median monthly savings × 12 with no market return; the FIRE projection compounds a 5%

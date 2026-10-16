@@ -12,6 +12,7 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
     public DbSet<ExchangeCredential> ExchangeCredentials => Set<ExchangeCredential>();
     public DbSet<CryptoHolding> CryptoHoldings => Set<CryptoHolding>();
     public DbSet<CryptoTradeRecord> CryptoTrades => Set<CryptoTradeRecord>();
+    public DbSet<CryptoFlowEvent> CryptoFlowEvents => Set<CryptoFlowEvent>();
 
     protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
@@ -32,6 +33,8 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
             entity.Property(e => e.KeyVersion).IsRequired();
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.FirstLinkedAt).IsRequired();
+            entity.Property(e => e.FlowsWalkLane).IsRequired();
             entity.Property(e => e.LastSyncError).HasMaxLength(1000);
             entity.HasConnectionHealth(e => e.Health);
         });
@@ -71,6 +74,26 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
             entity.Property(e => e.PriceUsd).HasPrecision(20, 8);
             entity.Property(e => e.QuoteQuantityUsd).HasPrecision(20, 4);
             entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.RecordedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<CryptoFlowEvent>(entity =>
+        {
+            entity.ToTable("CryptoFlowEvents");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.ProviderType, e.EventId }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.EventId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ProviderType).IsRequired().HasMaxLength(30);
+            entity.Property(e => e.OccurredAt).IsRequired();
+            entity.Property(e => e.Amount).HasPrecision(30, 10);
+            entity.Property(e => e.Unit).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.IsFiat).IsRequired();
+            entity.Property(e => e.UnitPriceUsd).HasPrecision(20, 8);
+            entity.Property(e => e.Fee).HasPrecision(30, 10);
+            entity.Property(e => e.FeeUnit).HasMaxLength(20);
+            entity.Property(e => e.CounterpartyRef).HasMaxLength(50);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
             entity.Property(e => e.RecordedAt).IsRequired();
         });
     }

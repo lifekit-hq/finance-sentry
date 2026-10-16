@@ -75,6 +75,41 @@ public sealed class BinanceHttpClient
             HttpMethod.Get, "/api/v3/myTrades", apiKey, apiSecret, query, ct);
     }
 
+    // /sapi/v1/fiat/orders — fiat deposits (transactionType 0) or withdrawals (1) created in [beginTime, endTime].
+    // https://developers.binance.com/docs/fiat/rest-api/Get-Fiat-Deposit-Withdraw-History
+    public Task<BinanceFiatPage<BinanceFiatOrder>> GetFiatOrdersAsync(
+        string apiKey,
+        string apiSecret,
+        int transactionType,
+        long beginTimeMs,
+        long endTimeMs,
+        int page,
+        int rows,
+        CancellationToken ct = default) =>
+        SendSignedAsync<BinanceFiatPage<BinanceFiatOrder>>(
+            HttpMethod.Get, "/sapi/v1/fiat/orders", apiKey, apiSecret,
+            FiatHistoryQuery(transactionType, beginTimeMs, endTimeMs, page, rows), ct);
+
+    // /sapi/v1/fiat/payments — crypto bought (transactionType 0) or sold (1) for fiat, created in [beginTime, endTime].
+    // https://developers.binance.com/docs/fiat/rest-api/Get-Fiat-Payments-History
+    public Task<BinanceFiatPage<BinanceFiatPayment>> GetFiatPaymentsAsync(
+        string apiKey,
+        string apiSecret,
+        int transactionType,
+        long beginTimeMs,
+        long endTimeMs,
+        int page,
+        int rows,
+        CancellationToken ct = default) =>
+        SendSignedAsync<BinanceFiatPage<BinanceFiatPayment>>(
+            HttpMethod.Get, "/sapi/v1/fiat/payments", apiKey, apiSecret,
+            FiatHistoryQuery(transactionType, beginTimeMs, endTimeMs, page, rows), ct);
+
+    private static string FiatHistoryQuery(int transactionType, long beginTimeMs, long endTimeMs, int page, int rows) =>
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"transactionType={transactionType}&beginTime={beginTimeMs}&endTime={endTimeMs}&page={page}&rows={rows}");
+
     private async Task<T> SendSignedAsync<T>(
         HttpMethod method,
         string path,

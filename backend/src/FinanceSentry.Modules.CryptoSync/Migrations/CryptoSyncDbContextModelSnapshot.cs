@@ -23,6 +23,77 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.CryptoFlowEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)");
+
+                    b.Property<string>("CounterpartyRef")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("Fee")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)");
+
+                    b.Property<string>("FeeUnit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsFiat")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProviderType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("UnitPriceUsd")
+                        .HasPrecision(20, 8)
+                        .HasColumnType("numeric(20,8)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Provider", "ProviderType", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("CryptoFlowEvents", "crypto_sync");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.CryptoHolding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -195,6 +266,15 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                     b.Property<byte[]>("EncryptedApiSecret")
                         .IsRequired()
                         .HasColumnType("bytea");
+
+                    b.Property<DateTime>("FirstLinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FlowsWalkLane")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FlowsWalkedTo")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");

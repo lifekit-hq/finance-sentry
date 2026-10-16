@@ -52,3 +52,39 @@ public sealed record BinanceTradeRow(
     [property: JsonPropertyName("commissionAsset")] string CommissionAsset,
     [property: JsonPropertyName("time")] long TimeMs,
     [property: JsonPropertyName("isBuyer")] bool IsBuyer);
+
+// /sapi/v1/fiat/orders and /sapi/v1/fiat/payments share one envelope; code "000000" is success.
+public sealed record BinanceFiatPage<T>(
+    [property: JsonPropertyName("code")] string? Code,
+    [property: JsonPropertyName("message")] string? Message,
+    [property: JsonPropertyName("data")] IReadOnlyList<T>? Data,
+    [property: JsonPropertyName("total")] int Total,
+    [property: JsonPropertyName("success")] bool Success);
+
+// /sapi/v1/fiat/orders — a fiat deposit (transactionType 0) or withdrawal (1). indicatedAmount is the trade amount,
+// amount what was credited or paid out after totalFee.
+public sealed record BinanceFiatOrder(
+    [property: JsonPropertyName("orderNo")] string OrderNo,
+    [property: JsonPropertyName("fiatCurrency")] string? FiatCurrency,
+    [property: JsonPropertyName("indicatedAmount")] string? IndicatedAmount,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("totalFee")] string? TotalFee,
+    [property: JsonPropertyName("method")] string? Method,
+    [property: JsonPropertyName("status")] string? Status,
+    [property: JsonPropertyName("createTime")] long CreateTimeMs,
+    [property: JsonPropertyName("updateTime")] long? UpdateTimeMs);
+
+// /sapi/v1/fiat/payments — crypto bought (transactionType 0) or sold (1) for fiat: sourceAmount of fiatCurrency
+// for obtainAmount of cryptoCurrency. paymentMethod is reported on buys only.
+public sealed record BinanceFiatPayment(
+    [property: JsonPropertyName("orderNo")] string OrderNo,
+    [property: JsonPropertyName("sourceAmount")] string? SourceAmount,
+    [property: JsonPropertyName("fiatCurrency")] string? FiatCurrency,
+    [property: JsonPropertyName("obtainAmount")] string? ObtainAmount,
+    [property: JsonPropertyName("cryptoCurrency")] string? CryptoCurrency,
+    [property: JsonPropertyName("totalFee")] string? TotalFee,
+    [property: JsonPropertyName("price")] string? Price,
+    [property: JsonPropertyName("status")] string? Status,
+    [property: JsonPropertyName("paymentMethod")] string? PaymentMethod,
+    [property: JsonPropertyName("createTime")] long CreateTimeMs,
+    [property: JsonPropertyName("updateTime")] long? UpdateTimeMs);

@@ -5,19 +5,23 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
+using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Ports;
+using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
 
-/// <summary>S1: the brokerage sleeve's contributions against its growth (M2) and its money-weighted return (M4).</summary>
-public class GetBrokerageGrowthQueryHandlerTests
+/// <summary>S1/S2: a sleeve's contributions against its growth (M2) and its money-weighted return (M4).</summary>
+public class GetSleeveGrowthQueryHandlerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly DateOnly D0 = new(2026, 7, 1);
 
     private readonly Mock<IBrokerageValueHistoryReader> _history = new();
     private readonly Mock<IBrokerageFlowReader> _flows = new();
+    private readonly Mock<INetWorthSnapshotRepository> _snapshots = new();
+    private readonly Mock<ICryptoFlowReader> _cryptoFlows = new();
 
     private static DateOnly Day(int n) => D0.AddDays(n);
 
@@ -28,12 +32,28 @@ public class GetBrokerageGrowthQueryHandlerTests
         _history.Setup(h => h.GetDailyAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(values);
         _flows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BrokerageFlowReading(sources, flows));
+            .ReturnsAsync(new SleeveFlowReading(sources, flows));
     }
 
-    private Task<BrokerageGrowthResponse> Handle()
-        => new GetBrokerageGrowthQueryHandler(_history.Object, _flows.Object)
-            .Handle(new GetBrokerageGrowthQuery(UserId), CancellationToken.None);
+    private Task<SleeveGrowthResponse> Handle(string sleeve = WealthSourceIds.Brokerage)
+        => new GetSleeveGrowthQueryHandler(_history.Object, _flows.Object, _snapshots.Object, _cryptoFlows.Object)
+            .Handle(new GetSleeveGrowthQuery(UserId, sleeve), CancellationToken.None);
+
+    private void SetupCrypto(NetWorthSnapshot[] snapshots, FlowSourceCoverage[] sources, params SourceFlow[] flows)
+    {
+        _snapshots.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(snapshots);
+        _snapshots.Setup(r => r.GetSourcesUnscopedAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _cryptoFlows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SleeveFlowReading(sources, flows));
+    }
+
+    private static NetWorthSnapshot CryptoClose(int day, decimal crypto, string? staleSleeves = null)
+        => new() { Id = Guid.NewGuid(), UserId = UserId, SnapshotDate = Day(day), CryptoTotal = crypto, BrokerageTotal = 99_999m, StaleSleeves = staleSleeves };
+
+    private static SourceFlow RevolutXFlow(int day, FlowClass flowClass, decimal usd)
+        => new("revolut_x", new ClassifiedFlow(Day(day), flowClass, usd), FxStatus.Exact);
 
     private static SourceFlow Flow(int day, FlowClass flowClass, decimal usd)
         => new("ibkr", new ClassifiedFlow(Day(day), flowClass, usd), FxStatus.Exact);
@@ -127,5 +147,58 @@ public class GetBrokerageGrowthQueryHandlerTests
         result.Growth.Should().BeNull();
         result.Headline.Quality.Should().Be(HeadlineQuality.Unavailable);
         result.Headline.Reasons.Should().Contain(r => r.Code == HeadlineReasonCode.ShortHistory);
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_SplitsTheVenuesValueChange_FromTheVenuesFlows()
+    {
+        // Fixture 19 at EURUSD 1.10: EUR 500 in from the owner's Revolut app, then a EUR 100 card buy with a EUR 2 fee.
+        SetupCrypto(
+            [CryptoClose(0, 1000m), CryptoClose(10, 1700m)],
+            [new FlowSourceCoverage("revolut_x", Day(-30), true)],
+            RevolutXFlow(3, FlowClass.ExternalInflow, 550m),
+            RevolutXFlow(4, FlowClass.ExternalInflow, 110m),
+            RevolutXFlow(4, FlowClass.Fee, 2.20m));
+
+        var result = await Handle(WealthSourceIds.Crypto);
+
+        result.StartValue.Should().Be(1000m, "the crypto column, never the brokerage one");
+        result.EndValue.Should().Be(1700m);
+        result.Contributed.Should().Be(660m);
+        result.Fees.Should().Be(2.20m);
+        result.Growth.Should().Be(40m);
+        result.Headline.Scope.Should().Be(HeadlineScope.Sleeve(WealthSourceIds.Crypto));
+        _flows.Verify(f => f.ReadAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+        _history.Verify(h => h.GetDailyAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_WithholdsTheSplit_WhileAVenuesFlowsAreUnknown()
+    {
+        SetupCrypto(
+            [CryptoClose(0, 1000m), CryptoClose(10, 1700m)],
+            [new FlowSourceCoverage("binance", Day(-30), false), new FlowSourceCoverage("revolut_x", Day(-30), true)],
+            RevolutXFlow(3, FlowClass.ExternalInflow, 550m));
+
+        var result = await Handle(WealthSourceIds.Crypto);
+
+        result.SourcesWithoutFlows.Should().Equal("binance");
+        result.Contributed.Should().BeNull();
+        result.Growth.Should().BeNull();
+        result.Headline.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "binance"));
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_CarriesOnlyTheCryptoSourcesOwnStaleness()
+    {
+        SetupCrypto(
+            [CryptoClose(0, 1000m, staleSleeves: "brokerage"), CryptoClose(10, 1100m, staleSleeves: "crypto")],
+            [new FlowSourceCoverage("revolut_x", Day(-30), true)]);
+
+        var result = await Handle(WealthSourceIds.Crypto);
+
+        result.Growth.Should().Be(100m);
+        result.Headline.Reasons.Where(r => r.Code == HeadlineReasonCode.StaleSource)
+            .Should().Equal(new HeadlineReason(HeadlineReasonCode.StaleSource, WealthSourceIds.Crypto));
     }
 }

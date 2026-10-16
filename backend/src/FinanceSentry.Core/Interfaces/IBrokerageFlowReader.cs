@@ -4,20 +4,20 @@ using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
 
 /// <summary>
-/// One brokerage provider in the measured scope. <paramref name="LinkedOn"/> is the UTC day its earliest active
-/// connection was created (a relink re-stamps it). <paramref name="FlowsRecorded"/> says whether the provider has
-/// ever reported a deposit or withdrawal: until it has, its external flows are unknown, so no figure may read its
-/// value change as growth.
+/// One provider in a measured sleeve. <paramref name="LinkedOn"/> is the UTC day its earliest active connection was
+/// created (a relink re-stamps it). <paramref name="FlowsRecorded"/> says whether the provider's external flows are
+/// known (a broker: it has ever reported a deposit or withdrawal): until they are, no figure may read its value change
+/// as growth.
 /// </summary>
 public sealed record FlowSourceCoverage(string Source, DateOnly LinkedOn, bool FlowsRecorded);
 
 /// <summary>One provider's classified cash movement, converted to USD at its own date's rate (<paramref name="Fx"/>).</summary>
 public sealed record SourceFlow(string Source, ClassifiedFlow Flow, FxStatus Fx);
 
-/// <summary>The brokerage scope's providers and their classified flows dated after each provider's link day.</summary>
-public sealed record BrokerageFlowReading(IReadOnlyList<FlowSourceCoverage> Sources, IReadOnlyList<SourceFlow> Flows)
+/// <summary>A sleeve's providers and their classified flows dated after each provider's link day.</summary>
+public sealed record SleeveFlowReading(IReadOnlyList<FlowSourceCoverage> Sources, IReadOnlyList<SourceFlow> Flows)
 {
-    public static BrokerageFlowReading Empty { get; } = new([], []);
+    public static SleeveFlowReading Empty { get; } = new([], []);
 
     /// <summary>The providers linked by <paramref name="closing"/> that have never reported a deposit or withdrawal.</summary>
     public IReadOnlyList<string> SourcesWithoutFlows(DateOnly closing)
@@ -45,5 +45,5 @@ public interface IBrokerageFlowReader
     /// <paramref name="from"/> (and after its own link day: earlier rows are history the linked value
     /// already holds).
     /// </summary>
-    Task<BrokerageFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default);
+    Task<SleeveFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default);
 }

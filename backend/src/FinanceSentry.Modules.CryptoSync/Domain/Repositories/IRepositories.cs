@@ -65,3 +65,14 @@ public interface ICryptoTradeRepository
     /// </summary>
     Task AddNewAsync(Guid userId, string provider, IReadOnlyList<CryptoTrade> trades, CancellationToken ct = default);
 }
+
+public interface ICryptoFlowEventRepository
+{
+    /// <summary>
+    /// Persists the movements a walk returned, skipping any already recorded for
+    /// <c>(UserId, Provider, ProviderType, EventId)</c> so a re-walked window adds nothing. For the sync; opts out of
+    /// the Owner query filter.
+    /// </summary>
+    Task AddNewUnscopedAsync(
+        Guid userId, string provider, IReadOnlyList<CryptoFlow> flows, DateTime recordedAt, CancellationToken ct = default);
+}

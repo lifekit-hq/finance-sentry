@@ -63,6 +63,35 @@ public sealed class RevolutXHttpClient(HttpClient httpClient, IConfiguration con
             credentials, $"/trades/private/{Uri.EscapeDataString(symbol)}", ct, BuildQuery(query));
     }
 
+    /// <summary>
+    /// <c>GET /transactions</c> — the account's transactions of <paramref name="types"/> (comma-joined, as the venue
+    /// reads an array parameter) created between two instants (Unix ms, at most 30 days apart), every status, paged by
+    /// <paramref name="cursor"/>.
+    /// </summary>
+    public Task<RevolutXTransactionsResponse> GetTransactionsAsync(
+        RevolutXCredentials credentials,
+        string types,
+        long startMs,
+        long endMs,
+        string? cursor,
+        int limit,
+        CancellationToken ct = default)
+    {
+        var query = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["end_date"] = endMs.ToString(CultureInfo.InvariantCulture),
+            ["limit"] = limit.ToString(CultureInfo.InvariantCulture),
+            ["start_date"] = startMs.ToString(CultureInfo.InvariantCulture),
+            ["types"] = types,
+        };
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            query["cursor"] = cursor;
+        }
+
+        return SendSignedAsync<RevolutXTransactionsResponse>(credentials, "/transactions", ct, BuildQuery(query));
+    }
+
     /// <summary>Keys in ordinal order, each part percent-encoded — the exact string that is signed.</summary>
     private static string BuildQuery(SortedDictionary<string, string> parameters) =>
         string.Join('&', parameters.Select(p => $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));

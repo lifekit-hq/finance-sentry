@@ -76,7 +76,7 @@ public sealed class CryptoSyncOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(3);
+        perUser.Should().HaveCount(4);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -186,6 +186,31 @@ public sealed class CryptoSyncOwnerQueryFilterTests : IAsyncLifetime
         await using var read = CreateContext();
         (await read.CryptoTrades.IgnoreQueryFilters([OwnerQueryFilter.Name]).CountAsync(t => t.UserId == _userA))
             .Should().Be(1, "a filtered dedup read would find nothing and trip the unique index");
+    }
+
+    [DockerRequiredFact]
+    public async Task Flow_events_are_visible_only_to_their_owner_and_the_walk_with_no_person_skips_stored_ones()
+    {
+        var flow = new CryptoFlow("f-1", CryptoFlowTypes.Receive, DateTime.UtcNow, 500m, "EUR", true, null, null, null, "revolut", "completed");
+
+        foreach (var user in new[] { _userA, _userA, _userB })
+        {
+            await using var ctx = CreateContext();
+            await new CryptoFlowEventRepository(ctx).AddNewUnscopedAsync(user, CryptoExchangeProvider.RevolutX, [flow], DateTime.UtcNow);
+            await ctx.SaveChangesAsync();
+        }
+
+        await using (var asA = CreateContext(_userA))
+            (await asA.CryptoFlowEvents.Select(e => e.UserId).ToListAsync()).Should().Equal(_userA);
+
+        await using (var asB = CreateContext(_userB))
+            (await asB.CryptoFlowEvents.AnyAsync(e => e.UserId == _userA)).Should().BeFalse();
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.CryptoFlowEvents.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+        (await asNoOne.CryptoFlowEvents.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .CountAsync(e => e.UserId == _userA || e.UserId == _userB))
+            .Should().Be(2, "a re-walked movement is skipped, not re-inserted against the unique index");
     }
 
     [DockerRequiredFact]

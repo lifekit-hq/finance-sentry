@@ -16,10 +16,10 @@ public class WealthController(
     IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> wealthSummaryHandler,
     IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
-    IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse> brokerageGrowthHandler,
+    IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> sleeveGrowthHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
-    private readonly IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse> _brokerageGrowthHandler = brokerageGrowthHandler ?? throw new ArgumentNullException(nameof(brokerageGrowthHandler));
+    private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
     private readonly IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> _txSummaryHandler = txSummaryHandler ?? throw new ArgumentNullException(nameof(txSummaryHandler));
@@ -135,17 +135,26 @@ public class WealthController(
     /// the percent): <c>GET /api/v1/wealth/brokerage/growth</c>.
     /// </summary>
     [HttpGet("brokerage/growth")]
-    public async Task<IActionResult> GetBrokerageGrowth(CancellationToken ct)
+    public Task<IActionResult> GetBrokerageGrowth(CancellationToken ct) => GetSleeveGrowth(WealthSourceIds.Brokerage, ct);
+
+    /// <summary>
+    /// Contributions vs growth for the crypto sleeve (the venues), the same split as the brokerage one:
+    /// <c>GET /api/v1/wealth/crypto/growth</c>.
+    /// </summary>
+    [HttpGet("crypto/growth")]
+    public Task<IActionResult> GetCryptoGrowth(CancellationToken ct) => GetSleeveGrowth(WealthSourceIds.Crypto, ct);
+
+    private async Task<IActionResult> GetSleeveGrowth(string sleeve, CancellationToken ct)
     {
         var userId = User.RequireUserId();
-        var result = await _brokerageGrowthHandler.Handle(new GetBrokerageGrowthQuery(userId), ct);
+        var result = await _sleeveGrowthHandler.Handle(new GetSleeveGrowthQuery(userId, sleeve), ct);
         var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
         return Ok(InBaseCurrency(result, baseCurrency));
     }
 
     // Computed in USD over dated flows; shown in the base currency at today's rate, as the summary is. The headline
     // names that rate (FX_TODAY_RATE) for a window reaching into the past; the rate is a ratio and does not change.
-    private static BrokerageGrowthResponse InBaseCurrency(BrokerageGrowthResponse growth, string baseCurrency)
+    private static SleeveGrowthResponse InBaseCurrency(SleeveGrowthResponse growth, string baseCurrency)
     {
         if (baseCurrency == "USD")
             return growth;

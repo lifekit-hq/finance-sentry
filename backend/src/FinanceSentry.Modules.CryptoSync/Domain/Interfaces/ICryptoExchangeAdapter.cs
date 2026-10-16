@@ -45,6 +45,22 @@ public interface ICryptoExchangeAdapter
         string? cursor,
         CryptoTradeWalk walk,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// The completed movements across the venue's edge (S2a: fiat legs, and Revolut X transfers) created from
+    /// <see cref="CryptoFlowWalk.From"/> to <see cref="CryptoFlowWalk.AsOf"/>, raw: the adapter never decides
+    /// whether a movement is external or internal. <see cref="CryptoFlowPage.WalkedTo"/> is where the next walk
+    /// resumes: before the earliest movement still pending, so it is read again once it settles, and before
+    /// <see cref="CryptoFlowWalk.AsOf"/> when one run walks only part of the gap. A venue that reads one source per run
+    /// (Binance) takes <see cref="CryptoFlowWalk.Lane"/> and returns the lane to read next in
+    /// <see cref="CryptoFlowPage.NextLane"/>, moving <see cref="CryptoFlowPage.WalkedTo"/> only once every lane has
+    /// read the window. Any call failing throws.
+    /// </summary>
+    Task<CryptoFlowPage> GetFlowsAsync(
+        string apiKey,
+        string apiSecret,
+        CryptoFlowWalk walk,
+        CancellationToken ct = default);
 }
 
 /// <param name="IsFiat">
@@ -83,3 +99,28 @@ public sealed record CryptoTrade(
     decimal QuoteQuantityUsd,
     bool IsBuyer,
     DateTime Timestamp);
+
+public sealed record CryptoFlowWalk(DateTime From, DateTime AsOf, int Lane = 0);
+
+public sealed record CryptoFlowPage(IReadOnlyList<CryptoFlow> Flows, DateTime WalkedTo, int NextLane = 0);
+
+/// <summary>One completed movement as the venue reported it. See <c>CryptoFlowEvent</c>.</summary>
+/// <param name="ProviderType">A <c>CryptoFlowTypes</c> value.</param>
+/// <param name="Amount">
+/// Positive, in <paramref name="Unit"/>, on the far side of the venue's edge: what the bank or card paid in or
+/// received, what the sending or receiving account moved. A fee the venue kept is <paramref name="Fee"/>, not netted.
+/// </param>
+/// <param name="UnitPriceUsd">USD per unit at read time for a crypto unit; null for fiat (dated FX values it) or when unpriced.</param>
+/// <param name="CounterpartyRef">The venue's raw word for the other side: a Revolut X account type, a Binance method.</param>
+public sealed record CryptoFlow(
+    string EventId,
+    string ProviderType,
+    DateTime OccurredAt,
+    decimal Amount,
+    string Unit,
+    bool IsFiat,
+    decimal? UnitPriceUsd,
+    decimal? Fee,
+    string? FeeUnit,
+    string? CounterpartyRef,
+    string Status);

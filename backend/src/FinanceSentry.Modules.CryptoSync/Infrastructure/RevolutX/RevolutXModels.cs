@@ -63,6 +63,33 @@ public sealed record RevolutXTrade(
     [property: JsonPropertyName("oid")] string? OrderId,
     [property: JsonPropertyName("s")] string? Side);
 
+/// <summary><c>GET /transactions</c>.</summary>
+public sealed record RevolutXTransactionsResponse(
+    [property: JsonPropertyName("data")] IReadOnlyList<RevolutXTransaction> Data,
+    [property: JsonPropertyName("metadata")] RevolutXPageMetadata? Metadata);
+
+/// <summary>
+/// One account transaction. <see cref="Source"/> is the leg debited, <see cref="Destination"/> the leg credited, each
+/// with its net amount and the type of the account it touched (<c>revolut</c>, <c>revolut_x</c>,
+/// <c>external_bank_account</c>, <c>external_crypto_wallet</c>). <see cref="ProcessedDate"/> is absent while pending.
+/// </summary>
+public sealed record RevolutXTransaction(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("status")] string? Status,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("source")] RevolutXTransactionLeg? Source,
+    [property: JsonPropertyName("destination")] RevolutXTransactionLeg? Destination,
+    [property: JsonPropertyName("created_date")] long CreatedDateMs,
+    [property: JsonPropertyName("processed_date")] long? ProcessedDateMs);
+
+public sealed record RevolutXTransactionLeg(
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("currency")] string? Currency,
+    [property: JsonPropertyName("account")] RevolutXLegAccount? Account);
+
+public sealed record RevolutXLegAccount(
+    [property: JsonPropertyName("type")] string? Type);
+
 public sealed record RevolutXErrorResponse(
     [property: JsonPropertyName("error_id")] string? ErrorId,
     [property: JsonPropertyName("message")] string? Message,

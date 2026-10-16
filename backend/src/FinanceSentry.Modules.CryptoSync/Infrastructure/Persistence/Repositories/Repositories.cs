@@ -180,3 +180,34 @@ public sealed class CryptoTradeRepository(CryptoSyncDbContext context) : ICrypto
         }
     }
 }
+
+public sealed class CryptoFlowEventRepository(CryptoSyncDbContext context) : ICryptoFlowEventRepository
+{
+    private readonly CryptoSyncDbContext _context = context;
+
+    public async Task AddNewUnscopedAsync(
+        Guid userId, string provider, IReadOnlyList<CryptoFlow> flows, DateTime recordedAt, CancellationToken ct = default)
+    {
+        if (flows.Count == 0)
+        {
+            return;
+        }
+
+        var eventIds = flows.Select(f => f.EventId).Distinct(StringComparer.Ordinal).ToList();
+        var existingKeys = await _context.CryptoFlowEvents.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(e => e.UserId == userId && e.Provider == provider && eventIds.Contains(e.EventId))
+            .Select(e => new { e.ProviderType, e.EventId })
+            .ToListAsync(ct);
+        var existing = existingKeys.Select(k => (k.ProviderType, k.EventId)).ToHashSet();
+
+        var toAdd = flows
+            .Where(f => existing.Add((f.ProviderType, f.EventId)))
+            .Select(f => CryptoFlowEvent.Create(userId, provider, f, recordedAt))
+            .ToList();
+
+        if (toAdd.Count > 0)
+        {
+            await _context.CryptoFlowEvents.AddRangeAsync(toAdd, ct);
+        }
+    }
+}
