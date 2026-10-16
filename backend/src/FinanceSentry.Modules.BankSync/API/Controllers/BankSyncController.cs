@@ -246,7 +246,6 @@ public class BankSyncController(
         await lifecycle.ReopenAsync(account, ct);
         _backgroundJobs.Enqueue<Infrastructure.Jobs.ScheduledSyncJob>(job => job.ExecuteManualSyncAsync(accountId));
 
-        logger.LogInformation("Account {AccountId} reopened by its owner.", accountId);
         return NoContent();
     }
 
