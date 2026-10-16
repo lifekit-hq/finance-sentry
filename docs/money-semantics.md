@@ -1048,8 +1048,9 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
 - Brokerage TWR and contributions vs growth (§8, §10): the market move on a provider's link day is lost
   into the "newly linked" line (one or two days, bridged as capital). The link day is the credential's
   `FirstLinkedAt` (set once; M016 backfilled it from the earliest of both IBKR credentials' `CreatedAt` and the first stored IBKR cash row or trade), which a relink of an IBKR / Flex credential never
-  moves, so deposits between the first link and a relink stay contributions; the relink still re-stamps `CreatedAt`,
-  which the headline reads as `SCOPE_CHANGED`. A credential relinked before M016 with no earlier synced row keeps its
+  moves, so deposits between the first link and a relink stay contributions, and a relink no longer moves the link
+  day in the brokerage growth query or the Book headline nor raises `SCOPE_CHANGED` there. Known gap:
+  `BrokerageScopeChangeReader`, used only by the net-worth history query, still reads the re-stamped `CreatedAt`. A credential relinked before M016 with no earlier synced row keeps its
   relink day (the earlier link is not recoverable). A removed
   provider is not seen (connections record no deactivation time); its value leaving reads as a loss unless a
   withdrawal was recorded. Inzhur's link day is its credential's `CreatedAt` (Inzhur credentials have no

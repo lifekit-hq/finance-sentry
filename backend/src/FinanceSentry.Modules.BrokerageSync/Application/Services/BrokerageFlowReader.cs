@@ -12,9 +12,8 @@ using Microsoft.EntityFrameworkCore;
 /// <see cref="IBrokerageFlowReader"/> over the cash rows IBKR (Flex) and Inzhur report, classified by
 /// <see cref="BrokerageFlowClassifier"/> and converted to USD at each row's own date (rule 5: today's rate would
 /// read a currency move as growth). A provider's link day is its earliest active connection's first-linked day, which a
-/// relink never moves (<see cref="BrokerageScopeChangeReader"/> reports the re-stamped <c>CreatedAt</c> instead, so a
-/// relink still flags the headline); rows on or before it are history the linked value
-/// already holds. A connection records no deactivation time, so a removed provider is not seen.
+/// relink never moves, so a relink neither shifts the bridge nor raises <c>SCOPE_CHANGED</c> on the growth and Book
+/// headlines; rows on or before it are history the linked value already holds. A connection records no deactivation time, so a removed provider is not seen.
 /// </summary>
 public sealed class BrokerageFlowReader(BrokerageSyncDbContext db, IHistoricalExchangeRateService fx) : IBrokerageFlowReader
 {
