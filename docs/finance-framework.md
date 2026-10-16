@@ -818,7 +818,9 @@ so its daily run and its own early re-checks (1 h, then 4 h; a suspect 1020's fi
 
 **What the person is told** (connection-health slice S5), again only for a provider in
 `ConnectionHealth:ActiveProviders`: a shadow provider's labels, alerts, Companion relay and MCP read stay exactly
-what its own sync path gives, and with the list empty nothing a person can see changes. Every surface reads the
+what its own sync path gives, except that an account its module holds Dormant (closed at the bank) is labelled
+`dormant` on the Accounts page, so it does not fail its working siblings' institution; with the list empty nothing
+else a person can see changes. Every surface reads the
 health its module stores, through one port per module (`IConnectionHealthReader`: bank tokens, consents and
 accounts; IBKR and Flex credentials; exchange credentials), and labels it with one map
 (`ConnectionHealthSurface`), so the app, Companion and the agent cannot disagree:

@@ -81,12 +81,73 @@ public class WealthConnectionHealthLabelsTests
 
         var summary = await SummaryAsync(
             [Monobank(account, status)],
-            [Connection("monobank", ConnectionHealthState.Failing, Token), Account(account, ConnectionHealthState.Dormant)],
+            [Connection("monobank", ConnectionHealthState.Failing, Token), Account(account, ConnectionHealthState.Failing)],
             HealthOptions.With("ibkr"));
 
         Institution(summary, "monobank").SyncStatus.Should().Be(status);
         Institution(summary, "monobank").Accounts.Single().SyncStatus.Should().Be(status);
     }
+
+    [Fact]
+    public async Task A_shadow_providers_Dormant_account_is_quiet_and_leaves_its_working_siblings_synced()
+    {
+        var closed = Guid.NewGuid();
+        var working = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(closed, "failed"), Monobank(working, "synced", "2222")],
+            [
+                Connection("monobank", ConnectionHealthState.Healthy, Token),
+                Account(closed, ConnectionHealthState.Dormant),
+                Account(working, ConnectionHealthState.Healthy),
+            ],
+            HealthOptions.With("ibkr"));
+
+        var monobank = Institution(summary, "monobank");
+        monobank.SyncStatus.Should().Be("synced");
+        monobank.Accounts.Single(a => a.AccountId == closed).SyncStatus.Should().Be("dormant");
+        monobank.Accounts.Single(a => a.AccountId == working).SyncStatus.Should().Be("synced");
+        summary.Headline!.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.StaleSource && r.Source == "monobank");
+    }
+
+    [Fact]
+    public async Task A_shadow_providers_failed_account_that_is_not_Dormant_still_fails_the_institution()
+    {
+        var failing = Guid.NewGuid();
+        var working = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(failing, "failed"), Monobank(working, "synced", "2222")],
+            [
+                Connection("monobank", ConnectionHealthState.Failing, Token),
+                Account(failing, ConnectionHealthState.Failing),
+                Account(working, ConnectionHealthState.Healthy),
+            ],
+            HealthOptions.With("ibkr"));
+
+        Institution(summary, "monobank").SyncStatus.Should().Be("failed");
+    }
+
+    [Fact]
+    public async Task A_shadow_providers_connection_level_Dormant_is_not_surfaced()
+    {
+        var account = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(account, "synced")],
+            [Connection("monobank", ConnectionHealthState.Dormant, Token), Account(account, ConnectionHealthState.Healthy)],
+            HealthOptions.With("ibkr"));
+
+        Institution(summary, "monobank").SyncStatus.Should().Be("synced");
+    }
+
+    [Theory]
+    [InlineData(new[] { "synced", "dormant" }, "synced")]
+    [InlineData(new[] { "dormant", "failed" }, "failed")]
+    [InlineData(new[] { "dormant", "dormant" }, "dormant")]
+    [InlineData(new[] { "dormant", "stale", "synced" }, "stale")]
+    public void WorstSyncStatus_ignores_dormant_members_unless_every_member_is_dormant(string[] statuses, string expected) =>
+        WealthAggregationService.WorstSyncStatus(statuses).Should().Be(expected);
 
     [Theory]
     [InlineData(ConnectionHealthState.Failing, "retrying")]

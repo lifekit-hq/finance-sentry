@@ -78,18 +78,22 @@ export function accountsComputed(store: StateSignals) {
           color: ChartColorUtils.canvas(CATEGORY_COLOUR[cat.category]),
         }))
     ),
+    // A negative category (a card owing more than the cash held) still counts toward net worth, so it
+    // keeps a row; it has no share of the positive total, hence no percent.
     netWorthBreakdown: computed((): NetWorthBreakdownRow[] => {
-      const positive = (store.summary()?.categories ?? []).filter(
-        cat => cat.totalInBaseCurrency > 0
+      const nonZero = (store.summary()?.categories ?? []).filter(
+        cat => cat.totalInBaseCurrency !== 0
       );
-      const total = positive.reduce((sum, cat) => sum + cat.totalInBaseCurrency, 0);
-      return positive
+      const total = nonZero
+        .filter(cat => cat.totalInBaseCurrency > 0)
+        .reduce((sum, cat) => sum + cat.totalInBaseCurrency, 0);
+      return nonZero
         .map(cat => ({
           label: CATEGORY_LABEL[cat.category],
           color: ChartColorUtils.css(CATEGORY_COLOUR[cat.category]),
           value: cat.totalInBaseCurrency,
           institutionCount: cat.institutionCount,
-          percent: total > 0 ? (cat.totalInBaseCurrency / total) * PERCENT : 0,
+          percent: cat.totalInBaseCurrency > 0 ? (cat.totalInBaseCurrency / total) * PERCENT : null,
         }))
         .sort((a, b) => b.value - a.value);
     }),

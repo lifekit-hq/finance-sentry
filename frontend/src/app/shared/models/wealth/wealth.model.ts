@@ -103,5 +103,6 @@ export interface NetWorthBreakdownRow {
   color: string;
   value: number;
   institutionCount: number;
-  percent: number;
+  /** Share of the positive total; null for a negative category, which has no share. */
+  percent: number | null;
 }

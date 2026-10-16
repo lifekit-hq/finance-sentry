@@ -41,3 +41,38 @@ describe('accountsComputed.categorySections', () => {
     expect(c.categorySections().map(s => s.rowNoun)).toEqual(['account', 'position']);
   });
 });
+
+describe('accountsComputed net-worth breakdown', () => {
+  const withTotals = (banking: number, brokerage: number, crypto: number) =>
+    computedFor([
+      {...category('banking'), totalInBaseCurrency: banking},
+      {...category('brokerage'), totalInBaseCurrency: brokerage},
+      {...category('crypto'), totalInBaseCurrency: crypto},
+    ]);
+
+  it('keeps a negative category as a row with no percent', () => {
+    const rows = withTotals(-93.23, 9278.96, 6489.6).netWorthBreakdown();
+
+    expect(rows.map(r => r.label)).toEqual(['Brokerage', 'Crypto', 'Banking']);
+    expect(rows[2].value).toBe(-93.23);
+    expect(rows[2].percent).toBeNull();
+  });
+
+  it('takes the percent of the positive total only', () => {
+    const rows = withTotals(-100, 75, 25).netWorthBreakdown();
+
+    expect(rows.slice(0, 2).map(r => r.percent)).toEqual([75, 25]);
+  });
+
+  it('drops a category that nets to zero', () => {
+    const rows = withTotals(0, 50, 50).netWorthBreakdown();
+
+    expect(rows.map(r => r.label)).toEqual(['Brokerage', 'Crypto']);
+  });
+
+  it('keeps only positive categories in the donut', () => {
+    const segments = withTotals(-93.23, 9278.96, 6489.6).netWorthSegments();
+
+    expect(segments.map(s => s.label)).toEqual(['Brokerage', 'Crypto']);
+  });
+});

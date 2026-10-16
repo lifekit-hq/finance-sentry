@@ -9,6 +9,7 @@ import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {
   type AccountBalanceItem,
   type Institution,
+  type NetWorthBreakdownRow,
 } from '../../../../shared/models/wealth/wealth.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -39,6 +40,7 @@ function setupFixture(
     totalNetWorth?: number;
     headline?: Headline;
     collapsed?: string[];
+    breakdown?: NetWorthBreakdownRow[];
     setInstitutionOpen?: (key: string, isOpen: boolean) => void;
   } = {}
 ) {
@@ -55,7 +57,7 @@ function setupFixture(
     totalNetWorth: signal(state.totalNetWorth ?? 0),
     netWorthHeadline: signal(state.headline ?? null),
     isNetWorthUnavailable: signal(state.headline?.quality === 'UNAVAILABLE'),
-    netWorthBreakdown: signal([]),
+    netWorthBreakdown: signal(state.breakdown ?? []),
     baseCurrency: signal('USD'),
     categorySections: signal([
       {
@@ -133,6 +135,28 @@ describe('AccountsListComponent sync status text', () => {
     const text = setup(false).textContent ?? '';
     expect(text).toContain('0 accounts');
     expect(text).not.toContain('0 accounts · Sync failed');
+  });
+});
+
+describe('AccountsListComponent net worth breakdown', () => {
+  const row = (label: string, value: number, percent: number | null): NetWorthBreakdownRow => ({
+    label,
+    color: '#000',
+    value,
+    institutionCount: 1,
+    percent,
+  });
+
+  it('shows a negative category as a plain negative amount, never as "Owes"', () => {
+    const fixture = setupFixture(false, {}, [], {
+      hasData: true,
+      totalNetWorth: 9185.73,
+      breakdown: [row('Brokerage', 9278.96, 100), row('Banking', -93.23, null)],
+    });
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('-$93.23');
+    expect(text).not.toContain('Owes $93.23');
   });
 });
 
