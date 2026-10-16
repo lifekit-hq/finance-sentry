@@ -92,6 +92,17 @@ public sealed class RevolutXHttpClient(HttpClient httpClient, IConfiguration con
         return SendSignedAsync<RevolutXTransactionsResponse>(credentials, "/transactions", ct, BuildQuery(query));
     }
 
+    /// <summary>
+    /// <c>GET /transactions/{id}</c> — one transaction with its fee and, for a transfer with an external crypto wallet,
+    /// the chain hash and network.
+    /// </summary>
+    public Task<RevolutXTransactionDetails> GetTransactionDetailsAsync(
+        RevolutXCredentials credentials,
+        string transactionId,
+        CancellationToken ct = default) =>
+        SendSignedAsync<RevolutXTransactionDetails>(
+            credentials, $"/transactions/{Uri.EscapeDataString(transactionId)}", ct);
+
     /// <summary>Keys in ordinal order, each part percent-encoded — the exact string that is signed.</summary>
     private static string BuildQuery(SortedDictionary<string, string> parameters) =>
         string.Join('&', parameters.Select(p => $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));

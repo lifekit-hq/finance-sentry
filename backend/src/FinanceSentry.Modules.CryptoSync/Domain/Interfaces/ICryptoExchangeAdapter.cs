@@ -61,6 +61,23 @@ public interface ICryptoExchangeAdapter
         string apiSecret,
         CryptoFlowWalk walk,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Whether the venue's on-chain transfers are read by a walk of their own (<see cref="GetChainFlowsAsync"/>, on
+    /// the credential's <c>ChainFlowsWalkedTo</c> cursor) rather than inside <see cref="GetFlowsAsync"/>.
+    /// </summary>
+    bool WalksChainFlows => false;
+
+    /// <summary>
+    /// The completed on-chain deposits and withdrawals (S2b) from <see cref="CryptoFlowWalk.From"/>, raw, with the
+    /// same resume rule as <see cref="GetFlowsAsync"/>: <see cref="CryptoFlowPage.WalkedTo"/> stops before the
+    /// earliest movement still pending. Only called when <see cref="WalksChainFlows"/>.
+    /// </summary>
+    Task<CryptoFlowPage> GetChainFlowsAsync(
+        string apiKey,
+        string apiSecret,
+        CryptoFlowWalk walk,
+        CancellationToken ct = default) => Task.FromResult(new CryptoFlowPage([], walk.AsOf));
 }
 
 /// <param name="IsFiat">
@@ -112,6 +129,8 @@ public sealed record CryptoFlowPage(IReadOnlyList<CryptoFlow> Flows, DateTime Wa
 /// </param>
 /// <param name="UnitPriceUsd">USD per unit at read time for a crypto unit; null for fiat (dated FX values it) or when unpriced.</param>
 /// <param name="CounterpartyRef">The venue's raw word for the other side: a Revolut X account type, a Binance method.</param>
+/// <param name="TxRef">The chain transaction id (hash) as the venue reported it; null where none is given.</param>
+/// <param name="Network">The chain, in the venue's own vocabulary; null where none is given.</param>
 public sealed record CryptoFlow(
     string EventId,
     string ProviderType,
@@ -123,4 +142,6 @@ public sealed record CryptoFlow(
     decimal? Fee,
     string? FeeUnit,
     string? CounterpartyRef,
-    string Status);
+    string Status,
+    string? TxRef = null,
+    string? Network = null);

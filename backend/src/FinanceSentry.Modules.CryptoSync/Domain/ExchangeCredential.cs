@@ -41,6 +41,13 @@ public sealed class ExchangeCredential : IUserOwned
     /// <summary>Which of the venue's movement sources the next walk reads, for a venue that reads one source per run.</summary>
     public int FlowsWalkLane { get; private set; }
 
+    /// <summary>
+    /// How far the venue's on-chain deposits and withdrawals have been read, for a venue that walks them apart from
+    /// its other movements (Binance, S2b), from <see cref="FirstLinkedAt"/> on; null until the first such walk
+    /// succeeds. Its own cursor, so the days <see cref="FlowsWalkedTo"/> passed before S2b are read too.
+    /// </summary>
+    public DateTime? ChainFlowsWalkedTo { get; private set; }
+
     private ExchangeCredential() { }
 
     public static ExchangeCredential Create(
@@ -87,6 +94,11 @@ public sealed class ExchangeCredential : IUserOwned
         FlowsWalkLane = nextLane;
     }
 
+    public void MarkChainFlowsWalked(DateTime walkedTo)
+    {
+        ChainFlowsWalkedTo = walkedTo;
+    }
+
     private const int MaxSyncErrorLength = 1000;
 
     public void MarkSyncFailed(string error)
@@ -117,6 +129,7 @@ public sealed class ExchangeCredential : IUserOwned
         LastSyncError = null;
         FlowsWalkedTo = null;
         FlowsWalkLane = 0;
+        ChainFlowsWalkedTo = null;
         CreatedAt = DateTime.UtcNow;
         Health = Health with { LastFailureAt = null };
     }

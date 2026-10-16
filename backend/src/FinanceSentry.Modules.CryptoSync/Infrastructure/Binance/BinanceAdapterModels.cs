@@ -88,3 +88,32 @@ public sealed record BinanceFiatPayment(
     [property: JsonPropertyName("paymentMethod")] string? PaymentMethod,
     [property: JsonPropertyName("createTime")] long CreateTimeMs,
     [property: JsonPropertyName("updateTime")] long? UpdateTimeMs);
+
+// /sapi/v1/capital/deposit/hisrec — a coin deposit. status: 0 pending, 6 credited but cannot withdraw, 7 wrong
+// deposit, 8 waiting user confirm, 1 success, 2 rejected. transferType 0 is on-chain, 1 from another Binance account.
+// insertTime is when the deposit was seen, completeTime when it was credited (absent on older rows).
+public sealed record BinanceCoinDeposit(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("coin")] string? Coin,
+    [property: JsonPropertyName("network")] string? Network,
+    [property: JsonPropertyName("status")] int Status,
+    [property: JsonPropertyName("txId")] string? TxId,
+    [property: JsonPropertyName("insertTime")] long InsertTimeMs,
+    [property: JsonPropertyName("completeTime")] long? CompleteTimeMs,
+    [property: JsonPropertyName("transferType")] int TransferType);
+
+// /sapi/v1/capital/withdraw/history — a coin withdrawal. status: 0 email sent, 2 awaiting approval, 3 rejected,
+// 4 processing, 6 completed. amount is what was sent, transactionFee the network fee charged on top (unverified, see
+// BinanceAdapter.GetChainFlowsAsync). applyTime and completeTime are UTC "yyyy-MM-dd HH:mm:ss" strings.
+public sealed record BinanceCoinWithdrawal(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("transactionFee")] string? TransactionFee,
+    [property: JsonPropertyName("coin")] string? Coin,
+    [property: JsonPropertyName("network")] string? Network,
+    [property: JsonPropertyName("status")] int Status,
+    [property: JsonPropertyName("txId")] string? TxId,
+    [property: JsonPropertyName("applyTime")] string? ApplyTime,
+    [property: JsonPropertyName("completeTime")] string? CompleteTime,
+    [property: JsonPropertyName("transferType")] int TransferType);

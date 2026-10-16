@@ -49,6 +49,9 @@ public static class HeadlineQualityMapper
         if (signals.ScopeChanged)
             reasons.Add(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
 
+        foreach (var source in signals.UnmatchedTransferSources.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, source));
+
         if (percentFailure is { } failure)
             reasons.Add(new HeadlineReason(ReasonFor(failure)));
 

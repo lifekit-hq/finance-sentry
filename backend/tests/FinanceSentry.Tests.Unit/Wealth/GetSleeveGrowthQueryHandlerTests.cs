@@ -40,13 +40,16 @@ public class GetSleeveGrowthQueryHandlerTests
             .Handle(new GetSleeveGrowthQuery(UserId, sleeve), CancellationToken.None);
 
     private void SetupCrypto(NetWorthSnapshot[] snapshots, FlowSourceCoverage[] sources, params SourceFlow[] flows)
+        => SetupCrypto(snapshots, new SleeveFlowReading(sources, flows));
+
+    private void SetupCrypto(NetWorthSnapshot[] snapshots, SleeveFlowReading reading)
     {
         _snapshots.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(snapshots);
         _snapshots.Setup(r => r.GetSourcesUnscopedAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _cryptoFlows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SleeveFlowReading(sources, flows));
+            .ReturnsAsync(reading);
     }
 
     private static NetWorthSnapshot CryptoClose(int day, decimal crypto, string? staleSleeves = null)
@@ -200,5 +203,44 @@ public class GetSleeveGrowthQueryHandlerTests
         result.Growth.Should().Be(100m);
         result.Headline.Reasons.Where(r => r.Code == HeadlineReasonCode.StaleSource)
             .Should().Equal(new HeadlineReason(HeadlineReasonCode.StaleSource, WealthSourceIds.Crypto));
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_Fixture12_CountsTheValueInTransitBetweenVenues_SoTheMoveCostsOnlyItsFee()
+    {
+        // Revolut X held 20 SOL at 150; 10.05 SOL left it on day 1 (0.05 fee) and 10.00 reached Binance on day 2.
+        var venues = new[] { new FlowSourceCoverage("binance", Day(-30), true), new FlowSourceCoverage("revolut_x", Day(-30), true) };
+        SetupCrypto(
+            [CryptoClose(0, 3000m), CryptoClose(1, 1492.50m)],
+            new SleeveFlowReading(venues, [RevolutXFlow(1, FlowClass.Fee, 7.50m)])
+            {
+                InTransit = [new InTransitValue("revolut_x", Day(1), Day(2), 1500m, FxStatus.Exact)],
+            });
+
+        var result = await Handle(WealthSourceIds.Crypto);
+
+        result.EndValue.Should().Be(2992.50m);
+        result.Contributed.Should().Be(0m);
+        result.Fees.Should().Be(7.50m);
+        result.Growth.Should().Be(-7.50m);
+        result.MoneyWeightedReturn.Should().Be(-0.0025m);
+        result.Headline.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.UnmatchedTransfer);
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_ATransferReadAsExternalForWantOfAMatch_MarksTheHeadlineUnmatched()
+    {
+        // Fixture 13: 500 USDT reached Binance and no venue's send matched it.
+        var venues = new[] { new FlowSourceCoverage("binance", Day(-30), true), new FlowSourceCoverage("revolut_x", Day(-30), true) };
+        SetupCrypto(
+            [CryptoClose(0, 1000m), CryptoClose(10, 1500m)],
+            venues,
+            new SourceFlow("binance", new ClassifiedFlow(Day(4), FlowClass.ExternalInflow, 500m), FxStatus.Exact, UnmatchedTransfer: true));
+
+        var result = await Handle(WealthSourceIds.Crypto);
+
+        result.Contributed.Should().Be(500m, "provisionally external: never growth");
+        result.Growth.Should().Be(0m);
+        result.Headline.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, "binance"));
     }
 }

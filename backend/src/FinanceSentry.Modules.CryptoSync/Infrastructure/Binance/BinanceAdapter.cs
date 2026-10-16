@@ -42,6 +42,26 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
     private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
 
+    // capital/deposit/hisrec and capital/withdraw/history take windows under 90 days. A run reads one such window of
+    // both (deposits weigh IP 1, withdrawals UID 18000 of the 180000-per-minute budget).
+    private const long ChainWindowMs = 89L * 24 * 60 * 60 * 1000;
+    private const int ChainPageRows = 1000;
+    private const int MaxChainPages = 20;
+    private const int DepositSuccess = 1;
+    private const int DepositCreditedLocked = 6;
+    private const int WithdrawalCompleted = 6;
+    private const int InternalTransferType = 1;
+    private const string WithdrawTimeFormat = "yyyy-MM-dd HH:mm:ss";
+
+    /// <summary>The counterparty a chain leg records: a transfer over a chain, or one with another Binance account.</summary>
+    public const string OnChainCounterparty = "on_chain";
+
+    /// <inheritdoc cref="OnChainCounterparty"/>
+    public const string InternalCounterparty = "binance_internal";
+
+    private static readonly HashSet<int> PendingDepositStatuses = [0, 8];
+    private static readonly HashSet<int> PendingWithdrawalStatuses = [0, 2, 4];
+
     private static readonly HashSet<string> CompletedFiatStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
         "Successful", "Finished", "Completed",
@@ -55,6 +75,8 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     public string ExchangeName => CryptoExchangeProvider.Binance;
 
     public bool TradeHistoryStartsAtConnect => false;
+
+    public bool WalksChainFlows => true;
 
     public BinanceAdapter(
         BinanceHttpClient httpClient,
@@ -193,7 +215,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     /// The cursor moves a window on only after the last lane has read it; a pending leg in any lane restarts the
     /// lanes on the same window, so it is read again once it settles.
     /// </summary>
-    // shortcut: on-chain, P2P and Pay legs are not read, so Binance's flows stay unknown to the reader; S2b reads them.
+    // shortcut: P2P and Pay legs are not read; on-chain legs are, by GetChainFlowsAsync on a cursor of their own.
     public async Task<CryptoFlowPage> GetFlowsAsync(
         string apiKey,
         string apiSecret,
@@ -252,6 +274,146 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             ? new CryptoFlowPage(ordered, DateTimeOffset.FromUnixTimeMilliseconds(endMs).UtcDateTime)
             : new CryptoFlowPage(ordered, stayAt, walk.Lane + 1);
     }
+
+    /// <summary>
+    /// The completed coin deposits and withdrawals (S2b) in one window of under 90 days from
+    /// <see cref="CryptoFlowWalk.From"/>, both read every run. A deposit counts once credited (status 1, or 6 =
+    /// credited but not yet withdrawable) at the amount credited, dated when credited; a withdrawal once completed
+    /// (status 6) at <c>amount</c> with <c>transactionFee</c> as its fee, dated when applied (the balance leaves
+    /// then). The chain hash and network are kept for cross-venue matching, and the counterparty says whether the
+    /// coin crossed a chain (<see cref="OnChainCounterparty"/>) or came from or went to another Binance account
+    /// (<see cref="InternalCounterparty"/>). A pending leg stops the cursor before it, so it is read again once it
+    /// settles. Every crypto leg is priced at read time, as Revolut X's are.
+    /// </summary>
+    // shortcut: whether withdraw/history's amount is net of transactionFee is unverified; read as net (what left for
+    // the address), so the fee is what the sleeve paid on top. A matched pair's fee is the sent less the received
+    // either way, so only an unmatched withdrawal's split between outflow and fee depends on it.
+    public async Task<CryptoFlowPage> GetChainFlowsAsync(
+        string apiKey,
+        string apiSecret,
+        CryptoFlowWalk walk,
+        CancellationToken ct = default)
+    {
+        var beginMs = ToUnixMs(walk.From);
+        var asOfMs = ToUnixMs(walk.AsOf);
+        if (beginMs > asOfMs)
+        {
+            return new CryptoFlowPage([], walk.From.AddMilliseconds(-1));
+        }
+
+        var endMs = Math.Min(beginMs + ChainWindowMs - 1, asOfMs);
+        var depositsTask = ReadChainPagesAsync(
+            (offset, c) => _httpClient.GetCoinDepositsAsync(apiKey, apiSecret, beginMs, endMs, offset, ChainPageRows, c), ct);
+        var withdrawalsTask = ReadChainPagesAsync(
+            (offset, c) => _httpClient.GetCoinWithdrawalsAsync(apiKey, apiSecret, beginMs, endMs, offset, ChainPageRows, c), ct);
+        await Task.WhenAll(depositsTask, withdrawalsTask);
+
+        var holdSinceMs = ToUnixMs(walk.AsOf - MaxPendingHold);
+        var holdBelowMs = long.MaxValue;
+        var completed = new List<ChainLeg>();
+        foreach (var deposit in depositsTask.Result)
+        {
+            if (deposit.Status is DepositSuccess or DepositCreditedLocked)
+            {
+                completed.Add(new ChainLeg(
+                    deposit.Id, CryptoFlowTypes.CryptoDeposit, deposit.CompleteTimeMs ?? deposit.InsertTimeMs, deposit.Amount,
+                    deposit.Coin, null, deposit.TxId, deposit.Network, deposit.TransferType, deposit.Status));
+            }
+            else if (PendingDepositStatuses.Contains(deposit.Status) && deposit.InsertTimeMs >= holdSinceMs)
+            {
+                holdBelowMs = Math.Min(holdBelowMs, deposit.InsertTimeMs);
+            }
+        }
+
+        foreach (var withdrawal in withdrawalsTask.Result)
+        {
+            var appliedMs = ParseWithdrawTime(withdrawal.ApplyTime);
+            if (withdrawal.Status == WithdrawalCompleted && appliedMs is { } at)
+            {
+                completed.Add(new ChainLeg(
+                    withdrawal.Id, CryptoFlowTypes.CryptoWithdrawal, at, withdrawal.Amount, withdrawal.Coin,
+                    withdrawal.TransactionFee, withdrawal.TxId, withdrawal.Network, withdrawal.TransferType, withdrawal.Status));
+            }
+            else if (PendingWithdrawalStatuses.Contains(withdrawal.Status) && (appliedMs ?? asOfMs) >= holdSinceMs)
+            {
+                holdBelowMs = Math.Min(holdBelowMs, appliedMs ?? beginMs);
+            }
+        }
+
+        var priceMap = completed.Count == 0
+            ? []
+            : BinanceHoldingsAggregator.PriceMap(await _httpClient.GetAllPricesAsync(ct));
+        var flows = new List<CryptoFlow>();
+        foreach (var leg in completed.OrderBy(l => l.AtMs).ThenBy(l => l.Id ?? string.Empty, StringComparer.Ordinal))
+        {
+            var unit = leg.Coin?.Trim().ToUpperInvariant();
+            var amount = ParseAmount(leg.Amount);
+            if (string.IsNullOrWhiteSpace(leg.Id) || amount is not > 0m || string.IsNullOrEmpty(unit))
+            {
+                _logger.LogWarning("Binance {ProviderType} {EventId} is unreadable and was skipped.", leg.Type, leg.Id);
+                continue;
+            }
+
+            var fee = ParseAmount(leg.Fee);
+            flows.Add(new CryptoFlow(
+                EventId: leg.Id.Trim(),
+                ProviderType: leg.Type,
+                OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(leg.AtMs).UtcDateTime,
+                Amount: amount.Value,
+                Unit: unit,
+                IsFiat: false,
+                UnitPriceUsd: BinanceHoldingsAggregator.UnitPriceUsd(unit, priceMap),
+                Fee: fee is > 0m ? fee : null,
+                FeeUnit: fee is > 0m ? unit : null,
+                CounterpartyRef: leg.TransferType == InternalTransferType ? InternalCounterparty : OnChainCounterparty,
+                Status: leg.Status.ToString(CultureInfo.InvariantCulture),
+                TxRef: string.IsNullOrWhiteSpace(leg.TxId) ? null : leg.TxId.Trim(),
+                Network: string.IsNullOrWhiteSpace(leg.Network) ? null : leg.Network.Trim()));
+        }
+
+        var resumeMs = Math.Min(endMs, holdBelowMs - 1);
+        return new CryptoFlowPage(flows, DateTimeOffset.FromUnixTimeMilliseconds(Math.Max(resumeMs, beginMs - 1)).UtcDateTime);
+    }
+
+    private static async Task<IReadOnlyList<T>> ReadChainPagesAsync<T>(
+        Func<int, CancellationToken, Task<IReadOnlyList<T>>> fetch,
+        CancellationToken ct)
+    {
+        var rows = new List<T>();
+        for (var page = 0; ; page++)
+        {
+            if (page == MaxChainPages)
+            {
+                throw new BinanceException($"Binance returned more than {MaxChainPages} pages of coin history for one window.");
+            }
+
+            var data = await fetch(page * ChainPageRows, ct);
+            rows.AddRange(data);
+            if (data.Count < ChainPageRows)
+            {
+                return rows;
+            }
+        }
+    }
+
+    private readonly record struct ChainLeg(
+        string? Id,
+        string Type,
+        long AtMs,
+        string? Amount,
+        string? Coin,
+        string? Fee,
+        string? TxId,
+        string? Network,
+        int TransferType,
+        int Status);
+
+    private static long? ParseWithdrawTime(string? value) =>
+        DateTime.TryParseExact(
+            value, WithdrawTimeFormat, CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var at)
+            ? ToUnixMs(at)
+            : null;
 
     private static async Task<IReadOnlyList<T>> ReadFiatPagesAsync<T>(
         Func<int, CancellationToken, Task<BinanceFiatPage<T>>> fetch,

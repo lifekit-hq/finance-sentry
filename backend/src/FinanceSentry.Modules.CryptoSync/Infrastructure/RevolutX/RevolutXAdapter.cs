@@ -40,6 +40,7 @@ public sealed class RevolutXAdapter(
     private const string PendingStatus = "pending";
     private const string ReceiveType = "receive";
     private const string SendType = "send";
+    private const string ExternalCryptoWallet = "external_crypto_wallet";
 
     // A transfer pending longer than this stops holding the walk back, so a stuck row cannot pin it forever.
     private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
@@ -180,9 +181,9 @@ public sealed class RevolutXAdapter(
     /// millisecond wider on both sides, filtered back, as the fills walk does). Each leg's account type is what makes a
     /// transfer readable: the leg that is not <c>revolut_x</c> is the counterparty (<c>revolut</c>: the owner's own
     /// Revolut app; <c>external_*</c>: outside it). The amount is the venue-side leg, credited for a receive and
-    /// debited for a send, net of any fee, so the sleeve's value change is explained without the fee.
+    /// debited for a send. A coin transfer with an external crypto wallet also takes its chain hash, network and
+    /// fee from its details (<see cref="ChainDetailsAsync"/>), so another venue's leg can be matched to it.
     /// </summary>
-    // shortcut: no fee, network or on-chain hash (the per-id details call); read them when S2b matches txIds.
     public async Task<CryptoFlowPage> GetFlowsAsync(
         string apiKey,
         string apiSecret,
@@ -289,22 +290,59 @@ public sealed class RevolutXAdapter(
             }
 
             var isFiat = RevolutXHoldingsAggregator.IsFiat(unit, currenciesTask.Result);
+            var counterparty = other?.Account?.Type?.Trim().ToLowerInvariant();
+            var chain = !isFiat && counterparty == ExternalCryptoWallet
+                ? await ChainDetailsAsync(credentials, row.Id, type == SendType, unit, amount.Value, ct)
+                : null;
             flows.Add(new CryptoFlow(
                 EventId: row.Id,
                 ProviderType: type == ReceiveType ? CryptoFlowTypes.Receive : CryptoFlowTypes.Send,
                 OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(row.ProcessedDateMs ?? row.CreatedDateMs).UtcDateTime,
-                Amount: amount.Value,
+                Amount: chain?.Amount ?? amount.Value,
                 Unit: unit,
                 IsFiat: isFiat,
                 UnitPriceUsd: isFiat ? null : RevolutXHoldingsAggregator.UnitPriceUsd(unit, tickersTask.Result.Data),
-                Fee: null,
-                FeeUnit: null,
-                CounterpartyRef: other?.Account?.Type?.Trim().ToLowerInvariant(),
-                Status: CompletedStatus));
+                Fee: chain?.Fee,
+                FeeUnit: chain?.Fee is null ? null : unit,
+                CounterpartyRef: counterparty,
+                Status: CompletedStatus,
+                TxRef: chain?.TxRef,
+                Network: chain?.Network));
         }
 
         return flows;
     }
+
+    /// <summary>
+    /// The chain hash and network of a transfer with an external crypto wallet (S2b), read from the transaction's
+    /// details; the list leaves them out. A send's listed amount is what left the account, Revolut's own fee
+    /// included: when the details name that fee in the sent unit, the amount becomes what went on chain and the
+    /// fee is kept apart, the way a Binance withdrawal is recorded.
+    /// </summary>
+    private async Task<ChainDetails> ChainDetailsAsync(
+        RevolutXCredentials credentials,
+        string transactionId,
+        bool isSend,
+        string unit,
+        decimal listedAmount,
+        CancellationToken ct)
+    {
+        var details = await httpClient.GetTransactionDetailsAsync(credentials, transactionId, ct);
+        var source = details.Source;
+        var fee = isSend
+            && string.Equals(source?.FeeCurrency?.Trim(), unit, StringComparison.OrdinalIgnoreCase)
+            && ParseAmount(source?.Fee) is > 0m and var kept
+            && kept < listedAmount
+                ? kept
+                : (decimal?)null;
+        return new ChainDetails(
+            fee is { } f ? listedAmount - f : listedAmount,
+            fee,
+            string.IsNullOrWhiteSpace(details.CryptoTransactionHash) ? null : details.CryptoTransactionHash.Trim(),
+            string.IsNullOrWhiteSpace(details.Network) ? null : details.Network.Trim());
+    }
+
+    private sealed record ChainDetails(decimal Amount, decimal? Fee, string? TxRef, string? Network);
 
     private async Task WalkWindowAsync(
         RevolutXCredentials credentials,

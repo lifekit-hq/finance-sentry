@@ -21,7 +21,9 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// <see cref="Taxes"/> and the market remainder. <see cref="MoneyWeightedReturn"/> is Modified Dietz over the
 /// window (a rate, not annualised). <see cref="SourcesWithoutFlows"/> are providers whose deposits and withdrawals
 /// are not known (a broker that has never reported one, a venue whose movements are not read or not yet walked): while any is listed the split cannot be made (its deposits would read as growth), so
-/// the amounts are null and <see cref="Headline"/> is unavailable with <c>UNKNOWN_FLOW</c> naming each one.
+/// the amounts are null and <see cref="Headline"/> is unavailable with <c>UNKNOWN_FLOW</c> naming each one. Value in
+/// transit between two of the sleeve's providers counts in the sleeve's value on each day it is held by neither; a
+/// transfer read as external only for want of a match marks the headline <c>UNMATCHED_TRANSFER</c>.
 /// </summary>
 public record SleeveGrowthResponse(
     DateOnly? SeriesStart,
@@ -55,7 +57,7 @@ public class GetSleeveGrowthQueryHandler(
     public async Task<SleeveGrowthResponse> Handle(GetSleeveGrowthQuery query, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var (daily, flows) = query.Sleeve switch
+        var (held, flows) = query.Sleeve switch
         {
             WealthSourceIds.Brokerage => (await BrokerageDailyAsync(query.UserId, today, cancellationToken),
                 await flowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
@@ -63,6 +65,8 @@ public class GetSleeveGrowthQueryHandler(
                 await cryptoFlowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
             _ => throw new ArgumentOutOfRangeException(nameof(query), query.Sleeve, "No growth split for this sleeve."),
         };
+        // Value moving between two of the sleeve's providers is held by neither, yet still the sleeve's.
+        var daily = held.Select(d => d with { TotalUsd = d.TotalUsd + flows.InTransitOn(d.Date) }).ToList();
         var seriesStart = daily.FirstOrDefault(d => d.TotalUsd > 0m)?.Date;
 
         var bridge = ScopeLinks.Bridge(
@@ -92,6 +96,7 @@ public class GetSleeveGrowthQueryHandler(
             Fx = edges.Fx.Worst(flows.FxWithin(opening.Date, closing.Date)),
             UnknownFlowSources = unknown,
             ScopeChanged = bridge.ScopeChanged,
+            UnmatchedTransferSources = flows.UnmatchedTransferSources(opening.Date, closing.Date),
         };
 
         // The linked value is placed before the window's growth, so M2 neither counts it as a contribution nor as

@@ -105,6 +105,39 @@ public sealed class BinanceHttpClient
             HttpMethod.Get, "/sapi/v1/fiat/payments", apiKey, apiSecret,
             FiatHistoryQuery(transactionType, beginTimeMs, endTimeMs, page, rows), ct);
 
+    // /sapi/v1/capital/deposit/hisrec — coin deposits inserted in [startTime, endTime] (at most 90 days apart), every
+    // status, paged by offset. https://developers.binance.com/docs/wallet/capital/deposite-history
+    public Task<IReadOnlyList<BinanceCoinDeposit>> GetCoinDepositsAsync(
+        string apiKey,
+        string apiSecret,
+        long startTimeMs,
+        long endTimeMs,
+        int offset,
+        int limit,
+        CancellationToken ct = default) =>
+        SendSignedAsync<IReadOnlyList<BinanceCoinDeposit>>(
+            HttpMethod.Get, "/sapi/v1/capital/deposit/hisrec", apiKey, apiSecret,
+            CoinHistoryQuery(startTimeMs, endTimeMs, offset, limit), ct);
+
+    // /sapi/v1/capital/withdraw/history — coin withdrawals applied in [startTime, endTime] (at most 90 days apart),
+    // every status, paged by offset. https://developers.binance.com/docs/wallet/capital/withdraw-history
+    public Task<IReadOnlyList<BinanceCoinWithdrawal>> GetCoinWithdrawalsAsync(
+        string apiKey,
+        string apiSecret,
+        long startTimeMs,
+        long endTimeMs,
+        int offset,
+        int limit,
+        CancellationToken ct = default) =>
+        SendSignedAsync<IReadOnlyList<BinanceCoinWithdrawal>>(
+            HttpMethod.Get, "/sapi/v1/capital/withdraw/history", apiKey, apiSecret,
+            CoinHistoryQuery(startTimeMs, endTimeMs, offset, limit), ct);
+
+    private static string CoinHistoryQuery(long startTimeMs, long endTimeMs, int offset, int limit) =>
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"startTime={startTimeMs}&endTime={endTimeMs}&offset={offset}&limit={limit}");
+
     private static string FiatHistoryQuery(int transactionType, long beginTimeMs, long endTimeMs, int page, int rows) =>
         string.Create(
             System.Globalization.CultureInfo.InvariantCulture,

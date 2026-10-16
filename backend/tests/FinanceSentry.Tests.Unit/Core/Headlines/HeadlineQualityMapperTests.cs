@@ -317,6 +317,19 @@ public class HeadlineQualityMapperTests
         assessment.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"));
     }
 
+    // Row: UnmatchedTransferSources -> UNMATCHED_TRANSFER per source, ESTIMATED: the figure stands, provisionally.
+    [Fact]
+    public void UnmatchedTransferSources_AreEstimated_WithOneReasonPerSource()
+    {
+        var assessment = HeadlineQualityMapper.Assess(
+            HeadlineSignals.None with { UnmatchedTransferSources = ["revolut_x", "binance", "binance"] }, amountAvailable: true);
+
+        assessment.Quality.Should().Be(HeadlineQuality.Estimated);
+        assessment.Reasons.Should().Equal(
+            new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, "binance"),
+            new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, "revolut_x"));
+    }
+
     // Row: ScopeChanged (bridged) -> COMPLETE + SCOPE_CHANGED, informative.
     [Fact]
     public void ScopeChanged_IsInformative_OnABridgedGrowthFigure()
