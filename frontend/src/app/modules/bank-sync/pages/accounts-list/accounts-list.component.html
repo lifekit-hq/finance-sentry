@@ -35,7 +35,7 @@
                 >
               }
               <span class="ml-auto text-cmn-sm tabular-nums text-text-primary">
-                {{ row.value | netBalance: store.baseCurrency() }}
+                {{ row.value | money: store.baseCurrency() }}
               </span>
             </div>
           }
