@@ -22,7 +22,7 @@ export class AsyncViewUtils {
         offlineNotice: AsyncViewUtils.offlineNotice(input.lastSyncedAt, now),
       };
     }
-    if (input.isLoading && !input.hasData) {
+    if (input.isLoading && (!input.hasData || input.keepContent === true)) {
       return {status: 'loading', errorMessage: '', offlineNotice: null};
     }
     if (input.errorMessage !== '' && !input.isLoading) {

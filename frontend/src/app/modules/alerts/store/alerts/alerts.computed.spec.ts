@@ -1,44 +1,48 @@
 import {signal} from '@angular/core';
 import {describe, expect, it} from 'vitest';
 
+import {type Alert} from '../../models/alert/alert.model';
 import {alertsComputed} from './alerts.computed';
 
-function build(totalCount: number, currentPage: number, pageSize = 20) {
+const BASE: Alert = {
+  id: 'a',
+  type: 'LowBalance',
+  severity: 'Warning',
+  title: 'Low balance',
+  message: 'Balance dropped',
+  referenceId: null,
+  referenceLabel: null,
+  isRead: false,
+  isResolved: false,
+  createdAt: '2026-10-01T09:00:00Z',
+  resolvedAt: null,
+  occurrenceCount: 1,
+  lastOccurredAt: '2026-10-01T09:00:00Z',
+};
+
+function build(loaded: number, totalCount: number, exhausted = false) {
   return alertsComputed({
-    alerts: signal([]),
+    alerts: signal(Array.from({length: loaded}, (_, i): Alert => ({...BASE, id: `a${i}`}))),
+    exhausted: signal(exhausted),
     filter: signal('unread' as const),
     unreadCount: signal(0),
     totalCount: signal(totalCount),
-    currentPage: signal(currentPage),
-    pageSize: signal(pageSize),
     search: signal(' rent '),
   });
 }
 
 describe('alertsComputed paging', () => {
-  it('totalPages rounds up and is at least one', () => {
-    expect(build(0, 1).totalPages()).toBe(1);
-    expect(build(20, 1).totalPages()).toBe(1);
-    expect(build(21, 1).totalPages()).toBe(2);
-    expect(build(101, 1, 50).totalPages()).toBe(3);
+  it('has more while fewer alerts are loaded than the server holds', () => {
+    expect(build(20, 45).hasMore()).toBe(true);
+    expect(build(45, 45).hasMore()).toBe(false);
+    expect(build(0, 0).hasMore()).toBe(false);
   });
 
-  it('knows whether there is a previous and a next page', () => {
-    const first = build(45, 1);
-    expect(first.hasPreviousPage()).toBe(false);
-    expect(first.hasNextPage()).toBe(true);
-
-    const last = build(45, 3);
-    expect(last.hasPreviousPage()).toBe(true);
-    expect(last.hasNextPage()).toBe(false);
+  it('has no more once the server had nothing new to give, whatever the count says', () => {
+    expect(build(38, 39, true).hasMore()).toBe(false);
   });
 
-  it('query bundles the filter, page, page size and trimmed search the list is showing', () => {
-    expect(build(45, 2, 50).query()).toEqual({
-      filter: 'unread',
-      page: 2,
-      pageSize: 50,
-      search: 'rent',
-    });
+  it('query bundles the filter and trimmed search the list is showing', () => {
+    expect(build(0, 45).query()).toEqual({filter: 'unread', search: 'rent'});
   });
 });

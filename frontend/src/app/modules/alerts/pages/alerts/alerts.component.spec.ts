@@ -1,7 +1,11 @@
 import {ApplicationRef, getDebugNode, type Signal, signal, type TemplateRef} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {CmnDrawerService, type FilterBarSheetContext} from '@lifekit-hq/ui';
+import {
+  ASYNC_STATE_SHOW_DELAY_MS,
+  CmnDrawerService,
+  type FilterBarSheetContext,
+} from '@lifekit-hq/ui';
 import {Subject} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
@@ -12,7 +16,6 @@ import {AlertsComponent} from './alerts.component';
 import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const UNREAD_COUNT = 3;
-const PAGE_SIZE = 20;
 const TOTAL_COUNT = 45;
 
 const drawerOpen = vi.fn(() => ({beforeClose$: new Subject<void>(), close: vi.fn()}));
@@ -30,18 +33,16 @@ function render(
     filter: signal(filter),
     search: signal(async.search ?? ''),
     unreadCount: signal(unreadCount),
-    pageSize: signal(PAGE_SIZE),
     totalCount: signal(TOTAL_COUNT),
-    currentPage: signal(1),
-    hasPreviousPage: signal(false),
-    hasNextPage: signal(true),
-    totalPages: signal(3),
+    hasMore: signal(true),
+    isAppendLoading: signal(false),
+    hasAppendError: signal(false),
+    loadMore: vi.fn(),
     setFilter: vi.fn(),
-    setPageSize: vi.fn(),
     applySearch: vi.fn(),
     isLoading: signal(async.isLoading ?? false),
     errorMessage: signal<Nullable<string>>(async.errorMessage ?? null),
-    query: signal({filter, page: 1, pageSize: PAGE_SIZE, search: ''}),
+    query: signal({filter, search: ''}),
     load: vi.fn(),
     markRead: vi.fn(),
     markAllRead: vi.fn(),
@@ -163,22 +164,29 @@ describe('AlertsComponent filter flow', () => {
     expect((el.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('rent');
   });
 
-  it('converts the chosen page size back to a number', () => {
-    const {component, store} = render();
-
-    component.onPageSizeChange(new CustomEvent('lk-segmented-change', {detail: {value: '50'}}));
-
-    expect(store.setPageSize).toHaveBeenCalledWith(50);
-  });
-
-  it('offers the page sizes as strings labelled "N per page"', () => {
-    const {component} = render();
-
-    expect(component.pageSizeOptions).toEqual([
-      {value: '20', label: '20 per page'},
-      {value: '50', label: '50 per page'},
-      {value: '100', label: '100 per page'},
+  it('pages the list through lk-infinite-list instead of a pager', () => {
+    const {el, store} = render('all', 0, [
+      {
+        id: 'a1',
+        title: 'T',
+        message: 'M',
+        severity: 'Info',
+        type: 'SyncFailed',
+        isRead: true,
+        isResolved: false,
+        createdAt: '2026-09-22T10:00:00Z',
+      } as unknown as Alert,
     ]);
+    const list = el.querySelector('[data-testid="alerts-list"]') as HTMLElement & {
+      hasMore: boolean;
+    };
+
+    expect(el.querySelector('[data-testid="alerts-pager"]')).toBeNull();
+    expect(list.hasMore).toBe(true);
+    list.dispatchEvent(new CustomEvent('lk-infinite-list-load-more', {bubbles: true}));
+    list.dispatchEvent(new CustomEvent('lk-infinite-list-retry', {bubbles: true}));
+
+    expect(store.loadMore).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -198,10 +206,14 @@ describe('AlertsComponent async states', () => {
     return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry');
   }
 
-  it('shows a skeleton, not the empty copy, while the page loads', () => {
-    const {el} = render('all', 0, [], {isLoading: true});
+  it('shows the section skeleton, not the empty copy, once a slow load outlasts the delay', async () => {
+    const {el, fixture} = render('all', 0, [], {isLoading: true});
+    await new Promise(resolve => setTimeout(resolve, ASYNC_STATE_SHOW_DELAY_MS + 50));
+    fixture.detectChanges();
 
-    expect(el.querySelector('[data-testid="alerts-skeleton"]')).not.toBeNull();
+    expect(
+      el.querySelector('[data-testid="alerts-skeleton"] cmn-skeleton[shape="section"]')
+    ).not.toBeNull();
     expect(el.textContent).not.toContain('All your accounts are healthy.');
   });
 
@@ -214,12 +226,7 @@ describe('AlertsComponent async states', () => {
     retryButton(el)?.click();
     fixture.detectChanges();
 
-    expect(store.load).toHaveBeenCalledWith({
-      filter: 'warning',
-      page: 1,
-      pageSize: PAGE_SIZE,
-      search: '',
-    });
+    expect(store.load).toHaveBeenCalledWith({filter: 'warning', search: ''});
   });
 
   it('replaces the previous query rows with the error when the new query fails', () => {
@@ -255,6 +262,22 @@ describe('AlertsComponent async states', () => {
 
     expect(el.querySelectorAll('[data-testid="alert-row"]').length).toBe(1);
     expect(el.querySelector('[data-testid="alerts-skeleton"]')).toBeNull();
+  });
+
+  it('paints the rows a revisit finds at once, without replaying the fade-in', () => {
+    const {el} = render('all', 1, [ALERT]);
+
+    expect(el.querySelector('[data-testid="alert-row"]')).not.toBeNull();
+    expect(el.querySelector('.animate-cmn-fade-in')).toBeNull();
+  });
+
+  it('fades the first rows in where they replace the skeleton', () => {
+    const {el, store, fixture} = render('all', 0, [], {isLoading: true});
+    store.alerts.set([ALERT]);
+    store.isLoading.set(false);
+    fixture.detectChanges();
+
+    expect(el.querySelector('.animate-cmn-fade-in [data-testid="alert-row"]')).not.toBeNull();
   });
 
   it('groups the rows under a labelled day section', () => {

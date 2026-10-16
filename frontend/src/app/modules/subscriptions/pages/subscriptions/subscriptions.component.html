@@ -28,16 +28,11 @@
     >
       <div skeleton class="space-y-cmn-5" data-testid="subscriptions-skeleton">
         <div class="grid grid-cols-2 gap-cmn-4">
-          <cmn-skeleton height="5rem" />
-          <cmn-skeleton height="5rem" />
+          <cmn-skeleton shape="stat" />
+          <cmn-skeleton shape="stat" />
         </div>
         <cmn-card padding="none">
-          @for (row of skeletonRows; track row) {
-            <div class="p-cmn-4 space-y-cmn-2">
-              <cmn-skeleton width="40%" height="14px" />
-              <cmn-skeleton width="20%" height="12px" />
-            </div>
-          }
+          <cmn-skeleton [count]="skeletonRowCount" shape="row" />
         </cmn-card>
       </div>
 

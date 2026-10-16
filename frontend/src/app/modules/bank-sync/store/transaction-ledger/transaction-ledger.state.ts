@@ -4,6 +4,7 @@ import {
   type TransactionAccountOption,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
+import {type LedgerFilter} from './transaction-ledger.computed';
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
@@ -26,6 +27,10 @@ export interface TransactionLedgerState {
   /** Server-side free-text filter (description / merchant). */
   search: string;
   accounts: TransactionAccountOption[];
+  /** The filter the rows on screen were loaded for; null until a first page has landed. */
+  rowsFilter: Nullable<LedgerFilter>;
+  /** The rows were restored from the session cache and their first reload has not landed yet. */
+  revalidating: boolean;
 }
 
 export const PAGE_SIZE = 50;
@@ -45,4 +50,19 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   to: null,
   search: '',
   accounts: [],
+  rowsFilter: null,
+  revalidating: false,
 };
+
+/** What a revisit restores: the rows and summary of the last visit, with the filter they were loaded for. The URL alone decides the current filter. */
+export const LEDGER_SESSION_FIELDS = [
+  'transactions',
+  'totalCount',
+  'hasMore',
+  'offset',
+  'lastSyncedAt',
+  'monthlyOutflowUsd',
+  'monthlyOutflowCurrency',
+  'accounts',
+  'rowsFilter',
+] as const satisfies readonly (keyof TransactionLedgerState)[];

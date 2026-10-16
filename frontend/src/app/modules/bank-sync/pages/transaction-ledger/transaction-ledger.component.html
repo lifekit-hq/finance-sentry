@@ -1,5 +1,6 @@
 <cmn-page-container spacing="none" fill>
-  <p class="mb-cmn-4 text-cmn-sm text-text-secondary" data-testid="ledger-summary">
+  <!-- One line is held while the figures load, so their arrival does not push the list down. -->
+  <p class="mb-cmn-4 min-h-[1lh] text-cmn-sm text-text-secondary" data-testid="ledger-summary">
     @if (store.monthlyOutflow() !== null) {
       <span
         >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this month</span
@@ -58,27 +59,22 @@
   <cmn-async-state
     [status]="view().status"
     [errorMessage]="view().errorMessage"
-    [isEmpty]="store.isEmpty()"
+    [isEmpty]="store.transactions().length === 0"
+    [showDelay]="showDelay"
+    [minDisplay]="minDisplay"
+    [crossfade]="crossfade"
     class="flex min-h-0 flex-1 flex-col"
     errorPlacement="above"
+    keepContent
   >
     <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
       >Retry</cmn-button
     >
-    <cmn-card skeleton padding="none" class="min-h-0 flex-1">
-      <div class="divide-y divide-border-default">
-        @for (_ of skeletonRows; track $index) {
-          <div class="flex items-center gap-cmn-3 px-cmn-4 py-cmn-3">
-            <cmn-skeleton height="2rem" width="2rem" />
-            <div class="flex-1 space-y-cmn-1">
-              <cmn-skeleton height="0.875rem" width="55%" />
-              <cmn-skeleton height="0.75rem" width="35%" />
-            </div>
-            <cmn-skeleton height="0.875rem" width="4rem" />
-          </div>
-        }
-      </div>
-    </cmn-card>
+    <div skeleton class="space-y-cmn-4" data-testid="ledger-skeleton">
+      @for (_ of skeletonSections; track $index) {
+        <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
+      }
+    </div>
     <div empty class="flex min-h-0 flex-1 items-center justify-center">
       @if (store.hasActiveFilter() || appliedFilters().length > 0) {
         <cmn-empty-state
@@ -92,7 +88,17 @@
         />
       }
     </div>
-    <div class="md:min-h-0 md:flex-1 md:overflow-auto">
+    <lk-infinite-list
+      [hasMore]="store.hasMore()"
+      [loading]="store.isAppendLoading()"
+      [failed]="store.hasAppendError()"
+      (lk-infinite-list-load-more)="store.loadMore()"
+      (lk-infinite-list-retry)="store.loadMore()"
+      class="block md:min-h-0 md:flex-1 md:overflow-auto"
+      end-label="No more transactions"
+      error-label="Couldn't load more transactions."
+      data-testid="ledger-list"
+    >
       @for (group of dayGroups(); track group.dayKey) {
         <cmn-list-section [heading]="group.label" class="mb-cmn-4">
           @for (t of group.items; track t.transactionId) {
@@ -131,14 +137,6 @@
           }
         </cmn-list-section>
       }
-
-      @if (store.hasMore()) {
-        <div class="flex justify-center p-cmn-4">
-          <cmn-button (clicked)="store.loadMore()" variant="secondary" size="sm"
-            >Load More</cmn-button
-          >
-        </div>
-      }
-    </div>
+    </lk-infinite-list>
   </cmn-async-state>
 </cmn-page-container>

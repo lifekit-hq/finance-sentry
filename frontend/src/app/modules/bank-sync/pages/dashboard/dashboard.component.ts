@@ -142,7 +142,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                   Net worth →
                 </a>
               </div>
-              @if (store.isLoading()) {
+              @if (store.isFirstLoad()) {
                 <cmn-skeleton class="block" height="1.875rem" width="50%" />
               } @else {
                 <div class="flex items-center gap-cmn-2">
@@ -161,7 +161,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               }
               <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
               <div class="h-4 leading-4" data-testid="net-worth-split-slot">
-                @if (store.isLoading()) {
+                @if (store.isFirstLoad()) {
                   <cmn-skeleton height="0.875rem" width="45%" />
                 } @else if (store.bookSplitFormatted() || store.bookSplitUnavailable()) {
                   <div class="flex items-center gap-cmn-2">
@@ -185,7 +185,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 not apply (or has no number yet) leaves its slot empty instead of collapsing it.
               -->
               <div class="h-5 leading-5" data-testid="net-worth-change-slot">
-                @if (store.isLoading() || store.isHistoryLoading()) {
+                @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
                   <cmn-skeleton height="1rem" width="40%" />
                 } @else if (store.netWorthChangeFormatted()) {
                   <div class="flex items-center gap-cmn-2">
@@ -239,7 +239,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 below two split days, so a range reaching before the backfill shows nothing here.
               -->
               <div class="h-4 leading-4" data-testid="net-worth-invested-change-slot">
-                @if (!store.isLoading() && !store.isHistoryLoading()) {
+                @if (!store.isFirstLoad() && !store.isHistoryFirstLoad()) {
                   @if (store.investedChangeFormatted()) {
                     <p
                       [class]="investedChangeClass()"
@@ -269,7 +269,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 it a savings forecast. Empty below three complete months (hasProjection()).
               -->
               <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
-                @if (store.isLoading() || store.isHistoryLoading()) {
+                @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
                   <cmn-skeleton height="0.875rem" width="55%" />
                 } @else if (store.hasProjection()) {
                   <p
@@ -287,9 +287,9 @@ const HISTORY_RANGES: ChipRowOption[] = [
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
               } @else if (
-                !store.historyHasHistory() && (store.isLoading() || store.isHistoryLoading())
+                store.isHistoryFirstLoad() || (!store.historyHasHistory() && store.isFirstLoad())
               ) {
-                <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
+                <cmn-skeleton height="19.8125rem" data-testid="net-worth-chart-skeleton" />
               } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
@@ -344,13 +344,13 @@ const HISTORY_RANGES: ChipRowOption[] = [
                     [attr.aria-label]="tile.ariaLabel"
                     (click)="tile.open()"
                     type="button"
-                    class="min-w-0 cursor-pointer space-y-cmn-1 border-border-default px-cmn-4 text-left transition-opacity first:pl-0 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default max-sm:[&:nth-child(2)]:border-l max-sm:last:col-span-2 max-sm:last:border-t max-sm:last:px-0 max-sm:last:pt-cmn-3 sm:border-l sm:first:border-l-0 sm:last:pr-0"
+                    class="min-w-0 cursor-pointer space-y-cmn-1 border-border-default px-cmn-4 text-left transition-opacity duration-cmn-short ease-cmn-standard first:pl-0 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default max-sm:[&:nth-child(2)]:border-l max-sm:last:col-span-2 max-sm:last:border-t max-sm:last:px-0 max-sm:last:pt-cmn-3 sm:border-l sm:first:border-l-0 sm:last:pr-0"
                   >
                     <span
                       class="block truncate font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
                       >{{ tile.label }}</span
                     >
-                    @if (store.isLoading()) {
+                    @if (store.isFirstLoad()) {
                       <span class="block h-6 sm:h-[1.5625rem]">
                         <cmn-skeleton height="100%" width="70%" />
                       </span>
@@ -366,7 +366,9 @@ const HISTORY_RANGES: ChipRowOption[] = [
             </cmn-card>
           </div>
 
-          @if (store.hasCashFlow()) {
+          @if (store.isFirstLoad()) {
+            <cmn-skeleton height="19.8125rem" data-testid="cash-flow-chart-skeleton" />
+          } @else if (store.hasCashFlow()) {
             <div>
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
@@ -378,36 +380,45 @@ const HISTORY_RANGES: ChipRowOption[] = [
           }
 
           <div class="grid grid-cols-1 gap-cmn-4 lg:grid-cols-3">
-            <div>
-              <cmn-donut-chart
-                [segments]="store.categoryChartData()"
-                [label]="topCategoriesLabel()"
-                [currency]="store.baseCurrency()"
-                (segmentClick)="onCategorySegmentClick($event)"
+            @if (store.isFirstLoad()) {
+              <cmn-skeleton height="12rem" data-testid="category-donut-skeleton" />
+              <cmn-skeleton
+                class="lg:col-span-2"
+                height="12rem"
+                data-testid="category-table-skeleton"
               />
-            </div>
-            <div class="lg:col-span-2">
-              <cmn-data-table
-                [rows]="store.data()?.topCategories ?? []"
-                (rowClick)="onCategoryClick($event)"
-                class="grid gap-4"
-                emptyMessage="No spending data available"
-              >
-                <cmn-column key="category" header="Category">
-                  <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
-                </cmn-column>
-                <cmn-column key="spend" header="Total Spend" align="right">
-                  <ng-template let-row cmnCell>{{
-                    row.totalSpend | money: store.baseCurrency()
-                  }}</ng-template>
-                </cmn-column>
-                <cmn-column key="pct" header="% of Total" align="right">
-                  <ng-template let-row cmnCell
-                    >{{ row.percentOfTotal | appDecimal: '1.1-1' }}%</ng-template
-                  >
-                </cmn-column>
-              </cmn-data-table>
-            </div>
+            } @else {
+              <div>
+                <cmn-donut-chart
+                  [segments]="store.categoryChartData()"
+                  [label]="topCategoriesLabel()"
+                  [currency]="store.baseCurrency()"
+                  (segmentClick)="onCategorySegmentClick($event)"
+                />
+              </div>
+              <div class="lg:col-span-2">
+                <cmn-data-table
+                  [rows]="store.data()?.topCategories ?? []"
+                  (rowClick)="onCategoryClick($event)"
+                  class="grid gap-4"
+                  emptyMessage="No spending data available"
+                >
+                  <cmn-column key="category" header="Category">
+                    <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
+                  </cmn-column>
+                  <cmn-column key="spend" header="Total Spend" align="right">
+                    <ng-template let-row cmnCell>{{
+                      row.totalSpend | money: store.baseCurrency()
+                    }}</ng-template>
+                  </cmn-column>
+                  <cmn-column key="pct" header="% of Total" align="right">
+                    <ng-template let-row cmnCell
+                      >{{ row.percentOfTotal | appDecimal: '1.1-1' }}%</ng-template
+                    >
+                  </cmn-column>
+                </cmn-data-table>
+              </div>
+            }
           </div>
         </cmn-async-state>
       </div>

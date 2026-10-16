@@ -1,5 +1,6 @@
-import {signal} from '@angular/core';
+import {computed, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -121,15 +122,32 @@ const ACCOUNTS: AccountsResponse = {
 // Signals are real so the EffectsStore type constraint is satisfied.
 // Pass initialOffset to simulate the offset of the last page already on screen.
 function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []) {
+  const accountId = signal<string | null>(null);
+  const transactionType = signal<TransactionType | null>(null);
+  const categories = signal<string[]>([]);
+  const from = signal<string | null>(null);
+  const to = signal<string | null>(null);
+  const search = signal('');
   return {
     transactions: signal(transactions),
     offset: signal(initialOffset),
-    accountId: signal<string | null>(null),
-    transactionType: signal<TransactionType | null>(null),
-    categories: signal<string[]>([]),
-    from: signal<string | null>(null),
-    to: signal<string | null>(null),
-    search: signal(''),
+    status: signal<AsyncStatus>('idle'),
+    accountId,
+    transactionType,
+    categories,
+    from,
+    to,
+    search,
+    filter: computed<LedgerFilter>(() => ({
+      accountId: accountId(),
+      transactionType: transactionType(),
+      categories: categories(),
+      from: from(),
+      to: to(),
+      search: search().trim(),
+    })),
+    rowsFilter: signal<LedgerFilter | null>(NO_FILTER),
+    setRevalidating: vi.fn(),
     clearRows: vi.fn(),
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
@@ -137,6 +155,10 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
     appendTransactions: vi.fn(),
     nextPage: vi.fn(),
     setError: vi.fn(),
+    setAppendLoading: vi.fn(),
+    setAppendSuccess: vi.fn(),
+    setAppendError: vi.fn(),
+    setAppendIdle: vi.fn(),
     setMonthlyOutflowUsd: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
@@ -171,10 +193,11 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
 
-      expect(store.clearRows).toHaveBeenCalled();
+      // The rows on screen stay (kept, dimmed) until the first page replaces them.
+      expect(store.clearRows).not.toHaveBeenCalled();
       expect(store.setLoading).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({offset: 0, limit: PAGE_SIZE});
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
       expect(store.setSuccess).toHaveBeenCalled();
     });
 
@@ -228,8 +251,23 @@ describe('transactionLedgerEffects', () => {
       });
     });
 
-    it('surfaces a transactions error', () => {
+    it('records the filter the landed rows were requested for', () => {
       const store = buildStore();
+      store.accountId.set('acc-1');
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, {
+        ...NO_FILTER,
+        accountId: 'acc-1',
+      });
+    });
+
+    it('keeps the rows on screen when revalidating them fails', () => {
+      const store = buildStore(0, [TX_ITEM]);
       const service = buildService();
       service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
       configure(service);
@@ -237,8 +275,38 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
 
       expect(store.setError).toHaveBeenCalled();
+      expect(store.clearRows).not.toHaveBeenCalled();
+      expect(store.setRevalidating).not.toHaveBeenCalled();
       expect(store.setTransactions).not.toHaveBeenCalled();
       expect(store.setSuccess).not.toHaveBeenCalled();
+    });
+
+    it('drops the previous query rows when the load for a new filter fails', () => {
+      const store = buildStore(0, [TX_ITEM]);
+      store.accountId.set('acc-2');
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.setRevalidating).toHaveBeenCalledWith(false);
+      expect(store.clearRows).toHaveBeenCalled();
+      expect(store.setError).toHaveBeenCalled();
+      expect(store.setTransactions).not.toHaveBeenCalled();
+    });
+
+    it('drops the rows when none have landed yet and the first page fails', () => {
+      const store = buildStore();
+      store.rowsFilter.set(null);
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.clearRows).toHaveBeenCalled();
+      expect(store.setError).toHaveBeenCalled();
     });
   });
 
@@ -313,6 +381,41 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('loadMore', () => {
+    it('waits while the first page is loading', () => {
+      const store = buildStore(PAGE_SIZE);
+      store.status.set('loading');
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(store.setAppendLoading).not.toHaveBeenCalled();
+    });
+
+    it('refuses while the filter changed and its first page has not started', () => {
+      const store = buildStore(PAGE_SIZE, [TX_ITEM]);
+      store.accountId.set('acc-2');
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(store.setAppendLoading).not.toHaveBeenCalled();
+    });
+
+    it('refuses while no rows have landed', () => {
+      const store = buildStore(PAGE_SIZE);
+      store.rowsFilter.set(null);
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+
     it('fetches the page after the loaded one, then advances the offset and appends', () => {
       const store = buildStore(PAGE_SIZE);
       const service = buildService();
@@ -332,11 +435,14 @@ describe('transactionLedgerEffects', () => {
         offset: 2 * PAGE_SIZE,
         limit: PAGE_SIZE,
       });
+      expect(store.setAppendLoading).toHaveBeenCalled();
       expect(store.nextPage).toHaveBeenCalled();
       expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+      expect(store.setAppendSuccess).toHaveBeenCalled();
+      expect(store.setLoading).not.toHaveBeenCalled();
     });
 
-    it('keeps the offset on a failed next page so Load More repeats the same request', () => {
+    it('keeps the offset on a failed next page so Try again repeats the same request', () => {
       const store = buildStore(0, [TX_ITEM]);
       store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
       const service = buildService();
@@ -359,6 +465,8 @@ describe('transactionLedgerEffects', () => {
         offset: PAGE_SIZE,
         limit: PAGE_SIZE,
       });
+      expect(store.setAppendError).toHaveBeenCalledTimes(1);
+      expect(store.setError).not.toHaveBeenCalled();
       expect(store.appendTransactions).toHaveBeenCalledTimes(1);
       expect(store.offset()).toBe(PAGE_SIZE);
     });
@@ -391,38 +499,6 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('retry', () => {
-    it('re-fetches a failed next page at the same offset and appends it', () => {
-      const store = buildStore(0, [TX_ITEM]);
-      store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
-      const service = buildService();
-      const PAGE2 = {
-        items: [TX_ITEM],
-        totalCount: 99,
-        offset: PAGE_SIZE,
-        limit: PAGE_SIZE,
-        hasMore: true,
-      };
-      service.getAllTransactions
-        .mockReturnValueOnce(throwError(() => new Error('boom')))
-        .mockReturnValueOnce(of(PAGE2));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => {
-        const effects = transactionLedgerEffects(store);
-        effects.loadMore();
-        effects.retry();
-      });
-
-      expect(store.setError).toHaveBeenCalledTimes(1);
-      expect(service.getAllTransactions).toHaveBeenLastCalledWith({
-        offset: PAGE_SIZE,
-        limit: PAGE_SIZE,
-      });
-      expect(store.appendTransactions).toHaveBeenCalledWith([TX_ITEM], 99, true);
-      expect(store.setTransactions).not.toHaveBeenCalled();
-      expect(store.offset()).toBe(PAGE_SIZE);
-    });
-
     it('re-fetches a failed first page and replaces the rows', () => {
       const store = buildStore();
       const service = buildService();
@@ -438,7 +514,7 @@ describe('transactionLedgerEffects', () => {
       });
 
       expect(service.getAllTransactions).toHaveBeenLastCalledWith({offset: 0, limit: PAGE_SIZE});
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
       expect(store.appendTransactions).not.toHaveBeenCalled();
     });
   });
@@ -455,7 +531,7 @@ describe('transactionLedgerEffects', () => {
       TestBed.tick();
 
       expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
     });
 
     it.each<[string, Partial<LedgerFilter>]>([

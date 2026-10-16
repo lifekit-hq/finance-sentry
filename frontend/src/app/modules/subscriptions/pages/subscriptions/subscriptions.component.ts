@@ -110,7 +110,7 @@ export class SubscriptionsComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(SubscriptionsStore);
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  public readonly skeletonRowCount = SKELETON_ROWS;
   /** Nothing tracked at all: with too little history to detect any, the page explains that instead. */
   public readonly isEmpty = computed(
     () => this.store.subscriptions().length === 0 && !this.store.hasInsufficientHistory()

@@ -5,9 +5,10 @@ import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {RouterTestingHarness} from '@angular/router/testing';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {NEVER} from 'rxjs';
+import {NEVER, of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {type DashboardData} from '../../models/dashboard/dashboard.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {DashboardStore} from './dashboard.store';
 
@@ -21,6 +22,13 @@ class HostComponent {
   public readonly store = inject(DashboardStore);
 }
 
+@Component({
+  selector: 'fns-dashboard-elsewhere',
+  template: '',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ElsewhereComponent {}
+
 const service = {
   getDashboardData: vi.fn(() => NEVER),
   getNetWorthHistory: vi.fn(() => NEVER),
@@ -32,7 +40,10 @@ async function open(url: string) {
       provideHttpClient(),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
-      provideRouter([{path: 'dashboard', component: HostComponent}]),
+      provideRouter([
+        {path: 'dashboard', component: HostComponent},
+        {path: 'elsewhere', component: ElsewhereComponent},
+      ]),
       {provide: BankSyncService, useValue: service},
     ],
   });
@@ -96,5 +107,49 @@ describe('DashboardStore range URL sync', () => {
     await harness.navigateByUrl('/dashboard?range=mtd');
 
     expect(store.historyRange()).toBe('mtd');
+  });
+});
+
+describe('DashboardStore loaded range', () => {
+  const data = {accountCount: 1} as unknown as DashboardData;
+  const history = {snapshots: [], hasHistory: false, scopeChanges: [], changeHeadline: null};
+
+  it('records the loaded range and skeletons another range until it lands', async () => {
+    service.getDashboardData.mockReturnValueOnce(of(data) as never);
+    service.getNetWorthHistory.mockReturnValueOnce(of(history) as never);
+    const {harness, store} = await open('/dashboard?range=1y');
+
+    expect(store.dataRange()).toBe('1y');
+    expect(store.historyLoadedRange()).toBe('1y');
+    expect(store.isFirstLoad()).toBe(false);
+
+    store.setHistoryRange('3m');
+    await settle(harness.fixture);
+
+    expect(store.dataRange()).toBe('1y');
+    expect(store.isFirstLoad()).toBe(true);
+  });
+
+  it('repaints a revisit once data and history were both loaded for the range', async () => {
+    service.getDashboardData.mockReturnValueOnce(of(data) as never);
+    service.getNetWorthHistory.mockReturnValueOnce(of(history) as never);
+    const {harness} = await open('/dashboard?range=1y');
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+
+    const host = await harness.navigateByUrl('/dashboard?range=1y', HostComponent);
+
+    expect(host.store.data()).toEqual(data);
+    expect(host.store.isFirstLoad()).toBe(false);
+  });
+
+  it('refuses a snapshot whose history was not loaded for the range', async () => {
+    service.getDashboardData.mockReturnValueOnce(of(data) as never);
+    service.getNetWorthHistory.mockReturnValueOnce(NEVER as never);
+    const {harness} = await open('/dashboard?range=1y');
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+
+    const host = await harness.navigateByUrl('/dashboard?range=1y', HostComponent);
+
+    expect(host.store.data()).toBeNull();
   });
 });

@@ -70,11 +70,9 @@
       errorPlacement="above"
       retryable
     >
-      <div skeleton class="space-y-cmn-3" data-testid="watchlist-skeleton">
-        @for (row of skeletonRows; track row) {
-          <cmn-skeleton height="4rem" />
-        }
-      </div>
+      <cmn-card skeleton padding="none" data-testid="watchlist-skeleton">
+        <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+      </cmn-card>
 
       <cmn-card padding="none" data-testid="watchlist-list">
         @for (row of store.rows(); track row.id) {

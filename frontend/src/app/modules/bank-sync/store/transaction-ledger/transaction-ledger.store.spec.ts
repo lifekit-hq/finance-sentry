@@ -26,6 +26,13 @@ class HostComponent {
   public readonly store = inject(TransactionLedgerStore);
 }
 
+@Component({
+  selector: 'fns-ledger-elsewhere',
+  template: '',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ElsewhereComponent {}
+
 const service = {
   getAllTransactions: vi.fn(() => NEVER),
   getDashboardData: vi.fn(() => NEVER),
@@ -226,7 +233,7 @@ describe('TransactionLedgerStore async status', () => {
     expect(store.isEmpty()).toBe(false);
   });
 
-  it('keeps the rows on a failed retry', async () => {
+  it('keeps the rows on a failed next page and through its retry', async () => {
     const {store} = await open('/transactions');
     service.getAllTransactions.mockReturnValueOnce(of(page) as never);
     store.load();
@@ -235,13 +242,126 @@ describe('TransactionLedgerStore async status', () => {
     );
     store.loadMore();
 
-    expect(store.status()).toBe('error');
+    expect(store.status()).toBe('success');
+    expect(store.hasAppendError()).toBe(true);
     expect(store.transactions()).toHaveLength(1);
 
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    store.loadMore();
+
+    expect(store.isAppendLoading()).toBe(true);
+    expect(store.hasAppendError()).toBe(false);
+    expect(store.transactions()).toHaveLength(1);
+  });
+
+  it('keeps the rows on screen while a reload is in flight', async () => {
+    const {store} = await open('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(of(page) as never);
+    store.load();
     service.getAllTransactions.mockReturnValueOnce(NEVER as never);
     store.retry();
 
     expect(store.status()).toBe('loading');
+    expect(store.transactions()).toHaveLength(1);
+  });
+});
+
+describe('TransactionLedgerStore revisit', () => {
+  const PAGE = {
+    items: [{transactionId: 'tx-1'}],
+    totalCount: 1,
+    offset: 0,
+    limit: 50,
+    hasMore: false,
+  };
+
+  async function visitAndLeave(
+    url: string,
+    beforeLeave: (store: InstanceType<typeof TransactionLedgerStore>) => void = () => undefined
+  ) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideApiBaseUrl('http://localhost/api/v1'),
+        provideRouter([
+          {path: 'transactions', component: HostComponent},
+          {path: 'elsewhere', component: ElsewhereComponent},
+        ]),
+        {provide: BankSyncService, useValue: service},
+        {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
+      ],
+    });
+    service.getAllTransactions.mockReturnValueOnce(of(PAGE) as never);
+    const harness = await RouterTestingHarness.create();
+    const host = await harness.navigateByUrl(url, HostComponent);
+    await harness.fixture.whenStable();
+    beforeLeave(host.store);
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+    return harness;
+  }
+
+  async function revisit(harness: RouterTestingHarness, url: string) {
+    const host = await harness.navigateByUrl(url, HostComponent);
+    await harness.fixture.whenStable();
+    return host.store;
+  }
+
+  it('repaints rows loaded for the same filter and revalidates them', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.transactions()).toHaveLength(1);
+    expect(store.revalidating()).toBe(true);
+    expect(store.status()).toBe('loading');
+    expect(store.accountId()).toBe('acc-1');
+  });
+
+  it('keeps the restored rows when their revalidation fails', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({status: 500})) as never
+    );
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.status()).toBe('error');
+    expect(store.transactions()).toHaveLength(1);
+  });
+
+  it('does not restore rows loaded for another filter', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-2');
+
+    expect(store.transactions()).toEqual([]);
+    expect(store.revalidating()).toBe(false);
+    expect(store.accountId()).toBe('acc-2');
+  });
+
+  it('refuses rows cached for the empty filter when the URL asks for an account', async () => {
+    const harness = await visitAndLeave('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.transactions()).toEqual([]);
+    expect(store.revalidating()).toBe(false);
+    expect(store.accountId()).toBe('acc-1');
+  });
+
+  it('does not carry a filter picked just before leaving into the next visit', async () => {
+    const harness = await visitAndLeave('/transactions', store =>
+      patchState(unprotected(store), {accountId: 'acc-2'})
+    );
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions');
+
+    expect(store.accountId()).toBeNull();
     expect(store.transactions()).toHaveLength(1);
   });
 });

@@ -9,6 +9,11 @@ export interface AsyncViewInput {
   offline: boolean;
   /** Epoch ms of the last successful load, or null when none has landed. */
   lastSyncedAt: Nullable<number>;
+  /**
+   * The region sets `keepContent` on `cmn-async-state`: a reload over data on screen reports
+   * `loading`, so the primitive keeps that data, dimmed, instead of reading it as settled.
+   */
+  keepContent?: boolean;
 }
 
 export interface AsyncView {

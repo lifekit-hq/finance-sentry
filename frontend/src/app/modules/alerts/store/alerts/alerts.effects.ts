@@ -1,17 +1,39 @@
 import {inject, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, debounceTime, EMPTY, exhaustMap, filter, pipe, switchMap, tap} from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  EMPTY,
+  exhaustMap,
+  filter,
+  pipe,
+  Subject,
+  switchMap,
+  takeUntil,
+  tap,
+} from 'rxjs';
 
-import {type Alert} from '../../models/alert/alert.model';
+import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
+import {ALERTS_PAGE_SIZE} from './alerts.state';
 
 export const ALERT_SEARCH_DEBOUNCE_MS = 300;
 
 interface EffectsStore {
   search: Signal<string>;
+  filter: Signal<AlertFilter>;
+  status: Signal<AsyncStatus>;
+  alerts: Signal<Alert[]>;
   setSearch: (search: string) => void;
   setData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
+  appendData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
+  clearData: () => void;
+  setAppendLoading: () => void;
+  setAppendSuccess: () => void;
+  setAppendError: (errorCode: Nullable<string>) => void;
+  setAppendIdle: () => void;
   setUnreadCount: (n: number) => void;
   setLoading: () => void;
   setSuccess: () => void;
@@ -23,22 +45,60 @@ interface EffectsStore {
 
 export function alertsEffects(store: EffectsStore) {
   const api = inject(AlertsService);
+  const firstPageStarted$ = new Subject<void>();
 
   return {
+    /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands. */
     load: rxMethod<AlertsQuery>(
       pipe(
-        tap(() => store.setLoading()),
-        switchMap(({filter: kind, page, pageSize, search}) =>
-          api.getAlerts(kind, page, pageSize, search).pipe(
+        tap(() => {
+          firstPageStarted$.next();
+          store.setAppendIdle();
+          store.setLoading();
+        }),
+        switchMap(({filter: kind, search}) =>
+          api.getAlerts(kind, 1, ALERTS_PAGE_SIZE, search).pipe(
             tap(res => {
               store.setData(res.items, res.totalCount, res.unreadCount);
+              store.setAppendSuccess();
               store.setSuccess();
             }),
             catchError(() => {
+              store.clearData();
               store.setError(null);
               return EMPTY;
             })
           )
+        )
+      )
+    ),
+    /**
+     * Appends the next page (the infinite list's paging contract): asked near the end and on retry.
+     * The page follows the rows on screen, so a row removed locally is refilled, not skipped.
+     */
+    loadMore: rxMethod<void>(
+      pipe(
+        filter(() => store.status() !== 'loading'),
+        tap(() => store.setAppendLoading()),
+        exhaustMap(() =>
+          api
+            .getAlerts(
+              store.filter(),
+              Math.floor(store.alerts().length / ALERTS_PAGE_SIZE) + 1,
+              ALERTS_PAGE_SIZE,
+              store.search().trim()
+            )
+            .pipe(
+              tap(res => {
+                store.appendData(res.items, res.totalCount, res.unreadCount);
+                store.setAppendSuccess();
+              }),
+              catchError(() => {
+                store.setAppendError(null);
+                return EMPTY;
+              }),
+              takeUntil(firstPageStarted$)
+            )
         )
       )
     ),

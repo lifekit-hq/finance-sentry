@@ -38,6 +38,8 @@ function fakeStore(
     baseCurrency: signal('EUR'),
     isLoading: signal(false),
     isHistoryLoading: signal(false),
+    isFirstLoad: signal(false),
+    isHistoryFirstLoad: signal(false),
     hasCashFlow: signal(false),
     hasProjection: signal(false),
     historyHasHistory: signal(true),
@@ -479,18 +481,21 @@ describe('DashboardComponent async states', () => {
     const SKELETON = '[data-testid="net-worth-chart-skeleton"]';
 
     it.each([
-      ['the page', {isLoading: signal(true)}],
-      ['the history', {isHistoryLoading: signal(true)}],
-    ])('shows the skeleton, not the chart or its empty state, while %s loads', (_, loading) => {
-      const {el} = render('3m', undefined, null, {historyHasHistory: signal(false), ...loading});
+      ['the page', {isLoading: signal(true), isFirstLoad: signal(true)}],
+      ['the history', {isHistoryLoading: signal(true), isHistoryFirstLoad: signal(true)}],
+    ])(
+      'shows the skeleton, not the chart or its empty state, while %s first loads',
+      (_, loading) => {
+        const {el} = render('3m', undefined, null, {historyHasHistory: signal(false), ...loading});
 
-      expect(el.querySelector(SKELETON)).not.toBeNull();
-      expect(el.querySelector(CHART)).toBeNull();
-      // Scoped to the hero card: the category donut below has its own empty copy.
-      const hero = el.querySelector('cmn-card')?.textContent;
-      expect(hero).not.toContain('No data yet');
-      expect(hero).not.toContain('starts after tonight');
-    });
+        expect(el.querySelector(SKELETON)).not.toBeNull();
+        expect(el.querySelector(CHART)).toBeNull();
+        // Scoped to the hero card: the category donut below has its own empty copy.
+        const hero = el.querySelector('cmn-card')?.textContent;
+        expect(hero).not.toContain('No data yet');
+        expect(hero).not.toContain('starts after tonight');
+      }
+    );
 
     it('says history starts tonight only once loaded with no history', () => {
       const {el} = render('3m', undefined, null, {historyHasHistory: signal(false)});
@@ -508,6 +513,16 @@ describe('DashboardComponent async states', () => {
 
       expect(el.querySelector(SKELETON)).toBeNull();
       expect(el.querySelector(CHART)).not.toBeNull();
+    });
+
+    it('shows the skeleton, not the previous range chart, while this range loads', () => {
+      const {el} = render('1y', undefined, null, {
+        historyHasHistory: signal(true),
+        isHistoryFirstLoad: signal(true),
+      });
+
+      expect(el.querySelector(SKELETON)).not.toBeNull();
+      expect(el.querySelector(CHART)).toBeNull();
     });
 
     it('mounts the chart once history has loaded', () => {
@@ -609,5 +624,50 @@ describe('DashboardComponent async states', () => {
       );
       expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
     });
+  });
+});
+
+describe('DashboardComponent range-scoped widgets', () => {
+  const BAR_CHART = 'cmn-bar-chart';
+  const DONUT = 'cmn-donut-chart';
+  const TABLE = 'cmn-data-table';
+  const SKELETONS = [
+    '[data-testid="cash-flow-chart-skeleton"]',
+    '[data-testid="category-donut-skeleton"]',
+    '[data-testid="category-table-skeleton"]',
+  ];
+  const data = {
+    accountCount: 1,
+    topCategories: [{category: 'GROCERIES', totalSpend: 3100, percentOfTotal: 100}],
+  };
+
+  it('shows skeletons, not the previous range figures, while this range loads', () => {
+    const {el} = render('1y', data, null, {
+      hasCashFlow: signal(true),
+      isFirstLoad: signal(true),
+    });
+
+    for (const selector of SKELETONS) {
+      expect(el.querySelector(selector)).not.toBeNull();
+    }
+    for (const selector of [BAR_CHART, DONUT, TABLE]) {
+      expect(el.querySelector(selector)).toBeNull();
+    }
+    expect(el.textContent).not.toContain('€3,100.00');
+  });
+
+  it('keeps the figures while the same range refreshes', () => {
+    const {el} = render('1y', data, null, {
+      hasCashFlow: signal(true),
+      isLoading: signal(true),
+    });
+
+    for (const selector of SKELETONS) {
+      expect(el.querySelector(selector)).toBeNull();
+    }
+    for (const selector of [BAR_CHART, DONUT, TABLE]) {
+      expect(el.querySelector(selector)).not.toBeNull();
+    }
+    expect(el.textContent).toContain('€3,100.00');
   });
 });

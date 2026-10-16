@@ -25,13 +25,17 @@
     [status]="view().status"
     [errorMessage]="view().errorMessage"
     [isEmpty]="store.alerts().length === 0"
+    [showDelay]="showDelay"
+    [minDisplay]="minDisplay"
+    [crossfade]="crossfade"
     (retry)="store.load(store.query())"
     class="mt-cmn-3 flex min-h-0 flex-1 flex-col"
     retryable
+    keepContent
   >
-    <div skeleton class="space-y-cmn-2" data-testid="alerts-skeleton">
-      @for (row of skeletonRows; track row) {
-        <cmn-skeleton height="4rem" />
+    <div skeleton class="space-y-cmn-4" data-testid="alerts-skeleton">
+      @for (_ of skeletonSections; track $index) {
+        <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
       }
     </div>
     <div empty class="flex min-h-0 flex-1 items-center justify-center">
@@ -42,7 +46,17 @@
         iconClass="text-status-success"
       />
     </div>
-    <div class="space-y-cmn-4 md:min-h-0 md:flex-1 md:overflow-auto">
+    <lk-infinite-list
+      [hasMore]="store.hasMore()"
+      [loading]="store.isAppendLoading()"
+      [failed]="store.hasAppendError()"
+      (lk-infinite-list-load-more)="store.loadMore()"
+      (lk-infinite-list-retry)="store.loadMore()"
+      class="block space-y-cmn-4 md:min-h-0 md:flex-1 md:overflow-auto"
+      end-label="No more alerts"
+      error-label="Couldn't load more alerts."
+      data-testid="alerts-list"
+    >
       @for (group of dayGroups(); track group.dayKey) {
         <cmn-list-section [heading]="group.label" data-testid="alerts-day">
           @for (alert of group.items; track alert.id) {
@@ -77,45 +91,6 @@
           }
         </cmn-list-section>
       }
-    </div>
+    </lk-infinite-list>
   </cmn-async-state>
-
-  @if (store.alerts().length > 0 && showPager()) {
-    <nav
-      class="mt-cmn-3 flex flex-wrap items-center justify-between gap-cmn-3"
-      aria-label="Alerts pages"
-      data-testid="alerts-pager"
-    >
-      <div class="flex items-center gap-cmn-2">
-        <cmn-button
-          [disabled]="!store.hasPreviousPage()"
-          (clicked)="store.setPage(store.currentPage() - 1)"
-          variant="secondary"
-          size="sm"
-          data-testid="alerts-prev"
-          icon="ChevronLeft"
-          >Previous</cmn-button
-        >
-        <span class="text-cmn-sm text-text-secondary" data-testid="alerts-page-label">
-          Page {{ store.currentPage() }} of {{ store.totalPages() }}
-        </span>
-        <cmn-button
-          [disabled]="!store.hasNextPage()"
-          (clicked)="store.setPage(store.currentPage() + 1)"
-          variant="secondary"
-          size="sm"
-          data-testid="alerts-next"
-          icon="ChevronRight"
-          iconPosition="suffix"
-          >Next</cmn-button
-        >
-      </div>
-      <lk-segmented
-        [options]="pageSizeOptions"
-        [value]="'' + store.pageSize()"
-        (lk-segmented-change)="onPageSizeChange($event)"
-        label="Alerts per page"
-      />
-    </nav>
-  }
 </cmn-page-container>

@@ -11,11 +11,11 @@ import {type DashboardState} from './dashboard.state';
 
 export function dashboardMethods(store: WritableStateSource<DashboardState>) {
   return {
-    setData(data: DashboardData): void {
-      patchState(store, {data, lastSyncedAt: Date.now()});
+    setData(data: DashboardData, range: HistoryRange): void {
+      patchState(store, {data, dataRange: range, lastSyncedAt: Date.now()});
     },
-    setNetWorthHistory(snapshots: NetWorthSnapshotDto[]): void {
-      patchState(store, {netWorthHistory: snapshots, scrubIndex: null});
+    setNetWorthHistory(snapshots: NetWorthSnapshotDto[], range: HistoryRange): void {
+      patchState(store, {netWorthHistory: snapshots, historyLoadedRange: range, scrubIndex: null});
     },
     setHistoryRange(range: HistoryRange): void {
       patchState(store, {historyRange: range, scrubIndex: null});

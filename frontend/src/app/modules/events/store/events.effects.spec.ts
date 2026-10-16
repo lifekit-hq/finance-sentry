@@ -1,6 +1,7 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -32,6 +33,7 @@ function buildStore(horizonDays = 30) {
     kinds: signal<EventKind[]>([]),
     calendarWindow: window,
     firedPage: signal(1),
+    firedStatus: signal<AsyncStatus>('idle'),
     firedPageSize: signal(20),
     setHorizonDays: vi.fn((days: number) => {
       window.set({from: '2026-09-22', to: days === 90 ? '2026-12-21' : '2026-10-22'});
@@ -46,6 +48,10 @@ function buildStore(horizonDays = 30) {
     setFired: vi.fn(),
     appendFired: vi.fn(),
     setFiredError: vi.fn(),
+    setFiredAppendLoading: vi.fn(),
+    setFiredAppendSuccess: vi.fn(),
+    setFiredAppendError: vi.fn(),
+    setFiredAppendIdle: vi.fn(),
   };
 }
 
@@ -157,7 +163,40 @@ describe('eventsEffects', () => {
     expect(api.getFired).toHaveBeenNthCalledWith(2, 3, 20);
     expect(store.setFired).toHaveBeenCalledWith(FIRED);
     expect(store.appendFired).toHaveBeenCalledWith(FIRED);
-    expect(store.setFiredSuccess).toHaveBeenCalledTimes(2);
+    expect(store.setFiredSuccess).toHaveBeenCalledTimes(1);
+    expect(store.setFiredAppendLoading).toHaveBeenCalledTimes(1);
+    expect(store.setFiredAppendSuccess).toHaveBeenCalledTimes(2);
+  });
+
+  it('loadMoreFired waits while the first page is loading', () => {
+    const store = buildStore();
+    store.firedStatus.set('loading');
+    const api = buildApi();
+    configure(api);
+
+    TestBed.runInInjectionContext(() => eventsEffects(store).loadMoreFired());
+
+    expect(api.getFired).not.toHaveBeenCalled();
+    expect(store.setFiredAppendLoading).not.toHaveBeenCalled();
+  });
+
+  it('a new first page drops the next page still in flight', () => {
+    const store = buildStore();
+    const api = buildApi();
+    const stalePage = new Subject<FiredEventsPageResponse>();
+    api.getFired.mockReturnValueOnce(stalePage).mockReturnValueOnce(of(FIRED));
+    configure(api);
+
+    TestBed.runInInjectionContext(() => {
+      const effects = eventsEffects(store);
+      effects.loadMoreFired();
+      effects.loadFired();
+    });
+    stalePage.next(FIRED);
+
+    expect(store.appendFired).not.toHaveBeenCalled();
+    expect(store.setFired).toHaveBeenCalledOnce();
+    expect(store.setFiredAppendIdle).toHaveBeenCalledOnce();
   });
 
   it('loadFired forwards the backend error code', () => {

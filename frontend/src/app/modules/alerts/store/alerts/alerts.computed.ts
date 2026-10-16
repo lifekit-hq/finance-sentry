@@ -5,25 +5,19 @@ import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 
 interface StateSignals {
   alerts: Signal<Alert[]>;
+  exhausted: Signal<boolean>;
   filter: Signal<AlertFilter>;
   search: Signal<string>;
   unreadCount: Signal<number>;
   totalCount: Signal<number>;
-  currentPage: Signal<number>;
-  pageSize: Signal<number>;
 }
 
 export function alertsComputed(store: StateSignals) {
-  const totalPages = computed(() => Math.max(1, Math.ceil(store.totalCount() / store.pageSize())));
   return {
-    totalPages,
-    hasPreviousPage: computed(() => store.currentPage() > 1),
-    hasNextPage: computed(() => store.currentPage() < totalPages()),
-    /** What the list is showing — the load effect refetches whenever it changes. */
+    hasMore: computed(() => !store.exhausted() && store.alerts().length < store.totalCount()),
+    /** What the list is filtered by — the load effect refetches the first page whenever it changes. */
     query: computed<AlertsQuery>(() => ({
       filter: store.filter(),
-      page: store.currentPage(),
-      pageSize: store.pageSize(),
       search: store.search().trim(),
     })),
   };

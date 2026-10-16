@@ -11,8 +11,9 @@ import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
+  ASYNC_STATE_MIN_DISPLAY_MS,
+  ASYNC_STATE_SHOW_DELAY_MS,
   AsyncStateComponent,
-  ButtonComponent,
   CmnPageActionsService,
   EmptyStateComponent,
   type FilterBarChip,
@@ -37,9 +38,10 @@ import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDayUtils} from '../../utils/alert-day.utils';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
-import {ALERT_PAGE_SIZE_OPTIONS, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
+import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
-const SKELETON_ROWS = 5;
+const SKELETON_SECTIONS = 2;
+const SKELETON_ROWS_PER_SECTION = 3;
 const ALERT_FILTER_CHIP_ID = 'filter';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
@@ -62,7 +64,6 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertMessagePipe,
     AlertFilterSheetComponent,
     AsyncStateComponent,
-    ButtonComponent,
     EmptyStateComponent,
     FilterBarComponent,
     FilterBarSheetDirective,
@@ -71,7 +72,7 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block h-full'},
+  host: {class: 'block md:h-full'},
   templateUrl: './alerts.component.html',
 })
 export class AlertsComponent {
@@ -81,15 +82,24 @@ export class AlertsComponent {
   private readonly searching = computed(() => this.store.search().trim() !== '');
 
   public readonly store = inject(AlertsStore);
+  /**
+   * The content fades in only where it replaces this visit's skeleton: a revisit that mounts with
+   * rows already in the store paints them at once instead of replaying the fade from nothing.
+   */
+  public readonly crossfade = this.store.alerts().length === 0;
   public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
+  public readonly skeletonRowsPerSection = SKELETON_ROWS_PER_SECTION;
+  public readonly showDelay = ASYNC_STATE_SHOW_DELAY_MS;
+  public readonly minDisplay = ASYNC_STATE_MIN_DISPLAY_MS;
 
-  // The list is bound to the filter and page, so a stale page never stands in for the one being
-  // fetched: `hasData` stays false and a reload shows the skeleton instead of the previous rows.
+  // A reload for a new filter or search keeps the previous rows on screen, dimmed, until the new
+  // first page lands (`keepContent`); a failed reload drops them and shows the error in place.
   public readonly view = computed(() =>
     AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
-      hasData: false,
+      hasData: this.store.alerts().length > 0,
+      keepContent: true,
       errorMessage: this.store.errorMessage() ?? '',
       offline: this.connectivity.offline(),
       lastSyncedAt: null,
@@ -132,18 +142,6 @@ export class AlertsComponent {
       : [{id: ALERT_FILTER_CHIP_ID, label: ALERT_FILTER_LABELS[this.store.filter()]}]
   );
 
-  // lk-segmented reads `value` as a string, so the page sizes carry strings; the handler converts
-  // back.
-  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS.map(size => ({
-    value: String(size),
-    label: `${size} per page`,
-  }));
-
-  // Everything fits on one page of the smallest size → no pager to show.
-  public readonly showPager = computed(
-    () => this.store.totalCount() > Math.min(...ALERT_PAGE_SIZE_OPTIONS)
-  );
-
   constructor() {
     inject(CmnPageActionsService)
       .on(ALERTS_MARK_ALL_READ_ACTION)
@@ -154,11 +152,6 @@ export class AlertsComponent {
 
   public clearFilter(): void {
     this.store.setFilter('all');
-  }
-
-  public onPageSizeChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: string}>).detail;
-    this.store.setPageSize(Number(value));
   }
 
   public iconFor(type: AlertType): LucideIconName {

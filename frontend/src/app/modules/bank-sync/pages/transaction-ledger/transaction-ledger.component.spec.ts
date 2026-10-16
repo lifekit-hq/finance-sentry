@@ -4,7 +4,7 @@ import {type Signal, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {CmnDrawerService} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CmnDrawerService} from '@lifekit-hq/ui';
 import {Subject} from 'rxjs';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
@@ -27,7 +27,11 @@ const ROW = {
   isPending: false,
 };
 
-function setup(type: string | null, extra: Record<string, string | string[]> = {}) {
+function setup(
+  type: string | null,
+  extra: Record<string, string | string[]> = {},
+  rows: unknown[] = []
+) {
   const drawerOpen = vi.fn(() => ({beforeClose$: new Subject<void>(), close: vi.fn()}));
   const store = {
     accounts: signal([]),
@@ -38,11 +42,15 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
     load: vi.fn(),
     retry: vi.fn(),
     lastSyncedAt: signal<number | null>(null),
+    revalidating: signal(false),
     isLoading: signal(false),
     isEmpty: signal(true),
     hasActiveFilter: signal(false),
     hasMore: signal(false),
-    transactions: signal([]),
+    isAppendLoading: signal(false),
+    hasAppendError: signal(false),
+    loadMore: vi.fn(),
+    transactions: signal(rows as never[]),
     accountId: signal<string | null>((extra['account'] as string | undefined) ?? null),
     transactionType: signal<string | null>(type),
     categories: signal<string[]>([extra['category'] ?? []].flat()),
@@ -348,13 +356,18 @@ describe('TransactionLedgerComponent rows', () => {
 });
 
 describe('TransactionLedgerComponent async states', () => {
-  it('shows skeleton rows and no ledger rows while loading', () => {
+  it('shows the section skeleton, once the show delay has passed, while loading', async () => {
     const {store, fixture, root} = setup(null);
     store.isEmpty.set(false);
     store.isLoading.set(true);
     fixture.detectChanges();
 
-    expect(root.querySelectorAll('cmn-skeleton').length).toBeGreaterThan(0);
+    // A load under the show delay draws no indicator, so a fast response never flashes one.
+    expect(root.querySelector('cmn-skeleton')).toBeNull();
+    await new Promise(resolve => setTimeout(resolve, ASYNC_STATE_SHOW_DELAY_MS + 50));
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('cmn-skeleton[shape="section"]').length).toBeGreaterThan(0);
     expect(root.querySelector('[data-testid="ledger-row"]')).toBeNull();
   });
 
@@ -387,11 +400,35 @@ describe('TransactionLedgerComponent async states', () => {
     expect(root.textContent).not.toContain('No transactions found');
   });
 
-  it('keeps the loaded rows under the error and through a retry', () => {
+  it('paints the rows a revisit restored at once while they revalidate', () => {
+    const {store, fixture, root} = setup(null, {}, [ROW]);
+    store.isEmpty.set(false);
+    store.revalidating.set(true);
+    store.isLoading.set(true);
+    fixture.detectChanges();
+
+    expect(root.querySelector('cmn-skeleton')).toBeNull();
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+    expect(root.querySelector('.animate-cmn-fade-in')).toBeNull();
+  });
+
+  it('fades the first rows in where they replace the skeleton', () => {
     const {store, fixture, root} = setup(null);
     store.transactions.set([ROW] as never);
     store.isEmpty.set(false);
+    fixture.detectChanges();
+
+    expect(root.querySelector('.animate-cmn-fade-in [data-testid="ledger-row"]')).not.toBeNull();
+  });
+
+  it('keeps the loaded rows on screen through a reload', async () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    fixture.detectChanges();
     store.isLoading.set(true);
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve, ASYNC_STATE_SHOW_DELAY_MS + 50));
     fixture.detectChanges();
 
     expect(root.querySelector('cmn-skeleton')).toBeNull();

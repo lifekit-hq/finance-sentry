@@ -36,33 +36,18 @@ function setup(alerts: Alert[], unreadCount: number, overrides = {}) {
 }
 
 describe('alertsMethods', () => {
-  it('setFilter returns to the first page', () => {
-    const {state, methods} = setup([], 0, {currentPage: 3});
+  it('setFilter reopens paging', () => {
+    const {state, methods} = setup([], 0, {exhausted: true});
     methods.setFilter('error');
     expect(state.filter()).toBe('error');
-    expect(state.currentPage()).toBe(1);
+    expect(state.exhausted()).toBe(false);
   });
 
-  it('setSearch returns to the first page', () => {
-    const {state, methods} = setup([], 0, {currentPage: 3});
+  it('setSearch reopens paging', () => {
+    const {state, methods} = setup([], 0, {exhausted: true});
     methods.setSearch('rent');
     expect(state.search()).toBe('rent');
-    expect(state.currentPage()).toBe(1);
-  });
-
-  it('setPage moves to the page and never below the first', () => {
-    const {state, methods} = setup([], 0);
-    methods.setPage(4);
-    expect(state.currentPage()).toBe(4);
-    methods.setPage(0);
-    expect(state.currentPage()).toBe(1);
-  });
-
-  it('setPageSize returns to the first page', () => {
-    const {state, methods} = setup([], 0, {currentPage: 3});
-    methods.setPageSize(50);
-    expect(state.pageSize()).toBe(50);
-    expect(state.currentPage()).toBe(1);
+    expect(state.exhausted()).toBe(false);
   });
 
   it('markReadLocal lowers the badge for an open unread alert', () => {
@@ -89,22 +74,16 @@ describe('alertsMethods', () => {
     expect(state.unreadCount()).toBe(1);
   });
 
-  it('markReadLocal steps back a page when it empties a later Unread page', () => {
-    const {state, methods} = setup([makeAlert({id: 'a'})], 1, {filter: 'unread', currentPage: 2});
-    methods.markReadLocal('a');
-    expect(state.currentPage()).toBe(1);
-  });
-
   it('markAllReadLocal empties the Unread filter', () => {
     const {state, methods} = setup([makeAlert({id: 'a'}), makeAlert({id: 'b'})], 2, {
       filter: 'unread',
-      currentPage: 2,
+      exhausted: true,
     });
     methods.markAllReadLocal();
     expect(state.alerts()).toEqual([]);
     expect(state.totalCount()).toBe(0);
     expect(state.unreadCount()).toBe(0);
-    expect(state.currentPage()).toBe(1);
+    expect(state.exhausted()).toBe(false);
   });
 
   it('markAllReadLocal keeps rows, marked read, on other filters', () => {
@@ -128,15 +107,36 @@ describe('alertsMethods', () => {
     expect(state.unreadCount()).toBe(2);
   });
 
-  it('dismissLocal steps back a page when it empties a later page', () => {
-    const {state, methods} = setup([makeAlert({id: 'only'})], 1, {currentPage: 3});
-    methods.dismissLocal('only');
-    expect(state.currentPage()).toBe(2);
+  it('setData replaces the rows and reopens paging', () => {
+    const {state, methods} = setup([makeAlert({id: 'old'})], 0, {exhausted: true});
+    methods.setData([makeAlert({id: 'new'})], 9, 4);
+    expect(state.alerts().map(a => a.id)).toEqual(['new']);
+    expect(state.totalCount()).toBe(9);
+    expect(state.unreadCount()).toBe(4);
+    expect(state.exhausted()).toBe(false);
   });
 
-  it('dismissLocal stays on the first page when it empties the list', () => {
-    const {state, methods} = setup([makeAlert({id: 'only'})], 1);
-    methods.dismissLocal('only');
-    expect(state.currentPage()).toBe(1);
+  it('appendData adds the next page once, skipping a row already on screen', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'})], 1);
+    methods.appendData([makeAlert({id: 'a'}), makeAlert({id: 'b'})], 30, 2);
+    expect(state.alerts().map(a => a.id)).toEqual(['a', 'b']);
+    expect(state.totalCount()).toBe(30);
+    expect(state.unreadCount()).toBe(2);
+    expect(state.exhausted()).toBe(false);
+  });
+
+  it('appendData marks the list exhausted when the page adds no row', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'})], 1);
+    methods.appendData([makeAlert({id: 'a'})], 30, 1);
+    expect(state.alerts().map(a => a.id)).toEqual(['a']);
+    expect(state.exhausted()).toBe(true);
+  });
+
+  it('clearData drops the rows of a query that failed to reload', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'})], 1, {exhausted: true});
+    methods.clearData();
+    expect(state.alerts()).toEqual([]);
+    expect(state.totalCount()).toBe(0);
+    expect(state.exhausted()).toBe(false);
   });
 });

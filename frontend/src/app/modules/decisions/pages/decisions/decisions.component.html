@@ -12,13 +12,98 @@
       [emptyMessage]="emptyCopy.message"
       [emptySubMessage]="emptyCopy.subMessage"
       [emptyIcon]="emptyCopy.icon"
-      [skeletonRows]="skeletonRows"
-      [skeletonHeight]="skeletonHeight"
       (retry)="store.load()"
-      class="block space-y-cmn-6"
+      class="block"
       errorPlacement="above"
       retryable
     >
+      <!-- Shaped like a pending card and the decided list, line boxes at the cards' line heights -->
+      <div skeleton class="space-y-cmn-6" data-testid="decisions-skeleton">
+        <div class="flex flex-col gap-cmn-3">
+          <div class="flex items-center" style="height: 0.9375rem">
+            <cmn-skeleton class="w-full" width="6rem" height="0.75rem" />
+          </div>
+          @for (_ of skeletonCards; track $index) {
+            <cmn-card>
+              <div class="flex flex-col gap-cmn-4">
+                <div class="flex flex-col gap-cmn-2">
+                  <div class="flex items-center gap-cmn-2" style="height: 1.5rem">
+                    <cmn-skeleton width="2.75rem" height="1.25rem" />
+                    <cmn-skeleton width="3.5rem" height="0.875rem" />
+                    <cmn-skeleton class="flex-1" width="70%" height="0.75rem" />
+                  </div>
+                  <div class="flex items-center" style="height: 0.9375rem">
+                    <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+                  </div>
+                </div>
+                <div class="flex items-center" style="height: 1.5rem">
+                  <cmn-skeleton class="w-full" width="85%" height="1rem" />
+                </div>
+                <div class="flex flex-col gap-cmn-1">
+                  <div class="flex items-center" style="height: 0.9375rem">
+                    <cmn-skeleton class="w-full" width="15%" height="0.75rem" />
+                  </div>
+                  @for (width of skeletonTextLines; track $index) {
+                    <div class="flex items-center" style="height: 1.3125rem">
+                      <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
+                    </div>
+                  }
+                </div>
+                <div class="grid gap-cmn-3 sm:grid-cols-2">
+                  @for (_ of skeletonFacts; track $index) {
+                    <div class="flex flex-col gap-cmn-1">
+                      <div class="flex items-center" style="height: 0.9375rem">
+                        <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
+                      </div>
+                      <div class="flex items-center" style="height: 1.3125rem">
+                        <cmn-skeleton class="w-full" width="70%" height="0.875rem" />
+                      </div>
+                    </div>
+                  }
+                </div>
+                <div class="flex flex-col gap-cmn-2">
+                  <div class="flex items-center" style="height: 0.9375rem">
+                    <cmn-skeleton class="w-full" width="20%" height="0.75rem" />
+                  </div>
+                  @for (width of skeletonEvidenceLines; track $index) {
+                    <div class="flex items-center gap-cmn-2" style="height: 1.3125rem">
+                      <cmn-skeleton width="4rem" height="1.25rem" />
+                      <cmn-skeleton [width]="width" class="flex-1" height="0.875rem" />
+                    </div>
+                  }
+                </div>
+                <div class="flex justify-end gap-cmn-2">
+                  <cmn-skeleton width="5rem" height="2.75rem" />
+                  <cmn-skeleton width="6.5rem" height="2.75rem" />
+                </div>
+              </div>
+            </cmn-card>
+          }
+        </div>
+        <div class="flex flex-col gap-cmn-3">
+          <div class="flex items-center" style="height: 0.9375rem">
+            <cmn-skeleton class="w-full" width="7rem" height="0.75rem" />
+          </div>
+          <div
+            class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+          >
+            @for (_ of skeletonDecidedRows; track $index) {
+              <div class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
+                <div class="flex items-center justify-between gap-cmn-2" style="height: 1.3125rem">
+                  <cmn-skeleton class="flex-1" width="50%" height="0.875rem" />
+                  <cmn-skeleton width="4.5rem" height="0.75rem" />
+                </div>
+                @for (width of skeletonOutcomeLines; track $index) {
+                  <div class="flex items-center" style="height: 1.3125rem">
+                    <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
       <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-pending-heading">
         <h2
           id="decisions-pending-heading"
@@ -40,7 +125,9 @@
         }
       </section>
 
-      <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-decided-heading">
+      <!-- Spaced on the section, not the host: a space-y host counts the hidden status span the
+           skeleton follows and would drop the skeleton below where the content starts -->
+      <section class="mt-cmn-6 flex flex-col gap-cmn-3" aria-labelledby="decisions-decided-heading">
         <h2
           id="decisions-decided-heading"
           class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"

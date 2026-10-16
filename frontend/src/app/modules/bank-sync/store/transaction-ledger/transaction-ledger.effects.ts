@@ -1,14 +1,18 @@
 import {inject, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {
   catchError,
   debounceTime,
   distinctUntilChanged,
+  exhaustMap,
   filter,
   forkJoin,
   of,
   pipe,
+  Subject,
   switchMap,
+  takeUntil,
   tap,
 } from 'rxjs';
 
@@ -21,6 +25,7 @@ import {
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {LedgerFilterUtils} from '../../utils/ledger-filter.utils';
 import {MonthKeyUtils} from '../../utils/month-key.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {type LedgerFilter} from './transaction-ledger.computed';
@@ -36,6 +41,9 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 interface EffectsStore {
   transactions: Signal<GlobalTransactionDto[]>;
   offset: Signal<number>;
+  status: Signal<AsyncStatus>;
+  filter: Signal<LedgerFilter>;
+  rowsFilter: Signal<Nullable<LedgerFilter>>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
   categories: Signal<string[]>;
@@ -50,8 +58,10 @@ interface EffectsStore {
   setTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
-    hasMore: boolean
+    hasMore: boolean,
+    rowsFilter: LedgerFilter
   ) => void;
+  setRevalidating: (revalidating: boolean) => void;
   appendTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
@@ -59,18 +69,11 @@ interface EffectsStore {
   ) => void;
   nextPage: () => void;
   setError: (errorCode: Nullable<string>) => void;
+  setAppendLoading: () => void;
+  setAppendSuccess: () => void;
+  setAppendError: (errorCode: Nullable<string>) => void;
+  setAppendIdle: () => void;
   setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
-}
-
-function sameFilter(a: LedgerFilter, b: LedgerFilter): boolean {
-  return (
-    a.accountId === b.accountId &&
-    a.transactionType === b.transactionType &&
-    a.categories.join() === b.categories.join() &&
-    a.from === b.from &&
-    a.to === b.to &&
-    a.search === b.search
-  );
 }
 
 function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
@@ -89,44 +92,76 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  const fetchPage = rxMethod<'first' | 'next'>(
+  /**
+   * The first page replaces the rows when it lands; until then the previous rows stay on screen
+   * (the page keeps them, dimmed) so a filter change or refresh never blanks the list.
+   */
+  // A first page (a filter change, a refresh) drops any next page still in flight: it belongs to
+  // the rows being replaced.
+  const firstPageStarted$ = new Subject<void>();
+
+  const rowsMatchFilter = (): boolean => LedgerFilterUtils.same(store.rowsFilter(), store.filter());
+
+  const fetchFirstPage = rxMethod<void>(
     pipe(
-      tap(page => {
-        if (page === 'first') {
-          store.clearRows();
+      tap(() => {
+        firstPageStarted$.next();
+        store.setAppendIdle();
+        if (!rowsMatchFilter()) {
+          store.setRevalidating(false);
         }
         store.setLoading();
       }),
-      switchMap(page => {
-        const offset = page === 'first' ? 0 : store.offset() + PAGE_SIZE;
-        return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
+      switchMap(() => {
+        const requested = store.filter();
+        return bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
           tap(res => {
-            if (page === 'next') {
-              store.nextPage();
-              store.appendTransactions(res.items, res.totalCount, res.hasMore);
-            } else {
-              store.setTransactions(res.items, res.totalCount, res.hasMore);
-            }
+            store.setTransactions(res.items, res.totalCount, res.hasMore, requested);
+            store.setAppendSuccess();
             store.setSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
-            setError: (code: Nullable<string>) => store.setError(code),
+            setError: (code: Nullable<string>) => {
+              if (!rowsMatchFilter()) {
+                store.clearRows();
+              }
+              store.setError(code);
+            },
           })
         );
       })
     )
   );
 
+  /** Appends the next page under the rows on screen (the infinite list's paging contract). */
+  const fetchNextPage = rxMethod<void>(
+    pipe(
+      filter(() => store.status() !== 'loading' && rowsMatchFilter()),
+      tap(() => store.setAppendLoading()),
+      exhaustMap(() =>
+        bankSyncService.getAllTransactions(pageParams(store, store.offset() + PAGE_SIZE)).pipe(
+          tap(res => {
+            store.nextPage();
+            store.appendTransactions(res.items, res.totalCount, res.hasMore);
+            store.setAppendSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setAppendError(code),
+          }),
+          takeUntil(firstPageStarted$)
+        )
+      )
+    )
+  );
+
   const load = (): void => {
-    fetchPage('first');
+    fetchFirstPage();
   };
 
   return {
     load,
-    /** Re-issues the failed request with the rows already on screen kept in place. */
-    retry: (): void => {
-      fetchPage(store.transactions().length > 0 ? 'next' : 'first');
-    },
+    /** Re-issues the failed first page. */
+    retry: load,
     loadSummary: rxMethod<void>(
       pipe(
         switchMap(() =>
@@ -145,8 +180,9 @@ export function transactionLedgerEffects(store: EffectsStore) {
         )
       )
     ),
+    /** Asked by the infinite list when its end is in reach, and by its Try again. */
     loadMore: (): void => {
-      fetchPage('next');
+      fetchNextPage();
     },
     /** Follows the search box: debounced, then written to the `q` query param by `withUrlSync`. */
     applySearch: rxMethod<string>(
@@ -162,7 +198,7 @@ export function transactionLedgerEffects(store: EffectsStore) {
      */
     watchFilter: rxMethod<LedgerFilter>(
       pipe(
-        distinctUntilChanged(sameFilter),
+        distinctUntilChanged((a, b) => LedgerFilterUtils.same(a, b)),
         tap(() => load())
       )
     ),

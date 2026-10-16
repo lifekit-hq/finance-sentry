@@ -20,11 +20,32 @@
       emptyIcon="PiggyBank"
       retryable
     >
+      <!-- Line boxes match the cards' text line heights, so the cards land where these sit -->
       <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
-        <cmn-skeleton height="7rem" />
+        <cmn-card>
+          <div class="flex items-center" style="height: 0.9375rem">
+            <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
+          </div>
+          <div class="mt-cmn-1 flex items-center" style="height: 1.625rem">
+            <cmn-skeleton class="w-full" width="50%" height="1.25rem" />
+          </div>
+          <cmn-skeleton class="mt-cmn-3 block" height="0.625rem" />
+        </cmn-card>
         <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
           @for (_ of skeletonCards; track $index) {
-            <cmn-skeleton height="8rem" />
+            <cmn-card>
+              <div class="mb-cmn-3 flex h-8 items-center justify-between gap-cmn-2">
+                <cmn-skeleton class="flex-1" width="45%" height="0.875rem" />
+                <cmn-skeleton width="2rem" height="2rem" />
+              </div>
+              <div class="flex items-center" style="height: 1.5rem">
+                <cmn-skeleton class="w-full" width="40%" height="1rem" />
+              </div>
+              <cmn-skeleton class="mt-cmn-3 block" height="0.375rem" />
+              <div class="mt-cmn-1 flex items-center" style="height: 0.9375rem">
+                <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+              </div>
+            </cmn-card>
           }
         </div>
       </div>

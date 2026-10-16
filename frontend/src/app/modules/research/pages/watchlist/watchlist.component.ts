@@ -65,7 +65,7 @@ export class WatchlistComponent {
 
   public readonly store = inject(WatchlistStore);
   public readonly emptyCopy = WATCHLIST_EMPTY_COPY;
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  public readonly skeletonRowCount = SKELETON_ROWS;
   public readonly noteRows = NOTE_ROWS;
   public readonly maxTickerLength = MAX_TICKER_LENGTH;
   public readonly maxExchangeLength = MAX_EXCHANGE_LENGTH;

@@ -8,6 +8,7 @@ import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rx
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
+import {SessionCacheStore} from '../../../shared/store/session-cache/session-cache.store';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
 import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
@@ -57,6 +58,7 @@ export function authEffects(store: EffectsStore) {
   const router = inject(Router);
   const pushSession = inject(PushSessionService);
   const doc = inject(DOCUMENT);
+  const sessionCache = inject(SessionCacheStore);
   let signingOut = false;
 
   const releasePush = (): void => {
@@ -101,6 +103,7 @@ export function authEffects(store: EffectsStore) {
         .logout()
         .pipe(catchError(() => of(null)))
         .subscribe(res => {
+          sessionCache.clear();
           store.clearSession();
           if (res?.endSessionUrl) {
             doc.location.assign(res.endSessionUrl);
@@ -117,6 +120,7 @@ export function authEffects(store: EffectsStore) {
       }
       releasePush();
       authService.logout().subscribe({error: () => undefined});
+      sessionCache.clear();
       store.clearSession();
       goToLogin();
     },
