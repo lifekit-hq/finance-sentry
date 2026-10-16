@@ -67,6 +67,13 @@ public interface IBankAccountRepository
     Task SaveHealthUnscopedAsync(Guid accountId, ConnectionHealth health, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Stores the account's provider identifiers (IBAN, card numbers, card expiry, last four) alone, straight to the
+    /// row, so a discovery pass cannot write its stale snapshot of health, sync status or balances back. For the
+    /// no-person discovery; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveProviderIdentifiersUnscopedAsync(BankAccount account, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Delete bank account (soft delete by setting IsActive = false).
     /// </summary>
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);

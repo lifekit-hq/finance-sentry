@@ -223,7 +223,8 @@ public sealed class TrueLayerHttpClient(
         ProviderName: c.ProviderDisplayName ?? string.Empty,
         AccountType: "credit",
         Iban: null,
-        AccountNumberLast4: ExtractLast4(iban: null, number: c.PartialCardNumber));
+        AccountNumberLast4: ExtractLast4(iban: null, number: c.PartialCardNumber),
+        ValidTo: c.ValidTo);
 
     private static TrueLayerTransaction MapTransaction(TransactionEntry t, bool isPending)
     {
@@ -407,6 +408,7 @@ public sealed class TrueLayerHttpClient(
         [JsonPropertyName("display_name")] public string? DisplayName { get; set; }
         [JsonPropertyName("currency")] public string? Currency { get; set; }
         [JsonPropertyName("partial_card_number")] public string? PartialCardNumber { get; set; }
+        [JsonPropertyName("valid_to")] public string? ValidTo { get; set; }
         [JsonPropertyName("provider")] public ProviderRef? Provider { get; set; }
 
         public string? ProviderDisplayName => Provider?.DisplayName;

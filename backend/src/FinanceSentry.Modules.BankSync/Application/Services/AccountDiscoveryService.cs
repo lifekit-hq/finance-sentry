@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -24,7 +25,9 @@ using Microsoft.Extensions.Logging;
 /// <c>ConnectionHealth:ActiveProviders</c> (in shadow mode it only records). For a listed provider the listing also
 /// keeps the Dormant cadence: a Dormant connection is listed at most once per <c>ConnectionHealth:DormantSyncInterval</c>.
 ///
-/// Existing accounts are never touched here: this only adds rows. On SCA-strict banks (e.g. AIB)
+/// Existing accounts only have their provider identifiers refreshed (IBAN, PANs, last four, card expiry); nothing else
+/// about them changes. A log-only detector names an account the provider no longer lists while its own health says
+/// Dormant/ResourceGone ("would retire"), so production shows the signal before anything acts on it. On SCA-strict banks (e.g. AIB)
 /// a discovered account stays balance-only until a user-present reconnect re-establishes the SCA
 /// session needed to pull transaction history in the background (see the inline-sync comment in
 /// <c>FinalizeTrueLayerConnectCommand</c>).
@@ -136,10 +139,13 @@ public class AccountDiscoveryService(
         TrueLayerConnection connection, string accessToken, CancellationToken ct)
     {
         var created = 0;
+        var known = await KnownAccountsAsync(connection.UserId, ct);
 
         var providerAccounts = await trueLayerClient.ListAccountsAsync(accessToken, ct);
         foreach (var pa in providerAccounts)
         {
+            if (await RefreshExistingAsync(known, pa.AccountId, pa.Iban, null, pa.AccountNumberLast4, null, ct))
+                continue;
             if (await accounts.ExistsByExternalAccountIdUnscopedAsync(pa.AccountId, ct))
                 continue;
 
@@ -161,12 +167,14 @@ public class AccountDiscoveryService(
         }
 
         IReadOnlyList<TrueLayerAccountInfo> providerCards = [];
+        var cardsListed = true;
         try
         {
             providerCards = await trueLayerClient.ListCardsAsync(accessToken, ct);
         }
         catch (TrueLayerException ex)
         {
+            cardsListed = false;
             logger.LogInformation(
                 "TrueLayer /cards unavailable for connection {ConnectionId}: {Error}",
                 connection.Id, ex.Message);
@@ -174,6 +182,8 @@ public class AccountDiscoveryService(
 
         foreach (var card in providerCards)
         {
+            if (await RefreshExistingAsync(known, card.AccountId, null, null, card.AccountNumberLast4, card.ValidTo, ct))
+                continue;
             if (await accounts.ExistsByExternalAccountIdUnscopedAsync(card.AccountId, ct))
                 continue;
 
@@ -195,6 +205,12 @@ public class AccountDiscoveryService(
             backgroundJobs.Enqueue<ScheduledSyncJob>(job => job.ExecuteSyncAsync(cardAccount.Id));
             created++;
         }
+
+        // A failed /cards read would make every card look absent, so the detector skips it.
+        if (cardsListed)
+            LogWouldRetire(
+                known.Values.Where(a => a.TrueLayerConnectionId == connection.Id),
+                [.. providerAccounts.Select(a => a.AccountId), .. providerCards.Select(c => c.AccountId)]);
 
         return created;
     }
@@ -226,10 +242,13 @@ public class AccountDiscoveryService(
                 var clientInfo = await monobankAdapter.GetClientInfoAsync(token, ct);
                 await connectionHealth.RecordConnectionSuccessAsync(health, ct);
 
+                var known = await KnownAccountsAsync(credential.UserId, ct);
                 foreach (var pa in clientInfo.Accounts)
                 {
                     monobankBalanceCache.Set(token, pa.Id, MonobankAdapter.ToBankAccountInfo(pa, clientInfo.Name));
 
+                    if (await RefreshExistingAsync(known, pa.Id, pa.Iban, pa.MaskedPans, LastFour(pa.MaskedPan), null, ct))
+                        continue;
                     if (await accounts.ExistsByExternalAccountIdUnscopedAsync(pa.Id, ct))
                         continue;
 
@@ -238,6 +257,10 @@ public class AccountDiscoveryService(
                     backgroundJobs.Enqueue<ScheduledSyncJob>(job => job.ExecuteSyncAsync(account.Id));
                     created++;
                 }
+
+                LogWouldRetire(
+                    known.Values.Where(a => a.MonobankCredentialId == credential.Id),
+                    [.. clientInfo.Accounts.Select(a => a.Id)]);
             }
             catch (Exception ex)
             {
@@ -249,5 +272,60 @@ public class AccountDiscoveryService(
         }
 
         return created;
+    }
+
+    private async Task<Dictionary<string, BankAccount>> KnownAccountsAsync(Guid userId, CancellationToken ct)
+        => (await accounts.GetByUserIdUnscopedAsync(userId, ct)).ToDictionary(a => a.ExternalAccountId);
+
+    // "0000" is the placeholder a missing PAN maps to; it must not overwrite a real last four.
+    private static string? LastFour(string maskedPan)
+        => maskedPan.Length >= 4 && maskedPan[^4..] != "0000" ? maskedPan[^4..] : null;
+
+    /// <summary>Refreshes a row the provider still lists; true when the listed id is one we already hold.</summary>
+    private async Task<bool> RefreshExistingAsync(
+        Dictionary<string, BankAccount> known, string externalId, string? iban, string[]? pans, string? last4,
+        string? validTo, CancellationToken ct)
+    {
+        if (!known.TryGetValue(externalId, out var account))
+            return false;
+
+        var previousLast4 = account.AccountNumberLast4;
+        if (account.RefreshProviderIdentifiers(iban, pans, last4 == "0000" ? null : last4, validTo))
+        {
+            try
+            {
+                await accounts.SaveProviderIdentifiersUnscopedAsync(account, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Could not store provider identifiers for account {AccountId}.", account.Id);
+                return true;
+            }
+
+            if (account.AccountNumberLast4 != previousLast4)
+                logger.LogInformation(
+                    "Account {AccountId} ({Provider}) card digits changed ···{Previous} -> ···{Current}.",
+                    account.Id, account.Provider, previousLast4, account.AccountNumberLast4);
+        }
+
+        return true;
+    }
+
+    // Log-only (PR 1 of the card lifecycle): nothing here may change a row. Needs a sibling still listed so one empty
+    // or truncated answer cannot flag everything.
+    private void LogWouldRetire(IEnumerable<BankAccount> connectionAccounts, HashSet<string> listedIds)
+    {
+        var held = connectionAccounts.ToList();
+        if (!held.Any(a => listedIds.Contains(a.ExternalAccountId)))
+            return;
+
+        foreach (var account in held.Where(a => !listedIds.Contains(a.ExternalAccountId)
+            && a.Health.State == ConnectionHealthState.Dormant
+            && a.Health.LastFailureClass == FailureClass.ResourceGone))
+        {
+            logger.LogWarning(
+                "would retire account {AccountId} ({Provider} {ExternalAccountId} ···{Last4}) (absent from list, health Dormant/ResourceGone).",
+                account.Id, account.Provider, account.ExternalAccountId, account.AccountNumberLast4);
+        }
     }
 }

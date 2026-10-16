@@ -53,7 +53,9 @@ public class MonobankHttpClient(HttpClient http)
             CurrencyCode: a.CurrencyCode,
             Balance: a.Balance,
             ProductType: a.Type,
-            CreditLimit: a.CreditLimit)).ToList();
+            CreditLimit: a.CreditLimit,
+            Iban: a.Iban,
+            MaskedPans: a.MaskedPan?.ToArray())).ToList();
 
         return new MonobankClientInfo(raw.ClientId, raw.Name, accounts);
     }
@@ -173,6 +175,7 @@ public class MonobankHttpClient(HttpClient http)
         [JsonPropertyName("currencyCode")] public int CurrencyCode { get; set; }
         [JsonPropertyName("balance")] public long Balance { get; set; }
         [JsonPropertyName("creditLimit")] public long CreditLimit { get; set; }
+        [JsonPropertyName("iban")] public string? Iban { get; set; }
     }
 
     private sealed class StatementEntry

@@ -37,6 +37,7 @@ public class AccountDiscoveryServiceTests
         Mock<IBackgroundJobClient> BackgroundJobs,
         Mock<IBankConnectionHealth> ConnectionHealth,
         MonobankBalanceCache MonobankBalanceCache,
+        Mock<ILogger<AccountDiscoveryService>> Logger,
         List<BankAccount> StoredAccounts,
         List<BankAccount> AddedAccounts);
 
@@ -65,6 +66,9 @@ public class AccountDiscoveryServiceTests
                 addedAccounts.Add(a);
                 return a;
             });
+        accounts.Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid userId, CancellationToken _) =>
+                storedAccounts.Where(a => a.UserId == userId && a.IsActive).ToList());
         accounts.Setup(r => r.ExistsByExternalAccountIdUnscopedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string id, CancellationToken _) => storedAccounts.Any(a => a.ExternalAccountId == id));
 
@@ -94,7 +98,7 @@ public class AccountDiscoveryServiceTests
             logger.Object);
 
         return new Harness(sut, trueLayerConnections, trueLayerClient, trueLayerTokenRefresh,
-            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, connectionHealth, monobankBalanceCache,
+            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, connectionHealth, monobankBalanceCache, logger,
             storedAccounts, addedAccounts);
     }
 
@@ -255,8 +259,8 @@ public class AccountDiscoveryServiceTests
         h.TrueLayerConnections.Setup(r => r.GetByIdUnscopedAsync(deadConnection.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(deadConnection);
 
-        var deadAccount = new BankAccount { TrueLayerConnectionId = deadConnection.Id, UserId = UserId };
-        var otherAccount = new BankAccount { TrueLayerConnectionId = healthyConnection.Id, UserId = UserId };
+        var deadAccount = new BankAccount { TrueLayerConnectionId = deadConnection.Id, UserId = UserId, ExternalAccountId = "dead-acc" };
+        var otherAccount = new BankAccount { TrueLayerConnectionId = healthyConnection.Id, UserId = UserId, ExternalAccountId = "other-acc" };
         h.Accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([deadAccount, otherAccount]);
 
@@ -454,5 +458,168 @@ public class AccountDiscoveryServiceTests
         var act = async () => await h.Sut.DiscoverNewAccountsAsync();
 
         await act.Should().NotThrowAsync();
+    }
+
+    // ── Card lifecycle PR 1: identifiers refreshed on existing rows; log-only "would retire" detector ──
+
+    private static void VerifyWouldRetireLogged(Harness h, Times times)
+        => h.Logger.Verify(l => l.Log(
+            LogLevel.Warning, It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((v, _) => $"{v}".Contains("would retire")),
+            null, It.IsAny<Func<It.IsAnyType, Exception?, string>>()), times);
+
+    private static BankAccount SeedOwned(
+        Harness h, string externalId, Guid? monobankCredentialId = null, Guid? trueLayerConnectionId = null,
+        ConnectionHealth? health = null)
+    {
+        var account = new BankAccount
+        {
+            UserId = UserId, ExternalAccountId = externalId, Provider = "x", AccountNumberLast4 = "0000",
+            MonobankCredentialId = monobankCredentialId, TrueLayerConnectionId = trueLayerConnectionId,
+        };
+        if (health is not null) account.ApplyHealth(health);
+        h.StoredAccounts.Add(account);
+        return account;
+    }
+
+    private static readonly ConnectionHealth DormantGone = new()
+    {
+        State = ConnectionHealthState.Dormant, LastFailureClass = FailureClass.ResourceGone,
+    };
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_WritesIbanPansAndLast4OntoExistingRow()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h, new MonobankAccountInfo(
+            "mono-1", "black UAH", "checking", "516875******9876", 980, 100, 0,
+            Iban: "UA733220010000026201234567890", MaskedPans: ["537541******1234", "516875******9876"]));
+        var row = SeedOwned(h, "mono-1", monobankCredentialId: credential.Id);
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(0);
+        row.Iban.Should().Be("UA733220010000026201234567890");
+        row.MaskedPans.Should().Equal("537541******1234", "516875******9876");
+        row.AccountNumberLast4.Should().Be("9876");
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(row, It.IsAny<CancellationToken>()), Times.Once);
+        h.Accounts.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_FailedIdentifierSave_DoesNotAbortTheConnection()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-1", "black UAH", "checking", "516875******9876", 980, 100, 0, Iban: "UA1"),
+            new MonobankAccountInfo("mono-2", "white UAH", "checking", "537541******1234", 980, 100, 0));
+        SeedOwned(h, "mono-1", monobankCredentialId: credential.Id);
+        h.Accounts.Setup(r => r.SaveProviderIdentifiersUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("value too long"));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
+        h.Accounts.Verify(r => r.AddAsync(It.Is<BankAccount>(a => a.ExternalAccountId == "mono-2"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_MissingPanKeepsTheStoredLast4_AndUnchangedRowIsNotSaved()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h, new MonobankAccountInfo("mono-1", "black UAH", "checking", "0000", 980, 100, 0));
+        var row = SeedOwned(h, "mono-1", monobankCredentialId: credential.Id);
+        row.AccountNumberLast4 = "4321";
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        row.AccountNumberLast4.Should().Be("4321");
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Accounts.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayer_WritesIbanAndCardValidToOntoExistingRows()
+    {
+        var h = BuildSut();
+        var connection = SetupTrueLayer(h);
+        h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("tl-acc", "Checking", "EUR", "AIB", "checking", "IE29AIBK93115212345678", "5678")]);
+        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("tl-card", "Credit", "EUR", "", "credit", null, "4321", ValidTo: "2027-01")]);
+        var account = SeedOwned(h, "tl-acc", trueLayerConnectionId: connection.Id);
+        var card = SeedOwned(h, "tl-card", trueLayerConnectionId: connection.Id);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        account.Iban.Should().Be("IE29AIBK93115212345678");
+        account.AccountNumberLast4.Should().Be("5678");
+        card.CardValidTo.Should().Be("2027-01");
+        card.AccountNumberLast4.Should().Be("4321");
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_LogsWouldRetire_ForAbsentDormantResourceGoneAccount_AndChangesNothing()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h, new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0));
+        SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
+        var gone = SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        VerifyWouldRetireLogged(h, Times.Once());
+        gone.IsActive.Should().BeTrue();
+        gone.ClosedAt.Should().BeNull();
+        gone.Health.Should().Be(DormantGone);
+        h.Accounts.Verify(r => r.SaveProviderIdentifiersUnscopedAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
+        h.Accounts.Verify(r => r.UpdateAsync(gone, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_DoesNotLogWouldRetire_ForListedOrHealthyOrOtherFailureAccounts()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h,
+            new MonobankAccountInfo("mono-live", "black UAH", "checking", "1111", 980, 100, 0),
+            new MonobankAccountInfo("mono-listed-dormant", "black UAH", "checking", "2222", 980, 100, 0));
+        SeedOwned(h, "mono-live", monobankCredentialId: credential.Id);
+        SeedOwned(h, "mono-listed-dormant", monobankCredentialId: credential.Id, health: DormantGone);
+        SeedOwned(h, "mono-absent-healthy", monobankCredentialId: credential.Id);
+        SeedOwned(h, "mono-absent-transient", monobankCredentialId: credential.Id,
+            health: new ConnectionHealth { State = ConnectionHealthState.Dormant, LastFailureClass = FailureClass.Transient });
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        VerifyWouldRetireLogged(h, Times.Never());
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_DoesNotLogWouldRetire_WhenNoSiblingIsListed()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h);
+        SeedOwned(h, "mono-gone", monobankCredentialId: credential.Id, health: DormantGone);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        VerifyWouldRetireLogged(h, Times.Never());
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayer_LogsWouldRetire_ForAbsentAccount_ButNotWhenCardsListingFailed()
+    {
+        var h = BuildSut();
+        var connection = SetupTrueLayer(h, "tl-live");
+        SeedOwned(h, "tl-live", trueLayerConnectionId: connection.Id);
+        SeedOwned(h, "tl-gone", trueLayerConnectionId: connection.Id, health: DormantGone);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+        VerifyWouldRetireLogged(h, Times.Once());
+
+        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TrueLayerException("TRUELAYER_ERROR", "down", 503));
+        await h.Sut.DiscoverNewAccountsAsync();
+        VerifyWouldRetireLogged(h, Times.Once());
     }
 }

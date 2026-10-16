@@ -67,6 +67,24 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>The provider-reported IBAN (Monobank client-info, TrueLayer account number). Never logged.</summary>
+    public string? Iban { get; set; }
+
+    /// <summary>Every masked PAN the provider lists for the account (Monobank lists several on premium cards). Never logged in full.</summary>
+    public string[]? MaskedPans { get; set; }
+
+    /// <summary>A TrueLayer card's optional <c>valid_to</c> as the provider sends it (year-month, e.g. "2027-01").</summary>
+    public string? CardValidTo { get; set; }
+
+    // Closure and reissue bookkeeping: stored and read by later increments, written by nothing yet.
+    public DateTimeOffset? ClosedAt { get; set; }
+
+    public string? ClosedReason { get; set; }
+
+    public string? ClosedBy { get; set; }
+
+    public Guid? PredecessorAccountId { get; set; }
+
     public Guid? CreatedBy { get; set; }
 
     public Guid? UpdatedBy { get; set; }
@@ -166,6 +184,20 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
         // The state is kept so the first success still resolves the open alert, but the old failure no longer times a
         // Dormant account's slowed cadence: the next scheduled run tries it.
         Health = Health with { LastFailureAt = null };
+    }
+
+    /// <summary>
+    /// Writes the identifiers a discovery read lists onto an existing row and refreshes the last four digits.
+    /// A null argument leaves its field alone (the provider did not list it). Returns whether anything changed.
+    /// </summary>
+    public bool RefreshProviderIdentifiers(string? iban, string[]? maskedPans, string? last4, string? cardValidTo)
+    {
+        var changed = false;
+        if (iban is not null && iban != Iban) { Iban = iban; changed = true; }
+        if (maskedPans is { Length: > 0 } && !maskedPans.SequenceEqual(MaskedPans ?? [])) { MaskedPans = maskedPans; changed = true; }
+        if (cardValidTo is not null && cardValidTo != CardValidTo) { CardValidTo = cardValidTo; changed = true; }
+        if (last4 is { Length: 4 } && last4.All(char.IsDigit) && last4 != AccountNumberLast4) { AccountNumberLast4 = last4; changed = true; }
+        return changed;
     }
 
     public void ValidateInvariants()
