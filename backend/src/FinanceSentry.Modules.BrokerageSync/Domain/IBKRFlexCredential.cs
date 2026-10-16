@@ -27,6 +27,9 @@ public sealed class IBKRFlexCredential : IUserOwned
     public string? LastError { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>When this user first linked an IBKR Flex token. Set once; <see cref="Replace"/> re-stamps <see cref="CreatedAt"/> but never this.</summary>
+    public DateTime FirstLinkedAt { get; private set; }
+
     /// <summary>The Activity Flex Query id (identifier, not secret).</summary>
     public string QueryId { get; private set; } = string.Empty;
 
@@ -50,6 +53,7 @@ public sealed class IBKRFlexCredential : IUserOwned
         UserId = userId;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
+        FirstLinkedAt = CreatedAt;
         QueryId = queryId;
         EncryptedToken = encryptedToken;
         TokenIv = tokenIv;

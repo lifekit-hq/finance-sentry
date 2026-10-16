@@ -43,6 +43,15 @@ public class BrokerageFlowReaderTests
     {
         var credential = new IBKRCredential(userId, "key", "token", "dh", [], [], [], [], [], [], [], [], [], 1);
         typeof(IBKRCredential).GetProperty(nameof(IBKRCredential.CreatedAt))!.SetValue(credential, createdAt);
+        typeof(IBKRCredential).GetProperty(nameof(IBKRCredential.FirstLinkedAt))!.SetValue(credential, createdAt);
+        return credential;
+    }
+
+    private static IBKRFlexCredential Flex(DateTime linkedAt)
+    {
+        var credential = new IBKRFlexCredential(UserId, "q", [], [], [], 1);
+        typeof(IBKRFlexCredential).GetProperty(nameof(IBKRFlexCredential.CreatedAt))!.SetValue(credential, linkedAt);
+        typeof(IBKRFlexCredential).GetProperty(nameof(IBKRFlexCredential.FirstLinkedAt))!.SetValue(credential, linkedAt);
         return credential;
     }
 
@@ -159,5 +168,55 @@ public class BrokerageFlowReaderTests
         reading.ClassifiedFlows.Should().Equal(
             new ClassifiedFlow(DateOnly.FromDateTime(IbkrLinked.AddDays(20)), FlowClass.ExternalOutflow, 40m));
         reading.Sources.Single().FlowsRecorded.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadAsync_AfterAFlexRelink_KeepsDepositsBetweenFirstLinkAndRelinkAsContributions()
+    {
+        await using var db = NewDb();
+        var flex = Flex(IbkrLinked);
+        db.IBKRFlexCredentials.Add(flex);
+        db.BrokerageCashTransactions.Add(Cash("ibkr", "Deposits/Withdrawals", 500m, "USD", IbkrLinked.AddDays(20)));
+        await db.SaveChangesAsync();
+
+        // The token is re-entered: Replace re-stamps CreatedAt to now (long after the deposit) but not FirstLinkedAt.
+        flex.Deactivate();
+        flex.Replace("q2", [], [], [], 1);
+        await db.SaveChangesAsync();
+        flex.CreatedAt.Should().BeAfter(IbkrLinked.AddDays(20));
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Sources.Should().Equal(new FlowSourceCoverage("ibkr", new DateOnly(2026, 7, 1), true));
+        reading.ClassifiedFlows.Should().Equal(new ClassifiedFlow(DateOnly.FromDateTime(IbkrLinked.AddDays(20)), FlowClass.ExternalInflow, 500m));
+    }
+
+    [Fact]
+    public async Task ReadAsync_AfterAnOAuthRelink_KeepsDepositsBetweenFirstLinkAndRelinkAsContributions()
+    {
+        await using var db = NewDb();
+        var ibkr = Ibkr(UserId, IbkrLinked);
+        db.IBKRCredentials.Add(ibkr);
+        db.BrokerageCashTransactions.Add(Cash("ibkr", "Deposits/Withdrawals", 500m, "USD", IbkrLinked.AddDays(20)));
+        await db.SaveChangesAsync();
+
+        ibkr.Deactivate();
+        ibkr.Reactivate("key", "token", "dh", [], [], [], [], [], [], [], [], [], 1);
+        await db.SaveChangesAsync();
+        ibkr.CreatedAt.Should().BeAfter(IbkrLinked.AddDays(20));
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.ClassifiedFlows.Should().ContainSingle(f => f.Class == FlowClass.ExternalInflow && f.AmountUsd == 500m);
+    }
+
+    [Fact]
+    public void NewCredentials_RecordFirstLinkedAtOnce()
+    {
+        var flex = new IBKRFlexCredential(UserId, "q", [], [], [], 1);
+        var ibkr = new IBKRCredential(UserId, "key", "token", "dh", [], [], [], [], [], [], [], [], [], 1);
+
+        flex.FirstLinkedAt.Should().Be(flex.CreatedAt);
+        ibkr.FirstLinkedAt.Should().Be(ibkr.CreatedAt);
     }
 }

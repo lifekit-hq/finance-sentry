@@ -26,6 +26,9 @@ public sealed class IBKRCredential : IUserOwned
     public string? LastSyncError { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>When this user first linked IBKR OAuth. Set once; <see cref="Reactivate"/> re-stamps <see cref="CreatedAt"/> but never this.</summary>
+    public DateTime FirstLinkedAt { get; private set; }
+
     /// <summary>The 9-character consumer key registered on the IBKR portal (identifier, not secret).</summary>
     public string ConsumerKey { get; private set; } = string.Empty;
 
@@ -71,6 +74,7 @@ public sealed class IBKRCredential : IUserOwned
         UserId = userId;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
+        FirstLinkedAt = CreatedAt;
         ConsumerKey = consumerKey;
         AccessToken = accessToken;
         DhParam = dhParam;

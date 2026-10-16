@@ -378,6 +378,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                         .IsRequired()
                         .HasColumnType("bytea");
 
+                    b.Property<DateTime>("FirstLinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -424,6 +427,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                     b.Property<byte[]>("EncryptedToken")
                         .IsRequired()
                         .HasColumnType("bytea");
+
+                    b.Property<DateTime>("FirstLinkedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");

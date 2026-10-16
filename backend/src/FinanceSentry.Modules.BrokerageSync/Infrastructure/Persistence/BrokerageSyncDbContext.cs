@@ -29,6 +29,8 @@ public sealed class BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbConte
             entity.Property(e => e.AccountId).HasMaxLength(20);
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.FirstLinkedAt).IsRequired();
+            entity.Property(e => e.FirstLinkedAt).IsRequired();
             entity.Property(e => e.LastSyncError).HasMaxLength(1000);
             entity.Property(e => e.ConsumerKey).IsRequired().HasMaxLength(9);
             entity.Property(e => e.AccessToken).IsRequired().HasMaxLength(256);
