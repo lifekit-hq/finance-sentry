@@ -140,6 +140,31 @@ public sealed class GetSyncHealthConnectionHealthTests
     }
 
     [Fact]
+    public async Task A_connection_with_no_accounts_that_needs_a_reconnect_shows_beside_a_healthy_one_with_accounts()
+    {
+        await using var sp = BuildProvider("truelayer");
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankSyncDbContext>();
+        var expired = new FinanceSentry.Modules.BankSync.Domain.TrueLayerConnection(_userId, "bank-a", "Bank A", "ref-a");
+        expired.ApplyHealth(new ConnectionHealth { State = ConnectionHealthState.ActionRequired, LastFailureCode = "CONSENT_EXPIRED" });
+        var working = new FinanceSentry.Modules.BankSync.Domain.TrueLayerConnection(_userId, "bank-b", "Bank B", "ref-b");
+        var account = new FinanceSentry.Modules.BankSync.Domain.BankAccount(
+            _userId, "ext-2", "Bank B", "checking", "2222", "Owner", "EUR", _userId, "truelayer")
+        {
+            TrueLayerConnectionId = working.Id,
+        };
+        db.TrueLayerConnections.AddRange(expired, working);
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "truelayer");
+
+        entry.Status.Should().Be("error");
+        entry.Health.Should().Be("reconnect_needed");
+    }
+
+    [Fact]
     public async Task A_shadow_Flex_credentials_health_does_not_show_under_the_ibkr_entry()
     {
         await using var sp = BuildProvider("ibkr");

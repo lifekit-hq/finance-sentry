@@ -101,8 +101,10 @@ public sealed class GetSyncHealthTool(
         var accounts = mine.Where(r => r.IsAccount).Select(r => ConnectionHealthSurface.Effective(
             r.ConnectionId is { } id && connections.TryGetValue(id, out var shared) ? shared : null, r.Health.State));
 
-        var shown = accounts.OfType<ConnectionHealthState>().ToList();
-        return ConnectionHealthSurface.Worst(shown.Count > 0 ? shown : connections.Values);
+        var withAccounts = mine.Where(r => r.IsAccount && r.ConnectionId is not null).Select(r => r.ConnectionId!.Value).ToHashSet();
+        var bare = connections.Where(c => !withAccounts.Contains(c.Key)).Select(c => c.Value);
+
+        return ConnectionHealthSurface.Worst([.. accounts.OfType<ConnectionHealthState>(), .. bare]);
     }
 
     private static SyncHealthEntry FromHealth(SyncHealthEntry entry, ConnectionHealthState state)
