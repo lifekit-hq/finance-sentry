@@ -40,7 +40,7 @@ rule or shape agreed but not implemented), **missing**.
 |---|---|---|
 | C6 | **Steam: whether and how to link.** | **Undecided.** Research comes first (report §5.5, the F1 list); no linking decision is made. The treatment in §5.5 below is the *valuation* rule for when it is decided, not a commitment to link. |
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
-| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues (G6). |
+| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues, S2c the earn, airdrop and dust events (G6). |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
 
 ---

@@ -150,6 +150,40 @@ public class CryptoFlowReaderTests
     }
 
     [Fact]
+    public async Task ARewardAndADustFee_AreIncomeAndFee_NeverMoneyPutIn()
+    {
+        await using var db = NewDb();
+        db.ExchangeCredentials.Add(Link(CryptoExchangeProvider.RevolutX));
+        db.CryptoFlowEvents.AddRange(
+            Event(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.Reward, Apr9, 2m, "SOL", null, priceUsd: 150m, isFiat: false),
+            Event(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.DustConversion, Apr9, 0.2m, "BNB", null, fee: 0.001m, priceUsd: 600m, isFiat: false));
+        await db.SaveChangesAsync();
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Select(f => (f.Flow.Class, f.Flow.AmountUsd)).Should().BeEquivalentTo(new[]
+        {
+            (FlowClass.Income, 300m),
+            (FlowClass.Fee, 0.6m),
+        });
+        reading.Sources.Should().ContainSingle().Which.FlowsRecorded.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AnUnpricedReward_DropsOut_WithoutMakingTheVenuesFlowsUnknown()
+    {
+        await using var db = NewDb();
+        db.ExchangeCredentials.Add(Link(CryptoExchangeProvider.RevolutX));
+        db.CryptoFlowEvents.Add(Event(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.Reward, Apr9, 5m, "DOGE", null, isFiat: false));
+        await db.SaveChangesAsync();
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Should().BeEmpty();
+        reading.Sources.Should().ContainSingle().Which.FlowsRecorded.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task FlowsOnOrBeforeFrom_AreLeftOut()
     {
         await using var db = NewDb();
