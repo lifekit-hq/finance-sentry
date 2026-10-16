@@ -289,7 +289,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               } @else if (
                 store.isHistoryFirstLoad() || (!store.historyHasHistory() && store.isFirstLoad())
               ) {
-                <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
+                <cmn-skeleton height="19.8125rem" data-testid="net-worth-chart-skeleton" />
               } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
@@ -367,7 +367,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
           </div>
 
           @if (store.isFirstLoad()) {
-            <cmn-skeleton height="12rem" data-testid="cash-flow-chart-skeleton" />
+            <cmn-skeleton height="19.8125rem" data-testid="cash-flow-chart-skeleton" />
           } @else if (store.hasCashFlow()) {
             <div>
               <cmn-bar-chart
