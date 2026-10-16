@@ -79,7 +79,7 @@ public sealed class GetSyncHealthConnectionHealthTests
     [InlineData(ConnectionHealthState.ActionRequired, "error", "reconnect_needed")]
     [InlineData(ConnectionHealthState.Failing, "error", "retrying")]
     [InlineData(ConnectionHealthState.Dormant, "error", "dormant")]
-    [InlineData(ConnectionHealthState.Degraded, "ok", "retrying")]
+    [InlineData(ConnectionHealthState.Degraded, "ok", "healthy")]
     [InlineData(ConnectionHealthState.Healthy, "ok", "healthy")]
     public async Task A_policy_driven_provider_is_read_from_its_connection_health(
         ConnectionHealthState state, string status, string health)
@@ -88,6 +88,44 @@ public sealed class GetSyncHealthConnectionHealthTests
 
         entry.Status.Should().Be(status);
         entry.Health.Should().Be(health);
+    }
+
+    [Theory]
+    [InlineData(ConnectionHealthState.ActionRequired, "error", "reconnect_needed")]
+    [InlineData(ConnectionHealthState.Dormant, "error", "dormant")]
+    public async Task A_listed_Flex_credentials_health_shows_under_the_ibkr_entry(
+        ConnectionHealthState state, string status, string health)
+    {
+        await using var sp = BuildProvider("ibkr", "ibkr-flex");
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BrokerageSyncDbContext>();
+        var flex = new IBKRFlexCredential(_userId, "query", [1], [2], [3], 1);
+        flex.ApplyHealth(new ConnectionHealth { State = state, LastFailureCode = "HTTP_401" });
+        db.IBKRFlexCredentials.Add(flex);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "ibkr");
+
+        entry.Status.Should().Be(status);
+        entry.Health.Should().Be(health);
+    }
+
+    [Fact]
+    public async Task A_shadow_Flex_credentials_health_does_not_show_under_the_ibkr_entry()
+    {
+        await using var sp = BuildProvider("ibkr");
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BrokerageSyncDbContext>();
+        var flex = new IBKRFlexCredential(_userId, "query", [1], [2], [3], 1);
+        flex.ApplyHealth(new ConnectionHealth { State = ConnectionHealthState.ActionRequired, LastFailureCode = "HTTP_401" });
+        db.IBKRFlexCredentials.Add(flex);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "ibkr");
+
+        entry.Health.Should().BeNull("nothing of an unlisted Flex row counts, and no IBKR row exists to label");
     }
 
     [Fact]

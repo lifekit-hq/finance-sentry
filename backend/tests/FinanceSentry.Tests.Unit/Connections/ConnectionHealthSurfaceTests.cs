@@ -9,7 +9,7 @@ public class ConnectionHealthSurfaceTests
 {
     [Theory]
     [InlineData(ConnectionHealthState.Healthy, null)]
-    [InlineData(ConnectionHealthState.Degraded, "retrying")]
+    [InlineData(ConnectionHealthState.Degraded, null)]
     [InlineData(ConnectionHealthState.Failing, "retrying")]
     [InlineData(ConnectionHealthState.ActionRequired, "reconnect_needed")]
     [InlineData(ConnectionHealthState.Dormant, "dormant")]
@@ -43,6 +43,13 @@ public class ConnectionHealthSurfaceTests
     [Fact]
     public void An_account_with_no_connection_shows_its_own_state() =>
         ConnectionHealthSurface.Effective(null, ConnectionHealthState.Dormant).Should().Be(ConnectionHealthState.Dormant);
+
+    [Theory]
+    [InlineData("ibkr-flex", "ibkr")]
+    [InlineData("ibkr", "ibkr")]
+    [InlineData("monobank", "monobank")]
+    public void A_provider_is_shown_under_its_institution(string provider, string institution) =>
+        ConnectionHealthSurface.InstitutionOf(provider).Should().Be(institution);
 
     [Fact]
     public void A_group_shows_its_most_urgent_member() =>

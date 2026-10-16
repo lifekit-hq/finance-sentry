@@ -13,12 +13,6 @@ internal sealed class ConnectionHealthLabels
     /// <summary>No labels: every provider keeps its own status.</summary>
     public static readonly ConnectionHealthLabels None = new([], new ConnectionHealthOptions());
 
-    // IBKR Flex writes its positions under the OAuth feed's provider, so its health belongs to the same institution.
-    private static readonly Dictionary<string, string> InstitutionOf = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["ibkr-flex"] = "ibkr",
-    };
-
     private readonly ConnectionHealthOptions _options;
     private readonly Dictionary<Guid, ConnectionHealthEntry> _connections;
     private readonly Dictionary<Guid, ConnectionHealthEntry> _accounts;
@@ -79,7 +73,7 @@ internal sealed class ConnectionHealthLabels
     public string? ForInstitution(string provider)
     {
         var states = _connections.Values
-            .Where(e => string.Equals(InstitutionOf.GetValueOrDefault(e.Provider, e.Provider), provider, StringComparison.OrdinalIgnoreCase))
+            .Where(e => string.Equals(ConnectionHealthSurface.InstitutionOf(e.Provider), provider, StringComparison.OrdinalIgnoreCase))
             .Select(e => e.Health.State)
             .ToList();
 

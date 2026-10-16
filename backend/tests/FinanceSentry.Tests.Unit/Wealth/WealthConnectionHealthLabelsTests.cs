@@ -89,7 +89,6 @@ public class WealthConnectionHealthLabelsTests
     }
 
     [Theory]
-    [InlineData(ConnectionHealthState.Degraded, "retrying")]
     [InlineData(ConnectionHealthState.Failing, "retrying")]
     [InlineData(ConnectionHealthState.ActionRequired, "reconnect_needed")]
     [InlineData(ConnectionHealthState.Dormant, "dormant")]
@@ -104,6 +103,35 @@ public class WealthConnectionHealthLabelsTests
 
         Institution(summary, "monobank").SyncStatus.Should().Be(label);
         Institution(summary, "monobank").Accounts.Should().OnlyContain(a => a.SyncStatus == label);
+    }
+
+    [Fact]
+    public async Task A_Degraded_connection_is_silent_and_reads_as_a_Healthy_one_does()
+    {
+        var account = Guid.NewGuid();
+
+        var summary = await SummaryAsync(
+            [Monobank(account, "failed")],
+            [Connection("monobank", ConnectionHealthState.Degraded, Token), Account(account, ConnectionHealthState.Degraded)],
+            HealthOptions.With("monobank"));
+
+        Institution(summary, "monobank").SyncStatus.Should().Be("synced");
+        Institution(summary, "monobank").Accounts.Single().SyncStatus.Should().Be("synced");
+        summary.Headline!.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.StaleSource && r.Source == "monobank");
+    }
+
+    [Fact]
+    public async Task A_Failing_member_still_wins_over_a_Degraded_one()
+    {
+        BrokerageHoldingSummary[] holdings = [new("AAPL", "STK", 1m, 100m, DateTime.UtcNow, "ibkr")];
+
+        var summary = await SummaryAsync(
+            [],
+            [Connection("ibkr", ConnectionHealthState.Degraded), Connection("ibkr-flex", ConnectionHealthState.Failing)],
+            HealthOptions.With("ibkr", "ibkr-flex"),
+            brokerage: holdings);
+
+        Institution(summary, "ibkr").SyncStatus.Should().Be("retrying");
     }
 
     [Fact]

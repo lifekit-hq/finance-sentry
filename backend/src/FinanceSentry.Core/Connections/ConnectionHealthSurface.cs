@@ -6,10 +6,11 @@ namespace FinanceSentry.Core.Connections;
 /// <see cref="ConnectionHealthOptions.ActiveProviders"/> is shown its health; a shadow provider keeps whatever its own
 /// path shows (<see cref="StatusFor(string, ConnectionHealthState?, ConnectionHealthOptions)"/> answers null).
 /// <list type="bullet">
-/// <item>Degraded and Failing read <see cref="Retrying"/>: the policy keeps trying and there is nothing to do.</item>
+/// <item>Failing reads <see cref="Retrying"/>: the policy keeps trying and there is nothing to do.</item>
 /// <item>ActionRequired reads <see cref="ReconnectNeeded"/>: only the person can fix it.</item>
 /// <item>Dormant reads <see cref="Dormant"/>: failing for long enough that the account may be closed.</item>
-/// <item>Healthy has no label of its own: the path's freshness ("synced", "stale") still says how current it is.</item>
+/// <item>Healthy and Degraded have no label of their own: Degraded is not yet long enough to tell the person, and the
+/// path's freshness ("synced", "stale") still says how current the data is.</item>
 /// </list>
 /// </summary>
 public static class ConnectionHealthSurface
@@ -20,10 +21,10 @@ public static class ConnectionHealthSurface
 
     public const string Dormant = "dormant";
 
-    /// <summary>The label of <paramref name="state"/>, or null for Healthy.</summary>
+    /// <summary>The label of <paramref name="state"/>, or null for Healthy and Degraded.</summary>
     public static string? StatusFor(ConnectionHealthState state) => state switch
     {
-        ConnectionHealthState.Degraded or ConnectionHealthState.Failing => Retrying,
+        ConnectionHealthState.Failing => Retrying,
         ConnectionHealthState.ActionRequired => ReconnectNeeded,
         ConnectionHealthState.Dormant => Dormant,
         _ => null,
@@ -72,6 +73,15 @@ public static class ConnectionHealthSurface
 
         return !any ? null : allDormant ? ConnectionHealthState.Dormant : worst;
     }
+
+    // IBKR Flex writes its positions under the OAuth feed's provider, so its health belongs to the same institution.
+    private static readonly Dictionary<string, string> Institutions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["ibkr-flex"] = "ibkr",
+    };
+
+    /// <summary>The institution <paramref name="provider"/>'s health is shown under (<c>ibkr-flex</c> under <c>ibkr</c>).</summary>
+    public static string InstitutionOf(string provider) => Institutions.GetValueOrDefault(provider, provider);
 
     private static int Urgency(ConnectionHealthState state) => state switch
     {

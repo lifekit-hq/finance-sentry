@@ -85,6 +85,15 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<StoredAccountHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(ba => ba.UserId == userId)
+            .Select(ba => new StoredAccountHealthRow(
+                ba.Id, ba.Provider, ba.Health, ba.MonobankCredentialId ?? ba.TrueLayerConnectionId))
+            .ToListAsync(cancellationToken);
+
     public async Task<BankAccount> UpdateAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
         account.ValidateInvariants();

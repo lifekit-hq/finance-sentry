@@ -825,7 +825,7 @@ accounts; IBKR and Flex credentials; exchange credentials), and labels it with o
 | State | Label (Accounts page, MCP `health`) | In-app | Companion | MCP `get_sync_health` status |
 |---|---|---|---|---|
 | Healthy | none (the path's own "synced" / "stale") | nothing | nothing | `ok` |
-| Degraded | Retrying, quietly (muted text, warning dot) | nothing else | nothing | `ok` |
+| Degraded | none (told only once Failing) | nothing | nothing | `ok`, health `healthy` |
 | Failing | Retrying, quietly | the `SyncFailure` alert (S2/S3) | digest; escalates once open > 24 h (existing reconciler) | `error` |
 | ActionRequired | Reconnect needed (error colour, attention row) | the reconnect alert, linking `/accounts/list?reconnect=<provider>` | relayed at once in every mode, Quiet included | `error`, "Reconnection required." |
 | Dormant | Dormant, quietly (neutral dot) on the account or connection | one info notice, "… may be closed" | one digest line | `error` |

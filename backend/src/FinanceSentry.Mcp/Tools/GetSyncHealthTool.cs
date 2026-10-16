@@ -68,7 +68,7 @@ public sealed class GetSyncHealthTool(
         Guid userId, IReadOnlyList<SyncHealthEntry> entries, CancellationToken ct)
     {
         var options = healthOptions.CurrentValue;
-        if (!entries.Any(e => options.IsActive(e.Provider)))
+        if (!options.ActiveProviders.Any(p => entries.Any(e => IsInstitution(e.Provider, p))))
             return entries;
 
         List<ConnectionHealthEntry> rows;
@@ -84,16 +84,18 @@ public sealed class GetSyncHealthTool(
             return entries;
         }
 
-        return [.. entries.Select(e => options.IsActive(e.Provider) && ProviderState(rows, e.Provider) is { } state
-            ? FromHealth(e, state)
-            : e)];
+        var active = rows.Where(r => options.IsActive(r.Provider)).ToList();
+        return [.. entries.Select(e => ProviderState(active, e.Provider) is { } state ? FromHealth(e, state) : e)];
     }
 
-    // The provider's state as its Accounts row shows it: each account reads its connection's state while that is not
-    // Healthy, and one Dormant account stays quiet beside working siblings.
+    private static bool IsInstitution(string entryProvider, string rowProvider) =>
+        string.Equals(ConnectionHealthSurface.InstitutionOf(rowProvider), entryProvider, StringComparison.OrdinalIgnoreCase);
+
+    // The provider's state as its Accounts row shows it, from the rows of the listed providers: each account reads its
+    // connection's state while that is not Healthy, and one Dormant account stays quiet beside working siblings.
     private static ConnectionHealthState? ProviderState(IReadOnlyList<ConnectionHealthEntry> rows, string provider)
     {
-        var mine = rows.Where(r => string.Equals(r.Provider, provider, StringComparison.OrdinalIgnoreCase)).ToList();
+        var mine = rows.Where(r => IsInstitution(provider, r.Provider)).ToList();
         var connections = mine.Where(r => !r.IsAccount).ToDictionary(r => r.Id, r => r.Health.State);
         var accounts = mine.Where(r => r.IsAccount).Select(r => ConnectionHealthSurface.Effective(
             r.ConnectionId is { } id && connections.TryGetValue(id, out var shared) ? shared : null, r.Health.State));

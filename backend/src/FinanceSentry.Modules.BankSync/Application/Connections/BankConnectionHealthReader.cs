@@ -17,7 +17,7 @@ public sealed class BankConnectionHealthReader(
     {
         var monobank = await monobankCredentials.GetHealthByUserUnscopedAsync(userId, ct);
         var trueLayer = await trueLayerConnections.GetHealthByUserUnscopedAsync(userId, ct);
-        var owned = await accounts.GetByUserIdUnscopedAsync(userId, ct);
+        var owned = await accounts.GetHealthByUserUnscopedAsync(userId, ct);
 
         return
         [
@@ -26,8 +26,7 @@ public sealed class BankConnectionHealthReader(
             .. trueLayer.Select(c => new ConnectionHealthEntry(
                 TrueLayerFailureClassifier.ProviderName, nameof(TrueLayerConnection), c.Id, c.Health)),
             .. owned.Select(a => new ConnectionHealthEntry(
-                a.Provider, nameof(BankAccount), a.Id, a.Health, IsAccount: true,
-                ConnectionId: a.MonobankCredentialId ?? a.TrueLayerConnectionId)),
+                a.Provider, nameof(BankAccount), a.Id, a.Health, IsAccount: true, ConnectionId: a.ConnectionId)),
         ];
     }
 }
