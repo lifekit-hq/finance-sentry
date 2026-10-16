@@ -267,6 +267,12 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                         .IsRequired()
                         .HasColumnType("bytea");
 
+                    b.Property<DateTime>("FirstLinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FlowsWalkLane")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("FlowsWalkedTo")
                         .HasColumnType("timestamp with time zone");
 

@@ -27,12 +27,19 @@ public sealed class ExchangeCredential : IUserOwned
     public string? LastSyncError { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>When this user first linked the venue. Set once; <see cref="Reconnect"/> re-stamps <see cref="CreatedAt"/> but never this.</summary>
+    public DateTime FirstLinkedAt { get; private set; }
+
     /// <summary>
-    /// How far the venue's money movements (<see cref="CryptoFlowEvent"/>) have been read; null until the first walk
-    /// succeeds, which starts at <see cref="CreatedAt"/>. Non-null also says the venue's flows are known from the link
-    /// day on.
+    /// How far the venue's money movements (<see cref="CryptoFlowEvent"/>) have been read, from
+    /// <see cref="FirstLinkedAt"/> on; null until the first walk succeeds. A run can read only part of the gap, or be
+    /// held back by a pending movement, so this alone does not say the flows are known: they are once it is close
+    /// behind now.
     /// </summary>
     public DateTime? FlowsWalkedTo { get; private set; }
+
+    /// <summary>Which of the venue's movement sources the next walk reads, for a venue that reads one source per run.</summary>
+    public int FlowsWalkLane { get; private set; }
 
     private ExchangeCredential() { }
 
@@ -49,6 +56,7 @@ public sealed class ExchangeCredential : IUserOwned
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
 
+        var now = DateTime.UtcNow;
         return new ExchangeCredential
         {
             Id = Guid.NewGuid(),
@@ -62,7 +70,8 @@ public sealed class ExchangeCredential : IUserOwned
             ApiSecretAuthTag = apiSecretAuthTag,
             KeyVersion = keyVersion,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = now,
+            FirstLinkedAt = now,
         };
     }
 
@@ -72,9 +81,10 @@ public sealed class ExchangeCredential : IUserOwned
         LastSyncError = null;
     }
 
-    public void MarkFlowsWalked(DateTime walkedTo)
+    public void MarkFlowsWalked(DateTime walkedTo, int nextLane = 0)
     {
         FlowsWalkedTo = walkedTo;
+        FlowsWalkLane = nextLane;
     }
 
     private const int MaxSyncErrorLength = 1000;
@@ -106,6 +116,7 @@ public sealed class ExchangeCredential : IUserOwned
         LastSyncAt = null;
         LastSyncError = null;
         FlowsWalkedTo = null;
+        FlowsWalkLane = 0;
         CreatedAt = DateTime.UtcNow;
         Health = Health with { LastFailureAt = null };
     }

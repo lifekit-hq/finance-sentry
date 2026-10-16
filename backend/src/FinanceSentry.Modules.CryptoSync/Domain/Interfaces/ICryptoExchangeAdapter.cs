@@ -51,7 +51,10 @@ public interface ICryptoExchangeAdapter
     /// <see cref="CryptoFlowWalk.From"/> to <see cref="CryptoFlowWalk.AsOf"/>, raw: the adapter never decides
     /// whether a movement is external or internal. <see cref="CryptoFlowPage.WalkedTo"/> is where the next walk
     /// resumes: before the earliest movement still pending, so it is read again once it settles, and before
-    /// <see cref="CryptoFlowWalk.AsOf"/> when one run walks only part of the gap. Any call failing throws.
+    /// <see cref="CryptoFlowWalk.AsOf"/> when one run walks only part of the gap. A venue that reads one source per run
+    /// (Binance) takes <see cref="CryptoFlowWalk.Lane"/> and returns the lane to read next in
+    /// <see cref="CryptoFlowPage.NextLane"/>, moving <see cref="CryptoFlowPage.WalkedTo"/> only once every lane has
+    /// read the window. Any call failing throws.
     /// </summary>
     Task<CryptoFlowPage> GetFlowsAsync(
         string apiKey,
@@ -97,9 +100,9 @@ public sealed record CryptoTrade(
     bool IsBuyer,
     DateTime Timestamp);
 
-public sealed record CryptoFlowWalk(DateTime From, DateTime AsOf);
+public sealed record CryptoFlowWalk(DateTime From, DateTime AsOf, int Lane = 0);
 
-public sealed record CryptoFlowPage(IReadOnlyList<CryptoFlow> Flows, DateTime WalkedTo);
+public sealed record CryptoFlowPage(IReadOnlyList<CryptoFlow> Flows, DateTime WalkedTo, int NextLane = 0);
 
 /// <summary>One completed movement as the venue reported it. See <c>CryptoFlowEvent</c>.</summary>
 /// <param name="ProviderType">A <c>CryptoFlowTypes</c> value.</param>

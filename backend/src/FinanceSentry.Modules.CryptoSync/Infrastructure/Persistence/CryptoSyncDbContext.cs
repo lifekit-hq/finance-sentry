@@ -33,6 +33,8 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
             entity.Property(e => e.KeyVersion).IsRequired();
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.FirstLinkedAt).IsRequired();
+            entity.Property(e => e.FlowsWalkLane).IsRequired();
             entity.Property(e => e.LastSyncError).HasMaxLength(1000);
             entity.HasConnectionHealth(e => e.Health);
         });

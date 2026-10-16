@@ -28,9 +28,12 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         "USDT", "USDC", "BUSD", "FDUSD", "DAI",
     };
 
-    // fiat/orders weighs UID 90000 per call against a 180000-per-minute UID budget, so a run reads one window of
-    // deposits and one of withdrawals; a walk further behind catches up over the next runs.
-    private const long FlowWindowMs = 30L * 24 * 60 * 60 * 1000;
+    // fiat/orders weighs UID 90000 per call against a 180000-per-minute UID budget (Binance's request-weight docs);
+    // the weight of fiat/payments is unverified. A run therefore spends one fiat call, rotating through four lanes
+    // (orders in, payments in, orders out, payments out) over one day-long window that the cursor leaves only after
+    // every lane has read it; a walk further behind catches up over the next runs.
+    private const long FlowWindowMs = 24L * 60 * 60 * 1000;
+    private const int FlowLanes = 4;
     private const int FlowPageRows = 500;
     private const int MaxFlowPages = 20;
     private const int FiatIn = 0;
@@ -182,11 +185,13 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     }
 
     /// <summary>
-    /// The completed fiat legs created in one window from <see cref="CryptoFlowWalk.From"/>: deposits and withdrawals
-    /// (<c>fiat/orders</c>) and crypto bought or sold for fiat (<c>fiat/payments</c>), each with its fee. A deposit is
-    /// the amount the bank or card paid (<c>indicatedAmount</c>), a withdrawal the amount paid out after the fee
-    /// (<c>amount</c>), a buy or sell its fiat side (<c>sourceAmount</c>); the method is the counterparty. Unlike the
-    /// holdings sources there is no fallback: a refused call throws, so the walk resumes from the same point.
+    /// One lane's completed fiat legs created in a day-long window from <see cref="CryptoFlowWalk.From"/>: deposits and
+    /// withdrawals (<c>fiat/orders</c>) or crypto bought or sold for fiat (<c>fiat/payments</c>), each with its fee. A
+    /// deposit is the amount the bank or card paid (<c>indicatedAmount</c>), a withdrawal the amount paid out after the
+    /// fee (<c>amount</c>), a buy or sell its fiat side (<c>sourceAmount</c>); the method is the counterparty. Unlike
+    /// the holdings sources there is no fallback: a refused call throws, so the walk resumes from the same point.
+    /// The cursor moves a window on only after the last lane has read it; a pending leg in any lane restarts the
+    /// lanes on the same window, so it is read again once it settles.
     /// </summary>
     // shortcut: on-chain, P2P and Pay legs are not read, so Binance's flows stay unknown to the reader; S2b reads them.
     public async Task<CryptoFlowPage> GetFlowsAsync(
@@ -196,35 +201,38 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         CancellationToken ct = default)
     {
         var beginMs = ToUnixMs(walk.From);
-        var endMs = Math.Min(beginMs + FlowWindowMs - 1, ToUnixMs(walk.AsOf));
-        if (beginMs > endMs)
+        var endMs = beginMs + FlowWindowMs - 1;
+        if (endMs > ToUnixMs(walk.AsOf))
         {
-            return new CryptoFlowPage([], walk.From.AddMilliseconds(-1));
+            return new CryptoFlowPage([], walk.From.AddMilliseconds(-1), walk.Lane);
         }
 
+        var type = walk.Lane < FlowLanes / 2 ? FiatIn : FiatOut;
         var flows = new List<CryptoFlow>();
-        var holdBelowMs = long.MaxValue;
+        var held = false;
         var holdSinceMs = ToUnixMs(walk.AsOf - MaxPendingHold);
 
-        foreach (var type in new[] { FiatIn, FiatOut })
+        if (walk.Lane % 2 == 0)
         {
             var orders = await ReadFiatPagesAsync(
                 (page, c) => _httpClient.GetFiatOrdersAsync(apiKey, apiSecret, type, beginMs, endMs, page, FlowPageRows, c), ct);
             foreach (var order in orders)
             {
-                holdBelowMs = Hold(holdBelowMs, holdSinceMs, order.Status, order.CreateTimeMs);
+                held |= IsHeld(holdSinceMs, order.Status, order.CreateTimeMs);
                 if (IsCompleted(order.Status)
                     && FiatOrderFlow(order, type) is { } flow)
                 {
                     flows.Add(flow);
                 }
             }
-
+        }
+        else
+        {
             var payments = await ReadFiatPagesAsync(
                 (page, c) => _httpClient.GetFiatPaymentsAsync(apiKey, apiSecret, type, beginMs, endMs, page, FlowPageRows, c), ct);
             foreach (var payment in payments)
             {
-                holdBelowMs = Hold(holdBelowMs, holdSinceMs, payment.Status, payment.CreateTimeMs);
+                held |= IsHeld(holdSinceMs, payment.Status, payment.CreateTimeMs);
                 if (IsCompleted(payment.Status)
                     && FiatPaymentFlow(payment, type) is { } flow)
                 {
@@ -233,10 +241,16 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             }
         }
 
-        var resumeMs = Math.Max(Math.Min(endMs, holdBelowMs - 1), beginMs - 1);
-        return new CryptoFlowPage(
-            [.. flows.OrderBy(f => f.OccurredAt).ThenBy(f => f.EventId, StringComparer.Ordinal)],
-            DateTimeOffset.FromUnixTimeMilliseconds(resumeMs).UtcDateTime);
+        var ordered = flows.OrderBy(f => f.OccurredAt).ThenBy(f => f.EventId, StringComparer.Ordinal).ToList();
+        var stayAt = walk.From.AddMilliseconds(-1);
+        if (held)
+        {
+            return new CryptoFlowPage(ordered, stayAt);
+        }
+
+        return walk.Lane == FlowLanes - 1
+            ? new CryptoFlowPage(ordered, DateTimeOffset.FromUnixTimeMilliseconds(endMs).UtcDateTime)
+            : new CryptoFlowPage(ordered, stayAt, walk.Lane + 1);
     }
 
     private static async Task<IReadOnlyList<T>> ReadFiatPagesAsync<T>(
@@ -268,12 +282,10 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
     private static bool IsCompleted(string? status) => status is not null && CompletedFiatStatuses.Contains(status.Trim());
 
-    // A pending leg holds the walk just before it, so it is read again once it settles; one pending longer than
+    // A pending leg holds the walk on its window, so it is read again once it settles; one pending longer than
     // MaxPendingHold no longer does, so a stuck row cannot pin the walk.
-    private static long Hold(long holdBelowMs, long holdSinceMs, string? status, long createTimeMs) =>
-        status is not null && PendingFiatStatuses.Contains(status.Trim()) && createTimeMs >= holdSinceMs
-            ? Math.Min(holdBelowMs, createTimeMs)
-            : holdBelowMs;
+    private static bool IsHeld(long holdSinceMs, string? status, long createTimeMs) =>
+        status is not null && PendingFiatStatuses.Contains(status.Trim()) && createTimeMs >= holdSinceMs;
 
     private CryptoFlow? FiatOrderFlow(BinanceFiatOrder order, int type)
     {

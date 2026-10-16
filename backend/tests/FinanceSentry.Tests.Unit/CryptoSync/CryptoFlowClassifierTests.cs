@@ -48,17 +48,4 @@ public class CryptoFlowClassifierTests
     {
         CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, "airdrop", 10m, "EUR", null)).Should().BeEmpty();
     }
-
-    [Theory]
-    [InlineData(CryptoExchangeProvider.RevolutX, "revolut", true)]
-    [InlineData(CryptoExchangeProvider.RevolutX, "external_crypto_wallet", false)]
-    [InlineData(CryptoExchangeProvider.RevolutX, "external_bank_account", false)]
-    [InlineData(CryptoExchangeProvider.RevolutX, "something_new", null)]
-    [InlineData(CryptoExchangeProvider.RevolutX, null, null)]
-    [InlineData(CryptoExchangeProvider.Binance, "BankAccount", null)]
-    public void TheOwnersOwnAccount_IsKnownOnlyWhereTheVenueSaysSo(string provider, string? counterparty, bool? expected)
-    {
-        CryptoFlowClassifier.IsOwnersOwnAccount(Flow(provider, CryptoFlowTypes.Receive, 1m, "EUR", counterparty))
-            .Should().Be(expected);
-    }
 }

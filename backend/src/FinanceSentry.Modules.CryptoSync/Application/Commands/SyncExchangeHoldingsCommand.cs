@@ -160,11 +160,11 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             return;
         }
 
-        var from = credential.FlowsWalkedTo?.AddMilliseconds(1) ?? credential.CreatedAt;
+        var from = credential.FlowsWalkedTo?.AddMilliseconds(1) ?? credential.FirstLinkedAt;
         CryptoFlowPage page;
         try
         {
-            page = await adapter.GetFlowsAsync(apiKey, apiSecret, new CryptoFlowWalk(from, asOf), ct);
+            page = await adapter.GetFlowsAsync(apiKey, apiSecret, new CryptoFlowWalk(from, asOf, credential.FlowsWalkLane), ct);
         }
         catch (CryptoExchangeException ex)
         {
@@ -176,7 +176,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
 
         await flowRepository.AddNewUnscopedAsync(
             credential.UserId, credential.Provider, page.Flows, timeProvider.GetUtcNow().UtcDateTime, ct);
-        credential.MarkFlowsWalked(page.WalkedTo);
+        credential.MarkFlowsWalked(page.WalkedTo, page.NextLane);
         credentialRepository.Update(credential);
         await credentialRepository.SaveChangesAsync(ct);
     }

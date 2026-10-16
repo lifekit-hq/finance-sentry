@@ -985,28 +985,32 @@ are closed periods.
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).
   - **Flows.** The venues' money movements are walked during the holdings sync (at most hourly, from a cursor
-    on the exchange credential that starts at the link day; a pending movement holds the cursor so it is read
-    again once settled; a refused walk leaves the cursor and the holdings sync succeeds) and stored raw as
+    on the exchange credential that starts at the first link day, `FirstLinkedAt`, which a reconnect never moves; a pending
+    movement holds the cursor so it is read again once settled; a refused walk leaves the cursor and the holdings
+    sync succeeds). A run can read only part of the gap (Revolut X reads at most twelve 30-day windows, Binance one
+    source of one 30-day window per run), so a venue's flows count as known only once the cursor is within two
+    days of now and stored raw as
     `CryptoFlowEvents`, insert-only and unique per venue event. Binance: completed fiat deposits and
     withdrawals (`fiat/orders`, a deposit at its indicated amount, a withdrawal at what left) and card buys and
-    sells (`fiat/payments`, at the fiat source amount), each with its fee. Revolut X: completed `receive` and
+    sells (`fiat/payments`, at the fiat source amount), each with its fee. A run makes one such call, rotating
+    through the four (orders in, payments in, orders out, payments out) over one day-long window; the cursor
+    moves a day only after all four have read it. The `fiat/payments` request weight is unverified. Revolut X: completed `receive` and
     `send` transfers (`/transactions`), with the other side's account type kept (`revolut` = the owner's own
     Revolut app, `external_*` = outside).
   - **Classification** (`CryptoFlowClassifier`, at read time): fiat in, a card buy and a transfer in are
     external inflows; fiat out, a sell for fiat and a transfer out are external outflows; the fee is a fee
     (return). A buy paid from Binance's own fiat balance (`Cash Balance`) moves nothing across the sleeve's
     edge, so only its fee counts. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
-    EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. Whether the other side is the
-    owner's own account (`IsOwnersOwnAccount`) is recorded for an umbrella scope that also holds the bank
-    account; the sleeve itself reads both as external.
+    EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. The other side's account type is kept raw
+    (`CounterpartyRef`); the sleeve reads both `revolut` and `external_*` as external.
   - **Valuation.** A fiat movement converts at its own date's rate, as brokerage cash does. A crypto transfer
     is valued at the venue price taken when it was read: exact when read on its own day, `FX_TODAY_RATE`
     otherwise (a catch-up walk over older transfers). A transfer the venue could not price leaves its venue's
     flows unknown.
   - **Withheld.** Binance's flows stay unknown (`sourcesWithoutFlows`, `UNKNOWN_FLOW binance`) until its
     on-chain deposits and withdrawals are read (S2b) - its fiat legs alone would read a crypto deposit as
-    growth - so the split is withheld for anyone with Binance linked. Revolut X counts once a walk has
-    succeeded.
+    growth - so the split is withheld for anyone with Binance linked. Revolut X counts once its walk has caught
+    up, and again unknown while the cursor is more than two days behind (a long catch-up, or a pending transfer).
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,

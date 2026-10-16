@@ -13,25 +13,29 @@ namespace FinanceSentry.Modules.CryptoSync.Application.Services;
 /// <see cref="ICryptoFlowReader"/> over the movements the venues reported (<see cref="CryptoFlowEvent"/>), classified
 /// for the crypto sleeve by <see cref="CryptoFlowClassifier"/>. A fiat leg is converted to USD at its own date's rate
 /// (rule 5); a crypto leg at the venue price taken when it was read, which is the date's own only when it was read
-/// that day. A venue's link day is its active connection's creation day; movements on or before it are history the
-/// linked value already holds.
+/// that day. A venue's link day is the day its credential was first linked, which a reconnect does not move;
+/// movements on or before it are history the linked value already holds. A venue's flows are known once its walk has
+/// caught up (<see cref="CaughtUpLag"/>).
 /// </summary>
-public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchangeRateService fx) : ICryptoFlowReader
+public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchangeRateService fx, TimeProvider timeProvider) : ICryptoFlowReader
 {
     private const string UsdCode = "USD";
+
+    /// <summary>How far behind now a venue's walk may be and still count as having read every movement.</summary>
+    public static readonly TimeSpan CaughtUpLag = TimeSpan.FromDays(2);
 
     public async Task<SleeveFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
     {
         var links = await db.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.UserId == userId && c.IsActive)
-            .Select(c => new { c.Provider, c.CreatedAt, c.FlowsWalkedTo })
+            .Select(c => new { c.Provider, c.FirstLinkedAt, c.FlowsWalkedTo })
             .ToListAsync(ct);
         if (links.Count == 0)
         {
             return SleeveFlowReading.Empty;
         }
 
-        var linkedOn = links.ToDictionary(l => l.Provider, l => DateOnly.FromDateTime(l.CreatedAt), StringComparer.Ordinal);
+        var linkedOn = links.ToDictionary(l => l.Provider, l => DateOnly.FromDateTime(l.FirstLinkedAt), StringComparer.Ordinal);
         var rows = await db.CryptoFlowEvents.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(e => e.UserId == userId)
@@ -67,7 +71,8 @@ public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchange
             }
         }
 
-        // A venue's flows are known once a walk of them has succeeded and every one could be valued.
+        // A venue's flows are known once its walk has caught up and every one could be valued.
+        var caughtUpFrom = timeProvider.GetUtcNow().UtcDateTime - CaughtUpLag;
         // shortcut: Binance stays unknown until its on-chain, P2P and Pay legs are read (S2b): its fiat legs alone
         // would read a crypto deposit as growth.
         var sources = links
@@ -76,7 +81,7 @@ public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchange
                 g.Key,
                 linkedOn[g.Key],
                 g.Key != CryptoExchangeProvider.Binance
-                    && g.All(l => l.FlowsWalkedTo is not null)
+                    && g.All(l => l.FlowsWalkedTo >= caughtUpFrom)
                     && !unpriced.Contains(g.Key)))
             .OrderBy(s => s.Source, StringComparer.Ordinal)
             .ToList();

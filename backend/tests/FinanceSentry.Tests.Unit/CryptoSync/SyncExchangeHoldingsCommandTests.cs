@@ -184,7 +184,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
 
         await SyncAsync(CryptoExchangeProvider.RevolutX);
 
-        seen.Should().Be(new CryptoFlowWalk(credential.CreatedAt, Now.UtcDateTime));
+        seen.Should().Be(new CryptoFlowWalk(credential.FirstLinkedAt, Now.UtcDateTime));
         credential.FlowsWalkedTo.Should().Be(walkedTo);
         var row = (await _db.CryptoFlowEvents.AsNoTracking().ToListAsync()).Should().ContainSingle().Subject;
         (row.UserId, row.Provider, row.EventId, row.ProviderType, row.Amount, row.Unit, row.CounterpartyRef)
@@ -221,8 +221,48 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         await SyncAsync(CryptoExchangeProvider.RevolutX);
         await SyncAsync(CryptoExchangeProvider.RevolutX);
 
-        walks.Select(w => w.From).Should().Equal(credential.CreatedAt, walkedTo.AddMilliseconds(1));
+        walks.Select(w => w.From).Should().Equal(credential.FirstLinkedAt, walkedTo.AddMilliseconds(1));
         (await _db.CryptoFlowEvents.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task FlowWalk_HandsTheVenuesLaneBack_OnTheNextRun()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance);
+        var walkedTo = Now.UtcDateTime.AddHours(-2);
+        var walks = new List<CryptoFlowWalk>();
+        _binance
+            .Setup(a => a.GetFlowsAsync("api-key", "api-secret", It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) => walks.Add(walk))
+            .ReturnsAsync(new CryptoFlowPage([], walkedTo, NextLane: 2));
+
+        await SyncAsync(CryptoExchangeProvider.Binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        walks.Select(w => w.Lane).Should().Equal(0, 2);
+    }
+
+    [Fact]
+    public async Task FlowWalk_AfterAReconnect_RestartsFromTheFirstLinkDay()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX);
+        var firstLinkedAt = credential.FirstLinkedAt;
+        var walks = new List<CryptoFlowWalk>();
+        _revolutX
+            .Setup(a => a.GetFlowsAsync("api-key", "api-secret", It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) => walks.Add(walk))
+            .ReturnsAsync(new CryptoFlowPage([], Now.UtcDateTime.AddHours(-2)));
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        credential.Deactivate();
+        credential.Reconnect([1], [0], [0], [2], [0], [0], 1);
+        await _db.SaveChangesAsync();
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        credential.FirstLinkedAt.Should().Be(firstLinkedAt);
+        walks.Select(w => w.From).Should().Equal(firstLinkedAt, firstLinkedAt);
     }
 
     [Fact]

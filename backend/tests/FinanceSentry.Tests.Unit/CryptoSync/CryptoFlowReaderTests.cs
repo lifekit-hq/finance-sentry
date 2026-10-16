@@ -9,6 +9,7 @@ using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Xunit;
 
@@ -36,7 +37,7 @@ public class CryptoFlowReaderTests
     private static ExchangeCredential Link(string provider, bool walked = true, Guid? userId = null)
     {
         var credential = ExchangeCredential.Create(userId ?? UserId, provider, [1], [1], [1], [1], [1], [1], 1);
-        typeof(ExchangeCredential).GetProperty(nameof(ExchangeCredential.CreatedAt))!.SetValue(credential, Linked);
+        typeof(ExchangeCredential).GetProperty(nameof(ExchangeCredential.FirstLinkedAt))!.SetValue(credential, Linked);
         if (walked)
         {
             credential.MarkFlowsWalked(Apr9);
@@ -53,7 +54,9 @@ public class CryptoFlowReaderTests
                 counterparty, "completed"),
             recordedAt ?? at);
 
-    private CryptoFlowReader Sut(CryptoSyncDbContext db) => new(db, _fx.Object);
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(Apr9.AddDays(1)));
+
+    private CryptoFlowReader Sut(CryptoSyncDbContext db) => new(db, _fx.Object, _time);
 
     [Fact]
     public async Task WithNoLinkedVenue_IsEmpty()
@@ -157,5 +160,39 @@ public class CryptoFlowReaderTests
         var reading = await Sut(db).ReadAsync(UserId, DateOnly.FromDateTime(Apr9.AddDays(-1)));
 
         reading.Flows.Should().ContainSingle().Which.Flow.AmountUsd.Should().Be(550.00m);
+    }
+
+    [Fact]
+    public async Task AWalkMoreThanTheLagBehindNow_LeavesTheVenuesFlowsUnknown_AndOneWithinItDoesNot()
+    {
+        await using var db = NewDb();
+        db.ExchangeCredentials.Add(Link(CryptoExchangeProvider.RevolutX));
+        await db.SaveChangesAsync();
+
+        _time.SetUtcNow(new DateTimeOffset(Apr9) + CryptoFlowReader.CaughtUpLag - TimeSpan.FromMinutes(1));
+        var caughtUp = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+        _time.SetUtcNow(new DateTimeOffset(Apr9) + CryptoFlowReader.CaughtUpLag + TimeSpan.FromMinutes(1));
+        var behind = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        caughtUp.Sources.Should().ContainSingle().Which.FlowsRecorded.Should().BeTrue();
+        behind.Sources.Should().ContainSingle().Which.FlowsRecorded.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AReconnect_DoesNotMoveTheLinkDay_SoADepositFromBeforeItStaysInScope()
+    {
+        await using var db = NewDb();
+        var credential = Link(CryptoExchangeProvider.RevolutX, walked: false);
+        credential.Deactivate();
+        credential.Reconnect([2], [2], [2], [2], [2], [2], 1);
+        credential.MarkFlowsWalked(Apr9);
+        db.ExchangeCredentials.Add(credential);
+        db.CryptoFlowEvents.Add(Event(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.Receive, Linked.AddDays(10), 100m, "USD", "revolut"));
+        await db.SaveChangesAsync();
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Should().ContainSingle().Which.Flow.AmountUsd.Should().Be(100m);
+        reading.Sources.Should().ContainSingle().Which.LinkedOn.Should().Be(DateOnly.FromDateTime(Linked));
     }
 }

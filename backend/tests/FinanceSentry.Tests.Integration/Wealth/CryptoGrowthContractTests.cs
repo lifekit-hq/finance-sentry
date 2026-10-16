@@ -54,7 +54,7 @@ public class CryptoGrowthContractTests(WealthApiFactory factory) : IClassFixture
         using var scope = _factory.Services.CreateScope();
         var crypto = scope.ServiceProvider.GetRequiredService<CryptoSyncDbContext>();
         var credential = ExchangeCredential.Create(_factory.TestUserId, CryptoExchangeProvider.RevolutX, [1], [1], [1], [1], [1], [1], 1);
-        typeof(ExchangeCredential).GetProperty(nameof(ExchangeCredential.CreatedAt))!
+        typeof(ExchangeCredential).GetProperty(nameof(ExchangeCredential.FirstLinkedAt))!
             .SetValue(credential, from.AddDays(-30).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
         credential.MarkFlowsWalked(DateTime.UtcNow);
         crypto.ExchangeCredentials.Add(credential);

@@ -15,11 +15,6 @@ public static class CryptoFlowClassifier
     /// <summary>Binance's <c>paymentMethod</c> for a buy paid from the venue's own fiat balance.</summary>
     public const string CashBalanceMethod = "Cash Balance";
 
-    /// <summary>Revolut X's account type for the owner's own Revolut app.</summary>
-    public const string RevolutAccount = "revolut";
-
-    private const string ExternalAccountPrefix = "external_";
-
     /// <summary>
     /// The movement's legs for the crypto sleeve, where every venue is in scope and anything outside the venues is
     /// not: fiat in, a card buy and a transfer in are external inflows, fiat out, a sell for fiat and a transfer out
@@ -52,26 +47,5 @@ public static class CryptoFlowClassifier
         }
 
         return legs;
-    }
-
-    /// <summary>
-    /// Whether the movement's other side is one of the owner's own accounts outside the venues, so a scope that also
-    /// holds that account reads it as internal. True: a Revolut X move from or to the owner's Revolut app. False: an
-    /// external bank account or wallet. Null when the venue does not say: Binance's fiat legs name only a method, so a
-    /// match against a linked bank leg has to decide.
-    /// </summary>
-    public static bool? IsOwnersOwnAccount(CryptoFlowEvent flow)
-    {
-        if (flow.Provider != CryptoExchangeProvider.RevolutX || string.IsNullOrEmpty(flow.CounterpartyRef))
-        {
-            return null;
-        }
-
-        if (flow.CounterpartyRef == RevolutAccount)
-        {
-            return true;
-        }
-
-        return flow.CounterpartyRef.StartsWith(ExternalAccountPrefix, StringComparison.Ordinal) ? false : null;
     }
 }
