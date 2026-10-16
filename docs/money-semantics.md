@@ -988,7 +988,7 @@ are closed periods.
     on the exchange credential that starts at the first link day, `FirstLinkedAt`, which a reconnect never moves; a pending
     movement holds the cursor so it is read again once settled; a refused walk leaves the cursor and the holdings
     sync succeeds). A run can read only part of the gap (Revolut X reads at most twelve 30-day windows, Binance one
-    source of one 30-day window per run), so a venue's flows count as known only once the cursor is within two
+    source of one day-long window per run), so a venue's flows count as known only once the cursor is within two
     days of now and stored raw as
     `CryptoFlowEvents`, insert-only and unique per venue event. Binance: completed fiat deposits and
     withdrawals (`fiat/orders`, a deposit at its indicated amount, a withdrawal at what left) and card buys and
