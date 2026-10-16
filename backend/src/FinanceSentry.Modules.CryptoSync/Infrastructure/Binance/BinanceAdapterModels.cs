@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
@@ -128,7 +129,7 @@ public sealed record BinanceFlexibleReward(
 
 // /sapi/v1/simple-earn/locked/history/rewardsRecord — one payout of a locked position.
 public sealed record BinanceLockedReward(
-    [property: JsonPropertyName("positionId")] string? PositionId,
+    [property: JsonPropertyName("positionId"), JsonConverter(typeof(BinanceStringOrNumberConverter))] string? PositionId,
     [property: JsonPropertyName("asset")] string? Asset,
     [property: JsonPropertyName("amount")] string? Amount,
     [property: JsonPropertyName("time")] long TimeMs);
@@ -155,3 +156,16 @@ public sealed record BinanceDribblet(
     [property: JsonPropertyName("operateTime")] long OperateTimeMs,
     [property: JsonPropertyName("totalTransferedAmount")] string? TransferedAmount,
     [property: JsonPropertyName("totalServiceChargeAmount")] string? ServiceChargeAmount);
+
+/// <summary>Reads a JSON string or number as its text, so an id Binance sends as a number keeps the digits a string id would carry.</summary>
+public sealed class BinanceStringOrNumberConverter : JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.Number => JsonElement.ParseValue(ref reader).GetRawText(),
+            _ => reader.GetString(),
+        };
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options) => writer.WriteStringValue(value);
+}
