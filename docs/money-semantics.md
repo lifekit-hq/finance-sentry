@@ -980,7 +980,7 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
+- **Crypto contributions vs growth** (S2a, S2b; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).

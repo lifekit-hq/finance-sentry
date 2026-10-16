@@ -40,7 +40,7 @@ rule or shape agreed but not implemented), **missing**.
 |---|---|---|
 | C6 | **Steam: whether and how to link.** | **Undecided.** Research comes first (report §5.5, the F1 list); no linking decision is made. The treatment in §5.5 below is the *valuation* rule for when it is decided, not a commitment to link. |
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
-| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers (G6). |
+| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues (G6). |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
 
 ---
@@ -234,7 +234,7 @@ bridge yet.
 | Id | Measure | The question it answers | Method | Standard | Test oracle | Today |
 |---|---|---|---|---|---|---|
 | M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the `book` headline of `get_book_performance`. Engine: `ValueChange`, not wired |
-| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetSleeveGrowthQuery`, flows from `BrokerageFlowReader`); the crypto sleeve's (flows from `CryptoFlowReader`: venue fiat legs and Revolut X transfers, S2a; withheld while Binance is linked, G6) |
+| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetSleeveGrowthQuery`, flows from `BrokerageFlowReader`); the crypto sleeve's (flows from `CryptoFlowReader`: venue fiat legs, Binance coin deposits and withdrawals and Revolut X transfers, S2a/S2b; withheld per venue while its walk is behind, G6) |
 | M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | Book vs SPY's `bookTwr` (brokerage sleeve, cash-inclusive, `BookPerformanceService`) |
 | M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | Modified Dietz on the brokerage sleeve's "Contributed vs growth"; XIRR (ported from ExcelFinancialFunctions) not wired |
 | M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
