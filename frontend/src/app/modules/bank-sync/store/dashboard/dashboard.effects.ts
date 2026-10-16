@@ -72,7 +72,10 @@ export function dashboardEffects(store: EffectsStore) {
 
     loadNetWorthHistory: rxMethod<HistoryRange>(
       pipe(
-        tap(() => store.setHistoryLoading(true)),
+        tap(() => {
+          store.setHistoryLoading(true);
+          store.setHistoryError(null);
+        }),
         switchMap(range =>
           bankSyncService.getNetWorthHistory(range).pipe(
             filter(() => isCurrentRange(store, range)),

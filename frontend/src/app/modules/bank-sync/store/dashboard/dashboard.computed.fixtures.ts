@@ -72,6 +72,7 @@ export function build(
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
     historyLoadedRange: signal<Nullable<HistoryRange>>(historyRange),
     isLoading: signal(false),
+    hasError: signal(false),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
     scrubIndex: signal<number | null>(scrubIndex),

@@ -46,6 +46,9 @@ import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashb
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
+// Hides the skeleton's moving sheen (its ::after), leaving the still block.
+const STATIC_PLACEHOLDER_CLASS = 'after:hidden';
+
 // Seven presets are more than lk-segmented holds, so they sit in a chip row keyed by the preset.
 const HISTORY_RANGES: ChipRowOption[] = [
   {label: '1W', value: '1w'},
@@ -143,7 +146,12 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 </a>
               </div>
               @if (store.isFirstLoad()) {
-                <cmn-skeleton class="block" height="1.875rem" width="50%" />
+                <cmn-skeleton
+                  [className]="dataPlaceholder()"
+                  class="block"
+                  height="1.875rem"
+                  width="50%"
+                />
               } @else {
                 <div class="flex items-center gap-cmn-2">
                   <p
@@ -162,7 +170,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
               <div class="h-4 leading-4" data-testid="net-worth-split-slot">
                 @if (store.isFirstLoad()) {
-                  <cmn-skeleton height="0.875rem" width="45%" />
+                  <cmn-skeleton [className]="dataPlaceholder()" height="0.875rem" width="45%" />
                 } @else if (store.bookSplitFormatted() || store.bookSplitUnavailable()) {
                   <div class="flex items-center gap-cmn-2">
                     <p
@@ -186,7 +194,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               -->
               <div class="h-5 leading-5" data-testid="net-worth-change-slot">
                 @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
-                  <cmn-skeleton height="1rem" width="40%" />
+                  <cmn-skeleton [className]="eitherPlaceholder()" height="1rem" width="40%" />
                 } @else if (store.netWorthChangeFormatted()) {
                   <div class="flex items-center gap-cmn-2">
                     <p
@@ -270,7 +278,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               -->
               <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
                 @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
-                  <cmn-skeleton height="0.875rem" width="55%" />
+                  <cmn-skeleton [className]="eitherPlaceholder()" height="0.875rem" width="55%" />
                 } @else if (store.hasProjection()) {
                   <p
                     [title]="store.projectionBasisLabel()"
@@ -285,11 +293,29 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 }
               </div>
               @if (store.historyErrorMessage()) {
-                <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
+                <div class="flex items-center gap-cmn-2" data-testid="net-worth-history-error">
+                  <cmn-alert variant="error" class="min-w-0 flex-1">{{
+                    store.historyErrorMessage()
+                  }}</cmn-alert>
+                  <cmn-button (clicked)="retryHistory()" variant="secondary" size="sm"
+                    >Retry</cmn-button
+                  >
+                </div>
+                @if (store.isHistoryFirstLoadFailed()) {
+                  <cmn-skeleton
+                    [className]="staticPlaceholder"
+                    height="19.8125rem"
+                    data-testid="net-worth-chart-skeleton"
+                  />
+                }
               } @else if (
                 store.isHistoryFirstLoad() || (!store.historyHasHistory() && store.isFirstLoad())
               ) {
-                <cmn-skeleton height="19.8125rem" data-testid="net-worth-chart-skeleton" />
+                <cmn-skeleton
+                  [className]="eitherPlaceholder()"
+                  height="19.8125rem"
+                  data-testid="net-worth-chart-skeleton"
+                />
               } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
@@ -352,7 +378,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                     >
                     @if (store.isFirstLoad()) {
                       <span class="block h-6 sm:h-[1.5625rem]">
-                        <cmn-skeleton height="100%" width="70%" />
+                        <cmn-skeleton [className]="dataPlaceholder()" height="100%" width="70%" />
                       </span>
                     } @else {
                       <span
@@ -367,7 +393,11 @@ const HISTORY_RANGES: ChipRowOption[] = [
           </div>
 
           @if (store.isFirstLoad()) {
-            <cmn-skeleton height="19.8125rem" data-testid="cash-flow-chart-skeleton" />
+            <cmn-skeleton
+              [className]="dataPlaceholder()"
+              height="19.8125rem"
+              data-testid="cash-flow-chart-skeleton"
+            />
           } @else if (store.hasCashFlow()) {
             <div>
               <cmn-bar-chart
@@ -381,8 +411,13 @@ const HISTORY_RANGES: ChipRowOption[] = [
 
           <div class="grid grid-cols-1 gap-cmn-4 lg:grid-cols-3">
             @if (store.isFirstLoad()) {
-              <cmn-skeleton height="12rem" data-testid="category-donut-skeleton" />
               <cmn-skeleton
+                [className]="dataPlaceholder()"
+                height="12rem"
+                data-testid="category-donut-skeleton"
+              />
+              <cmn-skeleton
+                [className]="dataPlaceholder()"
                 class="lg:col-span-2"
                 height="12rem"
                 data-testid="category-table-skeleton"
@@ -430,6 +465,17 @@ export class DashboardComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(DashboardStore);
+  public readonly staticPlaceholder = STATIC_PLACEHOLDER_CLASS;
+  // A failed range load leaves the sized placeholder in place but still: a sweep would promise
+  // figures that are not coming.
+  public readonly dataPlaceholder = computed(() =>
+    this.store.isFirstLoadFailed() ? STATIC_PLACEHOLDER_CLASS : ''
+  );
+  public readonly eitherPlaceholder = computed(() =>
+    this.store.isFirstLoadFailed() || this.store.isHistoryFirstLoadFailed()
+      ? STATIC_PLACEHOLDER_CLASS
+      : ''
+  );
   public readonly rangeOptions = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly accountsRoute = AppRoute.AccountsList;
@@ -504,6 +550,10 @@ export class DashboardComponent {
   public onRangeChange(event: Event): void {
     const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
     this.store.setHistoryRange(value as HistoryRange);
+  }
+
+  public retryHistory(): void {
+    this.store.loadNetWorthHistory(this.store.historyRange());
   }
 
   public retry(): void {

@@ -38,6 +38,7 @@ import {NetWorthSplitUtils} from '../../utils/net-worth-split.utils';
 
 interface StateSignals {
   isLoading: Signal<boolean>;
+  hasError: Signal<boolean>;
   data: Signal<Nullable<DashboardData>>;
   dataRange: Signal<Nullable<HistoryRange>>;
   historyRange: Signal<HistoryRange>;
@@ -487,6 +488,15 @@ export function dashboardComputed(store: StateSignals) {
     scrubbedTotal() === null ? (store.historyChangeHeadline() ?? null) : null
   );
 
+  const isFirstLoad = computed(() =>
+    store.data() === null ? store.isLoading() : store.dataRange() !== store.historyRange()
+  );
+  const isHistoryFirstLoad = computed(() =>
+    store.netWorthHistory().length === 0
+      ? store.historyLoading()
+      : store.historyLoadedRange() !== store.historyRange()
+  );
+
   return {
     baseCurrency,
     netWorthHeadline,
@@ -670,13 +680,13 @@ export function dashboardComputed(store: StateSignals) {
     // range. A same-range refresh or a revisit keeps the numbers on screen until the new ones land;
     // figures loaded for another range never sit under this range's label, so a range change shows
     // the skeletons until its own figures arrive.
-    isFirstLoad: computed(() =>
-      store.data() === null ? store.isLoading() : store.dataRange() !== store.historyRange()
-    ),
-    isHistoryFirstLoad: computed(() =>
-      store.netWorthHistory().length === 0
-        ? store.historyLoading()
-        : store.historyLoadedRange() !== store.historyRange()
+    isFirstLoad,
+    isHistoryFirstLoad,
+    // The placeholder is still owed (another range's figures never sit under this label) but the
+    // request has settled in failure, so it must not shimmer as if figures were on the way.
+    isFirstLoadFailed: computed(() => isFirstLoad() && !store.isLoading() && store.hasError()),
+    isHistoryFirstLoadFailed: computed(
+      () => isHistoryFirstLoad() && !store.historyLoading() && store.historyError() !== null
     ),
     historyErrorMessage: computed(() => store.historyError()),
   };
