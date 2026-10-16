@@ -56,6 +56,11 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         bab.Property(ba => ba.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("EUR");
         bab.Property(ba => ba.SyncStatus).IsRequired().HasMaxLength(50).HasDefaultValue("pending");
         bab.Property(ba => ba.IsActive).HasDefaultValue(true);
+        bab.Property(ba => ba.Iban).HasMaxLength(34);
+        bab.Property(ba => ba.MaskedPans).HasColumnType("text[]");
+        bab.Property(ba => ba.CardValidTo).HasMaxLength(10);
+        bab.Property(ba => ba.ClosedReason).HasMaxLength(50);
+        bab.Property(ba => ba.ClosedBy).HasMaxLength(64);
         bab.Property(ba => ba.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         bab.HasMany(ba => ba.Transactions).WithOne(t => t.Account).HasForeignKey(t => t.AccountId).OnDelete(DeleteBehavior.Cascade);
         bab.HasMany(ba => ba.SyncJobs).WithOne(sj => sj.Account).HasForeignKey(sj => sj.AccountId).OnDelete(DeleteBehavior.Cascade);

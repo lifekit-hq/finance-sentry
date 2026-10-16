@@ -70,6 +70,20 @@ public class MonobankClientInfoContractTests
     }
 
     [Fact]
+    public async Task GetClientInfo_KeepsIbanAndEveryMaskedPan()
+    {
+        var body = ClientInfoBody.Replace("[\"537541******1234\"]", "[\"537541******1234\", \"516875******9876\"]");
+        var handler = new MonobankStubHttpHandler().Enqueue(HttpStatusCode.OK, body);
+
+        var result = await handler.BuildClient().GetClientInfoAsync(Token);
+
+        result.Accounts[0].Iban.Should().Be("UA733220010000026201234567890");
+        result.Accounts[0].MaskedPans.Should().Equal("537541******1234", "516875******9876");
+        result.Accounts[0].MaskedPan.Should().Be("516875******9876", "the single-PAN field still carries the last PAN");
+        result.Accounts[1].MaskedPans.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetClientInfo_CardWithoutCreditLimit_KeepsProductTypeMapping()
     {
         var body = ClientInfoBody.Replace("\"creditLimit\": 500000", "\"creditLimit\": 0");

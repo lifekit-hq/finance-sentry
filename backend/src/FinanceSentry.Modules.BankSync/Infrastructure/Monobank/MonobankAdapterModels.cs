@@ -8,7 +8,9 @@ public record MonobankAccountInfo(
     int CurrencyCode,
     long Balance,
     long CreditLimit,
-    string? ProductType = null);
+    string? ProductType = null,
+    string? Iban = null,
+    string[]? MaskedPans = null);
 
 public record MonobankClientInfo(
     string ClientId,

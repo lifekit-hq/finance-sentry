@@ -26,7 +26,8 @@ public static class TrueLayerAccountFactory
             provider: "truelayer")
         {
             TrueLayerConnectionId = connection.Id,
-            CurrentBalance = currentBalance
+            CurrentBalance = currentBalance,
+            Iban = providerAccount.Iban
         };
 
     public static BankAccount CreateCardAccount(
@@ -46,6 +47,7 @@ public static class TrueLayerAccountFactory
             TrueLayerConnectionId = connection.Id,
             CurrentBalance = owed,
             CreditLimit = creditLimit,
-            ProductType = TrueLayerAdapter.CardProductType
+            ProductType = TrueLayerAdapter.CardProductType,
+            CardValidTo = providerCard.ValidTo
         };
 }

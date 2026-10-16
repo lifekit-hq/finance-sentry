@@ -18,7 +18,8 @@ public record TrueLayerAccountInfo(
     string ProviderName,
     string AccountType,
     string? Iban,
-    string AccountNumberLast4);
+    string AccountNumberLast4,
+    string? ValidTo = null);
 
 public record TrueLayerAccountBalance(
     decimal Current,

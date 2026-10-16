@@ -44,6 +44,21 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("CardValidTo")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClosedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ClosedReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -72,6 +87,10 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("Iban")
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -83,6 +102,9 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     b.Property<DateTime?>("LastTransactionSyncAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.PrimitiveCollection<string[]>("MaskedPans")
+                        .HasColumnType("text[]");
+
                     b.Property<Guid?>("MonobankCredentialId")
                         .HasColumnType("uuid");
 
@@ -90,6 +112,9 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<Guid?>("PredecessorAccountId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ProductType")
                         .HasColumnType("text");

@@ -31,7 +31,9 @@ public static class MonobankAccountFactory
             CurrentBalance = MonobankHttpClient.ToStoredBalance(providerAccount.Balance, providerAccount.CreditLimit),
             CreditLimit = providerAccount.CreditLimit > 0
                 ? MonobankHttpClient.KopecksToDecimal(providerAccount.CreditLimit) : null,
-            ProductType = providerAccount.ProductType
+            ProductType = providerAccount.ProductType,
+            Iban = providerAccount.Iban,
+            MaskedPans = providerAccount.MaskedPans
         };
     }
 }
