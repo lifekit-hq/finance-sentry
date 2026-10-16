@@ -36,6 +36,12 @@ public class BinanceFlowWalkTests
 
     public BinanceFlowWalkTests()
     {
+        _handler
+            .Respond("/sapi/v1/simple-earn/flexible/history/rewardsRecord", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/asset/assetDividend", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/asset/dribblet", """{"total":0,"userAssetDribblets":[]}""");
+
         foreach (var path in new[] { OrdersPath, PaymentsPath })
         {
             _handler.Respond(path, request =>
@@ -235,5 +241,18 @@ public class BinanceFlowWalkTests
 
         page.Flows.Should().BeEmpty();
         page.WalkedTo.Should().Be(WindowEnd);
+    }
+
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.TooManyRequests)]
+    [InlineData((System.Net.HttpStatusCode)418)]
+    [InlineData(System.Net.HttpStatusCode.BadRequest)]
+    public async Task AThrottledOrFailedEarnSource_Throws_SoTheWindowIsReadAgain(System.Net.HttpStatusCode status)
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", """{"code":-1003,"msg":"Too many requests."}""", status);
+
+        var act = () => WalkAsync(PaymentsOut);
+
+        await act.Should().ThrowAsync<BinanceException>();
     }
 }

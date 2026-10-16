@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
@@ -290,7 +291,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     /// <summary>
     /// What the venue paid or converted in a window: Simple Earn rewards (flexible, locked) and distributions or
     /// airdrops (<c>assetDividend</c>) as income, dust conversions to BNB as their service charge. Each source is
-    /// optional (a key scoped narrower than reading is rejected with a 4xx): a rejected source is skipped with a
+    /// optional (a key scoped narrower than reading is rejected with a 401 or 403): a rejected source is skipped with a
     /// warning, which only leaves that income inside the market remainder, never in contributions. A throttled,
     /// failed or unreachable call throws so the window is read again. A crypto leg carries the venue price taken now.
     /// </summary>
@@ -396,7 +397,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         {
             return await read();
         }
-        catch (BinanceException ex) when (ex.VenueStatusCode is >= 400 and < 500 and not 429)
+        catch (BinanceException ex) when (ex.VenueStatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden)
         {
             _logger.LogWarning(ex, "Skipping Binance source '{Source}' - request was rejected (likely missing API-key permission).", label);
             return [];
