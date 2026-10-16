@@ -4,9 +4,9 @@ using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 namespace FinanceSentry.Modules.CryptoSync.Domain;
 
 /// <summary>
-/// One money movement across a venue's edge as the venue reported it (S2a): a fiat deposit or withdrawal, a card buy
-/// or sell, a transfer in or out. Raw, never classified: the class depends on the scope a figure measures, so the
-/// reader classifies it (finance-framework §4.2 rule 1). Insert-only and idempotent on
+/// One money movement across a venue's edge as the venue reported it (S2a, S2b): a fiat deposit or withdrawal, a card
+/// buy or sell, a transfer in or out, a coin deposit or withdrawal. Raw, never classified: the class depends on the
+/// scope a figure measures, so the reader classifies it (finance-framework §4.2 rule 1). Insert-only and idempotent on
 /// <c>(UserId, Provider, ProviderType, EventId)</c>, like <see cref="CryptoTradeRecord"/>.
 /// </summary>
 public sealed class CryptoFlowEvent : IUserOwned
@@ -25,6 +25,15 @@ public sealed class CryptoFlowEvent : IUserOwned
     public string? FeeUnit { get; private set; }
     public string? CounterpartyRef { get; private set; }
     public string Status { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// The chain transaction id (hash) as the venue reported it, kept raw: matching normalizes it (S2b). Null where
+    /// the venue gives none (a fiat leg, a Revolut X transfer read before S2b).
+    /// </summary>
+    public string? TxRef { get; private set; }
+
+    /// <summary>The chain the transfer used, in the venue's own vocabulary (Binance <c>SOL</c>, Revolut X <c>SOLANA</c>).</summary>
+    public string? Network { get; private set; }
 
     /// <summary>When the row was read; also when <see cref="UnitPriceUsd"/> was taken.</summary>
     public DateTime RecordedAt { get; private set; }
@@ -52,6 +61,8 @@ public sealed class CryptoFlowEvent : IUserOwned
             FeeUnit = flow.FeeUnit,
             CounterpartyRef = flow.CounterpartyRef,
             Status = flow.Status,
+            TxRef = flow.TxRef,
+            Network = flow.Network,
             RecordedAt = recordedAt,
         };
     }
@@ -77,4 +88,10 @@ public static class CryptoFlowTypes
 
     /// <summary>Revolut X <c>send</c>: an asset out to the account type in the counterparty.</summary>
     public const string Send = "send";
+
+    /// <summary>Binance <c>capital/deposit/hisrec</c>: a coin in over a chain, or from another Binance account.</summary>
+    public const string CryptoDeposit = "crypto_deposit";
+
+    /// <summary>Binance <c>capital/withdraw/history</c>: a coin out over a chain, or to another Binance account.</summary>
+    public const string CryptoWithdrawal = "crypto_withdrawal";
 }

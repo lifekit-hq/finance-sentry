@@ -34,10 +34,7 @@ public sealed class BinanceHoldingsAggregator
         AddFlexibleEarnBalances(flexibleEarn, totals);
         AddLockedEarnBalances(lockedEarn, totals);
 
-        var priceMap = prices.ToDictionary(
-            p => p.Symbol,
-            p => decimal.Parse(p.Price),
-            StringComparer.OrdinalIgnoreCase);
+        var priceMap = PriceMap(prices);
 
         var holdings = new List<CryptoAssetBalance>();
         foreach (var (asset, (free, locked)) in totals)
@@ -53,6 +50,17 @@ public sealed class BinanceHoldingsAggregator
 
         return holdings;
     }
+
+    /// <summary>Last price per symbol (<c>BTCUSDT</c> → price).</summary>
+    public static Dictionary<string, decimal> PriceMap(IReadOnlyList<BinancePriceTicker> prices) =>
+        prices.ToDictionary(
+            p => p.Symbol,
+            p => decimal.Parse(p.Price, System.Globalization.CultureInfo.InvariantCulture),
+            StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>USD per unit of <paramref name="asset"/>, priced the way holdings are; null when no pair prices it.</summary>
+    public static decimal? UnitPriceUsd(string asset, Dictionary<string, decimal> priceMap) =>
+        ComputeUsdValue(asset, 1m, priceMap) is > 0m and var price ? price : null;
 
     // ── Per-source contributors ─────────────────────────────────────────────
 

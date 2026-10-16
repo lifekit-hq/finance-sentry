@@ -13,7 +13,8 @@ namespace FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
 /// <summary>
 /// The Revolut X money-movement walk over <c>/transactions</c> responses in the documented shape (the
 /// TransactionsPaginatedResponse example): receive and send legs, their counterparty account type, paging and the
-/// pending hold.
+/// pending hold; and, for a transfer with an external crypto wallet, its chain hash, network and fee from
+/// <c>/transactions/{id}</c> (the TransactionDetails example).
 /// </summary>
 public class RevolutXFlowWalkTests
 {
@@ -22,9 +23,21 @@ public class RevolutXFlowWalkTests
     private static readonly DateTime From = new(2023, 11, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime AsOf = new(2023, 11, 20, 0, 0, 0, DateTimeKind.Utc);
 
+    private const string SendToWalletId = "c3d4e5f6-a7b8-9012-cdef-234567890123";
+
     private readonly StubHttpMessageHandler _handler = new StubHttpMessageHandler()
         .Respond("/api/1.0/configuration/currencies", RevolutXFixtures.Currencies)
-        .Respond("/api/1.0/tickers", RevolutXFixtures.Tickers);
+        .Respond("/api/1.0/tickers", RevolutXFixtures.Tickers)
+        .Respond($"{TransactionsPath}/{SendToWalletId}", Details(SendToWalletId, "send", "0.5", fee: null, hash: null));
+
+    private static string Details(string id, string type, string amount, string? fee, string? hash, string? network = null)
+    {
+        var feePart = fee is null ? "" : $", \"fee\": \"{fee}\", \"fee_currency\": \"BTC\"";
+        var hashPart = hash is null ? "" : $", \"crypto_transaction_hash\": \"{hash}\"";
+        var networkPart = network is null ? "" : $", \"network\": \"{network}\"";
+        var source = $$"""{"amount": "{{amount}}", "currency": "BTC"{{feePart}}, "account": {"type": "revolut_x"} }""";
+        return $$"""{"id": "{{id}}", "status": "completed", "type": "{{type}}", "source": {{source}}, "destination": {"amount": "0.5", "currency": "BTC", "account": {"type": "external_crypto_wallet"} }, "created_date": 1700000200000{{hashPart}}{{networkPart}} }""";
+    }
 
     private RevolutXAdapter CreateSut()
     {
@@ -61,7 +74,7 @@ public class RevolutXFlowWalkTests
         Leg("500.00", "EUR", "revolut"), Leg("500.00", "EUR", "revolut_x"), 1700000000000, 1700000001000);
 
     private static readonly string SendToWallet = Row(
-        "c3d4e5f6-a7b8-9012-cdef-234567890123", "completed", "send",
+        SendToWalletId, "completed", "send",
         Leg("0.5", "BTC", "revolut_x"), Leg("0.5", "BTC", "external_crypto_wallet"), 1700000200000, 1700000300000);
 
     [Fact]
@@ -153,6 +166,50 @@ public class RevolutXFlowWalkTests
     public async Task ARefusedCall_Throws_SoTheCursorStays()
     {
         _handler.Respond(TransactionsPath, RevolutXFixtures.Unauthorized, System.Net.HttpStatusCode.Unauthorized);
+
+        var act = () => WalkAsync();
+
+        await act.Should().ThrowAsync<RevolutXException>();
+    }
+
+    [Fact]
+    public async Task ATransferWithAnExternalWallet_TakesItsHashNetworkAndFeeFromItsDetails()
+    {
+        // The TransactionDetails example: 0.5001 BTC left the account, 0.0001 of it Revolut's fee, 0.5 went on chain.
+        var send = Row(SendToWalletId, "completed", "send",
+            Leg("0.5001", "BTC", "revolut_x"), Leg("0.5", "BTC", "external_crypto_wallet"), 1700000200000, 1700000300000);
+        _handler.Respond(TransactionsPath, Page(null, ReceiveFromRevolut, send));
+        _handler.Respond($"{TransactionsPath}/{SendToWalletId}",
+            Details(SendToWalletId, "send", "0.5001", fee: "0.0001", hash: "0xABCDEF0123", network: "BITCOIN"));
+
+        var page = await WalkAsync();
+
+        var flow = page.Flows.Should().ContainSingle(f => f.ProviderType == CryptoFlowTypes.Send).Subject;
+        (flow.Amount, flow.Fee, flow.FeeUnit, flow.TxRef, flow.Network).Should().Be((0.5m, (decimal?)0.0001m, "BTC", "0xABCDEF0123", "BITCOIN"));
+        _handler.Requests.Where(r => r.RequestUri!.AbsolutePath.StartsWith($"{TransactionsPath}/", StringComparison.Ordinal))
+            .Should().ContainSingle("only a transfer with an external crypto wallet is looked up, not the fiat receive");
+    }
+
+    [Fact]
+    public async Task AReceiveFromAnExternalWallet_KeepsItsAmount_AndTakesItsHash()
+    {
+        const string id = "d4e5f6a7-b8c9-0123-def0-345678901234";
+        var receive = Row(id, "completed", "receive",
+            Leg("0.5", "BTC", "external_crypto_wallet"), Leg("0.5", "BTC", "revolut_x"), 1700000200000, 1700000300000);
+        _handler.Respond(TransactionsPath, Page(null, receive));
+        _handler.Respond($"{TransactionsPath}/{id}", Details(id, "receive", "0.5", fee: null, hash: "5VERv8NMvzbJMEkV8xnrLkEaWRtSz2CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW", network: "SOLANA"));
+
+        var flow = (await WalkAsync()).Flows.Should().ContainSingle().Subject;
+
+        (flow.Amount, flow.Fee, flow.TxRef, flow.Network).Should().Be(
+            (0.5m, (decimal?)null, "5VERv8NMvzbJMEkV8xnrLkEaWRtSz2CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW", "SOLANA"));
+    }
+
+    [Fact]
+    public async Task ARefusedDetailsCall_Throws_SoTheCursorStays()
+    {
+        _handler.Respond(TransactionsPath, Page(null, SendToWallet));
+        _handler.Respond($"{TransactionsPath}/{SendToWalletId}", RevolutXFixtures.Unauthorized, System.Net.HttpStatusCode.Unauthorized);
 
         var act = () => WalkAsync();
 

@@ -94,6 +94,8 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
             entity.Property(e => e.FeeUnit).HasMaxLength(20);
             entity.Property(e => e.CounterpartyRef).HasMaxLength(50);
             entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.TxRef).HasMaxLength(200);
+            entity.Property(e => e.Network).HasMaxLength(50);
             entity.Property(e => e.RecordedAt).IsRequired();
         });
     }

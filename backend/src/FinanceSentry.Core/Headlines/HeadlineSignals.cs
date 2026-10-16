@@ -35,6 +35,12 @@ public sealed record HeadlineSignals
     /// <summary>A source joined the scope inside the window and the measure bridged it (<c>SCOPE_CHANGED</c>, informative).</summary>
     public bool ScopeChanged { get; init; }
 
+    /// <summary>
+    /// Sources with a transfer leg inside the window that no leg on another source in scope matched, read as an
+    /// external flow (finance-framework §3.2 rule 6): the figure is an estimate (<c>UNMATCHED_TRANSFER</c> per source).
+    /// </summary>
+    public IReadOnlyList<string> UnmatchedTransferSources { get; init; } = [];
+
     /// <summary>Both figures' signals: the start and the end of a window.</summary>
     public HeadlineSignals Merge(HeadlineSignals other) => new()
     {
@@ -45,6 +51,7 @@ public sealed record HeadlineSignals
         NoCostBasis = NoCostBasis || other.NoCostBasis,
         UnknownFlowSources = [.. UnknownFlowSources.Concat(other.UnknownFlowSources).Distinct(StringComparer.OrdinalIgnoreCase)],
         ScopeChanged = ScopeChanged || other.ScopeChanged,
+        UnmatchedTransferSources = [.. UnmatchedTransferSources.Concat(other.UnmatchedTransferSources).Distinct(StringComparer.OrdinalIgnoreCase)],
     };
 
     /// <summary>

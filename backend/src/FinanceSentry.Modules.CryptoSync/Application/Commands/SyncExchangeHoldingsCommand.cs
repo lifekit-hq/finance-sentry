@@ -116,6 +116,10 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             var justClosed = stale.Select(h => h.Asset).ToHashSet(StringComparer.Ordinal);
 
             await WalkFlowsAsync(adapter, credential, apiKey, apiSecret, walk.AsOf, ct);
+            if (adapter.WalksChainFlows)
+            {
+                await WalkChainFlowsAsync(adapter, credential, apiKey, apiSecret, walk.AsOf, ct);
+            }
 
             if (adapter.TradeHistoryStartsAtConnect)
             {
@@ -177,6 +181,44 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         await flowRepository.AddNewUnscopedAsync(
             credential.UserId, credential.Provider, page.Flows, timeProvider.GetUtcNow().UtcDateTime, ct);
         credential.MarkFlowsWalked(page.WalkedTo, page.NextLane);
+        credentialRepository.Update(credential);
+        await credentialRepository.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// <see cref="WalkFlowsAsync"/> for a venue whose on-chain deposits and withdrawals are read on a cursor of their
+    /// own (<see cref="ExchangeCredential.ChainFlowsWalkedTo"/>), with the same interval, failure and save rules.
+    /// </summary>
+    private async Task WalkChainFlowsAsync(
+        ICryptoExchangeAdapter adapter,
+        ExchangeCredential credential,
+        string apiKey,
+        string apiSecret,
+        DateTime asOf,
+        CancellationToken ct)
+    {
+        if (credential.ChainFlowsWalkedTo is { } walkedTo && asOf - walkedTo < MinFlowWalkInterval)
+        {
+            return;
+        }
+
+        var from = credential.ChainFlowsWalkedTo?.AddMilliseconds(1) ?? credential.FirstLinkedAt;
+        CryptoFlowPage page;
+        try
+        {
+            page = await adapter.GetChainFlowsAsync(apiKey, apiSecret, new CryptoFlowWalk(from, asOf), ct);
+        }
+        catch (CryptoExchangeException ex)
+        {
+            logger.LogWarning(ex,
+                "On-chain flow history fetch failed on {Provider} (user {UserId}); the walk resumes from {From} next run.",
+                credential.Provider, credential.UserId, from);
+            return;
+        }
+
+        await flowRepository.AddNewUnscopedAsync(
+            credential.UserId, credential.Provider, page.Flows, timeProvider.GetUtcNow().UtcDateTime, ct);
+        credential.MarkChainFlowsWalked(page.WalkedTo);
         credentialRepository.Update(credential);
         await credentialRepository.SaveChangesAsync(ct);
     }

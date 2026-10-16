@@ -265,6 +265,76 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         walks.Select(w => w.From).Should().Equal(firstLinkedAt, firstLinkedAt);
     }
 
+    private static CryptoFlow CoinDeposit(string id) =>
+        new(id, CryptoFlowTypes.CryptoDeposit, Now.UtcDateTime.AddDays(-1), 10m, "SOL", false, 150m, null, null, "on_chain", "1",
+            TxRef: "H12", Network: "SOL");
+
+    [Fact]
+    public async Task ChainWalk_OnAVenueThatHasOne_StartsAtConnect_OnItsOwnCursor_AndKeepsHashAndNetwork()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance);
+        _binance.SetupGet(a => a.WalksChainFlows).Returns(true);
+        var walks = new List<CryptoFlowWalk>();
+        var walkedTo = Now.UtcDateTime.AddHours(-2);
+        _binance
+            .Setup(a => a.GetChainFlowsAsync("api-key", "api-secret", It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CryptoFlowWalk, CancellationToken>((_, _, walk, _) => walks.Add(walk))
+            .ReturnsAsync(new CryptoFlowPage([CoinDeposit("dep-1")], walkedTo));
+
+        await SyncAsync(CryptoExchangeProvider.Binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        walks.Select(w => w.From).Should().Equal(credential.FirstLinkedAt, walkedTo.AddMilliseconds(1));
+        credential.ChainFlowsWalkedTo.Should().Be(walkedTo);
+        credential.FlowsWalkedTo.Should().Be(Now.UtcDateTime, "the fiat walk keeps its own cursor");
+        var row = (await _db.CryptoFlowEvents.AsNoTracking().ToListAsync()).Should().ContainSingle().Subject;
+        (row.ProviderType, row.Amount, row.Unit, row.TxRef, row.Network)
+            .Should().Be((CryptoFlowTypes.CryptoDeposit, 10m, "SOL", "H12", "SOL"));
+    }
+
+    [Fact]
+    public async Task ChainWalk_IsNotAskedOfAVenueWithout()
+    {
+        await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX);
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        _revolutX.Verify(
+            a => a.GetChainFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ChainWalkRefused_KeepsItsCursor_AndTheFiatWalkStillAdvances()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance);
+        _binance.SetupGet(a => a.WalksChainFlows).Returns(true);
+        _binance
+            .Setup(a => a.GetChainFlowsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CryptoFlowWalk>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BinanceException("Binance API error: refused"));
+
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        credential.ChainFlowsWalkedTo.Should().BeNull();
+        credential.FlowsWalkedTo.Should().Be(Now.UtcDateTime);
+        credential.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChainWalk_AfterAReconnect_RestartsFromTheFirstLinkDay()
+    {
+        var credential = await ConnectAsync(CryptoExchangeProvider.Binance);
+        credential.MarkChainFlowsWalked(Now.UtcDateTime.AddHours(-2));
+
+        credential.Deactivate();
+        credential.Reconnect([1], [0], [0], [2], [0], [0], 1);
+
+        credential.ChainFlowsWalkedTo.Should().BeNull();
+    }
+
     [Fact]
     public async Task FlowWalkRefused_KeepsTheCursor_AndTheHoldingsSyncSucceeds()
     {

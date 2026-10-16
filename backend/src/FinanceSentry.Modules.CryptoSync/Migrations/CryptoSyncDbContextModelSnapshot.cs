@@ -53,6 +53,10 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                     b.Property<bool>("IsFiat")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Network")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -73,6 +77,10 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("TxRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -255,6 +263,9 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                     b.Property<byte[]>("ApiSecretIv")
                         .IsRequired()
                         .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("ChainFlowsWalkedTo")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
