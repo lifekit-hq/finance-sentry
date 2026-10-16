@@ -78,6 +78,21 @@ public class RevolutXFlowWalkTests
         Leg("0.5", "BTC", "revolut_x"), Leg("0.5", "BTC", "external_crypto_wallet"), 1700000200000, 1700000300000);
 
     [Fact]
+    public async Task AReward_IsReadFromItsDestinationLeg_AsIncomeWithNoCounterparty()
+    {
+        var reward = Row("d4e5f6a7-b8c9-0123-def0-345678901234", "completed", "reward",
+            null, Leg("0.00005", "BTC", "revolut_x"), 1700000400000, 1700000500000);
+        _handler.Respond(TransactionsPath, Page(null, reward));
+
+        var page = await WalkAsync();
+
+        page.Flows.Should().Equal(
+            new CryptoFlow("d4e5f6a7-b8c9-0123-def0-345678901234", CryptoFlowTypes.Reward,
+                DateTimeOffset.FromUnixTimeMilliseconds(1700000500000).UtcDateTime, 0.00005m, "BTC", false, 60000m, null, null,
+                null, "completed"));
+    }
+
+    [Fact]
     public async Task ReceiveAndSend_AreReadFromTheVenuesOwnLeg_WithTheOtherSidesAccountType()
     {
         _handler.Respond(TransactionsPath, Page(null, ReceiveFromRevolut, SendToWallet));
@@ -105,7 +120,7 @@ public class RevolutXFlowWalkTests
         request.Method.Should().Be(HttpMethod.Get);
         request.Headers.Contains(RevolutXSigner.SignatureHeader).Should().BeTrue();
         var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
-        query["types"].Should().Be("receive,send");
+        query["types"].Should().Be("receive,send,reward");
         query["limit"].Should().Be("1900");
         long.Parse(query["end_date"]!).Should().BeLessThan(long.Parse(query["start_date"]!) + 30L * 24 * 60 * 60 * 1000,
             "a request spans at most 30 days");

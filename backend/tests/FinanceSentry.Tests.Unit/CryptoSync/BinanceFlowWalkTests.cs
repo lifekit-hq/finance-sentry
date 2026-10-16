@@ -82,7 +82,8 @@ public class BinanceFlowWalkTests
         {
             _handler.Requests.Clear();
             var page = await WalkAsync(lane);
-            var request = _handler.Requests.Should().ContainSingle("a run spends one weighted fiat call").Subject;
+            var request = _handler.Requests.Where(r => r.RequestUri!.AbsolutePath.StartsWith("/sapi/v1/fiat", StringComparison.Ordinal))
+                .Should().ContainSingle("a run spends one weighted fiat call").Subject;
             var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
             rows.Add((lane, request.RequestUri.AbsolutePath, query["transactionType"]!, page.Flows.Should().ContainSingle().Subject));
         }
@@ -194,5 +195,45 @@ public class BinanceFlowWalkTests
         var act = () => WalkAsync(PaymentsOut);
 
         await act.Should().ThrowAsync<BinanceException>();
+    }
+
+    [Fact]
+    public async Task TheLastLane_AlsoReadsRewardsAirdropsAndDust_PricedAtTheVenueRate()
+    {
+        _handler
+            .Respond("/api/v3/ticker/price", """[{"symbol":"BNBUSDT","price":"500"}]""")
+            .Respond("/sapi/v1/simple-earn/flexible/history/rewardsRecord", request =>
+                HttpUtility.ParseQueryString(request.RequestUri!.Query)["type"] == "REWARDS"
+                    ? $$"""{"rows":[{"asset":"USDT","rewards":"3.00","projectId":"USDT001","type":"REWARDS","time":{{Apr9}}}],"total":1}"""
+                    : """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord",
+                $$"""{"rows":[{"positionId":"7","asset":"USDT","amount":"1.5","time":{{Apr9}}}],"total":1}""")
+            .Respond("/sapi/v1/asset/assetDividend",
+                $$"""{"rows":[{"id":11,"tranId":901,"asset":"BNB","amount":"0.1","enInfo":"Airdrop distribution","divTime":{{Apr9}}},{"id":12,"tranId":902,"asset":"USDT","amount":"9","enInfo":"Simple Earn payout","divTime":{{Apr9}}}],"total":2}""")
+            .Respond("/sapi/v1/asset/dribblet",
+                $$"""{"total":1,"userAssetDribblets":[{"transId":55,"operateTime":{{Apr9}},"totalTransferedAmount":"0.2","totalServiceChargeAmount":"0.0001"}]}""");
+
+        var page = await WalkAsync(PaymentsOut);
+
+        page.Flows.Select(f => (f.EventId, f.ProviderType, f.Amount, f.Unit, f.UnitPriceUsd, f.Fee)).Should().BeEquivalentTo(
+        [
+            ("USDT001:REWARDS:" + Apr9, CryptoFlowTypes.Reward, 3.00m, "USDT", (decimal?)1m, (decimal?)null),
+            ("7:" + Apr9, CryptoFlowTypes.Reward, 1.5m, "USDT", (decimal?)1m, (decimal?)null),
+            ("901", CryptoFlowTypes.Airdrop, 0.1m, "BNB", (decimal?)500m, (decimal?)null),
+            ("55", CryptoFlowTypes.DustConversion, 0.2m, "BNB", (decimal?)500m, (decimal?)0.0001m),
+        ]);
+        page.WalkedTo.Should().Be(WindowEnd);
+    }
+
+    [Fact]
+    public async Task ARejectedEarnSource_IsSkipped_AndTheWindowStillCompletes()
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""",
+            System.Net.HttpStatusCode.Unauthorized);
+
+        var page = await WalkAsync(PaymentsOut);
+
+        page.Flows.Should().BeEmpty();
+        page.WalkedTo.Should().Be(WindowEnd);
     }
 }

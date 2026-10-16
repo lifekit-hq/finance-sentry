@@ -35,12 +35,13 @@ public sealed class RevolutXAdapter(
     private const long FlowWindowMs = 30L * 24 * 60 * 60 * 1000 - 2;
     private const int MaxFlowWindowsPerCall = 12;
     private const int FlowPageLimit = 1900;
-    private const string FlowTypes = "receive,send";
+    private const string FlowTypes = "receive,send,reward";
     private const string CompletedStatus = "completed";
     private const string PendingStatus = "pending";
     private const string ReceiveType = "receive";
     private const string SendType = "send";
     private const string ExternalCryptoWallet = "external_crypto_wallet";
+    private const string RewardType = "reward";
 
     // A transfer pending longer than this stops holding the walk back, so a stuck row cannot pin it forever.
     private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
@@ -177,7 +178,7 @@ public sealed class RevolutXAdapter(
     }
 
     /// <summary>
-    /// The account's completed <c>receive</c> and <c>send</c> transactions created in the walk, window by window (one
+    /// The account's completed <c>receive</c>, <c>send</c> and <c>reward</c> (staking: income, not a transfer) transactions created in the walk, window by window (one
     /// millisecond wider on both sides, filtered back, as the fills walk does). Each leg's account type is what makes a
     /// transfer readable: the leg that is not <c>revolut_x</c> is the counterparty (<c>revolut</c>: the owner's own
     /// Revolut app; <c>external_*</c>: outside it). The amount is the venue-side leg, credited for a receive and
@@ -276,6 +277,8 @@ public sealed class RevolutXAdapter(
             {
                 ReceiveType => (row.Destination, row.Source),
                 SendType => (row.Source, row.Destination),
+                // A reward has a destination leg only: the asset credited, in the Revolut X account.
+                RewardType => (row.Destination, null),
                 _ => (null, null),
             };
             var unit = own?.Currency?.Trim().ToUpperInvariant();
@@ -296,7 +299,7 @@ public sealed class RevolutXAdapter(
                 : null;
             flows.Add(new CryptoFlow(
                 EventId: row.Id,
-                ProviderType: type == ReceiveType ? CryptoFlowTypes.Receive : CryptoFlowTypes.Send,
+                ProviderType: type switch { ReceiveType => CryptoFlowTypes.Receive, RewardType => CryptoFlowTypes.Reward, _ => CryptoFlowTypes.Send },
                 OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(row.ProcessedDateMs ?? row.CreatedDateMs).UtcDateTime,
                 Amount: chain?.Amount ?? amount.Value,
                 Unit: unit,

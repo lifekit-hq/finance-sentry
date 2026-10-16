@@ -94,4 +94,19 @@ public static class CryptoFlowTypes
 
     /// <summary>Binance <c>capital/withdraw/history</c>: a coin out over a chain, or to another Binance account.</summary>
     public const string CryptoWithdrawal = "crypto_withdrawal";
+
+    /// <summary>
+    /// Earn interest or a staking reward (Binance Simple Earn flexible and locked rewards, Revolut X <c>reward</c>):
+    /// the asset received, income within growth and never money put in.
+    /// </summary>
+    public const string Reward = "reward";
+
+    /// <summary>Binance <c>assetDividend</c>: a distribution or airdrop of the asset received, income like a <see cref="Reward"/>.</summary>
+    public const string Airdrop = "airdrop";
+
+    /// <summary>
+    /// Binance dust conversion (<c>asset/dribblet</c>): small balances swapped for BNB. The swap is internal, so
+    /// only <see cref="CryptoFlowEvent.Fee"/> (the service charge, in BNB) counts; <see cref="CryptoFlowEvent.Amount"/> is the BNB received.
+    /// </summary>
+    public const string DustConversion = "dust_conversion";
 }

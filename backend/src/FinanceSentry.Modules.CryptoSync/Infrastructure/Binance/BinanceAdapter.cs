@@ -39,6 +39,11 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     private const int FiatIn = 0;
     private const int FiatOut = 1;
     private const string FiatSuccessCode = "000000";
+    private const int EarnedPageRows = 100;
+    private const int MaxEarnedPages = 20;
+    private const int DividendRows = 500;
+    private const string Bnb = "BNB";
+    private static readonly string[] FlexibleRewardTypes = ["BONUS", "REALTIME", "REWARDS"];
 
     private static readonly TimeSpan MaxPendingHold = TimeSpan.FromDays(30);
 
@@ -270,9 +275,132 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             return new CryptoFlowPage(ordered, stayAt);
         }
 
-        return walk.Lane == FlowLanes - 1
-            ? new CryptoFlowPage(ordered, DateTimeOffset.FromUnixTimeMilliseconds(endMs).UtcDateTime)
-            : new CryptoFlowPage(ordered, stayAt, walk.Lane + 1);
+        if (walk.Lane != FlowLanes - 1)
+        {
+            return new CryptoFlowPage(ordered, stayAt, walk.Lane + 1);
+        }
+
+        // The window's last read also takes the cheap earn, distribution and dust history, once per window.
+        ordered.AddRange(await ReadEarnedAsync(apiKey, apiSecret, beginMs, endMs, ct));
+        return new CryptoFlowPage(
+            ordered.OrderBy(f => f.OccurredAt).ThenBy(f => f.EventId, StringComparer.Ordinal).ToList(),
+            DateTimeOffset.FromUnixTimeMilliseconds(endMs).UtcDateTime);
+    }
+
+    /// <summary>
+    /// What the venue paid or converted in a window: Simple Earn rewards (flexible, locked) and distributions or
+    /// airdrops (<c>assetDividend</c>) as income, dust conversions to BNB as their service charge. Each source is
+    /// optional (a key scoped narrower than reading is rejected with a 4xx): a rejected source is skipped with a
+    /// warning, which only leaves that income inside the market remainder, never in contributions. A throttled,
+    /// failed or unreachable call throws so the window is read again. A crypto leg carries the venue price taken now.
+    /// </summary>
+    private async Task<List<CryptoFlow>> ReadEarnedAsync(string apiKey, string apiSecret, long beginMs, long endMs, CancellationToken ct)
+    {
+        var earned = new List<(string Id, string Type, long TimeMs, string? Asset, string? Amount, string? Fee)>();
+
+        foreach (var type in FlexibleRewardTypes)
+        {
+            foreach (var row in await SafeReadAsync(
+                "Simple Earn flexible rewards",
+                () => ReadEarnPagesAsync((page, c) => _httpClient.GetFlexibleRewardsAsync(
+                    apiKey, apiSecret, type, beginMs, endMs, page, EarnedPageRows, c), ct)))
+            {
+                earned.Add(($"{row.ProjectId}:{row.Type ?? type}:{row.TimeMs}", CryptoFlowTypes.Reward, row.TimeMs, row.Asset, row.Rewards, null));
+            }
+        }
+
+        foreach (var row in await SafeReadAsync(
+            "Simple Earn locked rewards",
+            () => ReadEarnPagesAsync((page, c) => _httpClient.GetLockedRewardsAsync(
+                apiKey, apiSecret, beginMs, endMs, page, EarnedPageRows, c), ct)))
+        {
+            earned.Add(($"{row.PositionId}:{row.TimeMs}", CryptoFlowTypes.Reward, row.TimeMs, row.Asset, row.Amount, null));
+        }
+
+        // shortcut: a day holds at most DividendRows distributions, and Earn payouts that also show here (undocumented)
+        // are told apart by their text, so a payout worded otherwise would count twice; check against a real row.
+        var dividends = await SafeReadAsync("asset dividends", async () =>
+            (await _httpClient.GetAssetDividendsAsync(apiKey, apiSecret, beginMs, endMs, DividendRows, ct)).Rows ?? []);
+        foreach (var row in dividends.Where(d => d.Info?.Contains("Earn", StringComparison.OrdinalIgnoreCase) != true))
+        {
+            earned.Add(((row.TranId ?? row.Id).ToString(CultureInfo.InvariantCulture), CryptoFlowTypes.Airdrop, row.TimeMs, row.Asset, row.Amount, null));
+        }
+
+        foreach (var row in await SafeReadAsync(
+            "dust conversions",
+            async () => (await _httpClient.GetDribbletAsync(apiKey, apiSecret, beginMs, endMs, ct)).Dribblets ?? []))
+        {
+            earned.Add((row.TransId.ToString(CultureInfo.InvariantCulture), CryptoFlowTypes.DustConversion, row.OperateTimeMs,
+                Bnb, row.TransferedAmount, row.ServiceChargeAmount));
+        }
+
+        if (earned.Count == 0)
+        {
+            return [];
+        }
+
+        var priceMap = BinanceHoldingsAggregator.PriceMap(await _httpClient.GetAllPricesAsync(ct));
+        var flows = new List<CryptoFlow>();
+        foreach (var (id, type, timeMs, asset, amount, fee) in earned)
+        {
+            var unit = asset?.Trim().ToUpperInvariant();
+            var quantity = ParseAmount(amount);
+            var feeAmount = ParseAmount(fee);
+            if (string.IsNullOrEmpty(unit) || quantity is not > 0m && feeAmount is not > 0m)
+            {
+                _logger.LogWarning("Binance {ProviderType} {EventId} is unreadable and was skipped.", type, id);
+                continue;
+            }
+
+            flows.Add(new CryptoFlow(
+                EventId: id,
+                ProviderType: type,
+                OccurredAt: DateTimeOffset.FromUnixTimeMilliseconds(timeMs).UtcDateTime,
+                Amount: quantity ?? 0m,
+                Unit: unit,
+                IsFiat: false,
+                UnitPriceUsd: BinanceHoldingsAggregator.UnitPriceUsd(unit, priceMap),
+                Fee: feeAmount is > 0m ? feeAmount : null,
+                FeeUnit: feeAmount is > 0m ? unit : null,
+                CounterpartyRef: null,
+                Status: "completed"));
+        }
+
+        return flows;
+    }
+
+    private static async Task<IReadOnlyList<T>> ReadEarnPagesAsync<T>(
+        Func<int, CancellationToken, Task<BinanceEarnPage<T>>> fetch,
+        CancellationToken ct)
+    {
+        var rows = new List<T>();
+        for (var page = 1; ; page++)
+        {
+            if (page > MaxEarnedPages)
+            {
+                throw new BinanceException($"Binance returned more than {MaxEarnedPages} pages of earn rewards for one window.");
+            }
+
+            var response = await fetch(page, ct);
+            rows.AddRange(response.Rows);
+            if (response.Rows.Count < EarnedPageRows || rows.Count >= response.Total)
+            {
+                return rows;
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<T>> SafeReadAsync<T>(string label, Func<Task<IReadOnlyList<T>>> read)
+    {
+        try
+        {
+            return await read();
+        }
+        catch (BinanceException ex) when (ex.VenueStatusCode is >= 400 and < 500 and not 429)
+        {
+            _logger.LogWarning(ex, "Skipping Binance source '{Source}' - request was rejected (likely missing API-key permission).", label);
+            return [];
+        }
     }
 
     /// <summary>

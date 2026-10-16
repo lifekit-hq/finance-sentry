@@ -60,7 +60,7 @@ public static class CryptoFlowClassifier
     /// <summary>
     /// The movement's legs for the crypto sleeve, where every venue is in scope and anything outside the venues is
     /// not: fiat in, a card buy and a transfer or coin deposit in are external inflows, fiat out, a sell for fiat and
-    /// a transfer or coin withdrawal out are external outflows, and the fee the venue kept is a fee. A buy paid from
+    /// a transfer or coin withdrawal out are external outflows, a reward or airdrop is income, and the fee the venue kept is a fee. A buy paid from
     /// the venue's own fiat balance moves nothing across the sleeve's edge, so only its fee remains. A transfer the
     /// other venue's leg matches is not read here: <see cref="CryptoTransferMatcher"/> makes it internal.
     /// </summary>
@@ -69,6 +69,8 @@ public static class CryptoFlowClassifier
         FlowClass? movement = flow.ProviderType switch
         {
             CryptoFlowTypes.FiatDeposit or CryptoFlowTypes.Receive or CryptoFlowTypes.CryptoDeposit => FlowClass.ExternalInflow,
+            // Income is part of the return, never money put in; a dust swap moves nothing but its fee (below).
+            CryptoFlowTypes.Reward or CryptoFlowTypes.Airdrop => FlowClass.Income,
             CryptoFlowTypes.CardBuy when string.Equals(
                 flow.CounterpartyRef, CashBalanceMethod, StringComparison.OrdinalIgnoreCase) => null,
             CryptoFlowTypes.CardBuy => FlowClass.ExternalInflow,
