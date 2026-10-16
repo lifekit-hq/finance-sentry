@@ -10,6 +10,22 @@ import {AlertsService} from '../../services/alerts.service';
 import {ALERT_SEARCH_DEBOUNCE_MS, alertsEffects, alertsHooks} from './alerts.effects';
 import {ALERTS_PAGE_SIZE} from './alerts.state';
 
+const BASE_ALERT: Alert = {
+  id: 'a',
+  type: 'LowBalance',
+  severity: 'Warning',
+  title: 'Low balance',
+  message: 'Balance dropped',
+  referenceId: null,
+  referenceLabel: null,
+  isRead: false,
+  isResolved: false,
+  createdAt: '2026-10-01T09:00:00Z',
+  resolvedAt: null,
+  occurrenceCount: 1,
+  lastOccurredAt: '2026-10-01T09:00:00Z',
+};
+
 const PAGE = {items: [], totalCount: 45, unreadCount: 7, page: 2, pageSize: 20, totalPages: 3};
 
 function build() {
@@ -93,7 +109,9 @@ describe('alertsEffects', () => {
   it('loadMore appends the page after the loaded ones under its own status', () => {
     const store = build();
     store.filter.set('error');
-    store.alerts.set(Array.from({length: 2 * ALERTS_PAGE_SIZE}, (_, i) => ({id: `a${i}`}) as Alert));
+    store.alerts.set(
+      Array.from({length: 2 * ALERTS_PAGE_SIZE}, (_, i): Alert => ({...BASE_ALERT, id: `a${i}`}))
+    );
     TestBed.runInInjectionContext(() => alertsEffects(store).loadMore());
 
     expect(api.getAlerts).toHaveBeenCalledWith('error', 3, ALERTS_PAGE_SIZE, '');

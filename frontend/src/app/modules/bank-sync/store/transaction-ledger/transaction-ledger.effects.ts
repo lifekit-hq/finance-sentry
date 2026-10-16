@@ -100,8 +100,7 @@ export function transactionLedgerEffects(store: EffectsStore) {
   // the rows being replaced.
   const firstPageStarted$ = new Subject<void>();
 
-  const rowsMatchFilter = (): boolean =>
-    LedgerFilterUtils.same(store.rowsFilter(), store.filter());
+  const rowsMatchFilter = (): boolean => LedgerFilterUtils.same(store.rowsFilter(), store.filter());
 
   const fetchFirstPage = rxMethod<void>(
     pipe(

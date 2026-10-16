@@ -9,11 +9,24 @@ import {AlertsStore} from './alerts.store';
 
 const MAX_SCROLLS = 10;
 
+const BASE_ALERT: Alert = {
+  id: 'a',
+  type: 'LowBalance',
+  severity: 'Warning',
+  title: 'Low balance',
+  message: 'Balance dropped',
+  referenceId: null,
+  referenceLabel: null,
+  isRead: false,
+  isResolved: false,
+  createdAt: '2026-10-01T09:00:00Z',
+  resolvedAt: null,
+  occurrenceCount: 1,
+  lastOccurredAt: '2026-10-01T09:00:00Z',
+};
+
 function makeServer(count: number) {
-  let rows: Alert[] = Array.from(
-    {length: count},
-    (_, i) => ({id: `a${i}`, isRead: false, isResolved: false}) as Alert
-  );
+  let rows: Alert[] = Array.from({length: count}, (_, i): Alert => ({...BASE_ALERT, id: `a${i}`}));
   const visible = (filter: AlertFilter) => rows.filter(a => filter !== 'unread' || !a.isRead);
   return {
     ids: (filter: AlertFilter) => visible(filter).map(a => a.id),

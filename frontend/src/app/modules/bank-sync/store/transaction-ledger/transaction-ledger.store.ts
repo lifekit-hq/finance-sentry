@@ -19,16 +19,14 @@ import {
 
 /** The kept rows fit only the filter they were loaded for; the URL decides the filter. */
 function sameLedgerFilter(kept: Partial<TransactionLedgerState>, current: TransactionLedgerState) {
-  return (
-    LedgerFilterUtils.same(kept.rowsFilter ?? null, {
-      accountId: current.accountId,
-      transactionType: current.transactionType,
-      categories: current.categories,
-      from: current.from,
-      to: current.to,
-      search: current.search.trim(),
-    })
-  );
+  return LedgerFilterUtils.same(kept.rowsFilter ?? null, {
+    accountId: current.accountId,
+    transactionType: current.transactionType,
+    categories: current.categories,
+    from: current.from,
+    to: current.to,
+    search: current.search.trim(),
+  });
 }
 
 export const TransactionLedgerStore = signalStore(
