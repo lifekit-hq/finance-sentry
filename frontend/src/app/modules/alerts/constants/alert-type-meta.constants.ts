@@ -55,7 +55,7 @@ export const ALERT_TYPE_META_REGISTRY = {
   // The one notice that a connection or account has failed for days and may be closed.
   ['ConnectionDormant']: {
     icon: 'Unplug',
-    label: 'may be closed',
+    label: 'dormant',
     destination: AppRoute.AccountsList,
   },
   ['JobFailure']: {
