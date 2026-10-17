@@ -307,7 +307,7 @@ What does not change:
   snapshots from `ClosedAt` on omit it.
 - **Transactions are kept** in the ledger and in flow windows.
 - `GET /accounts` still returns the account (with `closedAt`, `closedReason`, `predecessorAccountId`, `absentSince`,
-  and the read-only `productType` / `cardValidTo`) and its `currencyTotals` skip it. The Accounts page lists a retired
+  `previousLast4` / `panChangedAt` for an in-place card reissue, and the read-only `productType` / `cardValidTo`) and its `currencyTotals` skip it. The Accounts page lists a retired
   account in a collapsed "Closed accounts (n)" section, never in a live group, and shows its balance as the last known
   figure at closure, not a live one. Reopen is offered on every closed row except one retired as `Reissued` (its
   successor carries the balance, so reopening would count the same money twice); Remove is offered on all.
