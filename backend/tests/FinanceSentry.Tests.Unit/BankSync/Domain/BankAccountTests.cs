@@ -224,6 +224,42 @@ public class BankAccountTests
     }
 
     [Fact]
+    public void RefreshProviderIdentifiers_RecordsNothing_WhenASecondCardIsAddedAndTheOldOneIsStillListed()
+    {
+        var account = MakeAccount();
+
+        account.RefreshProviderIdentifiers(null, ["537541******1234", "444444******9999"], "9999", null, ChangedAt);
+
+        account.AccountNumberLast4.Should().Be("9999");
+        account.PreviousLast4.Should().BeNull();
+        account.PanChangedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void RefreshProviderIdentifiers_RecordsNothing_WhenTheListIsReorderedAndTheOldCardIsStillListed()
+    {
+        var account = MakeAccount();
+        account.RefreshProviderIdentifiers(null, ["537541******1234", "444444******9999"], "9999", null, ChangedAt);
+
+        account.RefreshProviderIdentifiers(null, ["444444******9999", "537541******1234"], "1234", null, ChangedAt.AddDays(1));
+
+        account.AccountNumberLast4.Should().Be("1234");
+        account.PreviousLast4.Should().BeNull();
+        account.PanChangedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void RefreshProviderIdentifiers_RecordsThePreviousLastFour_WhenTheOldCardLeavesTheList()
+    {
+        var account = MakeAccount();
+
+        account.RefreshProviderIdentifiers(null, ["444444******9999"], "9999", null, ChangedAt);
+
+        account.PreviousLast4.Should().Be("1234");
+        account.PanChangedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
     public void RefreshProviderIdentifiers_RecordsNoPreviousLastFour_OnFirstPopulation()
     {
         var account = new BankAccount(UserId, "mono-1", "Monobank", "checking", "0000", "John Doe", "UAH", CreatorId, "monobank");

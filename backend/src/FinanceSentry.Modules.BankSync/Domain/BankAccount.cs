@@ -258,8 +258,11 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
         if (cardValidTo is not null && cardValidTo != CardValidTo) { CardValidTo = cardValidTo; changed = true; }
         if (last4 is { Length: 4 } && last4.All(char.IsDigit) && last4 != AccountNumberLast4)
         {
-            // A first population (empty or the "0000" placeholder) is not a card change; only a real digit-to-digit swap keeps the old value.
-            if (AccountNumberLast4.Length == 4 && AccountNumberLast4 != "0000")
+            // A first population (empty or the "0000" placeholder) is not a card change; only a real digit-to-digit swap keeps the old value,
+            // and only when the old card is gone from the provider's PAN list (a second card or a reorder is not a reissue).
+            var oldCardStillListed = maskedPans is { Length: > 0 }
+                && maskedPans.Any(pan => pan.EndsWith(AccountNumberLast4, StringComparison.Ordinal));
+            if (AccountNumberLast4.Length == 4 && AccountNumberLast4 != "0000" && !oldCardStillListed)
             {
                 PreviousLast4 = AccountNumberLast4;
                 PanChangedAt = changedAt;
