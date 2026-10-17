@@ -98,11 +98,6 @@ export class TransactionLedgerComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(TransactionLedgerStore);
-  /**
-   * The content fades in only where it replaces this visit's skeleton: a revisit that mounts with
-   * rows already in the store paints them at once instead of replaying the fade from nothing.
-   */
-  public readonly crossfade = this.store.transactions().length === 0;
   public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
   public readonly skeletonRowsPerSection = SKELETON_ROWS_PER_SECTION;
   public readonly showDelay = ASYNC_STATE_SHOW_DELAY_MS;

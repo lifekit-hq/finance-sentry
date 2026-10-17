@@ -82,11 +82,6 @@ export class AlertsComponent {
   private readonly searching = computed(() => this.store.search().trim() !== '');
 
   public readonly store = inject(AlertsStore);
-  /**
-   * The content fades in only where it replaces this visit's skeleton: a revisit that mounts with
-   * rows already in the store paints them at once instead of replaying the fade from nothing.
-   */
-  public readonly crossfade = this.store.alerts().length === 0;
   public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
   public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
   public readonly skeletonRowsPerSection = SKELETON_ROWS_PER_SECTION;
