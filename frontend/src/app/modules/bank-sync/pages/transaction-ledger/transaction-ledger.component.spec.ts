@@ -160,6 +160,20 @@ describe('TransactionLedgerComponent period chips', () => {
     });
   });
 
+  it('selects "All time" when no date filter is set', () => {
+    const {chip} = setup(null);
+    expect((chip('period-chips') as ChipRowElement).selected).toEqual(['all']);
+  });
+
+  it('drops the date filter and keeps the other params when "All time" is picked', () => {
+    const {chip, navigate} = setup('debit', {...LedgerPeriodUtils.dates('3m')});
+    pressChip(chip('period-chips'), 'all');
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {from: null, to: null, type: 'debit', category: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+
   it('selects the chip whose dates are in the URL', () => {
     const {chip} = setup(null, {...LedgerPeriodUtils.dates('3m')});
     expect((chip('period-chips') as ChipRowElement).selected).toEqual(['3m']);

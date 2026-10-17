@@ -38,7 +38,11 @@ import {
   ALL_ACCOUNTS_LABEL,
   ALL_ACCOUNTS_VALUE,
 } from '../../constants/account-filter/account-filter.constants';
-import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
+import {
+  ALL_PERIODS_LABEL,
+  ALL_PERIODS_VALUE,
+  LEDGER_PERIODS,
+} from '../../constants/ledger-period/ledger-period.constants';
 import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
@@ -109,10 +113,10 @@ export class TransactionLedgerComponent {
    */
   public readonly query = linkedSignal(() => this.store.search());
 
-  public readonly periodOptions: ChipRowOption[] = LEDGER_PERIODS.map(p => ({
-    value: p.id,
-    label: p.label,
-  }));
+  public readonly periodOptions: ChipRowOption[] = [
+    {value: ALL_PERIODS_VALUE, label: ALL_PERIODS_LABEL},
+    ...LEDGER_PERIODS.map(p => ({value: p.id, label: p.label})),
+  ];
 
   public readonly view = computed(() =>
     AsyncViewUtils.resolve({
@@ -127,12 +131,15 @@ export class TransactionLedgerComponent {
     })
   );
 
-  /** The quick period whose bounds equal the date filter; any other range selects none. */
+  /** The quick period whose bounds equal the date filter; "All time" when there is none, any other range selects nothing. */
   public readonly activePeriod = computed(() =>
     LedgerPeriodUtils.match(this.store.from(), this.store.to())
   );
 
   public readonly selectedPeriod = computed(() => {
+    if (!this.activeDateRangeLabel()) {
+      return [ALL_PERIODS_VALUE];
+    }
     const period = this.activePeriod();
     return period ? [period] : [];
   });
@@ -239,6 +246,10 @@ export class TransactionLedgerComponent {
 
   public onPeriodChange(event: Event): void {
     const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    if (value === ALL_PERIODS_VALUE) {
+      this.clearDateRange();
+      return;
+    }
     this.selectPeriod(value as LedgerPeriod);
   }
 
