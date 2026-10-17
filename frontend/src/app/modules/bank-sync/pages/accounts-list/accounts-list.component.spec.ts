@@ -667,6 +667,7 @@ describe('AccountsListComponent closed accounts', () => {
     reasonLabel: 'No longer listed by Monobank',
     lastBalance: 1250.5,
     currency: 'UAH',
+    reopenable: true,
   };
   const section = (element: HTMLElement): HTMLElement | null =>
     element.querySelector('[data-testid="closed-accounts"]');
@@ -741,6 +742,15 @@ describe('AccountsListComponent closed accounts', () => {
     expect(
       element.querySelector('[data-testid="closed-account-row"] > button cmn-menu')
     ).toBeNull();
+  });
+
+  it('offers Reopen and Remove on a delisted row, only Remove on a replaced card', () => {
+    const {fixture} = setupClosed();
+    const labels = (row: ClosedAccountRow) =>
+      fixture.componentInstance.closedAccountMenu(row).map(item => item.label);
+
+    expect(labels(closedRow)).toEqual(['Reopen', 'Remove']);
+    expect(labels({...closedRow, reopenable: false})).toEqual(['Remove']);
   });
 
   it('reopens straight away, without asking', () => {

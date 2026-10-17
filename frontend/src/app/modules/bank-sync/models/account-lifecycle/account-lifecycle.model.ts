@@ -10,6 +10,8 @@ export interface ClosedAccountRow {
   /** The balance the account held when it closed, not a live figure. */
   lastBalance: number;
   currency: string;
+  /** False for a card replaced by a live successor: reopening it would count the same money twice. */
+  reopenable: boolean;
 }
 
 /** The quiet lines under a live account row; each is null when it does not apply. */

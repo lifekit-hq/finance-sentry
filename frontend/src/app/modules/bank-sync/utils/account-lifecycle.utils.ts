@@ -101,6 +101,7 @@ export class AccountLifecycleUtils {
       reasonLabel: AccountLifecycleUtils.closedReasonLabel(account.closedReason, account.bankName),
       lastBalance: account.currentBalance,
       currency: account.currency,
+      reopenable: account.closedReason !== CLOSED_REASON_REISSUED,
     };
   }
 

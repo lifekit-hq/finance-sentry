@@ -322,7 +322,7 @@
                 </span>
               </button>
               <cmn-menu
-                [items]="closedAccountMenu"
+                [items]="closedAccountMenu(row)"
                 [ariaLabel]="'Actions for closed ' + row.bankName + ' •••• ' + row.last4"
                 (itemSelect)="onClosedAccountAction(row, $event.id)"
               >

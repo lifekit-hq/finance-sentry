@@ -139,6 +139,20 @@ describe('AccountLifecycleUtils.closedRows', () => {
     expect(rows[0].closedLabel).toMatch(/^Closed .*2026$/);
   });
 
+  it('lets an absent card reopen but not one replaced by a live successor', () => {
+    const [replaced, absent] = AccountLifecycleUtils.closedRows([
+      account({
+        accountId: 'absent',
+        closedAt: '2026-08-01T10:00:00Z',
+        closedReason: 'absent_from_list',
+      }),
+      account({accountId: 'replaced', closedAt: '2026-10-01T10:00:00Z', closedReason: 'reissued'}),
+    ]);
+
+    expect(replaced.reopenable).toBe(false);
+    expect(absent.reopenable).toBe(true);
+  });
+
   it('words a closure date it cannot read as just Closed', () => {
     expect(AccountLifecycleUtils.closedRow(account({closedAt: 'nonsense'})).closedLabel).toBe(
       'Closed'

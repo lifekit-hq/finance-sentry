@@ -56,6 +56,7 @@ import {AccountsDisclosureUtils} from '../../utils/accounts-disclosure.utils';
 import {InstitutionNavUtils} from '../../utils/institution-nav.utils';
 import {
   CLOSED_ACCOUNT_MENU,
+  CLOSED_REPLACED_ACCOUNT_MENU,
   DISCONNECT_ONLY_MENU,
   MENU_ACTION_DISCONNECT,
   MENU_ACTION_RECONNECT,
@@ -128,7 +129,6 @@ export class AccountsListComponent implements OnInit {
   );
   public readonly investmentsRoute = AppRoute.AccountsInvestments;
   public readonly closedAccountsKey = CLOSED_ACCOUNTS_KEY;
-  public readonly closedAccountMenu = CLOSED_ACCOUNT_MENU;
   /** Closed unless this device opened it: the section is a record, not something to read on every visit. */
   public readonly closedOpen = computed(
     () => this.store.institutionOpen()[CLOSED_ACCOUNTS_KEY] ?? false
@@ -308,6 +308,10 @@ export class AccountsListComponent implements OnInit {
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
     }
+  }
+
+  public closedAccountMenu(row: ClosedAccountRow): MenuItem[] {
+    return row.reopenable ? CLOSED_ACCOUNT_MENU : CLOSED_REPLACED_ACCOUNT_MENU;
   }
 
   public onClosedAccountAction(row: ClosedAccountRow, action: string): void {
