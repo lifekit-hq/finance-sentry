@@ -9,14 +9,13 @@ export function accountsMethods(store: WritableStateSource<AccountsState>) {
     setSummary(summary: WealthSummaryResponse): void {
       patchState(store, {summary, lastSyncedAt: Date.now()});
     },
-    restoreCollapsed(): void {
-      patchState(store, {collapsedInstitutions: AccountsDisclosureUtils.read()});
+    restoreInstitutionOpen(): void {
+      patchState(store, {institutionOpen: AccountsDisclosureUtils.read()});
     },
     setInstitutionOpen(key: string, isOpen: boolean): void {
-      const rest = getState(store).collapsedInstitutions.filter(item => item !== key);
-      const collapsedInstitutions = isOpen ? rest : [...rest, key];
-      patchState(store, {collapsedInstitutions});
-      AccountsDisclosureUtils.write(collapsedInstitutions);
+      const institutionOpen = {...getState(store).institutionOpen, [key]: isOpen};
+      patchState(store, {institutionOpen});
+      AccountsDisclosureUtils.write(institutionOpen);
     },
     bumpDisconnectVersion(): void {
       patchState(store, {disconnectVersion: getState(store).disconnectVersion + 1});

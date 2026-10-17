@@ -25,13 +25,3 @@ export const RECONNECT_TARGET: Readonly<Record<string, {slug: PickableProvider; 
 /** Stable arrays, so the menu input does not change identity on every change-detection pass. */
 export const DISCONNECT_ONLY_MENU: MenuItem[] = [DISCONNECT_ITEM];
 export const RECONNECT_MENU: MenuItem[] = [RECONNECT_ITEM, DISCONNECT_ITEM];
-
-/** Status dot colour per sync variant (see `syncStatusVariant`); the relative time sits beside it. */
-export const SYNC_DOT_CLASS: Record<'success' | 'warning' | 'error' | 'neutral', string> = {
-  success: 'bg-status-success',
-  warning: 'bg-status-warning',
-  error: 'bg-status-error',
-  neutral: 'bg-text-secondary',
-};
-
-export const PHONE_MEDIA_QUERY = '(max-width: 639px)';

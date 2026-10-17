@@ -50,7 +50,7 @@
     "@lifekit-hq/core": "^3.4.0",
     "@lifekit-hq/elements": "^3.4.0",
     "@lifekit-hq/tokens": "^3.4.0",
-    "@lifekit-hq/ui": "^3.4.0",
+    "@lifekit-hq/ui": "^3.5.0",
     "@ngrx/signals": "^22.0.1",
     "chart.js": "^4.5.1",
     "deep-chat": "^2.5.0",

@@ -1,4 +1,3 @@
-import {BreakpointObserver, type BreakpointState} from '@angular/cdk/layout';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, provideRouter, Router} from '@angular/router';
@@ -28,7 +27,6 @@ const baseInstitution: Institution = {
 };
 
 function setupFixture(
-  isPhone: boolean,
   overrides: Partial<Institution> = {},
   extraProviders: unknown[] = [],
   state: {
@@ -39,7 +37,7 @@ function setupFixture(
     load?: () => void;
     totalNetWorth?: number;
     headline?: Headline;
-    collapsed?: string[];
+    open?: Record<string, boolean>;
     breakdown?: NetWorthBreakdownRow[];
     setInstitutionOpen?: (key: string, isOpen: boolean) => void;
   } = {}
@@ -52,7 +50,7 @@ function setupFixture(
     summary: signal(state.hasData ? {} : null),
     lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
-    collapsedInstitutions: signal(state.collapsed ?? []),
+    institutionOpen: signal(state.open ?? {}),
     setInstitutionOpen: state.setInstitutionOpen ?? vi.fn(),
     totalNetWorth: signal(state.totalNetWorth ?? 0),
     netWorthHeadline: signal(state.headline ?? null),
@@ -80,10 +78,6 @@ function setupFixture(
       {provide: AccountsStore, useValue: store},
       {provide: ConnectStore, useValue: {}},
       {provide: ActivatedRoute, useValue: {snapshot: {queryParamMap: new Map()}}},
-      {
-        provide: BreakpointObserver,
-        useValue: {observe: () => of({matches: isPhone, breakpoints: {}} as BreakpointState)},
-      },
       ...(extraProviders as never[]),
     ],
   });
@@ -92,49 +86,69 @@ function setupFixture(
   return fixture;
 }
 
-function setup(isPhone: boolean, overrides: Partial<Institution> = {}): HTMLElement {
-  return setupFixture(isPhone, overrides).nativeElement as HTMLElement;
+function setup(overrides: Partial<Institution> = {}): HTMLElement {
+  return setupFixture(overrides).nativeElement as HTMLElement;
 }
 
-describe('AccountsListComponent sync status text', () => {
-  it('shows "Sync failed" as row subtitle text on a phone, not by colour alone', () => {
-    const text = setup(true, {syncStatus: 'failed'}).textContent ?? '';
-    expect(text).toContain('0 accounts · Sync failed');
+describe('AccountsListComponent sync status', () => {
+  const dot = (element: HTMLElement): HTMLElement | null =>
+    element.querySelector('[data-testid="avatar-status"]');
+
+  it.each([
+    ['failed', 'bg-status-error', '0 accounts · Sync failed'],
+    ['reauth_required', 'bg-status-error', '0 accounts · Reconnect needed'],
+    ['reconnect_needed', 'bg-status-error', '0 accounts · Reconnect needed'],
+    ['pending', 'bg-status-warning', '0 accounts · Not synced yet'],
+    ['dormant', 'bg-text-disabled', '0 accounts · Dormant'],
+  ] as const)(
+    'says a %s institution in words and marks it on the avatar',
+    (syncStatus, colour, sublabel) => {
+      const element = setup({syncStatus});
+
+      expect(element.textContent).toContain(sublabel);
+      expect(dot(element)?.className).toContain(colour);
+    }
+  );
+
+  it.each([
+    ['retrying', 'Retrying just now'],
+    ['stale', 'Stale just now'],
+  ] as const)('says how long ago a %s institution last synced', (syncStatus, note) => {
+    const element = setup({syncStatus, lastSyncTimestamp: new Date().toISOString()});
+
+    expect(element.textContent).toContain(`0 accounts · ${note}`);
+    expect(dot(element)?.className).toContain('bg-status-warning');
   });
 
-  it('shows "Reconnect needed" for a reauth-required institution on a phone', () => {
-    const text = setup(true, {syncStatus: 'reauth_required'}).textContent ?? '';
-    expect(text).toContain('0 accounts · Reconnect needed');
+  it('keeps a healthy institution to the count and a green dot that names its last sync', () => {
+    const element = setup({syncStatus: 'synced', lastSyncTimestamp: new Date().toISOString()});
+
+    const sublabel = element.querySelector('cmn-disclosure-row summary')?.textContent ?? '';
+    expect(sublabel).toContain('0 accounts');
+    expect(sublabel).not.toContain('0 accounts ·');
+    expect(dot(element)?.className).toContain('bg-status-success');
+    expect(dot(element)?.getAttribute('aria-label')).toBe('Last synced just now');
   });
 
-  it('shows "Syncing…" while a sync is in progress, even with a previous timestamp', () => {
-    const element = setup(true, {
+  it('adds no text while a sync is in progress, and says so on the dot', () => {
+    const element = setup({
       syncStatus: 'syncing',
       lastSyncTimestamp: new Date().toISOString(),
     });
-    const text = element.textContent ?? '';
-    expect(text).toContain('0 accounts · Syncing…');
+
+    expect(element.textContent).not.toContain('0 accounts ·');
+    expect(dot(element)?.getAttribute('aria-label')).toBe('Syncing…');
   });
 
-  it('shows "Not synced yet" for a pending institution that never synced', () => {
-    const text = setup(true, {syncStatus: 'pending'}).textContent ?? '';
-    expect(text).toContain('0 accounts · Not synced yet');
-    expect(text).not.toContain('synced never');
+  it('gives a broken institution the same words on the dot as in the row', () => {
+    expect(dot(setup({syncStatus: 'failed'}))?.getAttribute('aria-label')).toBe('Sync failed');
   });
 
-  it('shows the bare time for a synced institution with a timestamp', () => {
-    const element = setup(true, {
-      syncStatus: 'synced',
-      lastSyncTimestamp: new Date().toISOString(),
-    });
-    const text = element.textContent ?? '';
-    expect(text).toContain('0 accounts · just now');
-  });
+  it('puts the status on the avatar, not beside the figure', () => {
+    const element = setup({syncStatus: 'synced', lastSyncTimestamp: new Date().toISOString()});
 
-  it('keeps the plain count subtitle off phone', () => {
-    const text = setup(false).textContent ?? '';
-    expect(text).toContain('0 accounts');
-    expect(text).not.toContain('0 accounts · Sync failed');
+    expect(element.querySelector('[data-testid="institution-health-label"]')).toBeNull();
+    expect(dot(element)?.closest('cmn-institution-avatar')).not.toBeNull();
   });
 });
 
@@ -148,7 +162,7 @@ describe('AccountsListComponent net worth breakdown', () => {
   });
 
   it('shows a negative category as a plain negative amount', () => {
-    const fixture = setupFixture(false, {}, [], {
+    const fixture = setupFixture({}, [], {
       hasData: true,
       totalNetWorth: 9185.73,
       breakdown: [row('Brokerage', 9278.96, 100), row('Banking', -93.23, null)],
@@ -171,8 +185,8 @@ describe('AccountsListComponent net worth quality', () => {
     currency: 'USD',
     ...overrides,
   });
-  const header = (state: Parameters<typeof setupFixture>[3]): HTMLElement =>
-    setupFixture(false, {}, [], {hasData: true, ...state}).nativeElement as HTMLElement;
+  const header = (state: Parameters<typeof setupFixture>[2]): HTMLElement =>
+    setupFixture({}, [], {hasData: true, ...state}).nativeElement as HTMLElement;
 
   it('shows no badge for a complete total', () => {
     const el = header({totalNetWorth: 1000, headline: headline({})});
@@ -219,7 +233,7 @@ describe('AccountsListComponent account row', () => {
       syncStatus: 'synced',
       lastSyncTimestamp: null,
     };
-    const fixture = setupFixture(false, {accounts: [account]});
+    const fixture = setupFixture({accounts: [account]});
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const row = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
@@ -231,8 +245,13 @@ describe('AccountsListComponent account row', () => {
   });
 });
 
-describe('AccountsListComponent investment nav rows', () => {
-  function holding(accountId: string, symbol: string, accountType: string): AccountBalanceItem {
+describe('AccountsListComponent positions in a brokerage or exchange', () => {
+  function holding(
+    accountId: string,
+    symbol: string,
+    accountType: string,
+    overrides: Partial<AccountBalanceItem> = {}
+  ): AccountBalanceItem {
     return {
       accountId,
       bankName: 'Interactive Brokers',
@@ -246,60 +265,106 @@ describe('AccountsListComponent investment nav rows', () => {
       balanceInBaseCurrency: 400,
       syncStatus: 'synced',
       lastSyncTimestamp: null,
+      ...overrides,
     };
   }
 
-  function brokerage(overrides: Partial<Institution> = {}): HTMLElement {
-    const fixture = setupFixture(false, {
-      provider: 'ibkr',
-      name: 'Interactive Brokers',
-      category: 'brokerage',
-      syncStatus: 'synced',
-      totalInBaseCurrency: 800,
-      accounts: [
-        holding('a1', 'GOOGL', 'brokerage'),
-        holding('a2', 'BRK.B', 'brokerage'),
-        holding('a3', 'USD Cash', 'cash'),
-      ],
-      ...overrides,
-    });
+  function brokerage(state: Parameters<typeof setupFixture>[2] = {}): HTMLElement {
+    const fixture = setupFixture(
+      {
+        provider: 'ibkr',
+        name: 'Interactive Brokers',
+        institutionId: 'ibkr-1',
+        category: 'brokerage',
+        syncStatus: 'synced',
+        totalInBaseCurrency: 800,
+        accounts: [
+          holding('a1', 'GOOGL', 'brokerage', {currentBalance: 40, balanceInBaseCurrency: 6800.5}),
+          holding('a2', 'BRK.B', 'brokerage', {currentBalance: 1}),
+          holding('a3', 'USD', 'cash', {currentBalance: 400}),
+        ],
+      },
+      [],
+      state
+    );
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('renders one row per brokerage with its positions, cash and total, and no position rows', () => {
+  const details = (element: HTMLElement): HTMLDetailsElement =>
+    element.querySelector('cmn-disclosure-row details') as HTMLDetailsElement;
+
+  it('is one disclosure row with the compact sublabel and the total, like a bank', () => {
     const element = brokerage();
 
-    expect(element.querySelectorAll('[data-testid="institution-nav-row"]')).toHaveLength(1);
-    expect(
-      element.querySelector('[data-testid="institution-nav-sublabel"]')?.textContent?.trim()
-    ).toBe('2 positions · $400.00 cash');
-    expect(element.querySelector('[data-testid="institution-nav-total"]')?.textContent).toContain(
+    expect(element.querySelectorAll('cmn-disclosure-row')).toHaveLength(1);
+    expect(element.querySelector('cmn-disclosure-row summary')?.textContent).toContain(
+      '2 positions · $400.00 cash'
+    );
+    expect(element.querySelector('[data-testid="institution-total"]')?.textContent).toContain(
       '$800.00'
     );
-    expect(element.textContent).not.toContain('GOOGL');
-    expect(element.querySelector('cmn-disclosure-row')).toBeNull();
   });
 
-  it('opens Investments filtered to the provider', () => {
-    const element = brokerage();
+  it('starts closed on a first visit', () => {
+    expect(details(brokerage()).open).toBe(false);
+  });
 
-    const link = element.querySelector<HTMLAnchorElement>('[data-testid="institution-nav-link"]');
+  it('opens when this device opened it', () => {
+    expect(details(brokerage({open: {'ibkr:ibkr-1': true}})).open).toBe(true);
+  });
+
+  it('lists value-first position rows: ticker, size, then value', () => {
+    const element = brokerage({open: {'ibkr:ibkr-1': true}});
+
+    const rows = element.querySelectorAll('[data-testid="position-row"]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.querySelector('[data-testid="position-ticker"]')?.textContent).toBe('GOOGL');
+    expect(rows[0]?.querySelector('[data-testid="position-quantity"]')?.textContent).toBe(
+      '40 shares'
+    );
+    expect(rows[0]?.querySelector('[data-testid="position-value"]')?.textContent).toBe('$6,800.50');
+  });
+
+  it('keeps the cash line as a labelled Cash row, not a position', () => {
+    const element = brokerage({open: {'ibkr:ibkr-1': true}});
+
+    expect(element.querySelector('[data-testid="cash-label"]')?.textContent).toBe('Cash');
+    expect(element.querySelectorAll('[data-testid="cash-row"]')).toHaveLength(1);
+  });
+
+  it('opens the asset dossier from a position row', () => {
+    const fixture = setupFixture({
+      provider: 'ibkr',
+      category: 'brokerage',
+      syncStatus: 'synced',
+      accounts: [holding('a1', 'GOOGL', 'brokerage')],
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLElement>('[data-testid="position-row"]')
+      ?.click();
+
+    expect(navigate).toHaveBeenCalledWith(['/assets', 'GOOGL']);
+  });
+
+  it('ends the list with a link to Investments filtered to the provider', () => {
+    const link = brokerage().querySelector<HTMLAnchorElement>(
+      '[data-testid="institution-investments-link"]'
+    );
+
     expect(link?.getAttribute('href')).toBe('/accounts/investments?provider=ibkr');
   });
 
-  it('keeps the actions menu outside the link, so both stay reachable', () => {
-    const element = brokerage();
-
-    const row = element.querySelector('[data-testid="institution-nav-row"]');
-    expect(row?.querySelector('cmn-menu')).not.toBeNull();
-    expect(row?.querySelector('a cmn-menu')).toBeNull();
+  it('leaves the actions menu on the row', () => {
+    expect(brokerage().querySelector('cmn-disclosure-row cmn-menu')).not.toBeNull();
   });
 
-  it('leaves banking as an expanded disclosure row', () => {
-    const element = setup(false, {syncStatus: 'synced'});
+  it('gives a bank account list no position rows or Investments link', () => {
+    const element = setup({syncStatus: 'synced'});
 
-    expect(element.querySelector('cmn-disclosure-row')).not.toBeNull();
-    expect(element.querySelector('[data-testid="institution-nav-row"]')).toBeNull();
+    expect(element.querySelector('[data-testid="position-row"]')).toBeNull();
+    expect(element.querySelector('[data-testid="institution-investments-link"]')).toBeNull();
   });
 });
 
@@ -311,7 +376,7 @@ describe('AccountsListComponent sticky sections and remembered disclosure', () =
   }
 
   it('renders each category as a list section with its subtotal in the header', () => {
-    const element = setup(true, {syncStatus: 'synced'});
+    const element = setup({syncStatus: 'synced'});
 
     const heading = element.querySelector('cmn-list-section h2');
     expect(heading?.textContent).toContain('Banks');
@@ -319,11 +384,11 @@ describe('AccountsListComponent sticky sections and remembered disclosure', () =
   });
 
   it('opens a banking group by default', () => {
-    expect(details(setup(true, {syncStatus: 'synced'})).open).toBe(true);
+    expect(details(setup({syncStatus: 'synced'})).open).toBe(true);
   });
 
   it('opens a collapsed group closed, with its total still in the summary', () => {
-    const fixture = setupFixture(true, {syncStatus: 'synced'}, [], {collapsed: [KEY]});
+    const fixture = setupFixture({syncStatus: 'synced'}, [], {open: {[KEY]: false}});
     const element = fixture.nativeElement as HTMLElement;
 
     expect(details(element).open).toBe(false);
@@ -332,7 +397,7 @@ describe('AccountsListComponent sticky sections and remembered disclosure', () =
 
   it('records the open state when the user toggles the group', () => {
     const setInstitutionOpen = vi.fn();
-    const fixture = setupFixture(true, {syncStatus: 'synced'}, [], {setInstitutionOpen});
+    const fixture = setupFixture({syncStatus: 'synced'}, [], {setInstitutionOpen});
     const group = details(fixture.nativeElement as HTMLElement);
 
     group.open = false;
@@ -347,7 +412,7 @@ describe('AccountsListComponent attention row and subtotals', () => {
 
   it('shows a reconnect row at the top for an institution that needs reauth', () => {
     const frozenSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
-    const element = setup(true, {
+    const element = setup({
       name: 'AIB',
       syncStatus: 'reauth_required',
       lastSuccessfulSyncTimestamp: frozenSince,
@@ -361,7 +426,7 @@ describe('AccountsListComponent attention row and subtotals', () => {
   });
 
   it('shows no reconnect button on the attention row of a failed sync', () => {
-    const element = setup(true, {name: 'Monzo', syncStatus: 'failed'});
+    const element = setup({name: 'Monzo', syncStatus: 'failed'});
 
     const row = element.querySelector('[data-testid="attention-row"]');
     expect(row?.textContent).toContain('Monzo sync failed');
@@ -369,13 +434,13 @@ describe('AccountsListComponent attention row and subtotals', () => {
   });
 
   it('shows no attention row for a healthy institution', () => {
-    const element = setup(true, {syncStatus: 'synced'});
+    const element = setup({syncStatus: 'synced'});
 
     expect(element.querySelector('[data-testid="attention-row"]')).toBeNull();
   });
 
   it('shows the section subtotal instead of an institution count', () => {
-    const element = setup(false, {syncStatus: 'synced'});
+    const element = setup({syncStatus: 'synced'});
 
     expect(element.querySelector('[data-testid="section-subtotal"]')?.textContent).toContain(
       '$100.00'
@@ -388,7 +453,7 @@ describe('AccountsListComponent reconnect and disconnect', () => {
   function setupActions(provider: string) {
     const connectStore = {openModal: vi.fn(), selectPickedProvider: vi.fn()};
     const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
-    const fixture = setupFixture(false, {provider, syncStatus: 'reauth_required'}, [
+    const fixture = setupFixture({provider, syncStatus: 'reauth_required'}, [
       {provide: ConnectStore, useValue: connectStore},
       {provide: CmnDialogService, useValue: dialog},
     ]);
@@ -432,8 +497,8 @@ describe('AccountsListComponent reconnect and disconnect', () => {
 });
 
 describe('AccountsListComponent async states', () => {
-  const render = (state: Parameters<typeof setupFixture>[3]): HTMLElement =>
-    setupFixture(false, {}, [], state).nativeElement as HTMLElement;
+  const render = (state: Parameters<typeof setupFixture>[2]): HTMLElement =>
+    setupFixture({}, [], state).nativeElement as HTMLElement;
 
   it('shows skeleton rows and no institutions while loading', () => {
     const el = render({isLoading: true});
@@ -508,38 +573,8 @@ describe('AccountsListComponent connection-health labels', () => {
     lastSyncTimestamp: null,
   };
 
-  it.each([
-    ['retrying', 'Retrying · just now'],
-    ['reconnect_needed', 'Reconnect needed'],
-    ['dormant', 'Dormant'],
-  ] as const)('labels a %s institution "%s" on a phone', (syncStatus, label) => {
-    const text = setup(true, {syncStatus, lastSyncTimestamp: new Date().toISOString()}).textContent;
-    expect(text).toContain(`0 accounts · ${label}`);
-  });
-
-  it.each([
-    ['retrying', 'Retrying'],
-    ['dormant', 'Dormant'],
-  ] as const)('says %s quietly on desktop, never in the error colour', (syncStatus, label) => {
-    const element = setup(false, {syncStatus, lastSyncTimestamp: new Date().toISOString()});
-
-    const note = element.querySelector('[data-testid="institution-health-label"]');
-    expect(note?.textContent?.trim()).toBe(label);
-    expect(element.querySelector('.text-status-error')).toBeNull();
-  });
-
-  it('marks a retrying institution with the warning dot and a dormant one with the neutral dot', () => {
-    expect(
-      setup(false, {syncStatus: 'retrying'}).querySelector('.bg-status-warning')
-    ).not.toBeNull();
-    TestBed.resetTestingModule();
-    expect(
-      setup(false, {syncStatus: 'dormant'}).querySelector('.bg-text-secondary')
-    ).not.toBeNull();
-  });
-
   it('asks for a reconnect on the attention row and in the row, as for a reauth', () => {
-    const element = setup(true, {name: 'AIB', syncStatus: 'reconnect_needed'});
+    const element = setup({name: 'AIB', syncStatus: 'reconnect_needed'});
 
     const row = element.querySelector('[data-testid="attention-row"]');
     expect(row?.textContent).toContain('AIB needs reconnecting');
@@ -549,12 +584,12 @@ describe('AccountsListComponent connection-health labels', () => {
   it.each(['retrying', 'dormant'] as const)(
     'raises no attention row for a %s institution',
     syncStatus => {
-      expect(setup(true, {syncStatus}).querySelector('[data-testid="attention-row"]')).toBeNull();
+      expect(setup({syncStatus}).querySelector('[data-testid="attention-row"]')).toBeNull();
     }
   );
 
   it('labels a Dormant account quietly in its row', () => {
-    const element = setupFixture(false, {
+    const element = setupFixture({
       provider: 'monobank',
       syncStatus: 'synced',
       accounts: [dormantAccount],
@@ -571,7 +606,7 @@ describe('AccountsListComponent reconnect deep link', () => {
     const connectStore = {openModal: vi.fn(), selectPickedProvider: vi.fn()};
     const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
     const navigate = vi.fn().mockResolvedValue(true);
-    setupFixture(false, {provider, syncStatus: 'reconnect_needed'}, [
+    setupFixture({provider, syncStatus: 'reconnect_needed'}, [
       {provide: ConnectStore, useValue: connectStore},
       {provide: CmnDialogService, useValue: dialog},
       {provide: Router, useValue: {navigate}},

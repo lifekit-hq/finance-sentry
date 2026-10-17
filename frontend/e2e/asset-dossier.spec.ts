@@ -149,14 +149,28 @@ test.describe('Asset Dossier', () => {
     await expect(page).toHaveURL(/\/accounts\/investments/);
   });
 
-  test('accounts list brokerage row opens investments filtered to its provider', async ({page}) => {
+  test('accounts list brokerage row opens in place and links to investments for its provider', async ({
+    page,
+  }) => {
     await page.goto('/accounts/list');
-    const link = page.getByTestId('institution-nav-link').first();
+    const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
+    await broker.locator('summary').click();
+    const link = broker.getByTestId('institution-investments-link');
     await expect(link).toBeVisible();
 
     await link.click();
 
     await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
+  });
+
+  test('accounts list position row opens the asset dossier', async ({page}) => {
+    await page.goto('/accounts/list');
+    const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
+    await broker.locator('summary').click();
+
+    await broker.getByTestId('position-row').first().click();
+
+    await expect(page).toHaveURL(/\/assets\//);
   });
 
   test('dossier page keeps tax lots collapsed and shows triggers as sentences', async ({page}) => {

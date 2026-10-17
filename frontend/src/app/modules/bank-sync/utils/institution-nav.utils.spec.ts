@@ -69,4 +69,40 @@ describe('InstitutionNavUtils', () => {
 
     expect(InstitutionNavUtils.sublabel(inst, 'asset', 'USD')).toBe('2 assets');
   });
+
+  it('words a bank by its accounts, or by its cards when it has them', () => {
+    const bank = {
+      ...institution([account('current', 1), account('savings', 2)]),
+      category: 'banking' as const,
+    };
+
+    expect(InstitutionNavUtils.sublabel(bank, 'account', 'USD')).toBe('2 accounts');
+    expect(
+      InstitutionNavUtils.sublabel({...bank, accounts: [account('current', 1)]}, 'account', 'USD')
+    ).toBe('1 account');
+    expect(
+      InstitutionNavUtils.sublabel(
+        {
+          ...bank,
+          cards: [
+            {
+              cardType: 'black',
+              displayName: 'Black',
+              totalInBaseCurrency: 1,
+              syncStatus: 'synced',
+              accounts: [],
+            },
+          ],
+        },
+        'account',
+        'USD'
+      )
+    ).toBe('1 card');
+  });
+
+  it('does not mention cash on a bank', () => {
+    const bank = {...institution([account('cash', 5)]), category: 'banking' as const};
+
+    expect(InstitutionNavUtils.sublabel(bank, 'account', 'USD')).toBe('1 account');
+  });
 });
