@@ -43,6 +43,9 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
+import {RemoveClosedAccountDialogComponent} from '../../components/remove-closed-account-dialog/remove-closed-account-dialog.component';
+import {CLOSED_ACCOUNTS_KEY} from '../../constants/accounts-disclosure/accounts-disclosure.constants';
+import {type ClosedAccountRow} from '../../models/account-lifecycle/account-lifecycle.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
 import {PositionQuantityPipe} from '../../pipes/position-quantity.pipe';
@@ -52,9 +55,12 @@ import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsDisclosureUtils} from '../../utils/accounts-disclosure.utils';
 import {InstitutionNavUtils} from '../../utils/institution-nav.utils';
 import {
+  CLOSED_ACCOUNT_MENU,
   DISCONNECT_ONLY_MENU,
   MENU_ACTION_DISCONNECT,
   MENU_ACTION_RECONNECT,
+  MENU_ACTION_REMOVE,
+  MENU_ACTION_REOPEN,
   RECONNECT_MENU,
   RECONNECT_TARGET,
 } from './accounts-list.constants';
@@ -121,6 +127,12 @@ export class AccountsListComponent implements OnInit {
     })
   );
   public readonly investmentsRoute = AppRoute.AccountsInvestments;
+  public readonly closedAccountsKey = CLOSED_ACCOUNTS_KEY;
+  public readonly closedAccountMenu = CLOSED_ACCOUNT_MENU;
+  /** Closed unless this device opened it: the section is a record, not something to read on every visit. */
+  public readonly closedOpen = computed(
+    () => this.store.institutionOpen()[CLOSED_ACCOUNTS_KEY] ?? false
+  );
 
   public ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -296,6 +308,31 @@ export class AccountsListComponent implements OnInit {
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
     }
+  }
+
+  public onClosedAccountAction(row: ClosedAccountRow, action: string): void {
+    if (action === MENU_ACTION_REOPEN) {
+      this.store.reopenAccount(row.accountId);
+    } else if (action === MENU_ACTION_REMOVE) {
+      this.removeClosed(row);
+    }
+  }
+
+  public removeClosed(row: ClosedAccountRow): void {
+    const ref = this.dialog.open<boolean>(RemoveClosedAccountDialogComponent, {
+      title: `Remove ${row.bankName} •••• ${row.last4}`,
+      size: 'sm',
+      viewContainerRef: this.viewContainerRef,
+      data: {accountLabel: `${row.bankName} •••• ${row.last4}`},
+    });
+    ref
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (confirmed === true) {
+          this.store.disconnectAccount(row.accountId);
+        }
+      });
   }
 
   public navigateToDossier(symbol: string): void {

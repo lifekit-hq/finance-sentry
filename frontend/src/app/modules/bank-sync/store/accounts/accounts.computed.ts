@@ -17,11 +17,18 @@ import {
 } from '../../../../shared/models/wealth/wealth.model';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
+import {
+  type AccountNote,
+  type ClosedAccountRow,
+} from '../../models/account-lifecycle/account-lifecycle.model';
+import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {AccountLifecycleUtils} from '../../utils/account-lifecycle.utils';
 
 const PERCENT = 100;
 
 interface StateSignals {
   summary: Signal<Nullable<WealthSummaryResponse>>;
+  allAccounts: Signal<BankAccount[]>;
   status: Signal<'idle' | 'loading' | 'success' | 'error'>;
 }
 
@@ -60,6 +67,24 @@ export function accountsComputed(store: StateSignals) {
       HeadlineUtils.isUnavailable(store.summary()?.headline)
     ),
     baseCurrency: computed(() => store.summary()?.baseCurrency ?? 'USD'),
+    // Retired accounts for the "Closed accounts" section, newest closure first.
+    closedAccounts: computed((): ClosedAccountRow[] =>
+      AccountLifecycleUtils.closedRows(store.allAccounts())
+    ),
+    // The quiet lines under a live row (card expiry, replaced card), by account id; accounts with neither are absent.
+    accountNotes: computed((): Record<string, AccountNote> => {
+      const accounts = store.allAccounts();
+      const byId = new Map(accounts.map(account => [account.accountId, account]));
+      const now = new Date();
+      return Object.fromEntries(
+        accounts
+          .filter(account => !account.closedAt)
+          .map(
+            account => [account.accountId, AccountLifecycleUtils.note(account, byId, now)] as const
+          )
+          .filter(([, note]) => note.expiry !== null || note.replacement !== null)
+      );
+    }),
     // The inventory sections, in display order. The noun is what one institution of the
     // section is called ("2 brokers"), and the child noun what its rows are ("positions").
     categorySections: computed((): CategorySection[] => {

@@ -92,6 +92,11 @@ export class BankSyncService extends ApiService {
     return this.delete<void>(accountId);
   }
 
+  /** Brings a retired account back; the next sync lists and refreshes it again. */
+  public reopenAccount(accountId: string): Observable<void> {
+    return this.post<void>(`${accountId}/reopen`);
+  }
+
   public disconnectMonobank(): Observable<void> {
     return this.delete<void>('monobank');
   }

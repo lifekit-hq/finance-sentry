@@ -1,9 +1,10 @@
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
 
 import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';
+import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {BinanceService} from '../../services/binance.service';
 import {IBKRService} from '../../services/ibkr.service';
@@ -16,6 +17,7 @@ interface EffectsStore {
   setSuccess: () => void;
   setError: (errorCode: Nullable<string>) => void;
   setSummary: (summary: WealthSummaryResponse) => void;
+  setAllAccounts: (accounts: BankAccount[]) => void;
   bumpDisconnectVersion: () => void;
 }
 
@@ -31,11 +33,33 @@ export function accountsEffects(store: EffectsStore) {
     pipe(
       tap(() => store.setLoading()),
       switchMap(() =>
-        wealthService.getSummary().pipe(
-          tap(summary => {
+        forkJoin([
+          wealthService.getSummary(),
+          // The closed section and the row notes are extras: a failed list leaves what was there, never the page.
+          bankSyncService.getAccounts().pipe(catchError(() => of(null))),
+        ]).pipe(
+          tap(([summary, accounts]) => {
             store.setSummary(summary);
+            if (accounts) {
+              store.setAllAccounts(accounts.accounts);
+            }
             store.setSuccess();
           }),
+          catchError((err: unknown) => {
+            store.setError(extractErrorCode(err));
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
+  // A retired account counts again from the next sync; the reload shows it back in its card's group.
+  const reopenAccount = rxMethod<string>(
+    pipe(
+      switchMap(accountId =>
+        bankSyncService.reopenAccount(accountId).pipe(
+          tap(() => load()),
           catchError((err: unknown) => {
             store.setError(extractErrorCode(err));
             return EMPTY;
@@ -166,6 +190,7 @@ export function accountsEffects(store: EffectsStore) {
 
   return {
     load,
+    reopenAccount,
     disconnectMonobank,
     disconnectAccount,
     disconnectInstitution,
