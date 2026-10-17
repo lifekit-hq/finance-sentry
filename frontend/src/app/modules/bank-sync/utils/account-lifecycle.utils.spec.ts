@@ -82,6 +82,27 @@ describe('AccountLifecycleUtils.replacementNote', () => {
     );
   });
 
+  it('names the previous last four of a card reissued in place on the same account', () => {
+    const reissued = account({accountNumberLast4: '1234', previousLast4: '9312'});
+
+    expect(AccountLifecycleUtils.replacementNote(reissued, new Map())).toBe(
+      'New card •••• 1234 (replaced •••• 9312)'
+    );
+  });
+
+  it('prefers the predecessor account over the previous last four', () => {
+    const old = account({accountId: 'old', accountNumberLast4: '9312'});
+    const next = account({
+      accountNumberLast4: '1234',
+      predecessorAccountId: 'old',
+      previousLast4: '5555',
+    });
+
+    expect(AccountLifecycleUtils.replacementNote(next, new Map([['old', old]]))).toBe(
+      'New card •••• 1234 (replaced •••• 9312)'
+    );
+  });
+
   it('shows nothing without a predecessor, or when it is not in the list', () => {
     expect(AccountLifecycleUtils.replacementNote(account(), new Map())).toBeNull();
     expect(

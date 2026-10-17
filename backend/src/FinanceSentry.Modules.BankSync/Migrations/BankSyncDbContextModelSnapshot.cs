@@ -116,8 +116,15 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<DateTimeOffset?>("PanChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("PredecessorAccountId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PreviousLast4")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
 
                     b.Property<string>("ProductType")
                         .HasColumnType("text");

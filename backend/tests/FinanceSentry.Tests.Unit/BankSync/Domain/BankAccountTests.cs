@@ -194,6 +194,47 @@ public class BankAccountTests
         account.SyncStatus.Should().Be("active");
     }
 
+    // ── Card reissue in place ───────────────────────────────────────────────
+
+    private static readonly DateTimeOffset ChangedAt = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void RefreshProviderIdentifiers_KeepsTheOldLastFour_WhenItChanges()
+    {
+        var account = MakeAccount();
+
+        account.RefreshProviderIdentifiers(null, null, "9999", null, ChangedAt).Should().BeTrue();
+
+        account.AccountNumberLast4.Should().Be("9999");
+        account.PreviousLast4.Should().Be("1234");
+        account.PanChangedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
+    public void RefreshProviderIdentifiers_LeavesThePreviousLastFourAlone_WhenNothingChanges()
+    {
+        var account = MakeAccount();
+        account.RefreshProviderIdentifiers(null, null, "9999", null, ChangedAt);
+
+        account.RefreshProviderIdentifiers(null, null, "9999", null, ChangedAt.AddDays(1)).Should().BeFalse();
+        account.RefreshProviderIdentifiers(null, null, null, null, ChangedAt.AddDays(1));
+
+        account.PreviousLast4.Should().Be("1234");
+        account.PanChangedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
+    public void RefreshProviderIdentifiers_RecordsNoPreviousLastFour_OnFirstPopulation()
+    {
+        var account = new BankAccount(UserId, "mono-1", "Monobank", "checking", "0000", "John Doe", "UAH", CreatorId, "monobank");
+
+        account.RefreshProviderIdentifiers(null, null, "4321", null, ChangedAt);
+
+        account.AccountNumberLast4.Should().Be("4321");
+        account.PreviousLast4.Should().BeNull();
+        account.PanChangedAt.Should().BeNull();
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static BankAccount MakeAccount()

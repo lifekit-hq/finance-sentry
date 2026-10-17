@@ -189,4 +189,19 @@ public class ClosedAccountLiveTotalsTests
         dto.ProductType.Should().Be("black");
         dto.CardValidTo.Should().Be("2026-11");
     }
+
+    [Fact]
+    public async Task The_accounts_list_carries_the_previous_last_four_of_an_in_place_card_change()
+    {
+        var card = Add("UAH", 40m, "card");
+        card.PreviousLast4 = "9312";
+        card.PanChangedAt = _clock.GetUtcNow();
+        var handler = new GetAccountsQueryHandler(Repo().Object, Jobs().Object, _clock);
+
+        var result = await handler.Handle(new GetAccountsQuery(UserId), default);
+
+        var dto = result.Accounts.Single(a => a.AccountId == card.Id);
+        dto.PreviousLast4.Should().Be("9312");
+        dto.PanChangedAt.Should().Be(_clock.GetUtcNow());
+    }
 }

@@ -16,6 +16,10 @@ export interface BankAccount extends AccountIdentity, Timestamped {
   closedReason?: Nullable<string>;
   /** The retired account this one replaced, when discovery matched a re-issued card to it. */
   predecessorAccountId?: Nullable<string>;
+  /** The last four digits before a card reissue on this same account id; null until one changes. */
+  previousLast4?: Nullable<string>;
+  /** When discovery saw the last four digits change in place. */
+  panChangedAt?: Nullable<string>;
   absentSince?: Nullable<string>;
   /** Monobank card type (`black`, `white`, …) or `card` for a TrueLayer credit card. */
   productType?: Nullable<string>;
