@@ -859,7 +859,9 @@ the same connection is its reissue: the old one retires at once (reason `Reissue
 records it as `PredecessorAccountId`; a heuristic match without an IBAN (TrueLayer card: same type, currency and last
 four) only suggests and never links. A card reissued on the **same** provider account id (Monobank) is no retirement:
 discovery refreshes the last four in place and keeps the old digits as `PreviousLast4` (with `PanChangedAt`), so the
-Accounts row can still read "New card •••• new (replaced •••• old)"; a linked predecessor takes precedence over it.
+Accounts row can still read "New card •••• new (replaced •••• old)"; nothing is kept while the old card is still in the
+provider's masked PAN list (a second card, a token or a reorder is not a reissue), and a linked predecessor takes
+precedence over it.
 
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
 settings the way Flex does in `BrokerageSyncModule`):
