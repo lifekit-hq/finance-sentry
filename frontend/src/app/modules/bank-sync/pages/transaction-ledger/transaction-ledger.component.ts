@@ -208,7 +208,11 @@ export class TransactionLedgerComponent {
     const account = accountId && this.store.accounts().find(a => a.accountId === accountId)?.label;
     const period = this.activePeriod();
     const range = this.activeDateRangeLabel();
-    const when = period ? `for ${LEDGER_PERIOD_EMPTY_PHRASES[period]}` : range ? `for ${range}` : '';
+    const when = period
+      ? `for ${LEDGER_PERIOD_EMPTY_PHRASES[period]}`
+      : range
+        ? `for ${range}`
+        : '';
     return ['No transactions', account ? `on ${account}` : '', when].filter(Boolean).join(' ');
   });
 
