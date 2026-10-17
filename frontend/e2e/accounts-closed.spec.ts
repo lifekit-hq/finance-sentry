@@ -68,6 +68,7 @@ async function shot(page: Page, name: string): Promise<void> {
     await page.locator('main').evaluate(el => (el.scrollTop = el.scrollHeight));
     await page.waitForTimeout(SCROLL_SETTLE_MS);
     await page.locator('main').evaluate(el => (el.scrollTop = el.scrollHeight));
+    await page.mouse.move(0, 0);
     await page.screenshot({path: `${SHOTS_DIR}/${name}.png`});
   }
 }

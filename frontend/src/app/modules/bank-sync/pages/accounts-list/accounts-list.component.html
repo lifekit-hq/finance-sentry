@@ -295,12 +295,12 @@
         <ul class="bg-surface-bg">
           @for (row of store.closedAccounts(); track row.accountId) {
             <li
-              class="flex items-center border-t border-border-default pr-cmn-2"
+              class="flex items-center border-t border-border-default pr-cmn-2 transition-colors hover:bg-surface-card"
               data-testid="closed-account-row"
             >
               <button
                 (click)="navigateToTransactions(row.accountId)"
-                class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left transition-colors hover:bg-surface-card"
+                class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
                 type="button"
               >
                 <span class="min-w-0">
