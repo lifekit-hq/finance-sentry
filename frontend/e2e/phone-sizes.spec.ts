@@ -55,11 +55,76 @@ const WATCHLIST = [
   },
 ];
 
+function subscription(id: string, merchantName: string, extra: Record<string, unknown> = {}) {
+  return {
+    id,
+    merchantName,
+    cadence: 'monthly',
+    averageAmount: 15.99,
+    lastKnownAmount: 15.99,
+    monthlyEquivalent: 15.99,
+    currency: 'USD',
+    lastChargeDate: '2026-08-20T00:00:00Z',
+    nextExpectedDate: '2026-11-17T00:00:00Z',
+    status: 'active',
+    occurrenceCount: 12,
+    kind: 'subscription',
+    termCount: null,
+    endDate: null,
+    startDate: null,
+    remainingPayments: null,
+    isManual: false,
+    isTracked: true,
+    ...extra,
+  };
+}
+
+const SUBSCRIPTIONS = {
+  items: [
+    subscription('s-1', 'Netflix'),
+    subscription('s-2', 'Phone plan', {
+      kind: 'installment',
+      termCount: 24,
+      remainingPayments: 9,
+      endDate: '2027-06-12T00:00:00Z',
+    }),
+  ],
+  totalCount: 2,
+  hasInsufficientHistory: false,
+};
+
+const SUMMARY_BUCKET = {
+  monthly: 0,
+  next12Months: 0,
+  remainingCommitment: null,
+  activeCount: 0,
+  hasUnknownSchedule: false,
+};
+
+const SUBSCRIPTIONS_SUMMARY = {
+  subscriptions: SUMMARY_BUCKET,
+  installments: SUMMARY_BUCKET,
+  combined: SUMMARY_BUCKET,
+  potentiallyCancelledCount: 0,
+  currency: 'USD',
+};
+
+const PEOPLE = [
+  {id: 'u-1', email: 'test@gmail.com', roles: ['Owner'], status: 'Active'},
+  {id: 'u-2', email: 'sam@example.com', roles: ['Member'], status: 'Active'},
+  {id: 'u-5', email: 'closed@example.com', roles: ['Member'], status: 'Closed'},
+];
+
 async function open(page: Page, path: string): Promise<void> {
   await mockApis(page);
   await page.route(`${API}/alerts/unread-count`, route => route.fulfill(json({count: 0})));
   await page.route(`${API}/budgets/summary**`, route => route.fulfill(json(BUDGETS)));
   await page.route(`${API}/research/watchlist`, route => route.fulfill(json(WATCHLIST)));
+  await page.route(`${API}/subscriptions?**`, route => route.fulfill(json(SUBSCRIPTIONS)));
+  await page.route(`${API}/subscriptions/summary`, route =>
+    route.fulfill(json(SUBSCRIPTIONS_SUMMARY))
+  );
+  await page.route(`${API}/people`, route => route.fulfill(json(PEOPLE)));
   await page.goto(path);
 }
 
@@ -244,5 +309,61 @@ test.describe('phone dialogs', () => {
       expect(form.y + form.height).toBeLessThan(DESKTOP.height);
       expect(form.width).toBeLessThan(DESKTOP.width / 2);
     });
+
+    const confirms: {
+      name: string;
+      path: string;
+      heading: string;
+      trigger: (page: Page) => Promise<void>;
+    }[] = [
+      {
+        name: 'watchlist remove',
+        path: '/watchlist',
+        heading: 'Remove PLTR?',
+        trigger: page => page.getByTestId('watchlist-remove').first().click(),
+      },
+      {
+        name: 'subscription dismiss',
+        path: '/subscriptions',
+        heading: 'Dismiss Netflix?',
+        trigger: async page => {
+          await page.getByRole('button', {name: 'Subscription actions'}).first().click();
+          await page.getByRole('menuitem', {name: 'Dismiss'}).click();
+        },
+      },
+      {
+        name: 'installment delete',
+        path: '/subscriptions',
+        heading: 'Delete Phone plan?',
+        trigger: async page => {
+          await page.getByRole('button', {name: 'Installment actions'}).first().click();
+          await page.getByRole('menuitem', {name: 'Delete'}).click();
+        },
+      },
+      {
+        name: 'person revoke',
+        path: '/settings/people',
+        heading: 'Revoke access for sam@example.com?',
+        trigger: page => page.getByRole('button', {name: 'Revoke'}).first().click(),
+      },
+      {
+        name: 'person reopen',
+        path: '/settings/people',
+        heading: 'Reopen closed@example.com?',
+        trigger: page => page.getByRole('button', {name: 'Reopen'}).first().click(),
+      },
+    ];
+
+    for (const confirm of confirms) {
+      test(`${confirm.name} confirm shows one heading and no container header`, async ({page}) => {
+        await open(page, confirm.path);
+        await confirm.trigger(page);
+        const container = page.locator('cmn-dialog-container');
+        await expect(container).toHaveAttribute('data-presentation', 'dialog');
+        await expect(container.getByRole('heading')).toHaveCount(1);
+        await expect(container.getByRole('heading', {name: confirm.heading})).toBeVisible();
+        await expect(container.locator('.cmn-dialog-shell__header')).toHaveCount(0);
+      });
+    }
   });
 });

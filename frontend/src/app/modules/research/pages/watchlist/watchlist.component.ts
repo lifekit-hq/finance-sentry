@@ -25,6 +25,7 @@ import {take} from 'rxjs';
 
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {
   PENDING_ID_PREFIX,
   WATCHLIST_EMPTY_COPY,
@@ -122,7 +123,7 @@ export class WatchlistComponent {
           cancelLabel: 'Keep',
           confirmVariant: 'destructive',
         },
-        title: `Remove ${row.ticker}?`,
+        title: DialogUtils.phoneTitle(`Remove ${row.ticker}?`),
         size: 'sm',
         phone: 'action-sheet',
         cancelLabel: 'Keep',
