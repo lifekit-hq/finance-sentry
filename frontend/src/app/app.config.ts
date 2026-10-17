@@ -18,8 +18,13 @@ import {authInterceptor} from './modules/auth/interceptors/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    // Bottom tabs preload on idle (skipped under Save-Data or metered).
-    provideRouter(APP_ROUTES, withPreloading(TabPreloadStrategy), withLkViewTransitions()),
+    // Bottom tabs preload on idle (skipped under Save-Data or metered). The first load is not
+    // crossfaded: the fade would hold the page's first taps and screenshots behind the snapshot.
+    provideRouter(
+      APP_ROUTES,
+      withPreloading(TabPreloadStrategy),
+      withLkViewTransitions({skipInitialTransition: true})
+    ),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     provideApiBaseUrl(environment.apiBaseUrl),
     provideErrorHandler(),
