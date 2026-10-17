@@ -1,5 +1,6 @@
 using System.Globalization;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
@@ -40,7 +41,6 @@ public sealed class RevolutXAdapter(
     private const string PendingStatus = "pending";
     private const string ReceiveType = "receive";
     private const string SendType = "send";
-    private const string ExternalCryptoWallet = "external_crypto_wallet";
     private const string RewardType = "reward";
 
     // A transfer pending longer than this stops holding the walk back, so a stuck row cannot pin it forever.
@@ -326,7 +326,7 @@ public sealed class RevolutXAdapter(
 
             var isFiat = RevolutXHoldingsAggregator.IsFiat(unit, currenciesTask.Result);
             var counterparty = other?.Account?.Type?.Trim().ToLowerInvariant();
-            var chain = !isFiat && counterparty == ExternalCryptoWallet
+            var chain = !isFiat && CryptoFlowClassifier.IsExternalWalletType(counterparty)
                 ? await ChainDetailsAsync(credentials, row.Id, type == SendType, unit, amount.Value, ct)
                 : null;
             flows.Add(new CryptoFlow(

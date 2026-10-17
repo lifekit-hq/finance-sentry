@@ -25,6 +25,14 @@ public static class CryptoFlowClassifier
     /// <summary>The Revolut X account type of a wallet outside Revolut: another venue, or anyone's wallet.</summary>
     public const string ExternalCryptoWallet = "external_crypto_wallet";
 
+    /// <summary>The spelling Revolut X's API reports for the same account type (seen on a live SOL send).</summary>
+    public const string ExternalCrypto = "external_crypto";
+
+    /// <summary>True for either spelling of the Revolut X external-wallet account type.</summary>
+    public static bool IsExternalWalletType(string? counterpartyRef) =>
+        string.Equals(counterpartyRef, ExternalCryptoWallet, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(counterpartyRef, ExternalCrypto, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The counterparty a Binance chain leg records for a transfer with another Binance account.</summary>
     public const string BinanceInternalTransfer = "binance_internal";
 
@@ -98,6 +106,5 @@ public static class CryptoFlowClassifier
     private static bool IsBinanceInternal(CryptoFlowEvent flow) =>
         string.Equals(flow.CounterpartyRef, BinanceInternalTransfer, StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsExternalWallet(CryptoFlowEvent flow) =>
-        string.Equals(flow.CounterpartyRef, ExternalCryptoWallet, StringComparison.OrdinalIgnoreCase);
+    private static bool IsExternalWallet(CryptoFlowEvent flow) => IsExternalWalletType(flow.CounterpartyRef);
 }

@@ -1,4 +1,5 @@
 using System.Web;
+using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
@@ -224,6 +225,23 @@ public class RevolutXFlowWalkTests
         (flow.Amount, flow.Fee, flow.FeeUnit, flow.TxRef, flow.Network).Should().Be((0.5m, (decimal?)0.0001m, "BTC", "0xABCDEF0123", "BITCOIN"));
         _handler.Requests.Where(r => r.RequestUri!.AbsolutePath.StartsWith($"{TransactionsPath}/", StringComparison.Ordinal))
             .Should().ContainSingle("only a transfer with an external crypto wallet is looked up, not the fiat receive");
+    }
+
+    [Fact]
+    public async Task ASendReportedAsExternalCrypto_TakesItsHashNetworkAndFeeFromItsDetails()
+    {
+        // The live API spells the external-wallet account type "external_crypto".
+        var send = Row(SendToWalletId, "completed", "send",
+            Leg("0.5001", "BTC", "revolut_x"), Leg("0.5", "BTC", "external_crypto"), 1700000200000, 1700000300000);
+        _handler.Respond(TransactionsPath, Page(null, send));
+        _handler.Respond($"{TransactionsPath}/{SendToWalletId}",
+            Details(SendToWalletId, "send", "0.5001", fee: "0.0001", hash: "5VERv8NMvzbJ", network: "SOLANA"));
+
+        var flow = (await WalkAsync()).Flows.Should().ContainSingle().Subject;
+
+        (flow.CounterpartyRef, flow.TxRef, flow.Network, flow.Fee).Should().Be(("external_crypto", "5VERv8NMvzbJ", "SOLANA", (decimal?)0.0001m));
+        CryptoFlowClassifier.ChainTransfer(CryptoFlowEvent.Create(Guid.NewGuid(), CryptoExchangeProvider.RevolutX, flow, DateTime.UtcNow))
+            .Should().Be(CryptoTransferDirection.Out);
     }
 
     [Fact]

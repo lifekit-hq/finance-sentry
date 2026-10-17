@@ -1027,7 +1027,7 @@ are closed periods.
     to 30 days; a transfer with another Binance account (`transferType` 1) is marked `binance_internal`.
     Revolut X: completed `receive` and `send` transfers (`/transactions`) and `reward` (staking income, a separate request per window: a rejected one is skipped with a warning, so that income stays in the market remainder; rewards paid before this release are not fetched for a credential whose flow walk already passed them, and stay in the market remainder until a separate backfill), with the other side's account type
     kept (`revolut` = the owner's own Revolut app, `external_*` = outside); a coin transfer with an
-    `external_crypto_wallet` also reads its details (`/transactions/{id}`) for the chain hash and network, and a
+    `external_crypto_wallet` (or `external_crypto`, the spelling a live send reported) also reads its details (`/transactions/{id}`) for the chain hash and network, and a
     send whose fee is named in the sent coin is stored at what went on chain with that fee apart.
     S2c adds Binance's earn and
     dust history, read with the window's last lane (one day, once per window, best-effort: a call the key is not

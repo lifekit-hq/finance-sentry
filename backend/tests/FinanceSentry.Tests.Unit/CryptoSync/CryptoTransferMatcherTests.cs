@@ -48,6 +48,17 @@ public class CryptoTransferMatcherTests
     }
 
     [Fact]
+    public void ASendReportedAsExternalCrypto_PairsWithABinanceDeposit_AsOneMove()
+    {
+        var send = Row(CryptoExchangeProvider.RevolutX, CryptoFlowTypes.Send, 7.054m, "SOL", "external_crypto", Mar3, 0.013m, "H", "SOLANA");
+        var deposit = BinanceDeposit(7.054m, hash: "H");
+
+        var pair = CryptoTransferMatcher.Match([send, deposit]).Should().ContainSingle().Subject;
+
+        (pair.Sent, pair.Received, pair.Fee).Should().Be((send, deposit, 0.013m));
+    }
+
+    [Fact]
     public void Fixture11_AHexHash_MatchesWhateverItsCaseOr0xPrefix()
     {
         var withdrawal = BinanceWithdrawal(1m, hash: "0xAB0000000000000000000000000000000000000000000000000000000000001", at: Mar3.AddDays(-40));
