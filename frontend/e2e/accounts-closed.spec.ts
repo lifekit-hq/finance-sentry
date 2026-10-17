@@ -51,10 +51,10 @@ const ACCOUNTS = {
   ],
 };
 
-async function open(page: Page): Promise<void> {
+async function open(page: Page, payload = ACCOUNTS): Promise<void> {
   await mockApis(page);
   await mockAccounts(page);
-  await mockGet(page, 'accounts', ACCOUNTS);
+  await mockGet(page, 'accounts', payload);
   await page.route(`${API}/alerts/unread-count`, route =>
     route.fulfill({contentType: 'application/json', body: JSON.stringify({count: 0})})
   );
@@ -128,3 +128,48 @@ for (const [label, viewport] of [
     });
   });
 }
+
+test.describe('replacement note on a live card', () => {
+  const openWith = async (page: Page, accounts: Record<string, unknown>[]): Promise<void> => {
+    await open(page, {
+      accounts: [
+        bankAccount({
+          accountId: 'acc-gone',
+          accountNumberLast4: '9312',
+          closedAt: '2026-08-30T08:00:00Z',
+          closedReason: 'reissued',
+        }),
+        ...accounts,
+      ],
+    });
+  };
+
+  test('shows the previous last four of an in-place reissue', async ({page}) => {
+    await openWith(page, [
+      bankAccount({accountId: 'acc-monzo', accountNumberLast4: '4821', previousLast4: '9312'}),
+    ]);
+    await expect(page.getByTestId('account-replacement-note')).toHaveText(
+      'New card •••• 4821 (replaced •••• 9312)'
+    );
+  });
+
+  test('prefers the predecessor account over previousLast4', async ({page}) => {
+    await openWith(page, [
+      bankAccount({
+        accountId: 'acc-monzo',
+        accountNumberLast4: '4821',
+        previousLast4: '5555',
+        predecessorAccountId: 'acc-gone',
+      }),
+    ]);
+    await expect(page.getByTestId('account-replacement-note')).toHaveText(
+      'New card •••• 4821 (replaced •••• 9312)'
+    );
+  });
+
+  test('shows no replaced line without a previous last four or predecessor', async ({page}) => {
+    await openWith(page, [bankAccount({accountId: 'acc-monzo', accountNumberLast4: '4821'})]);
+    await expect(page.getByTestId('account-row').first()).toBeVisible();
+    await expect(page.getByTestId('account-replacement-note')).toHaveCount(0);
+  });
+});
