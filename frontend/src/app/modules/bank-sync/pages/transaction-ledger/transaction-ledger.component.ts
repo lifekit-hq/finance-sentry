@@ -58,6 +58,7 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
+import {LEDGER_PERIOD_EMPTY_PHRASES} from './transaction-ledger.constants';
 
 const SKELETON_SECTIONS = 2;
 const SKELETON_ROWS_PER_SECTION = 4;
@@ -205,16 +206,17 @@ export class TransactionLedgerComponent {
   public readonly emptyTitle = computed(() => {
     const accountId = this.store.accountId();
     const account = accountId && this.store.accounts().find(a => a.accountId === accountId)?.label;
-    const period = LEDGER_PERIODS.find(p => p.id === this.activePeriod())?.label.toLowerCase();
+    const period = this.activePeriod();
     const range = this.activeDateRangeLabel();
-    const when = period ? `in ${period}` : range ? `for ${range}` : '';
+    const when = period ? `for ${LEDGER_PERIOD_EMPTY_PHRASES[period]}` : range ? `for ${range}` : '';
     return ['No transactions', account ? `on ${account}` : '', when].filter(Boolean).join(' ');
   });
 
-  /** Widening needs a window to widen: 3M is the widest quick period, so past it only clearing helps. */
-  public readonly canWidenPeriod = computed(
-    () => this.activePeriod() !== '3m' && !!this.activeDateRangeLabel()
-  );
+  /** Only a quick period narrower than 3M can be widened to it; a custom range or 3M itself needs clearing. */
+  public readonly canWidenPeriod = computed(() => {
+    const period = this.activePeriod();
+    return period !== null && period !== '3m';
+  });
 
   public readonly dayGroups = computed(() =>
     TransactionGroupUtils.groupByDay(this.store.transactions())

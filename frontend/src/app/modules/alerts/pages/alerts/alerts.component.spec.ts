@@ -257,6 +257,30 @@ describe('AlertsComponent async states', () => {
     expect(el.textContent).toContain('All your accounts are healthy.');
   });
 
+  it('offers Show all alerts on a narrowed empty list and resets the filter and search', () => {
+    const {el, store, component, fixture} = render('error', 0, [], {search: 'rent'});
+    const showAll = () =>
+      Array.from(el.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'Show all alerts'
+      );
+
+    showAll()?.click();
+    fixture.detectChanges();
+
+    expect(store.setFilter).toHaveBeenCalledWith('all');
+    expect(component.query()).toBe('');
+  });
+
+  it('offers no Show all alerts when the inbox is simply empty', () => {
+    const {el} = render('all');
+
+    expect(
+      Array.from(el.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'Show all alerts'
+      )
+    ).toBeUndefined();
+  });
+
   it('lists the alerts once loaded', () => {
     const {el} = render('all', 1, [ALERT]);
 

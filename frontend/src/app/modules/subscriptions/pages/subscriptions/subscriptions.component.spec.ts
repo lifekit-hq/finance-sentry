@@ -208,6 +208,19 @@ describe('SubscriptionsComponent async states', () => {
     );
   });
 
+  it('opens the add dialog from the empty state', () => {
+    const {host, fixture} = render();
+    const openAdd = vi
+      .spyOn(fixture.componentInstance, 'openAdd')
+      .mockImplementation(() => undefined);
+
+    Array.from(host.querySelectorAll('button'))
+      .find(b => b.textContent?.trim() === 'Add subscription')
+      ?.click();
+
+    expect(openAdd).toHaveBeenCalledOnce();
+  });
+
   it('keeps the rows under the load error when a reload fails while offline', () => {
     const {host} = render({
       subscriptions: [NETFLIX],

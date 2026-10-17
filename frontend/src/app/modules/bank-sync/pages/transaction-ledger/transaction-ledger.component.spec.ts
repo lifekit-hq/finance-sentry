@@ -467,3 +467,68 @@ describe('TransactionLedgerComponent async states', () => {
     vi.restoreAllMocks();
   });
 });
+
+function buttonLabelled(root: HTMLElement, label: string): HTMLButtonElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+    b => b.textContent?.trim() === label
+  );
+}
+
+describe('TransactionLedgerComponent filtered empty state', () => {
+  const MONO = {accountId: 'a1', label: 'Monobank 4305'};
+
+  function filtered(extra: Record<string, string | string[]>) {
+    const ctx = setup(null, extra);
+    ctx.store.accounts.set([MONO] as never);
+    ctx.store.hasActiveFilter.set(true);
+    ctx.fixture.detectChanges();
+    return ctx;
+  }
+
+  it('names the account and the quick period', () => {
+    const {root} = filtered({account: 'a1', ...LedgerPeriodUtils.dates('this-month')});
+    expect(root.textContent).toContain('No transactions on Monobank 4305 for this month');
+  });
+
+  it('words the 3M period as the last 3 months', () => {
+    const {root} = filtered({...LedgerPeriodUtils.dates('3m')});
+    expect(root.textContent).toContain('No transactions for the last 3 months');
+  });
+
+  it('names a custom range by its dates', () => {
+    const {root} = filtered({from: '2020-01-01', to: '2020-01-31'});
+    expect(root.textContent).toContain('No transactions for 2020-01-01 – 2020-01-31');
+  });
+
+  it('names only the account when no date filter is set', () => {
+    const {root} = filtered({account: 'a1'});
+    expect(root.textContent).toContain('No transactions on Monobank 4305');
+    expect(root.textContent).not.toContain('Monobank 4305 for');
+  });
+
+  it('widens a narrower quick period to the last 3 months', () => {
+    const {root, navigate} = filtered({...LedgerPeriodUtils.dates('last-month')});
+    buttonLabelled(root, 'Show last 3 months')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: LedgerPeriodUtils.dates('3m'),
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('offers no widening from 3M or from a custom range', () => {
+    const threeMonths = filtered({...LedgerPeriodUtils.dates('3m')});
+    expect(buttonLabelled(threeMonths.root, 'Show last 3 months')).toBeUndefined();
+    TestBed.resetTestingModule();
+    const custom = filtered({from: '2020-01-01', to: '2020-01-31'});
+    expect(buttonLabelled(custom.root, 'Show last 3 months')).toBeUndefined();
+  });
+
+  it('clears the account, search and every filter from the URL', () => {
+    const {root, navigate} = filtered({account: 'a1', q: 'x', ...LedgerPeriodUtils.dates('3m')});
+    buttonLabelled(root, 'Clear filters')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {account: null, q: null, from: null, to: null, type: null, category: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+});
