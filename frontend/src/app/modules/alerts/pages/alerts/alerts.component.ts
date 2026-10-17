@@ -135,6 +135,9 @@ export class AlertsComponent {
       : 'Try a different filter.';
   });
 
+  /** Only a narrowed list has a way out; an empty inbox has nothing to widen. */
+  public readonly canShowAll = computed(() => this.searching() || this.store.filter() !== 'all');
+
   public readonly activeFilterCount = computed(() => (this.store.filter() === 'all' ? 0 : 1));
   public readonly appliedFilters = computed<FilterBarChip[]>(() =>
     this.store.filter() === 'all'
@@ -152,6 +155,12 @@ export class AlertsComponent {
 
   public clearFilter(): void {
     this.store.setFilter('all');
+  }
+
+  /** The empty state's way out: back to the unfiltered, unsearched list. */
+  public showAll(): void {
+    this.clearFilter();
+    this.query.set('');
   }
 
   public iconFor(type: AlertType): LucideIconName {

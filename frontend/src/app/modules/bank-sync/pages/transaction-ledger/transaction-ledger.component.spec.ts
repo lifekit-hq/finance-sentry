@@ -160,6 +160,20 @@ describe('TransactionLedgerComponent period chips', () => {
     });
   });
 
+  it('selects "All time" when no date filter is set', () => {
+    const {chip} = setup(null);
+    expect((chip('period-chips') as ChipRowElement).selected).toEqual(['all']);
+  });
+
+  it('drops the date filter and keeps the other params when "All time" is picked', () => {
+    const {chip, navigate} = setup('debit', {...LedgerPeriodUtils.dates('3m')});
+    pressChip(chip('period-chips'), 'all');
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {from: null, to: null, type: 'debit', category: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+
   it('selects the chip whose dates are in the URL', () => {
     const {chip} = setup(null, {...LedgerPeriodUtils.dates('3m')});
     expect((chip('period-chips') as ChipRowElement).selected).toEqual(['3m']);
@@ -378,7 +392,8 @@ describe('TransactionLedgerComponent async states', () => {
 
     store.hasActiveFilter.set(true);
     fixture.detectChanges();
-    expect(root.textContent).toContain('No matching transactions');
+    expect(root.textContent).toContain('Clear filters');
+    expect(root.textContent).not.toContain('Connect an account');
   });
 
   it('shows the error with a Retry that reloads the ledger', () => {
@@ -450,5 +465,80 @@ describe('TransactionLedgerComponent async states', () => {
     expect(root.textContent).not.toContain('Failed to load transactions.');
     expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
     vi.restoreAllMocks();
+  });
+});
+
+function buttonLabelled(root: HTMLElement, label: string): HTMLButtonElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+    b => b.textContent?.trim() === label
+  );
+}
+
+describe('TransactionLedgerComponent filtered empty state', () => {
+  const MONO = {accountId: 'a1', label: 'Monobank 4305'};
+
+  function filtered(extra: Record<string, string | string[]>) {
+    const ctx = setup(null, extra);
+    ctx.store.accounts.set([MONO] as never);
+    ctx.store.hasActiveFilter.set(true);
+    ctx.fixture.detectChanges();
+    return ctx;
+  }
+
+  it('names the account and the quick period', () => {
+    const {root} = filtered({account: 'a1', ...LedgerPeriodUtils.dates('this-month')});
+    expect(root.textContent).toContain('No transactions on Monobank 4305 for this month');
+  });
+
+  it('words the 3M period as the last 3 months', () => {
+    const {root} = filtered({...LedgerPeriodUtils.dates('3m')});
+    expect(root.textContent).toContain('No transactions for the last 3 months');
+  });
+
+  it('names a custom range by its dates', () => {
+    const {root} = filtered({from: '2020-01-01', to: '2020-01-31'});
+    expect(root.textContent).toContain('No transactions for 2020-01-01 – 2020-01-31');
+  });
+
+  it('names a one-sided range without a "for"', () => {
+    const from = filtered({from: '2020-01-01'});
+    expect(from.root.textContent).toContain('No transactions from 2020-01-01');
+    expect(from.root.textContent).not.toContain('for from');
+    TestBed.resetTestingModule();
+    const until = filtered({to: '2020-01-31'});
+    expect(until.root.textContent).toContain('No transactions until 2020-01-31');
+    expect(until.root.textContent).not.toContain('for until');
+  });
+
+  it('names only the account when no date filter is set', () => {
+    const {root} = filtered({account: 'a1'});
+    expect(root.textContent).toContain('No transactions on Monobank 4305');
+    expect(root.textContent).not.toContain('Monobank 4305 for');
+  });
+
+  it('widens a narrower quick period to the last 3 months', () => {
+    const {root, navigate} = filtered({...LedgerPeriodUtils.dates('last-month')});
+    buttonLabelled(root, 'Show last 3 months')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: LedgerPeriodUtils.dates('3m'),
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('offers no widening from 3M or from a custom range', () => {
+    const threeMonths = filtered({...LedgerPeriodUtils.dates('3m')});
+    expect(buttonLabelled(threeMonths.root, 'Show last 3 months')).toBeUndefined();
+    TestBed.resetTestingModule();
+    const custom = filtered({from: '2020-01-01', to: '2020-01-31'});
+    expect(buttonLabelled(custom.root, 'Show last 3 months')).toBeUndefined();
+  });
+
+  it('clears the account, search and every filter from the URL', () => {
+    const {root, navigate} = filtered({account: 'a1', q: 'x', ...LedgerPeriodUtils.dates('3m')});
+    buttonLabelled(root, 'Clear filters')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {account: null, q: null, from: null, to: null, type: null, category: null},
+      queryParamsHandling: 'merge',
+    });
   });
 });

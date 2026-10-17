@@ -18,14 +18,20 @@
       [status]="view().status"
       [errorMessage]="view().errorMessage"
       [isEmpty]="isEmpty()"
-      [emptyMessage]="noActiveCopy.message"
-      [emptySubMessage]="noActiveCopy.subMessage"
-      [emptyIcon]="noActiveCopy.icon"
       (retry)="store.load()"
       class="block space-y-cmn-5"
       errorPlacement="above"
       retryable
     >
+      <cmn-empty-state
+        [message]="noActiveCopy.message"
+        [subMessage]="noActiveCopy.subMessage"
+        [icon]="noActiveCopy.icon"
+        (action)="openAdd()"
+        actionLabel="Add subscription"
+        empty
+      />
+
       <div skeleton class="space-y-cmn-5" data-testid="subscriptions-skeleton">
         <div class="grid grid-cols-2 gap-cmn-4">
           <cmn-skeleton shape="stat" />
@@ -140,6 +146,8 @@
             [message]="noActiveCopy.message"
             [subMessage]="noActiveCopy.subMessage"
             [icon]="noActiveCopy.icon"
+            (action)="openAdd()"
+            actionLabel="Add subscription"
           />
         }
       </div>
