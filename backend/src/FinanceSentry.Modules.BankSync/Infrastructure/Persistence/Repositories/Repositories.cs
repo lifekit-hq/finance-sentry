@@ -116,6 +116,8 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
         var maskedPans = account.MaskedPans;
         var cardValidTo = account.CardValidTo;
         var last4 = account.AccountNumberLast4;
+        var previousLast4 = account.PreviousLast4;
+        var panChangedAt = account.PanChangedAt;
         await AllUsersIncludingRemoved
             .Where(ba => ba.Id == account.Id)
             .ExecuteUpdateAsync(
@@ -123,6 +125,8 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
                     .SetProperty(ba => ba.MaskedPans, maskedPans)
                     .SetProperty(ba => ba.CardValidTo, cardValidTo)
                     .SetProperty(ba => ba.AccountNumberLast4, last4)
+                    .SetProperty(ba => ba.PreviousLast4, previousLast4)
+                    .SetProperty(ba => ba.PanChangedAt, panChangedAt)
                     .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
                 cancellationToken);
     }

@@ -44,14 +44,16 @@ export class AccountLifecycleUtils {
 
   /** "New card •••• 1234 (replaced •••• 9312)" when this account took over a retired one; else null. */
   public static replacementNote(
-    account: Pick<BankAccount, 'accountNumberLast4' | 'predecessorAccountId'>,
+    account: Pick<BankAccount, 'accountNumberLast4' | 'predecessorAccountId' | 'previousLast4'>,
     byId: ReadonlyMap<string, BankAccount>
   ): Nullable<string> {
     const predecessor = account.predecessorAccountId
       ? byId.get(account.predecessorAccountId)
       : undefined;
-    return predecessor
-      ? `New card •••• ${account.accountNumberLast4} (replaced •••• ${predecessor.accountNumberLast4})`
+    // A new account linked by PredecessorAccountId wins; otherwise the same account's own previous last four.
+    const replaced = predecessor?.accountNumberLast4 ?? account.previousLast4;
+    return replaced
+      ? `New card •••• ${account.accountNumberLast4} (replaced •••• ${replaced})`
       : null;
   }
 

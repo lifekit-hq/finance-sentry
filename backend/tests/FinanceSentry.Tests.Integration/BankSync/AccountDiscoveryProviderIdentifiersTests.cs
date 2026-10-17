@@ -104,7 +104,7 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         var sut = new AccountDiscoveryService(
             connections, client.Object, refresh, monobankCredentials.Object, monobank.Object,
             new MonobankBalanceCache(TimeProvider.System), encryption.Object, accounts, jobs.Object,
-            connectionHealth, new AccountLifecycle(accounts, _alerts.Object, _clock, NullLogger<AccountLifecycle>.Instance), log);
+            connectionHealth, new AccountLifecycle(accounts, _alerts.Object, _clock, NullLogger<AccountLifecycle>.Instance), log, _clock);
         return (sut, client, monobank, monobankCredentials, log);
     }
 
@@ -334,12 +334,46 @@ public sealed class AccountDiscoveryProviderIdentifiersTests : IAsyncLifetime
         stored.Iban.Should().Be("UA213223130000026007233566001");
         stored.MaskedPans.Should().Equal("537541******4321", "444444******8765");
         stored.AccountNumberLast4.Should().Be("4321");
+        stored.PreviousLast4.Should().BeNull("populating the placeholder is not a card change");
+        stored.PanChangedAt.Should().BeNull();
         stored.SyncStatus.Should().Be("active");
         stored.CurrentBalance.Should().Be(5m);
         var absent = await ReloadAsync(gone.Id);
         absent.IsActive.Should().BeTrue();
         absent.AbsentSince.Should().Be(_clock.GetUtcNow());
         absent.ClosedAt.Should().BeNull();
+    }
+
+    [DockerRequiredFact]
+    public async Task Monobank_discovery_keeps_the_old_last_four_when_the_card_is_reissued_in_place()
+    {
+        var account = new BankAccount(_userId, "mono-1", "Monobank", "checking", "9312", "Owner", "UAH", _userId, "monobank")
+        { CurrentBalance = 5m, SyncStatus = "active" };
+        var credential = new MonobankCredential(_userId, [1], [2], [3], 1);
+        account.MonobankCredentialId = credential.Id;
+        await using (var seed = CreateContext())
+        {
+            seed.AddRange(credential, account);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        var (sut, _, monobank, credentials, _) = BuildSut(context);
+        credentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([credential]);
+        monobank.Setup(m => m.GetClientInfoAsync("token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankClientInfo("client", "Owner",
+            [
+                new MonobankAccountInfo("mono-1", "Black", "black", "537541******4321", 980, 100_00, 0,
+                    "black", "UA213223130000026007233566001", ["537541******4321"]),
+            ]));
+
+        await sut.DiscoverNewAccountsAsync();
+        await sut.DiscoverNewAccountsAsync();
+
+        var stored = await ReloadAsync(account.Id);
+        stored.AccountNumberLast4.Should().Be("4321");
+        stored.PreviousLast4.Should().Be("9312");
+        stored.PanChangedAt.Should().Be(_clock.GetUtcNow());
     }
 
     private sealed class AdjustableClock(DateTimeOffset start) : TimeProvider

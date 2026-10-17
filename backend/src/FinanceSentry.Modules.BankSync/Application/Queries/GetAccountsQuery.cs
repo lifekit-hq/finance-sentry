@@ -49,7 +49,9 @@ public record BankAccountDto(
     Guid? PredecessorAccountId = null,
     DateTimeOffset? AbsentSince = null,
     string? ProductType = null,
-    string? CardValidTo = null
+    string? CardValidTo = null,
+    string? PreviousLast4 = null,
+    DateTimeOffset? PanChangedAt = null
 );
 
 // ──────────────────────────────────────────────
@@ -102,7 +104,9 @@ public class GetAccountsQueryHandler(
             a.PredecessorAccountId,
             a.AbsentSince,
             a.ProductType,
-            a.CardValidTo
+            a.CardValidTo,
+            a.PreviousLast4,
+            a.PanChangedAt
         )).ToList();
 
         // Aggregate current balances by currency (only accounts with known balance that count in live totals: a

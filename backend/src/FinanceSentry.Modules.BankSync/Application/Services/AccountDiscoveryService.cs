@@ -50,8 +50,11 @@ public class AccountDiscoveryService(
     IBackgroundJobClient backgroundJobs,
     IBankConnectionHealth connectionHealth,
     IAccountLifecycle lifecycle,
-    ILogger<AccountDiscoveryService> logger) : IAccountDiscoveryService
+    ILogger<AccountDiscoveryService> logger,
+    TimeProvider? clock = null) : IAccountDiscoveryService
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     /// <summary>What a Monobank connection is called in its alert: the bank name its accounts carry.</summary>
     private const string MonobankBankName = "Monobank";
 
@@ -292,7 +295,8 @@ public class AccountDiscoveryService(
             return false;
 
         var previousLast4 = account.AccountNumberLast4;
-        if (account.RefreshProviderIdentifiers(iban, pans, last4 == "0000" ? null : last4, validTo))
+        if (account.RefreshProviderIdentifiers(iban, pans, last4 == "0000" ? null : last4, validTo,
+                _clock.GetUtcNow()))
         {
             try
             {

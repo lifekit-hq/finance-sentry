@@ -59,6 +59,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         bab.Property(ba => ba.Iban).HasMaxLength(34);
         bab.Property(ba => ba.MaskedPans).HasColumnType("text[]");
         bab.Property(ba => ba.CardValidTo).HasMaxLength(10);
+        bab.Property(ba => ba.PreviousLast4).HasMaxLength(4);
         bab.Property(ba => ba.ClosedReason).HasMaxLength(50);
         bab.Property(ba => ba.ClosedBy).HasMaxLength(64);
         bab.Property(ba => ba.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");

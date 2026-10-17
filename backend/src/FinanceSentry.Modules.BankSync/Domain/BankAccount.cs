@@ -89,6 +89,12 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     /// <summary><see cref="AccountClosedReasons.BySystem"/> when discovery retired it.</summary>
     public string? ClosedBy { get; set; }
 
+    /// <summary>The last four digits this account carried before a card reissue on the same account id; null until one changes.</summary>
+    public string? PreviousLast4 { get; set; }
+
+    /// <summary>When discovery saw the last four digits change in place; null until one does.</summary>
+    public DateTimeOffset? PanChangedAt { get; set; }
+
     /// <summary>The account this one replaced after a reissue (exact IBAN match); null otherwise.</summary>
     public Guid? PredecessorAccountId { get; set; }
 
@@ -243,13 +249,28 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     /// Writes the identifiers a discovery read lists onto an existing row and refreshes the last four digits.
     /// A null argument leaves its field alone (the provider did not list it). Returns whether anything changed.
     /// </summary>
-    public bool RefreshProviderIdentifiers(string? iban, string[]? maskedPans, string? last4, string? cardValidTo)
+    public bool RefreshProviderIdentifiers(string? iban, string[]? maskedPans, string? last4, string? cardValidTo,
+        DateTimeOffset changedAt)
     {
         var changed = false;
         if (iban is not null && iban != Iban) { Iban = iban; changed = true; }
         if (maskedPans is { Length: > 0 } && !maskedPans.SequenceEqual(MaskedPans ?? [])) { MaskedPans = maskedPans; changed = true; }
         if (cardValidTo is not null && cardValidTo != CardValidTo) { CardValidTo = cardValidTo; changed = true; }
-        if (last4 is { Length: 4 } && last4.All(char.IsDigit) && last4 != AccountNumberLast4) { AccountNumberLast4 = last4; changed = true; }
+        if (last4 is { Length: 4 } && last4.All(char.IsDigit) && last4 != AccountNumberLast4)
+        {
+            // A first population (empty or the "0000" placeholder) is not a card change; only a real digit-to-digit swap keeps the old value,
+            // and only when the old card is gone from the provider's PAN list (a second card or a reorder is not a reissue).
+            var oldCardStillListed = maskedPans is { Length: > 0 }
+                && maskedPans.Any(pan => pan.EndsWith(AccountNumberLast4, StringComparison.Ordinal));
+            if (AccountNumberLast4.Length == 4 && AccountNumberLast4 != "0000" && !oldCardStillListed)
+            {
+                PreviousLast4 = AccountNumberLast4;
+                PanChangedAt = changedAt;
+            }
+
+            AccountNumberLast4 = last4;
+            changed = true;
+        }
         return changed;
     }
 
