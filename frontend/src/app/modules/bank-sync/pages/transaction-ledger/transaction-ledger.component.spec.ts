@@ -378,7 +378,8 @@ describe('TransactionLedgerComponent async states', () => {
 
     store.hasActiveFilter.set(true);
     fixture.detectChanges();
-    expect(root.textContent).toContain('No matching transactions');
+    expect(root.textContent).toContain('Clear filters');
+    expect(root.textContent).not.toContain('Connect an account');
   });
 
   it('shows the error with a Retry that reloads the ledger', () => {

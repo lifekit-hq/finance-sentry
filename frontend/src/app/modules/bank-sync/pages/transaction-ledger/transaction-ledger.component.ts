@@ -194,6 +194,21 @@ export class TransactionLedgerComponent {
   /** Badge on the filter button: one per period, type and category in play. */
   public readonly activeFilterCount = computed(() => this.appliedFilters().length);
 
+  /** Names the account and period in play so an empty list says what it is empty of. */
+  public readonly emptyTitle = computed(() => {
+    const accountId = this.store.accountId();
+    const account = accountId && this.store.accounts().find(a => a.accountId === accountId)?.label;
+    const period = LEDGER_PERIODS.find(p => p.id === this.activePeriod())?.label.toLowerCase();
+    const range = this.activeDateRangeLabel();
+    const when = period ? `in ${period}` : range ? `for ${range}` : '';
+    return ['No transactions', account ? `on ${account}` : '', when].filter(Boolean).join(' ');
+  });
+
+  /** Widening needs a window to widen: 3M is the widest quick period, so past it only clearing helps. */
+  public readonly canWidenPeriod = computed(
+    () => this.activePeriod() !== '3m' && !!this.activeDateRangeLabel()
+  );
+
   public readonly dayGroups = computed(() =>
     TransactionGroupUtils.groupByDay(this.store.transactions())
   );
@@ -236,6 +251,14 @@ export class TransactionLedgerComponent {
 
   public clearFilters(): void {
     this.applySelection(EMPTY_TRANSACTION_FILTER);
+  }
+
+  /** The empty state's way out: drops the account and search too, which the filter sheet does not own. */
+  public clearAllFilters(): void {
+    void this.router.navigate([], {
+      queryParams: {account: null, q: null, from: null, to: null, type: null, category: null},
+      queryParamsHandling: 'merge',
+    });
   }
 
   public removeCategory(key: string): void {

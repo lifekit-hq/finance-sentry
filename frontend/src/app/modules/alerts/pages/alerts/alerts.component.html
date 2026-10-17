@@ -42,6 +42,8 @@
       <cmn-empty-state
         [message]="emptyTitle()"
         [subMessage]="emptySubtext()"
+        [actionLabel]="canShowAll() ? 'Show all alerts' : null"
+        (action)="showAll()"
         icon="CheckCircle2"
         iconClass="text-status-success"
       />

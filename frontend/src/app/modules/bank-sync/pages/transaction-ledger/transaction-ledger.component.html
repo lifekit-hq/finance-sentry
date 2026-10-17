@@ -5,9 +5,11 @@
       <span
         >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this month</span
       >
-      <span aria-hidden="true"> · </span>
     }
     @if (store.topCategory(); as top) {
+      @if (store.monthlyOutflow() !== null) {
+        <span aria-hidden="true"> · </span>
+      }
       <span>Top category: {{ top }}</span>
     }
   </p>
@@ -78,8 +80,13 @@
     <div empty class="flex min-h-0 flex-1 items-center justify-center">
       @if (store.hasActiveFilter() || appliedFilters().length > 0) {
         <cmn-empty-state
-          message="No matching transactions"
-          subMessage="Try a different search or filter."
+          [message]="emptyTitle()"
+          [actionLabel]="canWidenPeriod() ? 'Show last 3 months' : null"
+          (action)="selectPeriod('3m')"
+          (secondaryAction)="clearAllFilters()"
+          subMessage="Nothing matches the search and filters you've set."
+          icon="SearchX"
+          secondaryLabel="Clear filters"
         />
       } @else {
         <cmn-empty-state
