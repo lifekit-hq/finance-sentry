@@ -8,6 +8,8 @@ public record CreateInviteCommand(string Email) : ICommand<InviteDto>;
 
 /// <summary>
 /// An invited person: a passwordless account that the first identity-provider sign-in with the same verified
-/// email links to. There is no mailer and no invite link, so the owner tells the person to sign in.
+/// email links to. There is no mailer and no invite link, so the owner tells the person to sign in. An invite is
+/// one way to an account; the identity provider's app role is the other: a first verified sign-in that carries it
+/// creates the same Member account (<see cref="ExternalLoginCommandHandler"/>).
 /// </summary>
 public record InviteDto(string UserId, string Email);

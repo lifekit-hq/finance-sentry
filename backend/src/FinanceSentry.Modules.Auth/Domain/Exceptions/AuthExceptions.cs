@@ -39,7 +39,7 @@ public sealed class AccountUpdateConflictException()
     : ApiException(409, "ACCOUNT_UPDATE_CONFLICT", "Your account was changed elsewhere. Reload and try again.");
 
 public sealed class AccountNotInvitedException()
-    : ApiException(403, "ACCOUNT_NOT_INVITED", "No account exists for this email. Ask the owner for an invite.");
+    : ApiException(403, "ACCOUNT_NOT_INVITED", "This sign-in has no access to Finance Sentry. Ask the owner for access.");
 
 public sealed class CannotRevokeSelfException()
     : ApiException(400, "CANNOT_REVOKE_SELF", "You cannot revoke your own access.");

@@ -3,7 +3,8 @@ namespace FinanceSentry.Modules.Auth.Domain.People;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 
 /// <summary>
-/// Where an account stands in invite-only onboarding, derived from Identity state rather than stored:
+/// Where an account stands in onboarding (a People-page invite or an identity-provider role grant), derived from
+/// Identity state rather than stored:
 /// <list type="bullet">
 /// <item><see cref="Invited"/>: created from the People page, no password set and no external login linked yet.</item>
 /// <item><see cref="Active"/>: can sign in.</item>

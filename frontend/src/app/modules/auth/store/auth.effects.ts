@@ -44,7 +44,7 @@ function flashFromParams(
   if (info === SIGNED_OUT_INFO) {
     return {kind: 'info', text: 'You have been signed out.'};
   }
-  // The OIDC callback bounces here with the API's error code (ACCOUNT_NOT_INVITED, ...). Any code is a message:
+  // The OIDC callback bounces here with the API's error code (ACCOUNT_UNAVAILABLE, ...). Any code is a message:
   // an unregistered one must still hold the OIDC-only forward, or a failing sign-in would loop.
   return error === null ? null : {kind: 'error', text: resolveCode(error) ?? UNKNOWN_FAILURE_TEXT};
 }
