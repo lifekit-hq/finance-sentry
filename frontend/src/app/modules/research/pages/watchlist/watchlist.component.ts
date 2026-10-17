@@ -122,7 +122,10 @@ export class WatchlistComponent {
           cancelLabel: 'Keep',
           confirmVariant: 'destructive',
         },
+        title: `Remove ${row.ticker}?`,
         size: 'sm',
+        phone: 'action-sheet',
+        cancelLabel: 'Keep',
         viewContainerRef: this.viewContainerRef,
       })
       .afterClosed()

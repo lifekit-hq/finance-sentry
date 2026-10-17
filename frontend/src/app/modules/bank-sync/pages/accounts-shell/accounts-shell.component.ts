@@ -54,6 +54,7 @@ export class AccountsShellComponent {
     this.dialog.open(ConnectModalComponent, {
       title: 'Connect account',
       size: 'md',
+      phone: 'full-screen',
       viewContainerRef: this.viewContainerRef,
     });
   }

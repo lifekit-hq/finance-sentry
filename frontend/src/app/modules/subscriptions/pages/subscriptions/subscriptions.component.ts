@@ -239,7 +239,10 @@ export class SubscriptionsComponent {
         cancelLabel: 'Keep',
         confirmVariant: 'destructive',
       },
+      title: `Dismiss ${sub.merchantName}?`,
       size: 'sm',
+      phone: 'action-sheet',
+      cancelLabel: 'Keep',
       viewContainerRef: this.viewContainerRef,
     });
     ref
@@ -265,7 +268,10 @@ export class SubscriptionsComponent {
         cancelLabel: 'Keep',
         confirmVariant: 'destructive',
       },
+      title: `Delete ${sub.merchantName}?`,
       size: 'sm',
+      phone: 'action-sheet',
+      cancelLabel: 'Keep',
       viewContainerRef: this.viewContainerRef,
     });
     ref

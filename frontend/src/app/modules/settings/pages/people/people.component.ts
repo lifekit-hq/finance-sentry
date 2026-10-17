@@ -90,7 +90,9 @@ export class PeopleComponent {
         cancelLabel: 'Cancel',
         confirmVariant: 'destructive',
       },
+      title: `Revoke access for ${person.email}?`,
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
     });
     ref
@@ -111,7 +113,9 @@ export class PeopleComponent {
         confirmLabel: 'Reopen account',
         cancelLabel: 'Cancel',
       },
+      title: `Reopen ${person.email}?`,
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
     });
     ref
