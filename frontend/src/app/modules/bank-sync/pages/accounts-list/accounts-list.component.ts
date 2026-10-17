@@ -1,4 +1,3 @@
-import {BreakpointObserver} from '@angular/cdk/layout';
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -8,7 +7,6 @@ import {
   OnInit,
   ViewContainerRef,
 } from '@angular/core';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
@@ -24,16 +22,19 @@ import {
   ListSectionComponent,
   MenuComponent,
   type MenuItem,
-  RelativeTimePipe,
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
-import {map, take} from 'rxjs';
+import {take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {DisclosureToggleDirective} from '../../../../shared/directives/disclosure-toggle.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
-import {type Institution} from '../../../../shared/models/wealth/wealth.model';
+import {
+  type AccountCategory,
+  type Institution,
+} from '../../../../shared/models/wealth/wealth.model';
+import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
@@ -44,6 +45,8 @@ import {ConnectModalComponent} from '../../components/connect-modal/connect-moda
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
+import {PositionQuantityPipe} from '../../pipes/position-quantity.pipe';
+import {PositionValuePipe} from '../../pipes/position-value.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsDisclosureUtils} from '../../utils/accounts-disclosure.utils';
@@ -52,10 +55,8 @@ import {
   DISCONNECT_ONLY_MENU,
   MENU_ACTION_DISCONNECT,
   MENU_ACTION_RECONNECT,
-  PHONE_MEDIA_QUERY,
   RECONNECT_MENU,
   RECONNECT_TARGET,
-  SYNC_DOT_CLASS,
 } from './accounts-list.constants';
 
 const SKELETON_ROWS = 3;
@@ -66,6 +67,7 @@ const SKELETON_SECTIONS = 2;
   imports: [
     AccountBalancePipe,
     AlertComponent,
+    AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
     CardComponent,
@@ -81,7 +83,8 @@ const SKELETON_SECTIONS = 2;
     MenuComponent,
     MoneyPipe,
     NgTemplateOutlet,
-    RelativeTimePipe,
+    PositionQuantityPipe,
+    PositionValuePipe,
     RouterLink,
     SkeletonComponent,
     SyncStatusLabelPipe,
@@ -98,12 +101,6 @@ export class AccountsListComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly connectivity = inject(ConnectivityService);
   private readonly toast = inject(ToastService);
-  private readonly isPhone = toSignal(
-    inject(BreakpointObserver)
-      .observe(PHONE_MEDIA_QUERY)
-      .pipe(map(state => state.matches)),
-    {initialValue: false}
-  );
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
@@ -123,7 +120,6 @@ export class AccountsListComponent implements OnInit {
       lastSyncedAt: this.store.lastSyncedAt(),
     })
   );
-  public readonly dotClass = SYNC_DOT_CLASS;
   public readonly investmentsRoute = AppRoute.AccountsInvestments;
 
   public ngOnInit(): void {
@@ -201,47 +197,57 @@ export class AccountsListComponent implements OnInit {
       });
   }
 
-  public rowCountLabel(institution: Institution, noun: string): string {
-    const count = institution.cards?.length || institution.accounts.length;
-    const label = institution.cards?.length ? 'card' : noun;
-    return `${count} ${label}${count === 1 ? '' : 's'}`;
-  }
-
-  /** Row subtitle: on a phone the sync status moves here as text (not colour alone). */
-  public rowSublabel(institution: Institution, noun: string): string {
-    const count = this.rowCountLabel(institution, noun);
-    return this.isPhone() ? `${count} · ${this.syncSummary(institution)}` : count;
-  }
-
   /**
-   * A brokerage or exchange row: its positions live on Investments, so it says how many and what cash it
-   * holds. A phone adds the sync text only when the connection is broken, so the line stays on one row.
+   * The row's second line, the same for every category: what it holds ("3 accounts", "14 positions ·
+   * $3,008 cash"), then the sync state in words only when something is wrong. A healthy row is just the dot.
    */
-  public navSublabel(institution: Institution, noun: string): string {
+  public sublabel(institution: Institution, noun: string): string {
     const base = InstitutionNavUtils.sublabel(institution, noun, this.store.baseCurrency());
-    return this.isPhone() && (this.needsAttention(institution) || this.hasQuietNote(institution))
-      ? `${base} · ${this.syncSummary(institution)}`
-      : base;
+    const note = this.syncNote(institution);
+    return note ? `${base} · ${note}` : base;
   }
 
-  public syncSummary(institution: Institution): string {
+  /** What is wrong with the connection, in words; null while it is healthy or merely syncing. */
+  public syncNote(institution: Institution): Nullable<string> {
     if (this.needsReconnect(institution)) {
       return 'Reconnect needed';
     }
     if (institution.syncStatus === 'failed') {
       return 'Sync failed';
     }
-    if (institution.syncStatus === 'syncing') {
-      return 'Syncing…';
-    }
     if (institution.syncStatus === 'dormant') {
       return 'Dormant';
+    }
+    if (institution.syncStatus === 'syncing') {
+      return null;
     }
     if (!institution.lastSyncTimestamp) {
       return 'Not synced yet';
     }
     const since = formatRelativeTime(institution.lastSyncTimestamp);
-    return institution.syncStatus === 'retrying' ? `Retrying · ${since}` : since;
+    if (institution.syncStatus === 'retrying') {
+      return `Retrying ${since}`;
+    }
+    return institution.syncStatus === 'stale' ? `Stale ${since}` : null;
+  }
+
+  /** The avatar dot's accessible name: the sync note, or when it last synced for a healthy row. */
+  public statusLabel(institution: Institution): string {
+    if (institution.syncStatus === 'syncing') {
+      return 'Syncing…';
+    }
+    const since = institution.lastSyncTimestamp
+      ? formatRelativeTime(institution.lastSyncTimestamp)
+      : null;
+    return this.syncNote(institution) ?? `Last synced ${since ?? 'never'}`;
+  }
+
+  /** Open as the owner left it on this device, else the category's default (banks open, brokers closed). */
+  public isOpen(institution: Institution, category: AccountCategory): boolean {
+    return (
+      this.store.institutionOpen()[this.disclosureKey(institution)] ??
+      AccountsDisclosureUtils.defaultOpen(category)
+    );
   }
 
   public disclosureKey(institution: Institution): string {
@@ -257,11 +263,6 @@ export class AccountsListComponent implements OnInit {
     return (
       institution.syncStatus === 'reauth_required' || institution.syncStatus === 'reconnect_needed'
     );
-  }
-
-  /** A failure that is being handled (retrying) or a connection presumed closed (dormant): said, but quietly. */
-  public hasQuietNote(institution: Institution): boolean {
-    return institution.syncStatus === 'retrying' || institution.syncStatus === 'dormant';
   }
 
   public attentionTitle(institution: Institution): string {
@@ -295,6 +296,10 @@ export class AccountsListComponent implements OnInit {
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
     }
+  }
+
+  public navigateToDossier(symbol: string): void {
+    void this.router.navigate([AppRoute.AssetDossier, symbol]);
   }
 
   public navigateToTransactions(accountId: string): void {

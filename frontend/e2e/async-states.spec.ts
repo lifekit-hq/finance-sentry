@@ -119,7 +119,7 @@ test.describe('cmn-async-state surfaces', () => {
     await errorAlert.getByRole('button', {name: 'Retry'}).click();
 
     await expect(errorAlert).toHaveCount(0);
-    await expect(page.getByTestId('institution-nav-row').first()).toBeVisible();
+    await expect(page.locator('cmn-disclosure-row').first()).toBeVisible();
   });
 
   test('ledger: going offline keeps the rows and says when they were last synced', async ({

@@ -1,4 +1,4 @@
-import {expect, type Page, test} from '@playwright/test';
+import {expect, type Locator, type Page, test} from '@playwright/test';
 
 import {mockAccounts} from './support/accounts-mocks';
 import {API, mockApis} from './support/dossier-mocks';
@@ -169,6 +169,12 @@ function heavySummary(): typeof SUMMARY {
   };
 }
 
+// The shell's page-overflow spacer (a transparent block after the page frame) sits over the padding of
+// library rows that overflow the frame, so a tap lands on the row's label text, as a thumb does.
+async function toggle(row: Locator, name: string): Promise<void> {
+  await row.locator('summary').getByText(name, {exact: true}).click();
+}
+
 async function openAccounts(page: Page, summary: unknown = SUMMARY): Promise<void> {
   await mockApis(page);
   await mockAccounts(page);
@@ -193,19 +199,22 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(row.getByRole('button', {name: 'Reconnect'})).toBeVisible();
     });
 
-    test('shows subtotals and one nav row per brokerage and exchange, with no sideways scroll', async ({
+    test('shows one disclosure row per institution, with a status dot on every avatar and no sideways scroll', async ({
       page,
     }) => {
       await openAccounts(page);
 
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
-      await expect(page.getByTestId('position-ticker')).toHaveCount(0);
-      const rows = page.getByTestId('institution-nav-row');
-      await expect(rows).toHaveCount(2);
-      await expect(rows.first()).toContainText('Interactive Brokers');
-      await expect(rows.first().getByTestId('institution-nav-sublabel')).toHaveText('1 position');
-      await expect(rows.first().getByTestId('institution-nav-total')).toHaveText('$6,800.00');
-      await expect(rows.nth(1).getByTestId('institution-nav-sublabel')).toHaveText('1 asset');
+      const rows = page.locator('cmn-disclosure-row');
+      await expect(rows).toHaveCount(3);
+      await expect(rows.nth(1)).toContainText('Interactive Brokers');
+      await expect(rows.nth(1)).toContainText('1 position');
+      await expect(rows.nth(1).getByTestId('institution-total')).toHaveText('$6,800.00');
+      await expect(rows.nth(2)).toContainText('1 asset');
+      await expect(page.getByTestId('avatar-status')).toHaveCount(3);
+      // Only the broken bank spells its state out; healthy rows rely on the dot alone.
+      await expect(rows.nth(0)).toContainText('Reconnect needed');
+      await expect(rows.nth(1)).not.toContainText('Synced');
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -213,16 +222,38 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       expect(overflow).toBeLessThanOrEqual(0);
     });
 
-    test('opens Investments filtered to the provider and keeps the menu reachable', async ({
+    test('opens the bank and keeps the broker and exchange closed on a first visit', async ({
       page,
     }) => {
       await openAccounts(page);
 
-      const row = page.getByTestId('institution-nav-row').first();
+      const groups = page.locator('cmn-disclosure-row details');
+      await expect(groups.nth(0)).toHaveJSProperty('open', true);
+      await expect(groups.nth(1)).toHaveJSProperty('open', false);
+      await expect(groups.nth(2)).toHaveJSProperty('open', false);
+    });
+
+    test('opens a broker in place with value-first positions and a link to Investments', async ({
+      page,
+    }) => {
+      await openAccounts(page);
+
+      const broker = page.locator('cmn-disclosure-row').nth(1);
+      await toggle(broker, 'Interactive Brokers');
+
+      const row = broker.getByTestId('position-row');
+      await expect(row).toBeVisible();
+      await expect(row.getByTestId('position-ticker')).toHaveText('GOOGL');
+      await expect(row.getByTestId('position-quantity')).toHaveText('40 shares');
+      await expect(row.getByTestId('position-value')).toHaveText('$6,800.00');
       await expect(
-        row.getByRole('button', {name: 'Actions for Interactive Brokers'})
+        broker.getByRole('button', {name: 'Actions for Interactive Brokers'})
       ).toBeVisible();
-      await row.getByTestId('institution-nav-link').click();
+
+      await broker
+        .getByTestId('institution-investments-link')
+        .getByText('Open in Investments')
+        .click();
 
       await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
     });
@@ -269,30 +300,33 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
     });
 
-    test('remembers a collapsed bank across a reload, subtotal still in the header', async ({
+    test('remembers what was opened or closed across a reload, subtotal still in the header', async ({
       page,
     }) => {
       await openAccounts(page);
-      const group = page.locator('cmn-disclosure-row details').first();
-      await expect(group).toHaveJSProperty('open', true);
+      const groups = page.locator('cmn-disclosure-row details');
+      await expect(groups.nth(0)).toHaveJSProperty('open', true);
 
-      await group.locator('summary').click();
-      await expect(group).toHaveJSProperty('open', false);
+      await toggle(groups.nth(0), 'AIB');
+      await toggle(groups.nth(1), 'Interactive Brokers');
+      await expect(groups.nth(0)).toHaveJSProperty('open', false);
+      await expect(groups.nth(1)).toHaveJSProperty('open', true);
       await expect
-        .poll(() => page.evaluate(() => localStorage.getItem('fns.accounts.collapsedInstitutions')))
-        .toContain('truelayer:aib-1');
+        .poll(() => page.evaluate(() => localStorage.getItem('fns.accounts.institutionOpen')))
+        .toBe('{"truelayer:aib-1":false,"ibkr:ibkr-1":true}');
       await page.reload();
 
-      await expect(page.locator('cmn-disclosure-row details').first()).toHaveJSProperty(
-        'open',
-        false
-      );
+      await expect(groups.nth(0)).toHaveJSProperty('open', false);
+      await expect(groups.nth(1)).toHaveJSProperty('open', true);
+      await expect(groups.nth(2)).toHaveJSProperty('open', false);
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
     });
 
-    test('keeps a 23-position portfolio within two screens', async ({page}) => {
+    test('keeps a 23-position portfolio within two screens, closed until opened', async ({
+      page,
+    }) => {
       await openAccounts(page, heavySummary());
-      await expect(page.getByTestId('institution-nav-row').first()).toBeVisible();
+      await expect(page.locator('cmn-disclosure-row').nth(1)).toBeVisible();
 
       const screens = await page.evaluate(
         () => document.documentElement.scrollHeight / window.innerHeight

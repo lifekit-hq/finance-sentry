@@ -139,7 +139,7 @@ test.describe('connection-health labels on a phone', () => {
   test('says Retrying quietly and labels a Dormant account in its row', async ({page}) => {
     await openAccounts(page);
 
-    await expect(page.getByText('1 account · Retrying · just now')).toBeVisible();
+    await expect(page.getByText('1 account · Retrying just now')).toBeVisible();
     await expect(page.getByTestId('account-dormant-label')).toHaveText('· Dormant');
 
     const overflow = await page.evaluate(
@@ -206,8 +206,7 @@ test.describe('connection-health alerts', () => {
         type: 'ConnectionDormant',
         severity: 'Info',
         title: 'Monobank ···4321 may be closed',
-        message:
-          'It has been failing for 7 days while your other accounts sync fine.',
+        message: 'It has been failing for 7 days while your other accounts sync fine.',
         appPath: '/accounts/list',
       }),
     ];
