@@ -306,8 +306,11 @@ What does not change:
 - **Past snapshots are unchanged.** Net-worth snapshots written before `ClosedAt` keep the balance they recorded; only
   snapshots from `ClosedAt` on omit it.
 - **Transactions are kept** in the ledger and in flow windows.
-- The Accounts list still shows the account (with `closedAt`, `closedReason`, `predecessorAccountId`, `absentSince`)
-  and its `currencyTotals` skip it.
+- `GET /accounts` still returns the account (with `closedAt`, `closedReason`, `predecessorAccountId`, `absentSince`,
+  and the read-only `productType` / `cardValidTo`) and its `currencyTotals` skip it. The Accounts page lists a retired
+  account in a collapsed "Closed accounts (n)" section, never in a live group, and shows its balance as the last known
+  figure at closure, not a live one. Reopen is offered on every closed row except one retired as `Reissued` (its
+  successor carries the balance, so reopening would count the same money twice); Remove is offered on all.
 
 ## 2. Liability sign convention
 
