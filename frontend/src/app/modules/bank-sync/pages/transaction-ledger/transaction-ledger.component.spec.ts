@@ -500,6 +500,16 @@ describe('TransactionLedgerComponent filtered empty state', () => {
     expect(root.textContent).toContain('No transactions for 2020-01-01 – 2020-01-31');
   });
 
+  it('names a one-sided range without a "for"', () => {
+    const from = filtered({from: '2020-01-01'});
+    expect(from.root.textContent).toContain('No transactions from 2020-01-01');
+    expect(from.root.textContent).not.toContain('for from');
+    TestBed.resetTestingModule();
+    const until = filtered({to: '2020-01-31'});
+    expect(until.root.textContent).toContain('No transactions until 2020-01-31');
+    expect(until.root.textContent).not.toContain('for until');
+  });
+
   it('names only the account when no date filter is set', () => {
     const {root} = filtered({account: 'a1'});
     expect(root.textContent).toContain('No transactions on Monobank 4305');
