@@ -10,6 +10,10 @@ import {
   type Institution,
   type NetWorthBreakdownRow,
 } from '../../../../shared/models/wealth/wealth.model';
+import {
+  type AccountNote,
+  type ClosedAccountRow,
+} from '../../models/account-lifecycle/account-lifecycle.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsListComponent} from './accounts-list.component';
@@ -40,6 +44,8 @@ function setupFixture(
     open?: Record<string, boolean>;
     breakdown?: NetWorthBreakdownRow[];
     setInstitutionOpen?: (key: string, isOpen: boolean) => void;
+    closed?: ClosedAccountRow[];
+    notes?: Record<string, AccountNote>;
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -50,6 +56,10 @@ function setupFixture(
     summary: signal(state.hasData ? {} : null),
     lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
+    closedAccounts: signal(state.closed ?? []),
+    accountNotes: signal(state.notes ?? {}),
+    reopenAccount: vi.fn(),
+    disconnectAccount: vi.fn(),
     institutionOpen: signal(state.open ?? {}),
     setInstitutionOpen: state.setInstitutionOpen ?? vi.fn(),
     totalNetWorth: signal(state.totalNetWorth ?? 0),
@@ -644,5 +654,187 @@ describe('AccountsListComponent reconnect deep link', () => {
         replaceUrl: true,
       })
     );
+  });
+});
+
+describe('AccountsListComponent closed accounts', () => {
+  const closedRow: ClosedAccountRow = {
+    accountId: 'closed-1',
+    bankName: 'Monobank',
+    kindLabel: 'Black · UAH',
+    last4: '9312',
+    closedLabel: 'Closed Mon 12 Oct 2026',
+    reasonLabel: 'No longer listed by Monobank',
+    lastBalance: 1250.5,
+    currency: 'UAH',
+    reopenable: true,
+  };
+  const section = (element: HTMLElement): HTMLElement | null =>
+    element.querySelector('[data-testid="closed-accounts"]');
+  const group = (element: HTMLElement): HTMLDetailsElement =>
+    section(element)?.querySelector('details') ?? document.createElement('details');
+
+  function setupClosed(state: Parameters<typeof setupFixture>[2] = {}) {
+    const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
+    const fixture = setupFixture(
+      {syncStatus: 'synced'},
+      [{provide: CmnDialogService, useValue: dialog}],
+      {
+        closed: [closedRow],
+        ...state,
+      }
+    );
+    const store = TestBed.inject(AccountsStore) as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
+    return {fixture, element: fixture.nativeElement as HTMLElement, dialog, store};
+  }
+
+  it('shows nothing when no account is closed', () => {
+    expect(section(setup({syncStatus: 'synced'}))).toBeNull();
+  });
+
+  it('counts the closed accounts and starts collapsed', () => {
+    const {element} = setupClosed();
+
+    expect(group(element).querySelector('summary')?.textContent).toContain('Closed accounts (1)');
+    expect(group(element).open).toBe(false);
+  });
+
+  it('opens when this device left it open, and records the toggle', () => {
+    const setInstitutionOpen = vi.fn();
+    const {element} = setupClosed({open: {'closed:accounts': true}, setInstitutionOpen});
+
+    expect(group(element).open).toBe(true);
+
+    group(element).open = false;
+    group(element).dispatchEvent(new Event('toggle'));
+    expect(setInstitutionOpen).toHaveBeenCalledWith('closed:accounts', false);
+  });
+
+  it('words a row: bank, card type, currency, last four, closed date, reason and last known balance', () => {
+    const {element} = setupClosed();
+    const row = element.querySelector('[data-testid="closed-account-row"]') ?? element;
+
+    expect(row.textContent).toContain('Monobank · Black · UAH');
+    expect(row.textContent).toContain('•••• 9312');
+    expect(row.textContent).toContain('Closed Mon 12 Oct 2026');
+    expect(row.querySelector('[data-testid="closed-reason"]')?.textContent).toContain(
+      'No longer listed by Monobank'
+    );
+    expect(row.textContent).toContain('Last known');
+    expect(row.querySelector('[data-testid="closed-last-balance"]')?.textContent).toContain(
+      '1,250.50'
+    );
+  });
+
+  it('opens the account history from the row, apart from its menu', () => {
+    const {fixture, element} = setupClosed();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    (element.querySelector('[data-testid="closed-account-row"] > button') as HTMLElement).click();
+    fixture.detectChanges();
+
+    expect(navigate).toHaveBeenCalledWith(['/transactions'], {
+      queryParams: {account: 'closed-1'},
+    });
+    expect(
+      element.querySelector('[data-testid="closed-account-row"] > button cmn-menu')
+    ).toBeNull();
+  });
+
+  it('offers Reopen and Remove on a delisted row, only Remove on a replaced card', () => {
+    const {fixture} = setupClosed();
+    const labels = (row: ClosedAccountRow) =>
+      fixture.componentInstance.closedAccountMenu(row).map(item => item.label);
+
+    expect(labels(closedRow)).toEqual(['Reopen', 'Remove']);
+    expect(labels({...closedRow, reopenable: false})).toEqual(['Remove']);
+  });
+
+  it('reopens straight away, without asking', () => {
+    const {fixture, store, dialog} = setupClosed();
+
+    fixture.componentInstance.onClosedAccountAction(closedRow, 'reopen');
+
+    expect(store['reopenAccount']).toHaveBeenCalledWith('closed-1');
+    expect(dialog.open).not.toHaveBeenCalled();
+  });
+
+  it('removes only after the owner confirms', () => {
+    const {fixture, store, dialog} = setupClosed();
+
+    fixture.componentInstance.onClosedAccountAction(closedRow, 'remove');
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({data: {accountLabel: 'Monobank •••• 9312'}})
+    );
+    expect(store['disconnectAccount']).toHaveBeenCalledWith('closed-1');
+  });
+
+  it('keeps the account when the owner cancels the removal', () => {
+    const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(false)})};
+    const fixture = setupFixture(
+      {syncStatus: 'synced'},
+      [{provide: CmnDialogService, useValue: dialog}],
+      {
+        closed: [closedRow],
+      }
+    );
+    const store = TestBed.inject(AccountsStore) as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
+
+    fixture.componentInstance.onClosedAccountAction(closedRow, 'remove');
+
+    expect(store['disconnectAccount']).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountsListComponent lifecycle notes on live rows', () => {
+  const liveAccount: AccountBalanceItem = {
+    accountId: 'acc-1',
+    bankName: 'Revolut',
+    accountType: 'credit',
+    accountNumberLast4: '1234',
+    currency: 'EUR',
+    provider: 'truelayer',
+    category: 'banking',
+    currentBalance: 10,
+    balanceInBaseCurrency: 10,
+    syncStatus: 'synced',
+    lastSyncTimestamp: null,
+  };
+
+  function noteRows(notes: Record<string, AccountNote>): HTMLElement {
+    return setupFixture({syncStatus: 'synced', accounts: [liveAccount]}, [], {notes})
+      .nativeElement as HTMLElement;
+  }
+
+  it('shows the replaced-card line and the expiry line under the row', () => {
+    const element = noteRows({
+      'acc-1': {
+        expiry: 'Card expires 01/2027',
+        replacement: 'New card •••• 1234 (replaced •••• 9312)',
+      },
+    });
+
+    expect(
+      element.querySelector('[data-testid="account-replacement-note"]')?.textContent
+    ).toContain('New card •••• 1234 (replaced •••• 9312)');
+    expect(element.querySelector('[data-testid="account-expiry-note"]')?.textContent).toContain(
+      'Card expires 01/2027'
+    );
+  });
+
+  it('shows no note line for an account without one', () => {
+    const element = noteRows({});
+
+    expect(element.querySelector('[data-testid="account-row"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="account-expiry-note"]')).toBeNull();
+    expect(element.querySelector('[data-testid="account-replacement-note"]')).toBeNull();
   });
 });

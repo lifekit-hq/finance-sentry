@@ -273,6 +273,67 @@
       </cmn-list-section>
     }
   </cmn-async-state>
+
+  @if (store.closedAccounts().length > 0) {
+    <!-- Last in the page, closed by default and kept through reloads, so opening or reopening one never moves what is above.
+         Opened, its rows overflow the shell's page frame, which drops the content's own bottom inset: the margin restores it so the last row clears the tab bar. -->
+    <cmn-card
+      [class]="
+        closedOpen()
+          ? 'mb-[calc(2rem+var(--cmn-content-inset-bottom,0px))] block'
+          : 'mb-cmn-8 block'
+      "
+      data-testid="closed-accounts"
+      padding="none"
+    >
+      <cmn-disclosure-row
+        [label]="'Closed accounts (' + store.closedAccounts().length + ')'"
+        [open]="closedOpen()"
+        (fnsDisclosureToggle)="store.setInstitutionOpen(closedAccountsKey, $event)"
+        sublabel="No longer syncing · not in your totals"
+      >
+        <ul class="bg-surface-bg">
+          @for (row of store.closedAccounts(); track row.accountId) {
+            <li
+              class="flex items-center border-t border-border-default pr-cmn-2 transition-colors hover:bg-surface-card"
+              data-testid="closed-account-row"
+            >
+              <button
+                (click)="navigateToTransactions(row.accountId)"
+                class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
+                type="button"
+              >
+                <span class="min-w-0">
+                  <span class="block truncate text-cmn-sm text-text-primary"
+                    >{{ row.bankName }} · {{ row.kindLabel }}</span
+                  >
+                  <span class="block text-cmn-xs text-text-secondary"
+                    >•••• {{ row.last4 }} · {{ row.closedLabel }}</span
+                  >
+                  <span class="block text-cmn-xs text-text-secondary" data-testid="closed-reason">{{
+                    row.reasonLabel
+                  }}</span>
+                </span>
+                <span class="shrink-0 text-right tabular-nums text-text-secondary">
+                  <span class="block text-cmn-sm" data-testid="closed-last-balance">{{
+                    row.lastBalance | money: row.currency
+                  }}</span>
+                  <span class="block text-cmn-xs">Last known</span>
+                </span>
+              </button>
+              <cmn-menu
+                [items]="closedAccountMenu(row)"
+                [ariaLabel]="'Actions for closed ' + row.bankName + ' •••• ' + row.last4"
+                (itemSelect)="onClosedAccountAction(row, $event.id)"
+              >
+                <cmn-icon name="Ellipsis" />
+              </cmn-menu>
+            </li>
+          }
+        </ul>
+      </cmn-disclosure-row>
+    </cmn-card>
+  }
 </div>
 
 <ng-template #accountRow let-account let-title="title">
@@ -292,6 +353,18 @@
           >
         }
       </p>
+      @if (store.accountNotes()[account.accountId]; as note) {
+        @if (note.replacement) {
+          <p class="text-cmn-xs text-text-secondary" data-testid="account-replacement-note">
+            {{ note.replacement }}
+          </p>
+        }
+        @if (note.expiry) {
+          <p class="text-cmn-xs text-text-secondary" data-testid="account-expiry-note">
+            {{ note.expiry }}
+          </p>
+        }
+      }
     </div>
     <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
   </button>

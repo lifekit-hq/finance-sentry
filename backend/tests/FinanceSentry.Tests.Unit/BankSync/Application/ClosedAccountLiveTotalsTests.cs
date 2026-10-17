@@ -174,4 +174,19 @@ public class ClosedAccountLiveTotalsTests
         closed.ClosedReason.Should().Be(AccountClosedReasons.Reissued);
         result.Accounts.Single(a => a.AccountId == successor.Id).PredecessorAccountId.Should().Be(retired.Id);
     }
+
+    [Fact]
+    public async Task The_accounts_list_carries_the_card_type_and_expiry_the_closed_and_expiry_lines_read()
+    {
+        var card = Add("EUR", 40m, "card");
+        card.ProductType = "black";
+        card.CardValidTo = "2026-11";
+        var handler = new GetAccountsQueryHandler(Repo().Object, Jobs().Object, _clock);
+
+        var result = await handler.Handle(new GetAccountsQuery(UserId), default);
+
+        var dto = result.Accounts.Single(a => a.AccountId == card.Id);
+        dto.ProductType.Should().Be("black");
+        dto.CardValidTo.Should().Be("2026-11");
+    }
 }

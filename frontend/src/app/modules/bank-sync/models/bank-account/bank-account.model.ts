@@ -11,6 +11,16 @@ export interface BankAccount extends AccountIdentity, Timestamped {
   lastSyncTimestamp: Nullable<string>;
   lastSyncDurationMs: Nullable<number>;
   provider: string;
+  /** Set once a sync retired the account (it vanished from the provider's list, or its card was replaced). */
+  closedAt?: Nullable<string>;
+  closedReason?: Nullable<string>;
+  /** The retired account this one replaced, when discovery matched a re-issued card to it. */
+  predecessorAccountId?: Nullable<string>;
+  absentSince?: Nullable<string>;
+  /** Monobank card type (`black`, `white`, …) or `card` for a TrueLayer credit card. */
+  productType?: Nullable<string>;
+  /** A TrueLayer card's `valid_to` as the provider sends it: year-month, e.g. `2027-01`. */
+  cardValidTo?: Nullable<string>;
 }
 
 export interface AccountsResponse {

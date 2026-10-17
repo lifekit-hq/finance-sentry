@@ -16,3 +16,6 @@ export const ACCOUNTS_DEFAULT_OPEN: Readonly<Record<AccountCategory, boolean>> =
   brokerage: false,
   crypto: false,
 };
+
+/** The "Closed accounts" section's key in the same record; it follows no category, so it starts closed. */
+export const CLOSED_ACCOUNTS_KEY = 'closed:accounts';

@@ -13,6 +13,7 @@ function category(name: CategorySummary['category']): CategorySummary {
 
 function computedFor(categories: CategorySummary[]) {
   return accountsComputed({
+    allAccounts: signal([]),
     summary: signal({
       totalNetWorth: 0,
       baseCurrency: 'USD',
