@@ -2,7 +2,7 @@
   Choose a provider type to begin syncing your assets.
 </p>
 
-<div class="grid grid-cols-3 gap-cmn-3">
+<div class="grid grid-cols-1 gap-cmn-3 min-[360px]:grid-cols-3">
   @for (tile of tiles; track tile.id) {
     <cmn-selectable-card (clicked)="select(tile.id)" orientation="vertical">
       <div

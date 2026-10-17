@@ -160,6 +160,7 @@ export class AccountsListComponent implements OnInit {
     this.dialog.open(ConnectModalComponent, {
       title: 'Connect account',
       size: 'md',
+      phone: 'full-screen',
       viewContainerRef: this.viewContainerRef,
     });
   }
@@ -174,6 +175,7 @@ export class AccountsListComponent implements OnInit {
     this.dialog.open(ConnectModalComponent, {
       title: target.title,
       size: 'md',
+      phone: 'full-screen',
       viewContainerRef: this.viewContainerRef,
     });
   }
@@ -191,6 +193,7 @@ export class AccountsListComponent implements OnInit {
     const ref = this.dialog.open<boolean>(DisconnectDialogComponent, {
       title: `Disconnect ${account.bankName}`,
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
       data: {providerName: account.bankName},
     });
@@ -351,6 +354,7 @@ export class AccountsListComponent implements OnInit {
     const ref = this.dialog.open<boolean>(DisconnectDialogComponent, {
       title: `Disconnect ${institution.name}`,
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
       data: {providerName: institution.name},
     });

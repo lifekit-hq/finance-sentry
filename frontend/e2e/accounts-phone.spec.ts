@@ -265,6 +265,9 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(menus).toHaveCount(3);
       for (const menu of await menus.all()) {
         await menu.scrollIntoViewIfNeeded();
+        // The bottom tab bar overlays the content, so the menu has to be scrolled clear of it
+        // (not merely into the viewport) before its whole 44px target can be probed.
+        await menu.evaluate(el => el.scrollIntoView({block: 'center'}));
         const box = await menu.boundingBox();
         const covered = await menu.evaluate((el, edge) => {
           const r = el.getBoundingClientRect();

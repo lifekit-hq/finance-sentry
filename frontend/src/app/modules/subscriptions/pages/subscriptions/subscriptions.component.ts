@@ -33,6 +33,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
 import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
@@ -239,7 +240,10 @@ export class SubscriptionsComponent {
         cancelLabel: 'Keep',
         confirmVariant: 'destructive',
       },
+      title: DialogUtils.phoneTitle(`Dismiss ${sub.merchantName}?`),
       size: 'sm',
+      phone: 'action-sheet',
+      cancelLabel: 'Keep',
       viewContainerRef: this.viewContainerRef,
     });
     ref
@@ -265,7 +269,10 @@ export class SubscriptionsComponent {
         cancelLabel: 'Keep',
         confirmVariant: 'destructive',
       },
+      title: DialogUtils.phoneTitle(`Delete ${sub.merchantName}?`),
       size: 'sm',
+      phone: 'action-sheet',
+      cancelLabel: 'Keep',
       viewContainerRef: this.viewContainerRef,
     });
     ref

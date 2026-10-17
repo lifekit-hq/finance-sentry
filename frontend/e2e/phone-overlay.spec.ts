@@ -117,14 +117,18 @@ async function expectOnlyMainScrolls(page: Page): Promise<void> {
   expect(await expectShellNeverScrolls(page)).toEqual(['main']);
 }
 
-// The tab bar and every label sit inside the viewport above the bottom inset, and no label is
-// squeezed: its box is as tall as its text.
+// @lifekit-hq/ui 3.7.0 tab bar: edge-to-edge, flush with the bottom of the viewport, 49pt tall
+// plus the home-indicator inset it pads for. Icons and labels sit fully above that inset, and no
+// label is squeezed: its box is as tall as its text.
+const TAB_BAR_HEIGHT = 49;
+
 async function expectTabBarFullyVisible(page: Page): Promise<void> {
   const nav = page.locator('cmn-bottom-tab-bar nav');
   await expect(nav).toBeVisible();
   const navBox = await box(nav);
   expect(navBox.y).toBeGreaterThanOrEqual(0);
-  expect(navBox.y + navBox.height).toBeLessThanOrEqual(PHONE.height - INSET_BOTTOM);
+  expect(navBox.y + navBox.height).toBeCloseTo(PHONE.height, 0);
+  expect(navBox.height).toBeCloseTo(TAB_BAR_HEIGHT + INSET_BOTTOM, 0);
 
   const labels = await nav.locator('button span.font-label').evaluateAll(els =>
     els.map(el => {
@@ -148,7 +152,14 @@ async function expectTabBarFullyVisible(page: Page): Promise<void> {
   for (const label of labels) {
     expect(label.clientHeight).toBe(label.scrollHeight);
     expect(label.top).toBeGreaterThanOrEqual(navBox.y);
-    expect(label.bottom).toBeLessThanOrEqual(navBox.y + navBox.height);
+    expect(label.bottom).toBeLessThanOrEqual(PHONE.height - INSET_BOTTOM);
+  }
+  const icons = await nav
+    .locator('button cmn-icon')
+    .evaluateAll(els => els.map(el => el.getBoundingClientRect().bottom));
+  expect(icons).toHaveLength(labels.length);
+  for (const bottom of icons) {
+    expect(bottom).toBeLessThanOrEqual(PHONE.height - INSET_BOTTOM);
   }
 }
 
@@ -165,8 +176,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expectTabBarFullyVisible(page);
 
       const tabBox = await box(tabBar);
-      expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(PHONE.height);
-      expect(tabBox.y + tabBox.height).toBeGreaterThan(PHONE.height - INSET_BOTTOM);
+      expect(tabBox.y + tabBox.height).toBeCloseTo(PHONE.height, 0);
 
       const main = await box(page.locator('cmn-app-layout main'));
       const topBox = await box(topBar);
@@ -194,6 +204,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expectOnlyMainScrolls(page);
 
       await page.screenshot({path: `test-results/phone-overlay-${scheme}-scrolled.png`});
+
+      // At the end of the list the last row has scrolled fully clear of the tab bar.
+      await page.locator('cmn-app-layout main').evaluate(el => {
+        el.scrollTop = el.scrollHeight;
+      });
+      const last = await box(rows.last());
+      expect(last.y + last.height).toBeLessThanOrEqual(tabBox.y);
     });
 
     // Fails on @lifekit-hq/ui 0.6.0 (document scrolls by 62px, tab labels squeezed to 6px) and

@@ -24,6 +24,7 @@ import {take} from 'rxjs';
 
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {PERSON_STATUS_TAG_VARIANT} from '../../constants/person/person.constants';
 import {type PersonRow} from '../../models/person/person.model';
 import {PeopleStore} from '../../store/people/people.store';
@@ -90,7 +91,9 @@ export class PeopleComponent {
         cancelLabel: 'Cancel',
         confirmVariant: 'destructive',
       },
+      title: DialogUtils.phoneTitle(`Revoke access for ${person.email}?`),
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
     });
     ref
@@ -111,7 +114,9 @@ export class PeopleComponent {
         confirmLabel: 'Reopen account',
         cancelLabel: 'Cancel',
       },
+      title: DialogUtils.phoneTitle(`Reopen ${person.email}?`),
       size: 'sm',
+      phone: 'action-sheet',
       viewContainerRef: this.viewContainerRef,
     });
     ref
