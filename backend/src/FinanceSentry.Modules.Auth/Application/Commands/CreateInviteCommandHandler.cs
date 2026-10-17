@@ -3,8 +3,6 @@ using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Domain.People;
-using FluentValidation;
-using FluentValidation.Results;
 using Microsoft.AspNetCore.Identity;
 
 namespace FinanceSentry.Modules.Auth.Application.Commands;
@@ -15,8 +13,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 /// </summary>
 public class CreateInviteCommandHandler(
     UserManager<ApplicationUser> userManager,
-    IUserAccessService userAccess,
-    IEventBus eventBus) : ICommandHandler<CreateInviteCommand, InviteDto>
+    IMemberAccountCreator memberAccounts) : ICommandHandler<CreateInviteCommand, InviteDto>
 {
     public async Task<InviteDto> Handle(CreateInviteCommand request, CancellationToken cancellationToken)
     {
@@ -25,14 +22,7 @@ public class CreateInviteCommandHandler(
 
         if (user is null)
         {
-            user = new ApplicationUser { UserName = email, Email = email };
-            var created = await userManager.CreateAsync(user);
-            if (!created.Succeeded)
-                throw new ValidationException(
-                    created.Errors.Select(e => new ValidationFailure(nameof(request.Email), e.Description)));
-
-            await userAccess.GrantDefaultRoleAsync(user);
-            await PublishUserRegisteredAsync(user.Id, cancellationToken);
+            user = await memberAccounts.CreateAsync(email, cancellationToken);
         }
         else
         {
@@ -42,21 +32,5 @@ public class CreateInviteCommandHandler(
         }
 
         return new InviteDto(user.Id, user.Email!);
-    }
-
-    /// <summary>
-    /// Best-effort: a downstream module's per-user provisioning (e.g. Companion notification
-    /// settings, issue #686) must not fail the invite.
-    /// </summary>
-    private async Task PublishUserRegisteredAsync(string userId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await eventBus.Publish(new UserRegisteredEvent(Guid.Parse(userId)), cancellationToken);
-        }
-        catch
-        {
-            // best-effort
-        }
     }
 }

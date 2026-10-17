@@ -1,0 +1,18 @@
+<div class="flex items-center justify-center min-h-full bg-surface-bg px-cmn-4">
+  <div
+    class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[440px]"
+  >
+    <h1 class="font-headline text-cmn-xl font-bold text-text-primary mb-cmn-2">
+      You don't have access yet
+    </h1>
+    <p class="text-cmn-sm text-text-secondary mb-cmn-2" data-testid="access-denied-message">
+      You signed in, but this account has no access to Finance Sentry. Ask the owner for access.
+    </p>
+    <p class="text-cmn-sm text-text-secondary mb-cmn-6">
+      Once the owner has given you access, sign in again.
+    </p>
+    <cmn-button (click)="onTryAgain()" type="button" variant="primary" class="block w-full"
+      >Try again</cmn-button
+    >
+  </div>
+</div>

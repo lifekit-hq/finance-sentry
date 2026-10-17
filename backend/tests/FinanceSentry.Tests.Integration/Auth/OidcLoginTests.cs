@@ -3,6 +3,9 @@ namespace FinanceSentry.Tests.Integration.Auth;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
@@ -68,11 +71,14 @@ public class OidcApiFactory : AuthApiFactory
     }
 
     /// <summary>The external-cookie value the OIDC handler would leave after a successful provider round trip.</summary>
-    public string ExternalCookie(string subject, string? email, string emailVerified = "true", string? returnUrl = null, string? idToken = null)
+    public string ExternalCookie(
+        string subject, string? email, string emailVerified = "true", string? returnUrl = null, string? idToken = null,
+        IEnumerable<string>? roles = null)
     {
         var claims = new List<Claim> { new("sub", subject), new("email_verified", emailVerified) };
         if (email is not null)
             claims.Add(new Claim("email", email));
+        claims.AddRange((roles ?? []).Select(role => new Claim("roles", role)));
 
         var properties = new AuthenticationProperties();
         if (returnUrl is not null)
@@ -98,11 +104,14 @@ public class OidcApiFactory : AuthApiFactory
 
 /// <summary>
 /// GET /api/v1/auth/oidc/start and /oidc/callback: the org identity provider proves who the person is, the
-/// account must already exist (an invite) and be active, and the session is the same as any other sign-in.
+/// account must already exist (an invite) or be granted by the provider's app role, and be active; the session is
+/// the same as any other sign-in.
 /// </summary>
 public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFactory>
 {
     private const string LoginUrlPrefix = OidcApiFactory.PublicBaseUrl + "/login?error=";
+    private const string AccessDeniedUrl = OidcApiFactory.PublicBaseUrl + "/access-denied";
+    private const string AppRole = "finance-sentry";
 
     [Fact]
     public async Task Methods_ReportsOidcEnabled()
@@ -122,8 +131,17 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
         location.Should().StartWith(OidcApiFactory.AuthorizationEndpoint);
         location.Should().Contain("response_type=code").And.Contain("client_id=finance-sentry")
             .And.Contain("code_challenge_method=S256").And.Contain("code_challenge=")
-            .And.Contain("scope=openid email profile")
+            .And.Contain("scope=openid email profile roles")
             .And.Contain(Uri.EscapeDataString(OidcApiFactory.PublicBaseUrl + "/api/v1/auth/oidc/signin"));
+    }
+
+    [Fact]
+    public void Handler_KeepsTheProvidersRoleNamesAsRolesClaims()
+    {
+        var options = factory.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get("lifekit");
+
+        options.Scope.Should().Contain("roles");
+        options.ClaimActions.Should().Contain(a => a.ClaimType == "roles");
     }
 
     [Fact]
@@ -183,10 +201,10 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
     [Fact]
     public async Task Callback_UninvitedEmail_IsRefusedAndCreatesNothing()
     {
-        var cookie = factory.ExternalCookie("lk-sub-stranger", "stranger@test.com");
+        var cookie = factory.ExternalCookie("lk-sub-stranger", "stranger@test.com", roles: ["some-other-app"]);
         var response = await factory.ExternalClient(cookie).GetAsync("/api/v1/auth/oidc/callback");
 
-        response.Headers.Location!.ToString().Should().Be(LoginUrlPrefix + "ACCOUNT_NOT_INVITED");
+        response.Headers.Location!.ToString().Should().Be(AccessDeniedUrl);
         NoSessionCookies(response);
         using var scope = factory.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -198,13 +216,46 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
     {
         await factory.EnsureUserExistsAsync("oidc-unverified@test.com", "TestPass123!");
 
-        var cookie = factory.ExternalCookie("lk-sub-unverified", "oidc-unverified@test.com", emailVerified: "false");
+        var cookie = factory.ExternalCookie("lk-sub-unverified", "oidc-unverified@test.com", emailVerified: "false", roles: [AppRole]);
         var response = await factory.ExternalClient(cookie).GetAsync("/api/v1/auth/oidc/callback");
 
-        response.Headers.Location!.ToString().Should().Be(LoginUrlPrefix + "ACCOUNT_NOT_INVITED");
+        response.Headers.Location!.ToString().Should().Be(AccessDeniedUrl);
+        NoSessionCookies(response);
         using var scope = factory.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         (await users.FindByLoginAsync("lifekit", "lk-sub-unverified")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Callback_RoleHolderWithNoAccount_GetsAMemberAccountAndASession()
+    {
+        var cookie = factory.ExternalCookie("lk-sub-granted", "oidc-granted@test.com", returnUrl: "/budgets", roles: ["other", AppRole]);
+        var response = await factory.ExternalClient(cookie).GetAsync("/api/v1/auth/oidc/callback");
+
+        response.Headers.Location!.ToString().Should().Be(OidcApiFactory.PublicBaseUrl + "/budgets");
+        AuthApiFactory.CookieValue(response, "fs_refresh_token").Should().NotBeNullOrEmpty();
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = (await users.FindByLoginAsync("lifekit", "lk-sub-granted"))!;
+        user.Email.Should().Be("oidc-granted@test.com");
+        (await users.GetRolesAsync(user)).Should().Equal(AuthRoles.Member);
+    }
+
+    [Fact]
+    public async Task Callback_RevokedAccountWithTheRole_IsRefused()
+    {
+        var userId = await factory.CreatePendingInviteAsync("oidc-revoked@test.com");
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ICommandHandler<RevokePersonCommand, Unit>>()
+                .Handle(new RevokePersonCommand(userId, Guid.NewGuid().ToString()), CancellationToken.None);
+        }
+
+        var cookie = factory.ExternalCookie("lk-sub-revoked", "oidc-revoked@test.com", roles: [AppRole]);
+        var response = await factory.ExternalClient(cookie).GetAsync("/api/v1/auth/oidc/callback");
+
+        response.Headers.Location!.ToString().Should().Be(LoginUrlPrefix + "ACCOUNT_UNAVAILABLE");
+        NoSessionCookies(response);
     }
 
     [Fact]
