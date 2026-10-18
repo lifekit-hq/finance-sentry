@@ -21,6 +21,7 @@ public static class MccRangeClassifier
         [4829] = CategoryKeys.TransferOut,         // Wire transfer / money orders
         [5047] = CategoryKeys.Medical,             // Medical/dental/ophthalmic equipment
         [5122] = CategoryKeys.Medical,             // Drugs, proprietaries
+        [5262] = CategoryKeys.GeneralMerchandise,  // Marketplaces (online)
         [5541] = CategoryKeys.Transportation,      // Service stations (gas)
         [5542] = CategoryKeys.Transportation,      // Automated fuel dispensers
         [5811] = CategoryKeys.FoodAndDrink,        // Caterers
@@ -66,6 +67,7 @@ public static class MccRangeClassifier
         (4511, 4511, CategoryKeys.Travel),                   // Airlines (air carriers)
         (4582, 4582, CategoryKeys.Travel),                   // Airports / flying fields
         (4722, 4723, CategoryKeys.Travel),                   // Travel agencies / tour operators
+        (4214, 4225, CategoryKeys.GeneralServices),          // Freight, courier, warehousing & storage
         (4784, 4789, CategoryKeys.Transportation),           // Tolls, transportation services
         (4812, 4900, CategoryKeys.RentAndUtilities),         // Telecom, cable, utilities
         (5013, 5199, CategoryKeys.GeneralMerchandise),       // Wholesale / durable goods
@@ -77,6 +79,10 @@ public static class MccRangeClassifier
         (5712, 5722, CategoryKeys.HomeImprovement),          // Furniture, home furnishings, appliances
         (5731, 5735, CategoryKeys.GeneralMerchandise),       // Electronics, music, software
         (5811, 5814, CategoryKeys.FoodAndDrink),             // Eating & drinking places
+        (5815, 5816, CategoryKeys.Entertainment),            // Digital goods: media, books, music, games
+        (5817, 5817, CategoryKeys.GeneralServices),          // Digital goods: applications (excl. games)
+        (5818, 5818, CategoryKeys.GeneralMerchandise),       // Digital goods: large digital goods merchant
+        (5832, 5832, CategoryKeys.GeneralMerchandise),       // Antique shops
         (5900, 5999, CategoryKeys.GeneralMerchandise),       // Misc retail (see overrides)
         (6000, 6999, CategoryKeys.GeneralServices),          // Financial (see overrides)
         (7011, 7033, CategoryKeys.Travel),                   // Lodging, campgrounds

@@ -29,7 +29,9 @@ public sealed class CategoryResolver(IServiceScopeFactory scopeFactory) : ICateg
         if (mcc is null)
             return CategoryKeys.Uncategorized;
 
-        return _mccToKey!.TryGetValue(mcc.Value, out var key) ? key : CategoryKeys.Uncategorized;
+        // A table row wins; a code the table lacks (one issued after the seed dataset) falls back to
+        // the same rules a seeded row gets.
+        return _mccToKey!.TryGetValue(mcc.Value, out var key) ? key : MccRangeClassifier.Classify(mcc.Value);
     }
 
     public string ResolveCanonicalKey(string? primary)

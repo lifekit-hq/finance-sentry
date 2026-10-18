@@ -35,15 +35,16 @@ public class TransactionRecategorizationService(
     IMonobankCredentialRepository monobankCredentials,
     IMonobankAdapter monobankAdapter,
     ITrueLayerConnectionRepository truelayerConnections,
-    ITrueLayerClient truelayerClient,
+    ITrueLayerTokenRefreshService truelayerTokenRefresh,
     ITransactionCategorizer categorizer,
     TrueLayerCategoryMapper categoryMapper,
     IActiveSubscriptionsReader activeSubscriptions,
     ILogger<TransactionRecategorizationService> logger) : ITransactionRecategorizationService
 {
-    // Monobank statement API caps each request at 31 days and ~1 request per 60s per token.
+    // Monobank statement API caps each request at 31 days. Its ~1 request per 60 s per token limit is
+    // the client's to honour: MonobankResilience retries a 429 after its Retry-After, as on ingest.
     private const int MonobankWindowDays = 31;
-    private static readonly TimeSpan MonobankThrottle = TimeSpan.FromSeconds(61);
+    private const string LinkedStatus = "LINKED";
 
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ITransactionRepository _transactions = transactions;
@@ -53,14 +54,11 @@ public class TransactionRecategorizationService(
     private readonly IMonobankCredentialRepository _monobankCredentials = monobankCredentials;
     private readonly IMonobankAdapter _monobankAdapter = monobankAdapter;
     private readonly ITrueLayerConnectionRepository _truelayerConnections = truelayerConnections;
-    private readonly ITrueLayerClient _truelayerClient = truelayerClient;
+    private readonly ITrueLayerTokenRefreshService _truelayerTokenRefresh = truelayerTokenRefresh;
     private readonly ITransactionCategorizer _categorizer = categorizer;
     private readonly TrueLayerCategoryMapper _categoryMapper = categoryMapper;
     private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
     private readonly ILogger<TransactionRecategorizationService> _logger = logger;
-
-    // Guarantees ≥ MonobankThrottle spacing between statement calls across the whole run.
-    private bool _monobankCalled;
 
     public async Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default)
     {
@@ -106,7 +104,8 @@ public class TransactionRecategorizationService(
     /// <summary>
     /// Pass 2 — provider re-fetch for rows with no stored raw signal (pre-overhaul rows).
     /// Monobank walks 31-day windows from each account's oldest uncategorized row to now
-    /// (rate-limited); TrueLayer covers its ~90-day window.
+    /// (a 429 is retried by the Monobank client); TrueLayer covers its ~90-day window on a linked
+    /// connection, through the shared token refresh.
     /// </summary>
     private async Task<int> ReFetchMissingSignalAsync(
         IReadOnlyList<BankAccount> userAccounts, IReadOnlyList<Transaction> txns, CancellationToken ct)
@@ -129,6 +128,15 @@ public class TransactionRecategorizationService(
             try
             {
                 candidates = await FetchCandidatesAsync(account, rows, ct);
+            }
+            catch (TrueLayerException ex) when (IsRefreshRejected(ex))
+            {
+                // A dead consent, not a fault: account discovery expires the connection and the user is
+                // prompted to reconnect, after which a re-run can fetch these rows.
+                _logger.LogWarning(
+                    "Recategorization re-fetch skipped for account {AccountId}: TrueLayer rejected the refresh (invalid_grant).",
+                    account.Id);
+                continue;
             }
             catch (Exception ex)
             {
@@ -155,6 +163,10 @@ public class TransactionRecategorizationService(
         }
         return updated;
     }
+
+    // TrueLayer reports a dead consent as invalid_grant in the token endpoint's body, not as a status.
+    private static bool IsRefreshRejected(TrueLayerException ex)
+        => ex.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase);
 
     // The same ladder the ingest adapters run, so a backfill can only ever confirm or correct an
     // ingest decision — never reverse one (#553). A null means no rule claimed the row, which
@@ -197,7 +209,7 @@ public class TransactionRecategorizationService(
         var token = _encryption.Decrypt(cred.EncryptedToken, cred.Iv, cred.AuthTag, cred.KeyVersion);
 
         // Cover the full span of this account's uncategorized rows, oldest → now, in ≤31-day
-        // windows (Monobank's per-request cap), spaced to respect the per-token rate limit.
+        // windows (Monobank's per-request cap).
         var oldest = rows.Min(t => t.PostedDate ?? t.TransactionDate);
         var windowStart = new DateTimeOffset(DateTime.SpecifyKind(oldest.AddDays(-1), DateTimeKind.Utc));
         var now = DateTimeOffset.UtcNow;
@@ -208,10 +220,6 @@ public class TransactionRecategorizationService(
             var windowEnd = windowStart.AddDays(MonobankWindowDays);
             if (windowEnd > now)
                 windowEnd = now;
-
-            if (_monobankCalled)
-                await Task.Delay(MonobankThrottle, ct);
-            _monobankCalled = true;
 
             var candidates = await _monobankAdapter.GetCandidatesAsync(
                 token, account.ExternalAccountId, account.Id, account.UserId, windowStart, windowEnd, ct);
@@ -233,21 +241,22 @@ public class TransactionRecategorizationService(
 
         var connection = await _truelayerConnections.GetByIdUnscopedAsync(account.TrueLayerConnectionId.Value, ct)
             ?? throw new InvalidOperationException($"TrueLayer connection {account.TrueLayerConnectionId} not found.");
-        var refreshToken = _encryption.Decrypt(
-            connection.EncryptedRefreshToken, connection.Iv, connection.AuthTag, connection.KeyVersion);
 
-        var tokenSet = await _truelayerClient.RefreshAccessTokenAsync(refreshToken, ct);
-
-        // TrueLayer rotates refresh tokens — persist the new one so later syncs keep working.
-        if (!string.IsNullOrEmpty(tokenSet.RefreshToken) && tokenSet.RefreshToken != refreshToken)
+        // Only a linked consent can be refreshed; an expired one waits for the user to reconnect.
+        if (connection.Status != LinkedStatus)
         {
-            var encrypted = _encryption.Encrypt(tokenSet.RefreshToken);
-            connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
-            await _truelayerConnections.UpdateAsync(connection, ct);
+            _logger.LogInformation(
+                "Recategorization re-fetch skipped for account {AccountId}: TrueLayer connection {ConnectionId} is {Status}.",
+                account.Id, connection.Id, connection.Status);
+            return [];
         }
 
+        // The shared refresh serializes the rotating refresh-token exchange with sync and discovery and
+        // persists the rotated token before anything else runs.
+        var accessToken = await _truelayerTokenRefresh.AcquireAccessTokenAsync(connection.Id, ct);
+
         var (candidates, _) = await _providerFactory.Resolve("truelayer")
-            .SyncTransactionsAsync(tokenSet.AccessToken, account.ExternalAccountId, account.Id, account.UserId, null, ct);
+            .SyncTransactionsAsync(accessToken, account.ExternalAccountId, account.Id, account.UserId, null, ct);
         return candidates;
     }
 }
