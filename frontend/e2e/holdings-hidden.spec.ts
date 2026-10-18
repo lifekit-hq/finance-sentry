@@ -83,12 +83,17 @@ for (const [label, viewport] of [
       const summary = hidden.locator('summary');
       const box = await summary.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
-      const before = box?.y;
+      const offset = async (): Promise<number> => {
+        const top = (await hidden.boundingBox())?.y ?? Number.NaN;
+        const summaryTop = (await summary.boundingBox())?.y ?? Number.NaN;
+        return summaryTop - top;
+      };
+      const before = await offset();
       await summary.click();
       await expect(details).toHaveJSProperty('open', true);
       await expect(hidden.getByTestId('holdings-hidden-rows')).toContainText('SHIB');
       await expect(hidden.getByTestId('holdings-hidden-rows')).toContainText('DOGE');
-      expect((await summary.boundingBox())?.y).toBe(before);
+      expect(await offset()).toBe(before);
       await shot(page, `holdings-hidden-expanded-${label}`);
     });
   });
