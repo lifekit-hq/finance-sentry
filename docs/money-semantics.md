@@ -342,10 +342,10 @@ and AI all sum every row, hidden or not.
 
 - **empty** — value exactly 0, when `HideEmptyBalances` is on. Uniform for every provider; a paid-off credit
   card (owing 0) is empty.
-- **small** — |value| below the threshold, when `HideSmallBalances` is on. The threshold is one amount in the
+- **small** — a positive value below the threshold, when `HideSmallBalances` is on. The threshold is one amount in the
   person's base currency for every asset type; the service sums in USD, so it converts the threshold once with
   `CurrencyConverter.ToUsd` and compares USD with USD.
-- **never small:** a card or loan with anything owed, and a row whose value is unknown (an unpriced position).
+- **never small:** a card or loan with anything owed, any negative value (an overdraft or borrowed position), and a row whose value is unknown (an unpriced position).
   Institutions are never hidden, only their rows.
 
 `/wealth/summary` annotates instead of dropping: `AccountBalanceDto.HiddenReason`, `CardGroupDto.HiddenReason`

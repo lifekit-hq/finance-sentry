@@ -13,7 +13,7 @@ public static class AssetVisibility
     public const string Small = "small";
 
     /// <param name="valueInBase">The row's value, null when unknown (unpriced or unconverted).</param>
-    /// <param name="isOwed">A card or loan with anything owed: never hidden by the small rule.</param>
+    /// <param name="isOwed">A card or loan with anything owed: never hidden by the small rule. A negative value is owed too.</param>
     /// <returns><see cref="Empty"/>, <see cref="Small"/>, or null when the row stays visible.</returns>
     public static string? Classify(decimal? valueInBase, bool isOwed, UserAssetVisibility prefs)
     {
@@ -21,6 +21,6 @@ public static class AssetVisibility
             return null;
         if (value == 0m)
             return prefs.HideEmptyBalances ? Empty : null;
-        return prefs.HideSmallBalances && !isOwed && Math.Abs(value) < prefs.SmallBalanceThreshold ? Small : null;
+        return prefs.HideSmallBalances && !isOwed && value > 0m && value < prefs.SmallBalanceThreshold ? Small : null;
     }
 }

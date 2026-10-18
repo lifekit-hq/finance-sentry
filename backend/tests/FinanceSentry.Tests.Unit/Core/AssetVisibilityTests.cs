@@ -38,7 +38,7 @@ public class AssetVisibilityTests
     }
 
     [Fact]
-    public void Small_compares_the_absolute_value() => AssetVisibility.Classify(-0.5m, false, Small).Should().Be("small");
+    public void Negative_value_is_owed_and_never_small() => AssetVisibility.Classify(-0.5m, false, Small).Should().BeNull();
 
     [Fact]
     public void Owed_balance_is_never_small() => AssetVisibility.Classify(0.5m, true, Small).Should().BeNull();
