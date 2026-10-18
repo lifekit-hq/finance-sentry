@@ -52,6 +52,9 @@ export const PROFILE = {
   safeWithdrawalRate: 0.04,
   realAnnualReturn: 0.05,
   twoFactor: false,
+  hideEmptyBalances: true,
+  hideSmallBalances: false,
+  smallBalanceThreshold: 1,
 };
 
 export const EMPTY_PAGE = {items: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 0};
