@@ -16,4 +16,7 @@ public record UserProfileDto(
     bool WatchlistAnalystAlerts,
     bool TwoFactor,
     decimal SafeWithdrawalRate,
-    decimal RealAnnualReturn);
+    decimal RealAnnualReturn,
+    bool HideEmptyBalances,
+    bool HideSmallBalances,
+    decimal SmallBalanceThreshold);

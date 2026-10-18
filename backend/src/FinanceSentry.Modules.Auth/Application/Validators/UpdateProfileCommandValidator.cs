@@ -15,8 +15,18 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     public const decimal RealAnnualReturnMin = 0m;
     public const decimal RealAnnualReturnMax = 0.15m;
 
+    /// <summary>
+    /// The "hide below" amount is in the base currency and must stay above zero (zero would hide nothing, a
+    /// negative amount is meaningless). The cap keeps a typo from tucking away real money.
+    /// </summary>
+    public const decimal SmallBalanceThresholdMax = 100m;
+
     public UpdateProfileCommandValidator()
     {
+        RuleFor(x => x.SmallBalanceThreshold)
+            .Must(amount => amount is null or > 0m and <= SmallBalanceThresholdMax)
+            .WithMessage($"Hide-below amount must be greater than 0 and at most {SmallBalanceThresholdMax}.");
+
         RuleFor(x => x.SafeWithdrawalRate)
             .InclusiveBetween(SafeWithdrawalRateMin, SafeWithdrawalRateMax)
             .WithMessage("Safe withdrawal rate must be between 0.5% and 10%.");

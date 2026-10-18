@@ -23,6 +23,10 @@ public class UpdateProfileCommandHandler(UserManager<ApplicationUser> userManage
         user.WatchlistAnalystAlerts = command.WatchlistAnalystAlerts;
         user.SafeWithdrawalRate = command.SafeWithdrawalRate;
         user.RealAnnualReturn = command.RealAnnualReturn;
+        // Omitted (null) leaves the stored choice alone, so a client that predates these settings cannot reset them.
+        user.HideEmptyBalances = command.HideEmptyBalances ?? user.HideEmptyBalances;
+        user.HideSmallBalances = command.HideSmallBalances ?? user.HideSmallBalances;
+        user.SmallBalanceThreshold = command.SmallBalanceThreshold ?? user.SmallBalanceThreshold;
 
         var result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)

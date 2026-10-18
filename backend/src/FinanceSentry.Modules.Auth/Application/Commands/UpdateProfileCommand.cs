@@ -13,7 +13,10 @@ public record UpdateProfileCommand(
     bool SyncFailureAlerts,
     bool WatchlistAnalystAlerts,
     decimal SafeWithdrawalRate,
-    decimal RealAnnualReturn) : ICommand<UserProfileDto>;
+    decimal RealAnnualReturn,
+    bool? HideEmptyBalances = null,
+    bool? HideSmallBalances = null,
+    decimal? SmallBalanceThreshold = null) : ICommand<UserProfileDto>;
 
 public record UpdateProfileRequest(
     string FirstName,
@@ -25,4 +28,7 @@ public record UpdateProfileRequest(
     bool SyncFailureAlerts,
     bool WatchlistAnalystAlerts,
     decimal SafeWithdrawalRate,
-    decimal RealAnnualReturn);
+    decimal RealAnnualReturn,
+    bool? HideEmptyBalances = null,
+    bool? HideSmallBalances = null,
+    decimal? SmallBalanceThreshold = null);

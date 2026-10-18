@@ -29,5 +29,8 @@ public class GetProfileQueryHandler(UserManager<ApplicationUser> userManager)
             user.WatchlistAnalystAlerts,
             user.TwoFactorEnabled,
             user.SafeWithdrawalRate,
-            user.RealAnnualReturn);
+            user.RealAnnualReturn,
+            user.HideEmptyBalances,
+            user.HideSmallBalances,
+            user.SmallBalanceThreshold);
 }

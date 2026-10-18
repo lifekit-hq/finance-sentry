@@ -82,6 +82,7 @@ public static class AuthModule
         services.AddOidcLogin(config);
 
         services.AddScoped<IUserAlertPreferencesReader, UserAlertPreferencesReader>();
+        services.AddScoped<IUserAssetVisibilityReader, UserAssetVisibilityReader>();
         services.AddScoped<IUserBaseCurrencyReader, UserBaseCurrencyReader>();
         services.AddScoped<IClosedAccountsReader, ClosedAccountsReader>();
         services.AddScoped<IUserAuthorizationChecker, UserAuthorizationChecker>();

@@ -41,6 +41,28 @@ public class UpdateProfileCommandValidatorTests
             result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be(nameof(UpdateProfileCommand.RealAnnualReturn));
     }
 
+    [Theory]
+    [InlineData("0.01", true)]
+    [InlineData("1", true)]
+    [InlineData("100", true)]
+    [InlineData("0", false)]
+    [InlineData("-1", false)]
+    [InlineData("100.01", false)]
+    public void SmallBalanceThreshold_MustBeAboveZeroAndAtMostTheCap(string amount, bool valid)
+    {
+        var result = _validator.Validate(Command(0.04m, 0.05m) with { SmallBalanceThreshold = decimal.Parse(amount) });
+
+        result.IsValid.Should().Be(valid);
+        if (!valid)
+            result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be(nameof(UpdateProfileCommand.SmallBalanceThreshold));
+    }
+
+    [Fact]
+    public void SmallBalanceThreshold_WhenOmitted_IsValid()
+    {
+        _validator.Validate(Command(0.04m, 0.05m)).IsValid.Should().BeTrue();
+    }
+
     private static UpdateProfileCommand Command(decimal withdrawalRate, decimal realReturn) =>
         new(Guid.NewGuid(), "Fire", "Bounds", "USD", true, false, 100m, true, false, withdrawalRate, realReturn);
 }
