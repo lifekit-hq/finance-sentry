@@ -34,6 +34,12 @@ public interface IRecommendationRepository
     Task<IReadOnlyList<Recommendation>> ListOutcomeOpenUnscopedAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Every one of the user's proposals that left Pending (decided, expired or superseded), for the Ledger scoreboard,
+    /// which the weekly brief reads with no person in scope. Opts out of the Owner query filter.
+    /// </summary>
+    Task<IReadOnlyList<Recommendation>> ListClosedUnscopedAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Inserts a pending proposal. Throws <see cref="Exceptions.RecommendationConflictException"/> when another pending
     /// proposal on the ticker landed first (the partial unique index). <paramref name="supersedes"/>, an already-changed
     /// tracked row, is saved in the same transaction so a failed insert leaves it as it was.

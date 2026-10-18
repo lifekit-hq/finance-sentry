@@ -28,6 +28,7 @@ public sealed class BookPerformanceBriefJobTests
     private readonly Mock<IBookPerformanceService> _performance = new();
     private readonly Mock<IRadarSignalRepository> _signals = new();
     private readonly Mock<ITrackRecordSource> _trackRecord = new();
+    private readonly Mock<ILedgerScoreboardSource> _ledgerScoreboard = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
     private static BookPerformanceResult Scoreboard() =>
@@ -43,12 +44,16 @@ public sealed class BookPerformanceBriefJobTests
         _trackRecord
             .Setup(t => t.GetDeltaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((TrackRecordDelta?)null);
+        _ledgerScoreboard
+            .Setup(l => l.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LedgerScoreboardLine?)null);
 
         return new BookPerformanceBriefJob(
             _users.Object,
             _performance.Object,
             _signals.Object,
             _trackRecord.Object,
+            _ledgerScoreboard.Object,
             _alerts.Object,
             new ConfigurationBuilder().Build(),
             NullLogger<BookPerformanceBriefJob>.Instance);
@@ -82,6 +87,27 @@ public sealed class BookPerformanceBriefJobTests
             a => a.GeneratePerformanceBriefAlertAsync(
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task CarriesTheLedgerScoreboardLine_IntoTheBrief()
+    {
+        ActiveUsers(UserA);
+        PerformanceFor(UserA, Scoreboard());
+        var job = Job();
+        _ledgerScoreboard
+            .Setup(l => l.GetAsync(UserA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LedgerScoreboardLine(Scored: 12, Decided: 15, MeanExcessPct: 0.8m, TooFewToTell: true, MinimumSampleSize: 30));
+
+        await job.ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GeneratePerformanceBriefAlertAsync(
+                UserA,
+                It.IsAny<string>(),
+                It.Is<string>(body => body.Contains("Ledger's decided proposals: n=12, +0.8 pts vs S&P 500 on average; too few to tell (12 of 30).")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

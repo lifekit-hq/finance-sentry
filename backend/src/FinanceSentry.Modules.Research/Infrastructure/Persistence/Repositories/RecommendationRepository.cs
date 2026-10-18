@@ -7,8 +7,8 @@ using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-// Reads run under the Owner filter. The rule sweep, the expiry job and the outcome job run with no person in scope, so
-// their reads are the …Unscoped methods, which opt out explicitly and keep their own UserId predicate.
+// Reads run under the Owner filter. The rule sweep, the expiry job, the outcome job and the scoreboard (which the weekly
+// brief reads) run with no person in scope, so their reads are the …Unscoped methods, which opt out explicitly and keep their own UserId predicate.
 public sealed class RecommendationRepository(ResearchDbContext db) : IRecommendationRepository
 {
     public Task<Recommendation?> GetAsync(Guid userId, Guid id, CancellationToken ct = default)
@@ -66,6 +66,12 @@ public sealed class RecommendationRepository(ResearchDbContext db) : IRecommenda
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(r => (r.Status == RecommendationStatus.Confirmed || r.Status == RecommendationStatus.Rejected)
                 && r.DecidedAt != null && r.OutcomeScoredAt == null)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Recommendation>> ListClosedUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => await db.Recommendations.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(r => r.UserId == userId && r.Status != RecommendationStatus.Pending)
             .ToListAsync(ct);
 
     // Race-safe over the unique partial index on (UserId, Ticker) WHERE Status = 'Pending': the loser's SaveChanges

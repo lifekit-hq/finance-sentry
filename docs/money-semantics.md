@@ -1245,6 +1245,30 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   invalidation trigger is for. Settings:
   `ThesisTrackRecord:RelativePerformance` (`ThresholdPct`, `SustainedRuns`, `Window`).
 
+### Ledger scoreboard (MCP `get_ledger_scoreboard`, weekly brief, #986)
+
+- **One decision-value rule, on the server.** `RecommendationValue` holds it: excess = name return −
+  S&P 500 return over the 30 days after the decision (the outcome job, #1069). The owner's
+  `decisionValuePct` is the excess where the decision kept or added the name (a confirmed Add or Hold,
+  a rejected Trim or Exit) and its negation where it reduced or declined it (a confirmed Trim or Exit,
+  a rejected Add); null for a confirmed order never placed and for a rejected Hold. The Decisions page
+  reads that value from the API and no longer computes it.
+- **Contestants.** *Ledger as proposed*: every confirmed or rejected proposal as if followed, signed by
+  its action (Add/Hold keep the name, Trim/Exit hold the S&P 500). *Owner as decided*: the decision
+  value above. A rejected proposal counts for both. *Paper picks* (one row per candidate source, User /
+  Ledger / Scan): every opportunity candidate in any status, from its price-stamped `Created` event to a
+  stamp at the same 30-day horizon (an `Expired` event or the daily horizon `Snapshot`, within 7 days of
+  it); a pick with no stamp in that window is left unscored, never priced late. Expired and superseded
+  proposals are listed, never scored.
+- **Figures.** Per contestant, over its scored rows: mean, median, the share that beat the S&P 500 (excess
+  > 0, never a win rate against zero) and the worst row, gross and net. Net runs each row through
+  `ThesisPerformanceCalculator` with `ThesisTrackRecord:Friction`; for a proposal the friction falls on
+  the side the decision chose (the S&P 500 for a reduction). It is a modelled after-cost figure, not gated
+  on a verified cost basis like the track record's (#688), because a proposal as proposed has no fill.
+- **Sample size.** Below `MinimumClosedSampleSize` (30) scored rows a contestant reads "too few to tell
+  skill from luck (n of 30)". Windows overlap, so n counts decisions, never days. The weekly brief carries
+  only Ledger-as-proposed's gross mean, to one decimal.
+
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted

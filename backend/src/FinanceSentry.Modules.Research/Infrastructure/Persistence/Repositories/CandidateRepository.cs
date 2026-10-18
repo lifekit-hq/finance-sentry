@@ -9,7 +9,9 @@ using Npgsql;
 
 // Reads run under the Owner filter. The opportunity scan and the expiry job run with no person in scope: the
 // upsert's existence check and the expiry sweep opt out explicitly (a filtered check would find nothing and insert a
-// duplicate Active candidate). The check keeps its own UserId predicate.
+// duplicate Active candidate). The check keeps its own UserId predicate. The scoreboard's paper-pick read (which the weekly
+// brief reaches) and the horizon stamp's sweep opt out too; the first keeps its UserId predicate, the second is an
+// explicit all-users sweep by creation date.
 public sealed class CandidateRepository(ResearchDbContext db) : ICandidateRepository
 {
     // Race-safe over the unique partial index on (UserId, Ticker) WHERE Status = 'Active': two scans that both pass the
@@ -92,6 +94,20 @@ public sealed class CandidateRepository(ResearchDbContext db) : ICandidateReposi
         => await db.OpportunityCandidates
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.Status == CandidateStatus.Active && c.ExpiresAt <= asOf)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<OpportunityCandidate>> ListAllUnscopedAsync(
+        Guid userId, CancellationToken ct = default)
+        => await db.OpportunityCandidates.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.UserId == userId)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<OpportunityCandidate>> ListCreatedBetweenUnscopedAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+        => await db.OpportunityCandidates.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.CreatedAt >= from && c.CreatedAt <= to)
             .ToListAsync(ct);
 
     public async Task UpdateAsync(OpportunityCandidate candidate, CancellationToken ct = default)

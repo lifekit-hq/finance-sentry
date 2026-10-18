@@ -66,6 +66,12 @@ export interface RecommendationDto extends Timestamped {
   subjectReturnPct: Nullable<number>;
   benchmarkReturnPct: Nullable<number>;
   excessReturnPct: Nullable<number>;
+  /**
+   * What the owner's own decision earned over the S&P 500, signed by its direction - computed on the server
+   * (`RecommendationValue.DecisionValuePct`), the one definition the Ledger scoreboard also grades by. Null when
+   * unscored, when a confirmed order was never placed, and for a rejected Hold.
+   */
+  decisionValuePct: Nullable<number>;
   outcomeScoredAt: Nullable<string>;
 }
 

@@ -54,6 +54,7 @@ function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Recommend
     subjectReturnPct: null,
     benchmarkReturnPct: null,
     excessReturnPct: null,
+    decisionValuePct: null,
     outcomeScoredAt: null,
     ...overrides,
   };
@@ -180,6 +181,7 @@ describe('DecisionsComponent', () => {
           execution: 'Executed',
           decidedAt: '2026-10-05T00:00:00Z',
           excessReturnPct: 3.2,
+          decisionValuePct: 3.2,
         }),
         mkRecommendation({
           id: 'b',
@@ -189,6 +191,7 @@ describe('DecisionsComponent', () => {
           decisionNote: 'Still a core holding.',
           decidedAt: '2026-10-04T00:00:00Z',
           excessReturnPct: 1.5,
+          decisionValuePct: 1.5,
         }),
         mkRecommendation({
           id: 'c',
@@ -198,6 +201,7 @@ describe('DecisionsComponent', () => {
           execution: 'Executed',
           decidedAt: '2026-10-03T00:00:00Z',
           excessReturnPct: 2,
+          decisionValuePct: -2,
         }),
         mkRecommendation({
           id: 'd',
@@ -206,6 +210,7 @@ describe('DecisionsComponent', () => {
           status: 'Rejected',
           decidedAt: '2026-10-02T00:00:00Z',
           excessReturnPct: 4,
+          decisionValuePct: -4,
         }),
         mkRecommendation({
           id: 'e',

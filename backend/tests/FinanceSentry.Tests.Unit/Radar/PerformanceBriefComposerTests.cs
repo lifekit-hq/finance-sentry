@@ -197,11 +197,14 @@ public sealed class PerformanceBriefComposerTests
             .ToList();
         var record = new TrackRecordDelta(IsTerminal: true, Count: 12, 58m, 3.2m, LowSample: true);
 
-        var brief = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record);
+        var ledger = new LedgerScoreboardLine(Scored: 12, Decided: 14, MeanExcessPct: 0.8m, TooFewToTell: true, MinimumSampleSize: 30);
+
+        var brief = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record, ledgerScoreboard: ledger);
 
         var totalLines = 1 + BodyLines(brief).Length;
         totalLines.Should().BeLessOrEqualTo(12);
         brief.Body.Should().Contain("Calls:");
+        brief.Body.Should().Contain("Ledger's decided proposals:");
         brief.Body.Should().Contain("Action:");
     }
 
@@ -269,6 +272,42 @@ public sealed class PerformanceBriefComposerTests
         PerformanceBriefComposer.Compose(OneWeekResult(), [], null)
             .Body.Should().NotContain("Calls:");
     }
+
+    [Fact]
+    public void LedgerScoreboardLine_ReportsScoredDecisionsAgainstTheIndex_WithTheTooFewCaveat()
+    {
+        var ledger = new LedgerScoreboardLine(Scored: 12, Decided: 14, MeanExcessPct: 0.8m, TooFewToTell: true, MinimumSampleSize: 30);
+        var record = new TrackRecordDelta(IsTerminal: true, Count: 12, 58m, 3.2m, LowSample: true);
+
+        var lines = BodyLines(PerformanceBriefComposer.Compose(OneWeekResult(), [], record, AppBase, ledger));
+
+        lines.Should().Contain("• Ledger's decided proposals: n=12, +0.8 pts vs S&P 500 on average; too few to tell (12 of 30).");
+        Array.FindIndex(lines, l => l.StartsWith("• Ledger's")).Should().Be(Array.FindIndex(lines, l => l.StartsWith("• Calls:")) + 1);
+    }
+
+    [Fact]
+    public void LedgerScoreboardLine_DropsTheCaveat_OnceTheSampleIsLargeEnough()
+    {
+        var ledger = new LedgerScoreboardLine(Scored: 31, Decided: 33, MeanExcessPct: -1.25m, TooFewToTell: false, MinimumSampleSize: 30);
+
+        PerformanceBriefComposer.Compose(OneWeekResult(), [], null, ledgerScoreboard: ledger)
+            .Body.Should().Contain("• Ledger's decided proposals: n=31, -1.3 pts vs S&P 500 on average.")
+            .And.NotContain("too few");
+    }
+
+    [Fact]
+    public void LedgerScoreboardLine_SaysNoneScoredYet_BeforeTheFirstHorizon()
+    {
+        var ledger = new LedgerScoreboardLine(Scored: 0, Decided: 3, MeanExcessPct: null, TooFewToTell: true, MinimumSampleSize: 30);
+
+        PerformanceBriefComposer.Compose(OneWeekResult(), [], null, ledgerScoreboard: ledger)
+            .Body.Should().Contain("• Ledger's decided proposals: 3 decided, none scored yet; too few to tell (0 of 30).");
+    }
+
+    [Fact]
+    public void LedgerScoreboardLine_Omitted_WhenNothingIsDecided()
+        => PerformanceBriefComposer.Compose(OneWeekResult(), [], null)
+            .Body.Should().NotContain("Ledger's decided proposals");
 
     [Fact]
     public void ActionLine_TrimsTheWorstOverBandSleeve_WithDollarSwing()

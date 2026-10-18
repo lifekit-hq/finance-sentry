@@ -47,6 +47,10 @@ internal sealed class InMemoryRecommendationRepository : IRecommendationReposito
             .Where(r => r.Status is RecommendationStatus.Confirmed or RecommendationStatus.Rejected
                 && r.DecidedAt != null && r.OutcomeScoredAt == null).ToList());
 
+    public Task<IReadOnlyList<Recommendation>> ListClosedUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Recommendation>>(Rows
+            .Where(r => r.UserId == userId && r.Status != RecommendationStatus.Pending).ToList());
+
     public Task AddPendingAsync(Recommendation recommendation, Recommendation? supersedes = null, CancellationToken ct = default)
     {
         if (Rows.Any(r => r.UserId == recommendation.UserId && r.Ticker == recommendation.Ticker

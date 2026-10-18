@@ -55,6 +55,15 @@ internal sealed class FakeCandidateRepository : ICandidateRepository
             .Where(c => c.Status == CandidateStatus.Active && c.ExpiresAt <= asOf)
             .ToList());
 
+    public Task<IReadOnlyList<OpportunityCandidate>> ListAllUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<OpportunityCandidate>>(Candidates.Where(c => c.UserId == userId).ToList());
+
+    public Task<IReadOnlyList<OpportunityCandidate>> ListCreatedBetweenUnscopedAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<OpportunityCandidate>>(Candidates
+            .Where(c => c.CreatedAt >= from && c.CreatedAt <= to)
+            .ToList());
+
     public Task UpdateAsync(OpportunityCandidate candidate, CancellationToken ct = default)
     {
         if (!Candidates.Contains(candidate))

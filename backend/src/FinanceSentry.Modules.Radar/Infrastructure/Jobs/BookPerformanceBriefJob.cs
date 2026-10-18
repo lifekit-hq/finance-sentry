@@ -20,6 +20,7 @@ public sealed class BookPerformanceBriefJob(
     IBookPerformanceService performance,
     IRadarSignalRepository signals,
     ITrackRecordSource trackRecord,
+    ILedgerScoreboardSource ledgerScoreboard,
     IAlertGeneratorService alerts,
     IConfiguration configuration,
     ILogger<BookPerformanceBriefJob> logger)
@@ -85,8 +86,9 @@ public sealed class BookPerformanceBriefJob(
                 ct);
 
             var delta = await trackRecord.GetDeltaAsync(userId, ct);
+            var ledger = await ledgerScoreboard.GetAsync(userId, ct);
 
-            var brief = PerformanceBriefComposer.Compose(result, portfolioSignals, delta, AppBaseUrl);
+            var brief = PerformanceBriefComposer.Compose(result, portfolioSignals, delta, AppBaseUrl, ledger);
             await alerts.GeneratePerformanceBriefAlertAsync(userId, brief.Headline, brief.Body, ct);
             return null;
         }
