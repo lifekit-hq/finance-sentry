@@ -25,28 +25,116 @@ public class WealthAggregationServiceTests
                DateTime.UtcNow, DateTime.UtcNow, MonobankCredentialId: credId, ProductType: productType);
 
     [Fact]
-    public async Task GetWealthSummary_Monobank_GroupsByCard_HidesEmptySubAccountsAndEmptyCards()
+    public async Task GetWealthSummary_Monobank_GroupsByCard_FlagsEmptySubAccountsAndEmptyCardsWithoutDropping()
     {
         var cred = Guid.NewGuid();
         var accounts = new[]
         {
             MakeMonobankAccount("UAH", 10000m, "black", cred),  // black card — has money
-            MakeMonobankAccount("USD", 0m, "black", cred),      // black card — empty currency, hidden
+            MakeMonobankAccount("USD", 0m, "black", cred),      // black card — empty currency, flagged
             MakeMonobankAccount("UAH", 5000m, "white", cred),   // white card — has money
-            MakeMonobankAccount("UAH", 0m, "platinum", cred),   // platinum — all empty, whole card hidden
+            MakeMonobankAccount("UAH", 0m, "platinum", cred),   // platinum — all empty, whole card flagged
         };
 
         var svc = BuildService(accounts);
         var result = await svc.GetWealthSummaryAsync(UserId, null, null);
 
         var inst = result.Categories.Single(c => c.Category == "banking").Institutions.Single();
-        inst.Cards.Should().NotBeNull();
-        inst.Cards!.Select(c => c.CardType).Should().BeEquivalentTo(["black", "white"]); // platinum dropped
+        inst.Cards!.Select(c => c.CardType).Should().BeEquivalentTo(["black", "white", "platinum"]);
+        inst.Cards!.Single(c => c.CardType == "platinum").HiddenReason.Should().Be("empty");
+        inst.Cards!.Where(c => c.CardType != "platinum").Should().OnlyContain(c => c.HiddenReason == null);
 
         var black = inst.Cards!.Single(c => c.CardType == "black");
         black.DisplayName.Should().Be("Black");
-        black.Accounts.Should().HaveCount(1);                 // empty USD hidden
-        black.Accounts.Single().Currency.Should().Be("UAH");
+        black.Accounts.Should().HaveCount(2);
+        black.Accounts.Single(a => a.Currency == "USD").HiddenReason.Should().Be("empty");
+        black.Accounts.Single(a => a.Currency == "UAH").HiddenReason.Should().BeNull();
+        inst.HiddenCount.Should().Be(2);
+        inst.HiddenTotal.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_HidingOptions_NeverChangeAnyTotal()
+    {
+        var cred = Guid.NewGuid();
+        var accounts = new[]
+        {
+            MakeMonobankAccount("UAH", 10000m, "black", cred),
+            MakeMonobankAccount("USD", 0.5m, "black", cred),     // small
+            MakeMonobankAccount("USD", 0m, "black", cred),       // empty
+            MakeAccount("truelayer", "USD", 0m),                 // empty
+            MakeAccount("truelayer", "USD", 0.5m),               // small
+            MakeAccount("truelayer", "USD", 800m),
+        };
+
+        var show = await BuildService(accounts, new UserAssetVisibility(false, false, 1m)).GetWealthSummaryAsync(UserId, null, null);
+        var hide = await BuildService(accounts, new UserAssetVisibility(true, true, 5m)).GetWealthSummaryAsync(UserId, null, null);
+
+        hide.TotalNetWorth.Should().Be(show.TotalNetWorth);
+        hide.Categories.Sum(c => c.TotalInBaseCurrency).Should().Be(show.Categories.Sum(c => c.TotalInBaseCurrency));
+        hide.Categories.SelectMany(c => c.Institutions).Select(i => i.TotalInBaseCurrency)
+            .Should().Equal(show.Categories.SelectMany(c => c.Institutions).Select(i => i.TotalInBaseCurrency));
+        hide.Categories.SelectMany(c => c.Institutions).SelectMany(i => i.Accounts).Count()
+            .Should().Be(show.Categories.SelectMany(c => c.Institutions).SelectMany(i => i.Accounts).Count());
+        hide.Categories.SelectMany(c => c.Institutions).SelectMany(i => i.Cards ?? []).Select(c => c.TotalInBaseCurrency)
+            .Should().Equal(show.Categories.SelectMany(c => c.Institutions).SelectMany(i => i.Cards ?? []).Select(c => c.TotalInBaseCurrency));
+        show.Categories.SelectMany(c => c.Institutions).Sum(i => i.HiddenCount).Should().Be(0);
+        hide.Categories.SelectMany(c => c.Institutions).Sum(i => i.HiddenCount).Should().Be(4);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_EmptyHiding_AppliesToEveryProvider_AndCanBeSwitchedOff()
+    {
+        var accounts = new[] { MakeAccount("truelayer", "USD", 0m), MakeAccount("truelayer", "USD", 50m) };
+
+        var on = (await BuildService(accounts, new UserAssetVisibility(true, false, 1m)).GetWealthSummaryAsync(UserId, null, null))
+            .Categories.Single().Institutions.SelectMany(i => i.Accounts);
+        var off = (await BuildService(accounts, new UserAssetVisibility(false, false, 1m)).GetWealthSummaryAsync(UserId, null, null))
+            .Categories.Single().Institutions.SelectMany(i => i.Accounts);
+
+        on.Count(a => a.HiddenReason == "empty").Should().Be(1);
+        off.Should().OnlyContain(a => a.HiddenReason == null);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_SmallThreshold_IsReadInTheBaseCurrency()
+    {
+        var accounts = new[] { MakeAccount("truelayer", "USD", 2m), MakeAccount("truelayer", "USD", 3m) };
+        var uah = Mock.Of<IUserBaseCurrencyReader>(r => r.GetAsync(UserId, It.IsAny<CancellationToken>()) == Task.FromResult("UAH"));
+
+        // 100 UAH is about $2.4: the $2 row is under it, the $3 row is not.
+        var result = await BuildService(accounts, new UserAssetVisibility(true, true, 100m), uah).GetWealthSummaryAsync(UserId, null, null);
+
+        result.Categories.Single().Institutions.SelectMany(i => i.Accounts)
+            .Where(a => a.HiddenReason == "small").Select(a => a.CurrentBalance).Should().Equal(2m);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_OwedBalance_IsNeverSmall_AndPaidOffCardIsEmpty()
+    {
+        var accounts = new[]
+        {
+            MakeAccount("truelayer", "USD", 0.5m, accountType: "credit"),
+            MakeAccount("truelayer", "USD", 0m, accountType: "credit"),
+        };
+
+        var rows = (await BuildService(accounts, new UserAssetVisibility(true, true, 10m)).GetWealthSummaryAsync(UserId, null, null))
+            .Categories.Single().Institutions.SelectMany(i => i.Accounts).ToList();
+
+        rows.Single(a => a.CurrentBalance == 0.5m).HiddenReason.Should().BeNull();
+        rows.Single(a => a.CurrentBalance == 0m).HiddenReason.Should().Be("empty");
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_UnpricedCrypto_IsNeitherEmptyNorSmall()
+    {
+        var holdings = new[] { Holding("binance", "RARE", 10m, 0m), Holding("binance", "DOGE", 10m, 0.4m) };
+        var svc = BuildServiceWithCrypto(new UserAssetVisibility(true, true, 1m), holdings);
+
+        var rows = (await svc.GetWealthSummaryAsync(UserId, null, null)).Categories.Single().Institutions.Single().Accounts;
+
+        rows.Single(a => a.Symbol == "RARE").HiddenReason.Should().BeNull();
+        rows.Single(a => a.Symbol == "DOGE").HiddenReason.Should().Be("small");
     }
 
     [Fact]
@@ -61,6 +149,13 @@ public class WealthAggregationServiceTests
     private WealthAggregationService BuildService(
         IEnumerable<BankingAccountSummary> accounts,
         IEnumerable<BankingTransactionSummary>? transactions = null)
+        => BuildService(accounts, null, null, transactions);
+
+    private WealthAggregationService BuildService(
+        IEnumerable<BankingAccountSummary> accounts,
+        UserAssetVisibility? prefs,
+        IUserBaseCurrencyReader? baseCurrency = null,
+        IEnumerable<BankingTransactionSummary>? transactions = null)
     {
         var accountsMock = new Mock<IBankingAccountsReader>();
         accountsMock.Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
@@ -70,12 +165,19 @@ public class WealthAggregationServiceTests
         txMock.Setup(r => r.GetTransactionsAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((transactions ?? []).ToList());
 
-        return new WealthAggregationService(accountsMock.Object, txMock.Object);
+        var visibility = new Mock<IUserAssetVisibilityReader>();
+        visibility.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(prefs);
+
+        return new WealthAggregationService(
+            accountsMock.Object, txMock.Object, visibilityReader: visibility.Object, baseCurrencyReader: baseCurrency);
     }
 
     // ── GetWealthSummaryAsync ─────────────────────────────────────────────────
 
     private static WealthAggregationService BuildServiceWithCrypto(params CryptoHoldingSummary[] holdings)
+        => BuildServiceWithCrypto(null, holdings);
+
+    private static WealthAggregationService BuildServiceWithCrypto(UserAssetVisibility? prefs, CryptoHoldingSummary[] holdings)
     {
         var accountsMock = new Mock<IBankingAccountsReader>();
         accountsMock.Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
@@ -84,7 +186,9 @@ public class WealthAggregationServiceTests
         cryptoMock.Setup(r => r.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>()))
                   .ReturnsAsync(holdings);
 
-        return new WealthAggregationService(accountsMock.Object, Mock.Of<IBankingTransactionReader>(), cryptoMock.Object);
+        var visibility = Mock.Of<IUserAssetVisibilityReader>(r => r.GetAsync(UserId, It.IsAny<CancellationToken>()) == Task.FromResult(prefs));
+        return new WealthAggregationService(
+            accountsMock.Object, Mock.Of<IBankingTransactionReader>(), cryptoMock.Object, visibilityReader: visibility);
     }
 
     private static CryptoHoldingSummary Holding(string provider, string asset, decimal quantity, decimal usdValue)

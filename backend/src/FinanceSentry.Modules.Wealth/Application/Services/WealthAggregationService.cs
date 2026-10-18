@@ -16,7 +16,9 @@ public class WealthAggregationService(
     IBrokerageHoldingsReader? brokerageReader = null,
     IBrokerageConnectionStatusReader? brokerageConnections = null,
     IEnumerable<IConnectionHealthReader>? healthReaders = null,
-    IOptionsMonitor<ConnectionHealthOptions>? healthOptions = null) : IWealthAggregationService
+    IOptionsMonitor<ConnectionHealthOptions>? healthOptions = null,
+    IUserAssetVisibilityReader? visibilityReader = null,
+    IUserBaseCurrencyReader? baseCurrencyReader = null) : IWealthAggregationService
 {
     private static readonly HashSet<string> AllowedCategories =
         new(StringComparer.OrdinalIgnoreCase) { "banking", "crypto", "brokerage", "other" };
@@ -62,6 +64,7 @@ public class WealthAggregationService(
         var labels = healthReaders is null || healthOptions is null
             ? ConnectionHealthLabels.None
             : await ConnectionHealthLabels.ReadAsync(healthReaders, healthOptions.CurrentValue, userId, ct);
+        var prefs = await VisibilityAsync(userId, ct);
 
         IEnumerable<BankingAccountSummary> filtered = bankAccounts;
 
@@ -78,7 +81,7 @@ public class WealthAggregationService(
             .Select(g =>
             {
                 var summaries = g.ToList();
-                var institutions = BuildBankingInstitutions(summaries, labels);
+                var institutions = BuildBankingInstitutions(summaries, labels, prefs);
                 return new CategorySummaryDto(
                     g.Key,
                     institutions.Sum(i => i.TotalInBaseCurrency),
@@ -100,7 +103,8 @@ public class WealthAggregationService(
                     Guid.Empty, DisplayNameFor(h.Provider), h.IsVenueFiat ? "cash" : "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
                     h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt,
                     Symbol: h.Asset))
-                    .ToList<AccountBalanceDto>();
+                    .Select(a => Mark(a, prefs))
+                    .ToList();
 
                 var institutionsByProvider = holdings
                     .GroupBy(h => h.Provider, StringComparer.OrdinalIgnoreCase)
@@ -141,7 +145,8 @@ public class WealthAggregationService(
                     BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt,
                     NativeCurrency: h.NativeValue is null ? null : h.Currency, NativeValue: h.NativeValue,
                     Symbol: h.Symbol))
-                    .ToList<AccountBalanceDto>();
+                    .Select(a => Mark(a, prefs))
+                    .ToList();
 
                 var institutionsByProvider = holdings
                     .GroupBy(h => h.Provider, StringComparer.OrdinalIgnoreCase)
@@ -194,7 +199,7 @@ public class WealthAggregationService(
     }
 
     private static IReadOnlyList<InstitutionDto> BuildBankingInstitutions(
-        IReadOnlyList<BankingAccountSummary> summaries, ConnectionHealthLabels labels)
+        IReadOnlyList<BankingAccountSummary> summaries, ConnectionHealthLabels labels, UserAssetVisibility prefs)
     {
         var buckets = new Dictionary<string, List<BankingAccountSummary>>();
         foreach (var s in summaries)
@@ -216,7 +221,7 @@ public class WealthAggregationService(
                 a.Provider, ProviderCategoryMapper.GetCategory(a.Provider),
                 a.Currency, a.CurrentBalance, a.BalanceUsd,
                 AccountSyncStatus(a, labels), a.LastSyncTimestamp,
-                a.ProductType)).ToList();
+                a.ProductType)).Select(a => Mark(a, prefs)).ToList();
 
             // Monobank returns one account per card × currency. Group them into physical cards
             // (black/white/…) with empty sub-accounts hidden, so the UI can nest currencies under
@@ -248,9 +253,27 @@ public class WealthAggregationService(
     private static Guid InstitutionIdFor(BankingAccountSummary s)
         => s.MonobankCredentialId ?? s.TrueLayerConnectionId ?? s.AccountId;
 
+    // The visibility preferences with the threshold in USD, the currency this service sums in: the base-currency
+    // amount is converted once here, and the controller re-expresses the rows' values afterwards.
+    private async Task<UserAssetVisibility> VisibilityAsync(Guid userId, CancellationToken ct)
+    {
+        var prefs = visibilityReader is null ? null : await visibilityReader.GetAsync(userId, ct);
+        prefs ??= new UserAssetVisibility(HideEmptyBalances: true, HideSmallBalances: false, SmallBalanceThreshold: 1m);
+        var baseCurrency = CurrencyConverter.ResolveBase(
+            baseCurrencyReader is null ? null : await baseCurrencyReader.GetAsync(userId, ct));
+        return prefs with { SmallBalanceThreshold = CurrencyConverter.ToUsd(prefs.SmallBalanceThreshold, baseCurrency) };
+    }
+
+    // Labels a row, never drops it. A row with a quantity but no USD value is unpriced: unknown, so never hidden.
+    private static AccountBalanceDto Mark(AccountBalanceDto a, UserAssetVisibility prefs)
+    {
+        decimal? value = a.CurrentBalance is 0m ? 0m : a.BalanceInBaseCurrency is 0m ? null : a.BalanceInBaseCurrency;
+        return a with { HiddenReason = AssetVisibility.Classify(value, AccountBalanceMath.IsLiability(a.AccountType), prefs) };
+    }
+
     /// <summary>
-    /// Groups Monobank currency sub-accounts into physical cards by product type, hiding
-    /// zero-balance sub-accounts (and cards left entirely empty). A missing product type (rows
+    /// Groups Monobank currency sub-accounts into physical cards by product type. Every sub-account and card is
+    /// returned; the empty ones carry <see cref="AccountBalanceDto.HiddenReason"/>. A missing product type (rows
     /// connected before it was captured) collapses into one "Card" group until the next sync
     /// backfills it.
     /// </summary>
@@ -258,18 +281,12 @@ public class WealthAggregationService(
     {
         return [.. accounts
             .GroupBy(a => a.ProductType ?? "card")
-            .Select(g => new
-            {
-                CardType = g.Key,
-                NonEmpty = g.Where(a => (a.CurrentBalance ?? 0m) != 0m).ToList(),
-            })
-            .Where(x => x.NonEmpty.Count > 0)
-            .Select(x => new CardGroupDto(
-                CardType: x.CardType,
-                DisplayName: FormatCardName(x.CardType),
-                TotalInBaseCurrency: x.NonEmpty.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceInBaseCurrency ?? 0m)),
-                SyncStatus: WorstSyncStatus(x.NonEmpty.Select(a => a.SyncStatus)),
-                Accounts: x.NonEmpty))
+            .Select(g => new CardGroupDto(
+                CardType: g.Key,
+                DisplayName: FormatCardName(g.Key),
+                TotalInBaseCurrency: g.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceInBaseCurrency ?? 0m)),
+                SyncStatus: WorstSyncStatus(g.Select(a => a.SyncStatus)),
+                Accounts: [.. g]))
             .OrderByDescending(c => c.TotalInBaseCurrency)];
     }
 

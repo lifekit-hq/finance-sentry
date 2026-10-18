@@ -331,6 +331,27 @@ as stored), and an institution, card-group or category total that nets negative 
 (`MoneyUtils.format`). The sign convention above is unchanged — only the display negates.
 Net worth totals stay signed.
 
+### Display visibility
+
+**Hidden is display-only; totals unchanged.** A person's asset-visibility preferences (`HideEmptyBalances`,
+`HideSmallBalances`, `SmallBalanceThreshold`, read through `IUserAssetVisibilityReader`) decide which rows a list
+tucks away. They never touch a figure: net worth, sleeve, institution and card totals, snapshots, Liquidity, MCP
+and AI all sum every row, hidden or not.
+
+`AssetVisibility.Classify(valueInBase, isOwed, prefs)` (Core) labels a row `empty`, `small` or none:
+
+- **empty** — value exactly 0, when `HideEmptyBalances` is on. Uniform for every provider; a paid-off credit
+  card (owing 0) is empty.
+- **small** — |value| below the threshold, when `HideSmallBalances` is on. The threshold is one amount in the
+  person's base currency for every asset type; the service sums in USD, so it converts the threshold once with
+  `CurrencyConverter.ToUsd` and compares USD with USD.
+- **never small:** a card or loan with anything owed, and a row whose value is unknown (an unpriced position).
+  Institutions are never hidden, only their rows.
+
+`/wealth/summary` annotates instead of dropping: `AccountBalanceDto.HiddenReason`, `CardGroupDto.HiddenReason`
+(every sub-account hidden) and the institution's `HiddenCount` / `HiddenTotal` (signed, in the response currency,
+already inside the institution total). Monobank cards and pockets are all returned, flagged.
+
 ## 3. Currency conversion
 
 - Convert **once, at the reader/query boundary**, via `CurrencyConverter.ToUsd(amount,
