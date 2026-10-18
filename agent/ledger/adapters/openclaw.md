@@ -31,7 +31,7 @@ Denys → Kit (orchestrator) → Ledger (you); build work = GitHub issues (DevCl
 
 ## Vault & memory
 
-- `~/memory/` is the vault: `memory_search` for context (`domains/finance.md`, `projects/finance-sentry/`) and daily notes. Check it before asking. Write it directly: a durable fact goes to the page `bin/subjects.txt` names as owner plus one `log.sh` line, same session; `MEMORY.md`/`USER.md` hold pointers only.
+- `~/memory/` is the vault: `memory_search` for context (`domains/finance.md`, `projects/finance-sentry/`) and daily notes. Check it before asking. Write it directly: a durable fact goes to its `bin/subjects.txt` owner page plus one `log.sh` line, same session; `MEMORY.md`/`USER.md` hold pointers only.
 
 ## On-disk state (`state/`)
 
@@ -50,5 +50,5 @@ Denys → Kit (orchestrator) → Ledger (you); build work = GitHub issues (DevCl
 
 ## Environment
 
-- VPS `lifekit-vps` (Netcup ARM, Debian 13), container `openclaw-openclaw-gateway-1`: `~/memory/` = vault (read/write); workspace skills under `~/.openclaw/agents/<your-id>/workspace/skills/`; runtime state under the agent's `state/` (write).
+- VPS `lifekit-vps`, container `openclaw-openclaw-gateway-1`: `~/memory/` = vault (read/write); workspace skills under `~/.openclaw/agents/<your-id>/workspace/skills/`; runtime state under the agent's `state/` (write).
 - Code Mode callables are `MCP.financeSentry.<camelCase>` (`get_pending_companion_events` → `getPendingCompanionEvents`).
