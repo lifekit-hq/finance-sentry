@@ -88,6 +88,7 @@ public static class AuthModule
         services.AddScoped<IUserAuthorizationChecker, UserAuthorizationChecker>();
         services.AddScoped<IOrgIdentityLinkReader, OrgIdentityLinkReader>();
         services.AddScoped<IUserAccessService, UserAccessService>();
+        services.AddScoped<IMemberAccountCreator, MemberAccountCreator>();
         services.AddScoped<IUserFireAssumptionsReader, UserFireAssumptionsReader>();
 
         return services;

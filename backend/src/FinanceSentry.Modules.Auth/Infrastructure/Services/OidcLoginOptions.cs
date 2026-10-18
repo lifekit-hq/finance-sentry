@@ -16,6 +16,12 @@ public class OidcLoginOptions
     /// <summary>The path the provider returns the browser to; the OIDC handler completes the code exchange there.</summary>
     public const string CallbackPath = "/api/v1/auth/oidc/signin";
 
+    /// <summary>The claim (and the scope that asks for it) carrying the names of the person's provider roles.</summary>
+    public const string RolesClaim = "roles";
+
+    /// <summary>The SPA page a refused sign-in lands on.</summary>
+    public const string AccessDeniedPath = "/access-denied";
+
     /// <summary>The issuer, e.g. <c>https://host.tailnet.ts.net:3001/oidc</c>.</summary>
     public string Authority { get; set; } = string.Empty;
 
@@ -45,6 +51,13 @@ public class OidcLoginOptions
     /// </summary>
     public bool RequireHttpsMetadata { get; set; } = true;
 
+    /// <summary>
+    /// The provider role that grants this app. A first sign-in with a verified email and no account creates a
+    /// Member account only when the person holds it; existing accounts sign in without it. Empty = no sign-in
+    /// creates an account, so only People-page invites do.
+    /// </summary>
+    public string RequiredRole { get; set; } = "finance-sentry";
+
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Authority)
         && !string.IsNullOrWhiteSpace(ClientId)
@@ -60,4 +73,11 @@ public class OidcLoginOptions
     /// forwarding straight back to the provider.
     /// </summary>
     public string PostLogoutRedirectUri => PublicBaseUrl.TrimEnd('/') + "/login?info=signed_out";
+
+    /// <summary>Where a sign-in the app refuses (no account and no app role, or an unverified email) sends the browser.</summary>
+    public string AccessDeniedUrl => PublicBaseUrl.TrimEnd('/') + AccessDeniedPath;
+
+    /// <summary>Whether the provider's role claims grant this app (<see cref="RequiredRole"/>).</summary>
+    public bool GrantsApp(IEnumerable<string> roles) =>
+        !string.IsNullOrWhiteSpace(RequiredRole) && roles.Contains(RequiredRole, StringComparer.Ordinal);
 }

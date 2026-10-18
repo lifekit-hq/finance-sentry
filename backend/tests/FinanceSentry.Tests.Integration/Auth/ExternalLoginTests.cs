@@ -1,10 +1,13 @@
 namespace FinanceSentry.Tests.Integration.Auth;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
+using FinanceSentry.Modules.Auth.Domain.People;
 using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
+using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -160,6 +163,99 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
 
         var uninvited = async () => await SignInAsync(new ExternalLoginCommand(Provider, "sub-pw-off-stranger", "pw-off-stranger@test.com", true));
         await uninvited.Should().ThrowAsync<AccountNotInvitedException>();
+    }
+
+    [Fact]
+    public async Task RoleHolderWithNoAccount_GetsAnActiveMemberAccountLinkedToTheProvider()
+    {
+        var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-granted", " ext-granted@test.com ", true, HasAppRole: true));
+
+        result.Response.User.Email.Should().Be("ext-granted@test.com");
+        result.Response.User.Roles.Should().Equal(AuthRoles.Member);
+        result.Response.User.Permissions.Should().BeEquivalentTo(Permissions.MemberDefaults);
+        var user = (await FindByLoginAsync("sub-granted"))!;
+        user.Id.Should().Be(result.Response.User.Id);
+        user.PasswordHash.Should().BeNull();
+        PersonStatus.Of(user, hasExternalLogin: true).Should().Be(PersonStatus.Active);
+    }
+
+    [Fact]
+    public async Task RoleHolder_SigningInAgain_KeepsTheAccountTheFirstSignInCreated()
+    {
+        var first = await SignInAsync(new ExternalLoginCommand(Provider, "sub-granted-again", "ext-granted-again@test.com", true, HasAppRole: true));
+        var second = await SignInAsync(new ExternalLoginCommand(Provider, "sub-granted-again", "ext-granted-again@test.com", true, HasAppRole: true));
+
+        second.Response.User.Id.Should().Be(first.Response.User.Id);
+    }
+
+    [Fact]
+    public async Task RoleHolderWithAnUnverifiedEmail_IsRefusedAndCreatesNoAccount()
+    {
+        var act = () => SignInAsync(new ExternalLoginCommand(Provider, "sub-granted-unverified", "ext-granted-unverified@test.com", false, HasAppRole: true));
+
+        await act.Should().ThrowAsync<AccountNotInvitedException>();
+        using var scope = factory.Services.CreateScope();
+        (await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>()
+            .FindByEmailAsync("ext-granted-unverified@test.com")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RevokedAccount_StaysRefusedWithTheRole()
+    {
+        // Linked first, so both the login match and the email match are covered.
+        var userId = await factory.CreatePendingInviteAsync("ext-revoked@test.com");
+        await SignInAsync(new ExternalLoginCommand(Provider, "sub-revoked", "ext-revoked@test.com", true));
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ICommandHandler<RevokePersonCommand, Unit>>()
+                .Handle(new RevokePersonCommand(userId, Guid.NewGuid().ToString()), CancellationToken.None);
+        }
+
+        var linked = () => SignInAsync(new ExternalLoginCommand(Provider, "sub-revoked", "ext-revoked@test.com", true, HasAppRole: true));
+        var byEmail = () => SignInAsync(new ExternalLoginCommand(Provider, "sub-revoked-other", "ext-revoked@test.com", true, HasAppRole: true));
+
+        await linked.Should().ThrowAsync<InvalidCredentialsException>();
+        await byEmail.Should().ThrowAsync<InvalidCredentialsException>();
+        (await FindByLoginAsync("sub-revoked-other")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ClosedAccount_StaysRefusedWithTheRoleAndNoSecondAccountIsMade()
+    {
+        // A closed account as the closure leaves it: locked out for good, unlinked, with a pending closure record.
+        var userId = await factory.CreatePendingInviteAsync("ext-closed@test.com");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByIdAsync(userId))!;
+            await users.SetLockoutEnabledAsync(user, true);
+            await users.SetLockoutEndDateAsync(user, PersonStatus.RevokedLockoutEnd);
+            var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+            db.AccountClosures.Add(new AccountClosure(Guid.Parse(userId), DateTime.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        var act = () => SignInAsync(new ExternalLoginCommand(Provider, "sub-closed", "ext-closed@test.com", true, HasAppRole: true));
+
+        await act.Should().ThrowAsync<InvalidCredentialsException>();
+        (await FindByLoginAsync("sub-closed")).Should().BeNull();
+        using var check = factory.Services.CreateScope();
+        check.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().Users
+            .Count(u => u.Email == "ext-closed@test.com").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExistingAccountWithoutTheRole_SignsInAsBefore()
+    {
+        // The owner and current members may not hold the provider role yet; the role is only consulted to create.
+        await factory.EnsureUserExistsAsync("ext-no-role@test.com", "TestPass123!");
+        var first = await SignInAsync(new ExternalLoginCommand(Provider, "sub-no-role", "ext-no-role@test.com", true, HasAppRole: false));
+
+        var again = await SignInAsync(new ExternalLoginCommand(Provider, "sub-no-role", "ext-no-role@test.com", true, HasAppRole: false));
+
+        again.Response.User.Id.Should().Be(first.Response.User.Id);
+        again.Response.User.Roles.Should().Equal(AuthRoles.Member);
+        (await FindByLoginAsync("sub-no-role"))!.Id.Should().Be(first.Response.User.Id);
     }
 
     private async Task<AuthResult> SignInAsync(ExternalLoginCommand command)

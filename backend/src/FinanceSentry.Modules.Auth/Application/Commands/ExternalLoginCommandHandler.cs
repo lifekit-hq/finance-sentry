@@ -7,13 +7,16 @@ using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using Microsoft.AspNetCore.Identity;
 
 /// <summary>
-/// External sign-in for existing accounts only. The provider account resolves through Identity's external-login
-/// table; on first use it links to the account with the same (provider-verified) email, which includes a pending
-/// invite. An email with no account is refused: accounts are created by invite, never by sign-in.
+/// External sign-in. The provider account resolves through Identity's external-login table; on first use it links
+/// to the account with the same (provider-verified) email, which includes a pending invite. Neither path looks at
+/// the provider's app role, so an existing account signs in with or without it. A verified email with no account
+/// gets a Member account only when the provider grants the app role: the role grant is the invite. Any other
+/// email with no account is refused, and a locked, revoked or closed account stays refused with the role too.
 /// </summary>
 public class ExternalLoginCommandHandler(
     UserManager<ApplicationUser> userManager,
     IUserAccessService userAccess,
+    IMemberAccountCreator memberAccounts,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService) : ICommandHandler<ExternalLoginCommand, AuthResult>
 {
@@ -24,12 +27,19 @@ public class ExternalLoginCommandHandler(
 
         if (user is null)
         {
-            // An unverified email must never relink an existing account.
+            // An unverified email must never relink an existing account or create one.
             if (!request.EmailVerified)
                 throw new AccountNotInvitedException();
 
-            user = await userManager.FindByEmailAsync(request.Email)
-                ?? throw new AccountNotInvitedException();
+            var email = request.Email.Trim();
+            user = await userManager.FindByEmailAsync(email);
+            if (user is null)
+            {
+                if (!request.HasAppRole)
+                    throw new AccountNotInvitedException();
+
+                user = await memberAccounts.CreateAsync(email, cancellationToken);
+            }
         }
 
         if (await userManager.IsLockedOutAsync(user))

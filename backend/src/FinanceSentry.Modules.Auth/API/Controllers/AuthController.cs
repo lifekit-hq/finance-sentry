@@ -8,6 +8,7 @@ using FinanceSentry.Core.Exceptions;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
 using FinanceSentry.Modules.Auth.Infrastructure.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
@@ -89,8 +90,9 @@ public class AuthController(
         return Challenge(properties, OidcLoginOptions.Scheme);
     }
 
-    // The provider has proven who the person is; the account itself still has to exist (an invite) and be active.
-    // Failures go back to the SPA login page as an error code rather than a JSON body, since this is a browser navigation.
+    // The provider has proven who the person is; the account itself still has to exist (an invite) or be granted by
+    // the provider's app role, and be active. A person the app does not know goes to the SPA's access-denied page;
+    // other failures go back to the login page as an error code rather than a JSON body, since this is a browser navigation.
     [AllowAnonymous]
     [HttpGet("oidc/callback")]
     public async Task<IActionResult> OidcCallback()
@@ -108,22 +110,32 @@ public class AuthController(
             return Redirect(OidcLoginExtensions.LoginFailureUrl(options.PublicBaseUrl, OidcLoginExtensions.FailureRedirectCode));
 
         var emailVerified = bool.TryParse(external.Principal!.FindFirstValue("email_verified"), out var verified) && verified;
+        var hasAppRole = options.GrantsApp(external.Principal.FindAll(OidcLoginOptions.RolesClaim).Select(c => c.Value));
 
         try
         {
             var result = await externalLoginHandler.Handle(
-                new ExternalLoginCommand(OidcLoginOptions.Scheme, subject, email, emailVerified),
+                new ExternalLoginCommand(OidcLoginOptions.Scheme, subject, email, emailVerified, hasAppRole),
                 HttpContext.RequestAborted);
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
             if (external.Properties?.GetTokenValue(OpenIdConnectParameterNames.IdToken) is { Length: > 0 } idToken)
                 SetOidcIdTokenCookie(idToken);
         }
+        catch (AccountNotInvitedException)
+        {
+            return Redirect(options.AccessDeniedUrl);
+        }
         catch (ApiException ex)
         {
             // A locked or revoked account is the generic invalid-credentials error; name it for the login page.
             var code = ex is InvalidCredentialsException ? OidcLoginExtensions.AccountUnavailableCode : ex.ErrorCode;
             return Redirect(OidcLoginExtensions.LoginFailureUrl(options.PublicBaseUrl, code));
+        }
+        catch (ValidationException)
+        {
+            // Identity refused to create the granted account (its user-name rules reject the email); never a 500.
+            return Redirect(OidcLoginExtensions.LoginFailureUrl(options.PublicBaseUrl, OidcLoginExtensions.FailureRedirectCode));
         }
 
         string? returnUrl = null;

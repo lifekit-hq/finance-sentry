@@ -24,6 +24,16 @@ export const APP_ROUTES: Routes = [
     ...RouteTitleUtils.of('Sign in'),
   },
   {
+    // A sign-in the app refused: the provider knows the person, the app has no account or role grant for them.
+    path: AppRoute.AccessDenied.slice(1),
+    loadComponent: () =>
+      import('./modules/auth/pages/access-denied/access-denied.component').then(
+        m => m.AccessDeniedComponent
+      ),
+    canActivate: [guestGuard],
+    ...RouteTitleUtils.of('No access'),
+  },
+  {
     // The retired invite link: the invited person signs in through the identity provider like everyone else.
     path: 'accept-invite',
     redirectTo: AppRoute.Login.slice(1),

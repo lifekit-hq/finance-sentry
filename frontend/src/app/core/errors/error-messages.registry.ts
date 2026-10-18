@@ -7,7 +7,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   EXTERNAL_ACCOUNT_ONLY: 'This account signs in through single sign-on and has no password.',
   DUPLICATE_EMAIL: 'This email already belongs to an account.',
   SIGN_IN_METHOD_DISABLED: 'This sign-in method is not available.',
-  ACCOUNT_NOT_INVITED: 'No account exists for this email. Ask the owner for an invite.',
+  ACCOUNT_NOT_INVITED: 'This sign-in has no access to Finance Sentry. Ask the owner for access.',
   ACCOUNT_UNAVAILABLE:
     'This account is locked or has been revoked. Try again later or ask the owner.',
   OIDC_FAILED: 'Sign-in failed. Please try again.',

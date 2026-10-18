@@ -48,6 +48,7 @@ public static class OidcLoginExtensions
             o.Scope.Add("openid");
             o.Scope.Add("email");
             o.Scope.Add("profile");
+            o.Scope.Add(OidcLoginOptions.RolesClaim);
             // The ID token is the end-session hint; the callback moves it into its own cookie and drops the rest with the external cookie.
             o.SaveTokens = true;
             o.MapInboundClaims = false;
@@ -55,6 +56,8 @@ public static class OidcLoginExtensions
             o.GetClaimsFromUserInfoEndpoint = true;
             o.ClaimActions.MapUniqueJsonKey("email", "email");
             o.ClaimActions.MapUniqueJsonKey("email_verified", "email_verified");
+            // An array of role names; one claim per role. Kept only for the callback's app-role check.
+            o.ClaimActions.MapJsonKey(OidcLoginOptions.RolesClaim, OidcLoginOptions.RolesClaim);
 
             // The code flow returns by GET navigation, so Lax cookies carry the correlation and nonce back.
             o.CorrelationCookie.SameSite = SameSiteMode.Lax;

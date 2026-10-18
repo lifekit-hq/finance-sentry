@@ -1,6 +1,7 @@
 export enum AppRoute {
   Root = '/',
   Login = '/login',
+  AccessDenied = '/access-denied',
   McpConnect = '/mcp/connect',
   Accounts = '/accounts',
   AccountsList = '/accounts/list',

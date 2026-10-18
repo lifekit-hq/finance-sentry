@@ -68,7 +68,7 @@ on that user's first sign-in (passkey sign-in is on tenant-wide), so it never bi
 seeds the matching finance-sentry account at startup from `Auth__SmokeAccount__Email` (prod: compose reads
 `SMOKE_ACCOUNT_EMAIL`, which `deploy.yml` fills from `E2E_LIVE_LOGTO_EMAIL`): a passwordless Member marked with the
 `seeded-account: smoke` user claim, plus one fake `seeded` bank account with a few transactions. The first Logto sign-in
-with the same verified email links the account to the Logto identity (invite-only rule, same as any invited person); a
+with the same verified email links the account to the Logto identity (same as any invited person); a
 marked account that still carries a password has it removed at startup. Email unset = no seed. It never touches an
 account it did not create, is never granted Owner, is not shared with anyone, and its `seeded` account is excluded from
 every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from
