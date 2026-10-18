@@ -264,10 +264,11 @@ public class WealthAggregationService(
         return prefs with { SmallBalanceThreshold = CurrencyConverter.ToUsd(prefs.SmallBalanceThreshold, baseCurrency) };
     }
 
-    // Labels a row, never drops it. A row with a quantity but no USD value is unpriced: unknown, so never hidden.
+    // Labels a row, never drops it. An unreported balance counts as zero; a row with a quantity but no USD value
+    // is unpriced: unknown, so never hidden.
     private static AccountBalanceDto Mark(AccountBalanceDto a, UserAssetVisibility prefs)
     {
-        decimal? value = a.CurrentBalance is 0m ? 0m : a.BalanceInBaseCurrency is 0m ? null : a.BalanceInBaseCurrency;
+        decimal? value = (a.CurrentBalance ?? 0m) == 0m ? 0m : a.BalanceInBaseCurrency is 0m ? null : a.BalanceInBaseCurrency;
         return a with { HiddenReason = AssetVisibility.Classify(value, AccountBalanceMath.IsLiability(a.AccountType), prefs) };
     }
 

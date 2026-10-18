@@ -126,6 +126,25 @@ public class WealthAggregationServiceTests
     }
 
     [Fact]
+    public async Task GetWealthSummary_MonobankSubAccountWithUnreportedBalance_IsEmpty()
+    {
+        var cred = Guid.NewGuid();
+        var accounts = new[]
+        {
+            MakeMonobankAccount("UAH", 10000m, "black", cred),
+            MakeMonobankAccount("USD", null, "black", cred),
+        };
+
+        var on = (await BuildService(accounts, new UserAssetVisibility(true, false, 1m)).GetWealthSummaryAsync(UserId, null, null))
+            .Categories.Single().Institutions.Single().Cards!.Single().Accounts;
+        var off = (await BuildService(accounts, new UserAssetVisibility(false, false, 1m)).GetWealthSummaryAsync(UserId, null, null))
+            .Categories.Single().Institutions.Single().Cards!.Single().Accounts;
+
+        on.Single(a => a.Currency == "USD").HiddenReason.Should().Be("empty");
+        off.Should().OnlyContain(a => a.HiddenReason == null);
+    }
+
+    [Fact]
     public async Task GetWealthSummary_UnpricedCrypto_IsNeitherEmptyNorSmall()
     {
         var holdings = new[] { Holding("binance", "RARE", 10m, 0m), Holding("binance", "DOGE", 10m, 0.4m) };
