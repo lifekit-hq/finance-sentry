@@ -7,21 +7,14 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 /// <summary>
 /// Idempotently seeds the reference tables:
 ///   • <c>categories</c>     — from <see cref="CategorySeedData"/> (Plaid PFC primaries).
-///   • <c>mcc_categories</c> — from the embedded greggles/mcc-codes dataset plus
-///                             <see cref="SupplementaryMccCodes"/>, category assigned via
-///                             <see cref="MccRangeClassifier"/>.
+///   • <c>mcc_categories</c> — from the embedded greggles/mcc-codes dataset,
+///                             category assigned via <see cref="MccRangeClassifier"/>.
 ///
 /// Only missing rows are inserted, so runtime edits to either table are never clobbered.
 /// </summary>
 public static class CategorySeeder
 {
     private const string ResourceSuffix = "Infrastructure.Categorization.Data.mcc_codes.csv";
-
-    /// <summary>Codes the card networks issue that the embedded dataset predates.</summary>
-    internal static readonly IReadOnlyList<(int Mcc, string Description)> SupplementaryMccCodes =
-    [
-        (5262, "Marketplaces"),
-    ];
 
     public static void Seed(BankSyncDbContext db)
     {
@@ -64,7 +57,7 @@ public static class CategorySeeder
         var existing = db.MccCategories.Select(m => m.Mcc).ToHashSet();
         var toAdd = new List<MccCategory>();
 
-        foreach (var (mcc, description) in ReadDataset().Concat(SupplementaryMccCodes))
+        foreach (var (mcc, description) in ReadDataset())
         {
             if (existing.Contains(mcc))
                 continue;

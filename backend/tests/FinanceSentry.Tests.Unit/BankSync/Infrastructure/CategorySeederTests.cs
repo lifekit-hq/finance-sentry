@@ -27,7 +27,6 @@ public class CategorySeederTests
     [InlineData(5816, CategoryKeys.Entertainment)]      // Digital goods: games (Steam)
     [InlineData(5817, CategoryKeys.GeneralServices)]    // Digital goods: applications
     [InlineData(5818, CategoryKeys.GeneralMerchandise)] // Digital goods: large digital goods merchant
-    [InlineData(5262, CategoryKeys.GeneralMerchandise)] // Marketplaces: not in the embedded dataset
     public void FreshSeed_WritesTheCodeMapping(int mcc, string expected)
     {
         using var db = Context(Options());
