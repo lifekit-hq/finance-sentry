@@ -73,6 +73,9 @@ public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> op
             entity.Property(e => e.Quantity).HasPrecision(30, 10);
             entity.Property(e => e.PriceUsd).HasPrecision(20, 8);
             entity.Property(e => e.QuoteQuantityUsd).HasPrecision(20, 4);
+            entity.Property(e => e.Fee).HasPrecision(30, 10);
+            entity.Property(e => e.FeeAsset).HasMaxLength(20);
+            entity.Property(e => e.FeeUsd).HasPrecision(20, 4);
             entity.Property(e => e.Timestamp).IsRequired();
             entity.Property(e => e.RecordedAt).IsRequired();
         });

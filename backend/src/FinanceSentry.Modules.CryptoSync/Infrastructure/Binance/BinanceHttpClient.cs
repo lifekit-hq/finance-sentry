@@ -57,6 +57,26 @@ public sealed class BinanceHttpClient
         return await DeserializeAsync<IReadOnlyList<BinancePriceTicker>>(response, ct);
     }
 
+    // /api/v3/klines — public market data (no key): the one-minute candle that opens at or after startTime. Its open is
+    // the price at that minute, which is how a fee paid in another asset is valued at the fill's own time.
+    // https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints#klinecandlestick-data
+    public async Task<decimal?> GetMinuteOpenPriceAsync(string symbol, long startTimeMs, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync(
+            $"{_baseUrl}/api/v3/klines?symbol={symbol}&interval=1m&startTime={startTimeMs}&limit=1", ct);
+        var candles = await DeserializeAsync<JsonElement>(response, ct);
+        if (candles.ValueKind != JsonValueKind.Array || candles.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        var open = candles[0].ValueKind == JsonValueKind.Array && candles[0].GetArrayLength() > 1 ? candles[0][1].GetString() : null;
+        return decimal.TryParse(open, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var price)
+            && price > 0m
+            ? price
+            : null;
+    }
+
     // /api/v3/myTrades — returns up to 1000 fills for a given symbol. Pass fromId to walk
     // forward through trade history incrementally. Binance docs:
     // https://developers.binance.com/docs/binance-spot-api-docs/rest-api/account-endpoints#account-trade-list-user_data

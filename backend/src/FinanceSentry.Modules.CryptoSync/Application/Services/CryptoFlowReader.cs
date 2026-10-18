@@ -140,6 +140,22 @@ public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchange
             }
         }
 
+        // A spot fill's commission is a fee (return), valued at the fill's own time when it was synced; a fill whose
+        // fee could not be valued, or was synced before fees were kept, books none and stays in the market remainder.
+        var fills = await db.CryptoTrades.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking()
+            .Where(t => t.UserId == userId && t.FeeUsd > 0m)
+            .Select(t => new { t.Provider, t.Timestamp, FeeUsd = t.FeeUsd!.Value })
+            .ToListAsync(ct);
+        foreach (var fill in fills)
+        {
+            var date = DateOnly.FromDateTime(fill.Timestamp);
+            if (date > from && linkedOn.TryGetValue(fill.Provider, out var link) && date > link)
+            {
+                flows.Add(new SourceFlow(fill.Provider, new ClassifiedFlow(date, FlowClass.Fee, fill.FeeUsd), FxStatus.Exact, false));
+            }
+        }
+
         foreach (var pair in pairs)
         {
             var sentOn = DateOnly.FromDateTime(pair.Sent.OccurredAt);

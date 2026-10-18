@@ -147,4 +147,17 @@ public class ForwardCostBasisLedgerTests
         state.RealizedPnlUsd.Should().Be(50m);
         state.LastTradeAt.Should().Be(T0.AddMinutes(2));
     }
+
+    [Fact]
+    public void FeesOnBuyAndSell_JoinTheCostAndReduceTheRealizedPnl()
+    {
+        var buy = Buy(1m, 2_000m, 1) with { FeeUsd = 3m };
+        var sell = Sell(1m, 2_500m, 2) with { FeeUsd = 4m };
+
+        var bought = Apply(ForwardLedgerState.Empty, 1m, buy);
+        var sold = Apply(bought, 0m, sell);
+
+        bought.CostBasisUsd.Should().Be(2_003m);
+        sold.RealizedPnlUsd.Should().Be(493m);
+    }
 }

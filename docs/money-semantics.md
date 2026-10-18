@@ -1085,6 +1085,14 @@ are closed periods.
     flows unknown. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
     EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. The other side's account type is kept raw
     (`CounterpartyRef`); the sleeve reads both `revolut` and `external_*` as external.
+  - **Binance spot trade commission.** A fill's `commission` / `commissionAsset` (`/api/v3/myTrades`) is kept on the
+    stored trade (`Fee`, `FeeAsset`, `FeeUsd`) and books as a fee (return) on the fill's day, never as market
+    moves. `FeeUsd` is valued when the fill is synced: a stablecoin at par, the traded asset at the fill's price,
+    any other asset (typically BNB) at its one-minute `klines` open on the fill's minute. A fee with no price
+    stays unvalued and books nothing (it stays in the market remainder). Fills stored before this release carry no
+    fee and are not backfilled. Cost basis includes it: a buy's `FeeUsd` joins the lot's cost, a sell's reduces
+    realized P&L. Fixture 14: 0.005 BNB at 600 = a 3.00 fee. Revolut X trade fees are not read (they need
+    `/orders/{id}`, a read not made today) and stay in the market remainder.
   - **Transfers between venues** (`CryptoTransferMatcher`, at read time). A coin one venue sent and another
     received is a move inside the sleeve, not money in or out: the pair books no flow, only its cost as a fee
     on the send's day (what left the sender, its own fee included, less what arrived). A pair matches on the

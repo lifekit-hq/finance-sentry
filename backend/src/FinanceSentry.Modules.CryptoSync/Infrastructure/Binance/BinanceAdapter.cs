@@ -160,6 +160,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
         var nextFromIds = BinanceTradeCursor.Parse(cursor, QuoteCandidates);
         var allTrades = new List<CryptoTrade>();
+        var feePrices = new Dictionary<(string Asset, long Minute), decimal?>();
 
         foreach (var quote in QuoteCandidates)
         {
@@ -182,15 +183,22 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
                 var fresh = rows.Where(r => r.Id >= fromId).ToList();
                 foreach (var r in fresh)
                 {
+                    var price = decimal.Parse(r.Price, CultureInfo.InvariantCulture);
+                    var fee = ParseAmount(r.Commission);
+                    var feeAsset = string.IsNullOrWhiteSpace(r.CommissionAsset) ? null : r.CommissionAsset.Trim().ToUpperInvariant();
+                    var hasFee = fee is > 0m && feeAsset is not null;
                     allTrades.Add(new CryptoTrade(
                         TradeId: r.Id.ToString(CultureInfo.InvariantCulture),
                         Asset: asset.ToUpperInvariant(),
                         QuoteAsset: quote,
                         Quantity: decimal.Parse(r.Quantity, CultureInfo.InvariantCulture),
-                        PriceUsd: decimal.Parse(r.Price, CultureInfo.InvariantCulture),
+                        PriceUsd: price,
                         QuoteQuantityUsd: decimal.Parse(r.QuoteQuantity, CultureInfo.InvariantCulture),
                         IsBuyer: r.IsBuyer,
-                        Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(r.TimeMs).UtcDateTime));
+                        Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(r.TimeMs).UtcDateTime,
+                        Fee: hasFee ? fee : null,
+                        FeeAsset: hasFee ? feeAsset : null,
+                        FeeUsd: hasFee ? await FeeUsdAsync(fee!.Value, feeAsset!, asset, price, r.TimeMs, feePrices, ct) : null));
                 }
 
                 if (fresh.Count > 0)
@@ -211,6 +219,49 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             .ToList();
 
         return new CryptoTradePage(trades, BinanceTradeCursor.Format(nextFromIds));
+    }
+
+    /// <summary>
+    /// A fill's commission in USD at the fill's own time: a stablecoin at par, the traded asset at the fill's price, any
+    /// other asset (typically BNB) at its one-minute candle open from <c>klines</c>. Null when that asset has no
+    /// USDT pair or the call fails, so the fee stays unvalued instead of being priced at today's rate.
+    /// </summary>
+    private async Task<decimal?> FeeUsdAsync(
+        decimal fee,
+        string feeAsset,
+        string tradedAsset,
+        decimal fillPriceUsd,
+        long timeMs,
+        Dictionary<(string Asset, long Minute), decimal?> cache,
+        CancellationToken ct)
+    {
+        if (BinanceHoldingsAggregator.IsStablecoin(feeAsset))
+        {
+            return fee;
+        }
+
+        if (string.Equals(feeAsset, tradedAsset, StringComparison.OrdinalIgnoreCase))
+        {
+            return fee * fillPriceUsd;
+        }
+
+        var key = (feeAsset, timeMs / 60_000);
+        if (!cache.TryGetValue(key, out var unitPrice))
+        {
+            try
+            {
+                unitPrice = await _httpClient.GetMinuteOpenPriceAsync($"{feeAsset}USDT", key.Item2 * 60_000, ct);
+            }
+            catch (BinanceException ex)
+            {
+                _logger.LogDebug(ex, "Binance price for fee asset {Asset} unavailable; the commission stays unvalued.", feeAsset);
+                unitPrice = null;
+            }
+
+            cache[key] = unitPrice;
+        }
+
+        return unitPrice is { } p ? fee * p : null;
     }
 
     /// <summary>
