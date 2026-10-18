@@ -357,3 +357,37 @@ describe('holdingsComputed provider filter', () => {
     expect(c.totalPositionsValue()).toBe(300);
   });
 });
+
+describe('holdingsComputed hidden positions', () => {
+  const dust = position({symbol: 'SHIB', currentValue: 1, hiddenReason: 'small'});
+  const btc = position({symbol: 'BTC', currentValue: 99});
+
+  it('groups by the API verdict and leaves the group total and weights on the full book', () => {
+    const [group] = build([btc, dust]).positionsByAssetClass();
+
+    expect(group.rows.map(r => r.symbol)).toEqual(['BTC']);
+    expect(group.hiddenRows.map(r => r.symbol)).toEqual(['SHIB']);
+    expect(group.hiddenTotal).toBe(1);
+    expect(group.totalValue).toBe(100);
+    expect(group.rows[0].weightPercent).toBe(99);
+    expect(group.hiddenRows[0].weightPercent).toBe(1);
+  });
+
+  it('counts hidden positions in the page total and allocation', () => {
+    const c = build([btc, dust]);
+
+    expect(c.totalPositionsValue()).toBe(100);
+    expect(c.allocationSegments()[0].value).toBe(100);
+    expect(c.allocationBreakdown()[0].percent).toBe(100);
+  });
+
+  it('never decides hiding itself: a tiny row without a verdict stays in the list', () => {
+    const [group] = build([
+      btc,
+      position({symbol: 'TINY', currentValue: 0.01}),
+    ]).positionsByAssetClass();
+
+    expect(group.hiddenRows).toEqual([]);
+    expect(group.rows.length).toBe(2);
+  });
+});

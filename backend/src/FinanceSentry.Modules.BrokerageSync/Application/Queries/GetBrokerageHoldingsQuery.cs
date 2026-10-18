@@ -1,6 +1,7 @@
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
@@ -29,7 +30,8 @@ public sealed record BrokeragePositionDto(
     string Provider = "ibkr",
     string AssetClass = "Other",
     string Currency = "USD",
-    decimal? NativeValue = null);
+    decimal? NativeValue = null,
+    string? HiddenReason = null); // AssetVisibility.Empty / Small: display-only, the row still counts in the total and weights
 
 /// <summary>
 /// <see cref="Provider"/> is the one provider all positions come from, or <c>mixed</c>. <see cref="Headline"/> is
@@ -48,7 +50,9 @@ public sealed record BrokerageHoldingsResponse(
 public sealed class GetBrokerageHoldingsQueryHandler(
     IBrokerageHoldingRepository holdingRepository,
     IBrokerageTradeRepository tradeRepository,
-    BrokerageCostBasisReconciler reconciler)
+    BrokerageCostBasisReconciler reconciler,
+    IUserAssetVisibilityReader? visibilityReader = null,
+    IUserBaseCurrencyReader? baseCurrencyReader = null)
     : IQueryHandler<GetBrokerageHoldingsQuery, BrokerageHoldingsResponse>
 {
     private const int FlexStaleAfterDays = 4;
@@ -94,6 +98,8 @@ public sealed class GetBrokerageHoldingsQueryHandler(
         var providers = holdings.Select(h => h.Provider).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var totalUsd = holdings.Sum(h => h.UsdValue);
 
+        // Rows are labelled, never dropped: the total above and the weights the page derives sum every position.
+        var prefs = await AssetVisibility.ResolveInUsdAsync(visibilityReader, baseCurrencyReader, request.UserId, ct);
         var positions = holdings
             .Select(h =>
             {
@@ -111,7 +117,8 @@ public sealed class GetBrokerageHoldingsQueryHandler(
                     h.Provider,
                     AssetClassNormalizer.Normalize(h.InstrumentType),
                     h.Currency,
-                    h.NativeValue);
+                    h.NativeValue,
+                    AssetVisibility.ClassifyPosition(h.Quantity, h.UsdValue, prefs));
             })
             .ToList();
 

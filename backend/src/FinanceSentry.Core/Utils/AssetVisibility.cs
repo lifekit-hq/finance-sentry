@@ -23,4 +23,29 @@ public static class AssetVisibility
             return prefs.HideEmptyBalances ? Empty : null;
         return prefs.HideSmallBalances && !isOwed && value > 0m && value < prefs.SmallBalanceThreshold ? Small : null;
     }
+
+    /// <summary>
+    /// The person's preferences with the threshold converted once to USD, the currency the money readers sum in,
+    /// so a row's USD value and the threshold compare like with like. Defaults when the person has none stored.
+    /// </summary>
+    public static async Task<UserAssetVisibility> ResolveInUsdAsync(
+        IUserAssetVisibilityReader? visibilityReader, IUserBaseCurrencyReader? baseCurrencyReader, Guid userId, CancellationToken ct)
+    {
+        var prefs = visibilityReader is null ? null : await visibilityReader.GetAsync(userId, ct);
+        prefs ??= new UserAssetVisibility(HideEmptyBalances: true, HideSmallBalances: false, SmallBalanceThreshold: 1m);
+        var baseCurrency = CurrencyConverter.ResolveBase(
+            baseCurrencyReader is null ? null : await baseCurrencyReader.GetAsync(userId, ct));
+        return prefs with { SmallBalanceThreshold = CurrencyConverter.ToUsd(prefs.SmallBalanceThreshold, baseCurrency) };
+    }
+
+    /// <summary>
+    /// Classifies a position held in <paramref name="quantity"/> units worth <paramref name="usdValue"/>. A position
+    /// with a quantity but no USD value is unpriced: its value is unknown, so it is never hidden. A negative value
+    /// (a short) is owed and never small.
+    /// </summary>
+    public static string? ClassifyPosition(decimal quantity, decimal usdValue, UserAssetVisibility prefs)
+    {
+        decimal? value = quantity == 0m ? 0m : usdValue == 0m ? null : usdValue;
+        return Classify(value, isOwed: false, prefs);
+    }
 }

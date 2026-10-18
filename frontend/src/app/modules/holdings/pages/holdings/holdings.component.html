@@ -142,116 +142,139 @@
             </span>
           </div>
 
-          <cmn-data-table
-            [rows]="group.rows"
-            [rowsActionable]="group.assetClass !== 'cash'"
-            (rowClick)="openDossier(group.assetClass, $event.symbol)"
-          >
-            <cmn-column key="symbol" listSlot="primary" header="Symbol">
-              <ng-template let-row cmnCell>
-                <span class="inline-flex items-center gap-cmn-3 text-left">
-                  <cmn-institution-avatar
-                    [name]="row.symbol"
-                    [logoUrl]="row.symbol | assetLogo: row.provider"
-                    size="sm"
-                  />
-                  <span class="flex flex-col leading-tight">
-                    <span class="font-semibold text-text-primary">{{ row.symbol }}</span>
-                    <a
-                      [routerLink]="accountsRoute"
-                      (click)="$event.stopPropagation()"
-                      class="text-cmn-xs text-text-secondary hover:underline"
-                      data-testid="holding-provider-link"
-                      >{{ row.providerLabel }}</a
-                    >
-                  </span>
-                </span>
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
-              <ng-template let-row cmnCell>
-                <span class="tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
-                @if (row.currentPrice !== null) {
-                  <span class="tabular-nums md:hidden">
-                    ×
-                    {{
-                      row.nativeCurrency && row.nativePrice !== null
-                        ? (row.nativePrice | money: row.nativeCurrency)
-                        : (row.currentPrice | money)
-                    }}</span
-                  >
-                }
-                <span class="md:hidden" data-testid="holding-day-change-phone">
-                  <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
-                </span>
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="price" header="Price" align="right">
-              <ng-template let-row cmnCell>
-                @if (row.currentPrice === null) {
-                  <span class="tabular-nums text-text-secondary">—</span>
-                } @else if (row.nativeCurrency && row.nativePrice !== null) {
-                  <span class="tabular-nums" data-testid="holding-native-price">{{
-                    row.nativePrice | money: row.nativeCurrency
-                  }}</span>
-                } @else {
-                  <span class="tabular-nums">{{ row.currentPrice | money }}</span>
-                }
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="day" header="Day" align="right">
-              <ng-template let-row cmnCell>
-                <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="value" listSlot="trailing" header="Value" align="right">
-              <ng-template let-row cmnCell>
-                @if (row.nativeCurrency && row.nativeValue !== null) {
-                  <span class="flex flex-col items-end leading-tight">
-                    <span class="tabular-nums font-semibold" data-testid="holding-native-value">{{
-                      row.nativeValue | money: row.nativeCurrency
-                    }}</span>
-                    <span class="tabular-nums text-cmn-xs text-text-secondary"
-                      >~ {{ row.currentValue | money }}</span
-                    >
-                  </span>
-                } @else {
-                  <span class="tabular-nums font-semibold">{{ row.currentValue | money }}</span>
-                }
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">
-              <ng-template let-row cmnCell>
-                @if (row.pnlPercent === null) {
-                  <span
-                    class="tabular-nums text-text-secondary"
-                    title="No cost basis reported by provider"
-                    >—</span
-                  >
-                } @else {
-                  <span
-                    [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                    class="tabular-nums"
-                    >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
-                      row.pnlPercent | number: '1.2-2'
-                    }}%)</span
-                  >
-                }
-              </ng-template>
-            </cmn-column>
-            <cmn-column key="weight" header="Weight" align="right">
-              <ng-template let-row cmnCell>
-                <span class="tabular-nums text-text-secondary"
-                  >{{ row.weightPercent | number: '1.1-1' }}%</span
-                >
-              </ng-template>
-            </cmn-column>
-          </cmn-data-table>
+          @if (group.rows.length > 0) {
+            <ng-container
+              *ngTemplateOutlet="positionTable; context: {$implicit: group.rows, group: group}"
+            />
+          }
+          @if (group.hiddenRows.length > 0) {
+            <cmn-disclosure-row
+              [label]="group.hiddenRows.length + ' hidden · ' + (group.hiddenTotal | money)"
+              [open]="false"
+              class="block min-h-[2.75rem]"
+              data-testid="holdings-hidden"
+            >
+              <div class="opacity-70" data-testid="holdings-hidden-rows">
+                <ng-container
+                  *ngTemplateOutlet="
+                    positionTable;
+                    context: {$implicit: group.hiddenRows, group: group}
+                  "
+                />
+              </div>
+            </cmn-disclosure-row>
+          }
         </section>
       }
     </cmn-card>
   </cmn-async-state>
 </div>
+
+<ng-template #positionTable let-rows let-group="group">
+  <cmn-data-table
+    [rows]="asRows(rows)"
+    [rowsActionable]="group.assetClass !== 'cash'"
+    (rowClick)="openDossier(group.assetClass, $event.symbol)"
+  >
+    <cmn-column key="symbol" listSlot="primary" header="Symbol">
+      <ng-template let-row cmnCell>
+        <span class="inline-flex items-center gap-cmn-3 text-left">
+          <cmn-institution-avatar
+            [name]="row.symbol"
+            [logoUrl]="row.symbol | assetLogo: row.provider"
+            size="sm"
+          />
+          <span class="flex flex-col leading-tight">
+            <span class="font-semibold text-text-primary">{{ row.symbol }}</span>
+            <a
+              [routerLink]="accountsRoute"
+              (click)="$event.stopPropagation()"
+              class="text-cmn-xs text-text-secondary hover:underline"
+              data-testid="holding-provider-link"
+              >{{ row.providerLabel }}</a
+            >
+          </span>
+        </span>
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
+      <ng-template let-row cmnCell>
+        <span class="tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
+        @if (row.currentPrice !== null) {
+          <span class="tabular-nums md:hidden">
+            ×
+            {{
+              row.nativeCurrency && row.nativePrice !== null
+                ? (row.nativePrice | money: row.nativeCurrency)
+                : (row.currentPrice | money)
+            }}</span
+          >
+        }
+        <span class="md:hidden" data-testid="holding-day-change-phone">
+          <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
+        </span>
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="price" header="Price" align="right">
+      <ng-template let-row cmnCell>
+        @if (row.currentPrice === null) {
+          <span class="tabular-nums text-text-secondary">—</span>
+        } @else if (row.nativeCurrency && row.nativePrice !== null) {
+          <span class="tabular-nums" data-testid="holding-native-price">{{
+            row.nativePrice | money: row.nativeCurrency
+          }}</span>
+        } @else {
+          <span class="tabular-nums">{{ row.currentPrice | money }}</span>
+        }
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="day" header="Day" align="right">
+      <ng-template let-row cmnCell>
+        <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="value" listSlot="trailing" header="Value" align="right">
+      <ng-template let-row cmnCell>
+        @if (row.nativeCurrency && row.nativeValue !== null) {
+          <span class="flex flex-col items-end leading-tight">
+            <span class="tabular-nums font-semibold" data-testid="holding-native-value">{{
+              row.nativeValue | money: row.nativeCurrency
+            }}</span>
+            <span class="tabular-nums text-cmn-xs text-text-secondary"
+              >~ {{ row.currentValue | money }}</span
+            >
+          </span>
+        } @else {
+          <span class="tabular-nums font-semibold">{{ row.currentValue | money }}</span>
+        }
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">
+      <ng-template let-row cmnCell>
+        @if (row.pnlPercent === null) {
+          <span class="tabular-nums text-text-secondary" title="No cost basis reported by provider"
+            >—</span
+          >
+        } @else {
+          <span
+            [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
+            class="tabular-nums"
+            >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
+              row.pnlPercent | number: '1.2-2'
+            }}%)</span
+          >
+        }
+      </ng-template>
+    </cmn-column>
+    <cmn-column key="weight" header="Weight" align="right">
+      <ng-template let-row cmnCell>
+        <span class="tabular-nums text-text-secondary"
+          >{{ row.weightPercent | number: '1.1-1' }}%</span
+        >
+      </ng-template>
+    </cmn-column>
+  </cmn-data-table>
+</ng-template>
 
 <ng-template #dayChange let-row>
   @if (row.dayChangePct === null) {

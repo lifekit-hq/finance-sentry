@@ -349,4 +349,54 @@ describe('PositionsService', () => {
       expect(result.headline?.reasons.map(r => r.source)).toEqual(['brokerage', 'crypto']);
     });
   });
+
+  it('carries the API hidden verdict of crypto and brokerage rows onto the positions', () => {
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.expectOne(`${BASE}/brokerage/holdings`).flush({
+      ...emptyBrokerage,
+      positions: [
+        {
+          symbol: 'DUST',
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 0.5,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          hiddenReason: 'small',
+        },
+        {
+          symbol: 'AAPL',
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 200,
+          costBasisUsd: null,
+          averageCostUsd: null,
+        },
+      ],
+    });
+    http.expectOne(`${BASE}/crypto/holdings`).flush({
+      provider: 'binance',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 0.1,
+      holdings: [
+        {
+          asset: 'SHIB',
+          freeQuantity: 1,
+          lockedQuantity: 0,
+          usdValue: 0.1,
+          provider: 'binance',
+          isFiat: false,
+          hiddenReason: 'small',
+        },
+      ],
+    });
+
+    expect(positions.map(p => [p.symbol, p.hiddenReason])).toEqual([
+      ['DUST', 'small'],
+      ['AAPL', null],
+      ['SHIB', 'small'],
+    ]);
+  });
 });

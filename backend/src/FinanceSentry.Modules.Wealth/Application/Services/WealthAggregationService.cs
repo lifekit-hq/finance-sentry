@@ -255,14 +255,8 @@ public class WealthAggregationService(
 
     // The visibility preferences with the threshold in USD, the currency this service sums in: the base-currency
     // amount is converted once here, and the controller re-expresses the rows' values afterwards.
-    private async Task<UserAssetVisibility> VisibilityAsync(Guid userId, CancellationToken ct)
-    {
-        var prefs = visibilityReader is null ? null : await visibilityReader.GetAsync(userId, ct);
-        prefs ??= new UserAssetVisibility(HideEmptyBalances: true, HideSmallBalances: false, SmallBalanceThreshold: 1m);
-        var baseCurrency = CurrencyConverter.ResolveBase(
-            baseCurrencyReader is null ? null : await baseCurrencyReader.GetAsync(userId, ct));
-        return prefs with { SmallBalanceThreshold = CurrencyConverter.ToUsd(prefs.SmallBalanceThreshold, baseCurrency) };
-    }
+    private Task<UserAssetVisibility> VisibilityAsync(Guid userId, CancellationToken ct)
+        => AssetVisibility.ResolveInUsdAsync(visibilityReader, baseCurrencyReader, userId, ct);
 
     // Labels a row, never drops it. An unreported balance counts as zero; a row with a quantity but no USD value
     // is unpriced: unknown, so never hidden.
