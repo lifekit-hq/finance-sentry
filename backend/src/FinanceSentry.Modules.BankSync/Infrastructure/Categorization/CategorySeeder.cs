@@ -7,8 +7,8 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 /// <summary>
 /// Idempotently seeds the reference tables:
 ///   • <c>categories</c>     — from <see cref="CategorySeedData"/> (Plaid PFC primaries).
-///   • <c>mcc_categories</c> — from the embedded greggles/mcc-codes dataset, category
-///                             assigned via <see cref="MccRangeClassifier"/>.
+///   • <c>mcc_categories</c> — from the embedded greggles/mcc-codes dataset,
+///                             category assigned via <see cref="MccRangeClassifier"/>.
 ///
 /// Only missing rows are inserted, so runtime edits to either table are never clobbered.
 /// </summary>

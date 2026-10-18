@@ -7,8 +7,9 @@ namespace FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 public interface ICategoryResolver
 {
     /// <summary>
-    /// Resolves a Monobank/card MCC via the <c>mcc_categories</c> table.
-    /// Returns UNCATEGORIZED when the MCC is null or unmapped.
+    /// Resolves a Monobank/card MCC via the <c>mcc_categories</c> table, falling back to the
+    /// MCC range rules for a code the table has no row for. Returns UNCATEGORIZED when the MCC
+    /// is null or no rule covers it.
     /// </summary>
     string ResolveMcc(int? mcc);
 

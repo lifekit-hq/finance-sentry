@@ -55,4 +55,13 @@ public class MccDatasetCoverageTests
         var fraction = (double)uncategorized / mccs.Count;
         fraction.Should().BeLessThan(0.20, "range rules should cover the large majority of MCCs");
     }
+
+    [Fact]
+    public void NoDatasetCode_IsLeftUncategorized()
+    {
+        // A code the rules miss seeds an UNCATEGORIZED row on a fresh database; the live table
+        // then drifts from code as soon as someone fixes the row by hand.
+        LoadMccs().Where(m => MccRangeClassifier.Classify(m) == CategoryKeys.Uncategorized)
+            .Should().BeEmpty();
+    }
 }

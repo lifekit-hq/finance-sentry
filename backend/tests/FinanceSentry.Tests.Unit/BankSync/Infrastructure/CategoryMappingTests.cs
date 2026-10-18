@@ -22,6 +22,15 @@ public class CategoryMappingTests
     [InlineData(7230, CategoryKeys.PersonalCare)]   // Beauty shops (override)
     [InlineData(8011, CategoryKeys.Medical)]        // Doctors
     [InlineData(9399, CategoryKeys.GovernmentAndNonProfit)] // Government services
+    [InlineData(4214, CategoryKeys.GeneralServices)] // Freight carriers & trucking
+    [InlineData(4215, CategoryKeys.GeneralServices)] // Courier services
+    [InlineData(4225, CategoryKeys.GeneralServices)] // Warehousing & storage
+    [InlineData(5262, CategoryKeys.GeneralMerchandise)] // Marketplaces (override)
+    [InlineData(5815, CategoryKeys.Entertainment)]  // Digital goods: media
+    [InlineData(5816, CategoryKeys.Entertainment)]  // Digital goods: games
+    [InlineData(5817, CategoryKeys.GeneralServices)] // Digital goods: applications
+    [InlineData(5818, CategoryKeys.GeneralMerchandise)] // Digital goods: large merchant
+    [InlineData(5832, CategoryKeys.GeneralMerchandise)] // Antique shops
     public void MccRangeClassifier_MapsCodesToCanonicalKeys(int mcc, string expected)
     {
         MccRangeClassifier.Classify(mcc).Should().Be(expected);
