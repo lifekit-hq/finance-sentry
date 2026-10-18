@@ -356,8 +356,16 @@ already inside the institution total). Monobank cards and pockets are all return
 gathers them under one collapsed `N hidden · $X` row at the end of the institution (`HiddenCount` and signed
 `HiddenTotal`, formatted by `MoneyUtils.format` in the base currency), closed by default and remembered per device.
 The three preferences are edited in Settings → Preferences, saved with the profile; the threshold must be above 0 and
-at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Only Accounts applies
-them so far.
+at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts and Investments
+apply them.
+
+`/crypto/holdings` and `/brokerage/holdings` (the Investments page) annotate each position with `HiddenReason` the
+same way, through the same `Classify` (`AssetVisibility.ClassifyPosition` wraps it). Their DTOs are in USD, so the
+base-currency threshold is converted once to USD at the handler (`AssetVisibility.ResolveInUsdAsync`, shared with
+`/wealth/summary`). A position with a quantity but no price is unpriced (value unknown) and a short or negative one
+is never `small`, so neither is hidden. `TotalUsdValue`, the page total and every portfolio weight sum **all**
+positions: the Investments page closes each asset-class group with a collapsed "N hidden · $X" row and groups by the
+API's `hiddenReason` without deciding anything itself. Group totals and weights still include the hidden rows.
 
 ## 3. Currency conversion
 

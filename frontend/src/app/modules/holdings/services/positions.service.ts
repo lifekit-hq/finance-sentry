@@ -105,6 +105,7 @@ export class PositionsService extends ApiService {
             isVenueCash: false,
             assetClass: BROKERAGE_ASSET_CLASS.get(p.assetClass ?? '') ?? 'equity',
             ...nativeAmount(p),
+            hiddenReason: p.hiddenReason ?? null,
           };
         });
 
@@ -121,6 +122,7 @@ export class PositionsService extends ApiService {
           pnlUsd: null,
           isVenueCash: h.isFiat,
           assetClass: h.isFiat ? 'cash' : 'crypto',
+          hiddenReason: h.hiddenReason ?? null,
         }));
 
         const positions = [...brokeragePositions, ...cryptoPositions];

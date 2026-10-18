@@ -1,5 +1,6 @@
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
@@ -48,17 +49,25 @@ public sealed record CryptoHoldingDto(
     string Provider,
     decimal? CostBasisUsd = null,
     decimal? AverageBuyPriceUsd = null,
-    bool IsFiat = false);
+    bool IsFiat = false,
+    string? HiddenReason = null); // AssetVisibility.Empty / Small: display-only, the row still counts in the total and weights
 
 public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldingsQuery, CryptoHoldingsResponse>
 {
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(1);
 
     private readonly ICryptoHoldingRepository _holdingRepository;
+    private readonly IUserAssetVisibilityReader? _visibilityReader;
+    private readonly IUserBaseCurrencyReader? _baseCurrencyReader;
 
-    public GetCryptoHoldingsQueryHandler(ICryptoHoldingRepository holdingRepository)
+    public GetCryptoHoldingsQueryHandler(
+        ICryptoHoldingRepository holdingRepository,
+        IUserAssetVisibilityReader? visibilityReader = null,
+        IUserBaseCurrencyReader? baseCurrencyReader = null)
     {
         _holdingRepository = holdingRepository;
+        _visibilityReader = visibilityReader;
+        _baseCurrencyReader = baseCurrencyReader;
     }
 
     public async Task<CryptoHoldingsResponse> Handle(GetCryptoHoldingsQuery request, CancellationToken ct)
@@ -82,16 +91,23 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
         var lastSyncedAt = holdings.Max(h => h.SyncedAt);
         var isStale = now - lastSyncedAt > StaleThreshold;
 
+        // Rows are labelled, never dropped: the total below and the weights the page derives sum every row.
+        var prefs = await AssetVisibility.ResolveInUsdAsync(_visibilityReader, _baseCurrencyReader, request.UserId, ct);
         var dtos = holdings
-            .Select(h => new CryptoHoldingDto(
-                h.Asset,
-                h.FreeQuantity,
-                h.LockedQuantity,
-                CryptoHoldingValuation.UsdValue(h),
-                h.Provider,
-                h.IsFiat ? null : h.CostBasisUsd,
-                h.IsFiat ? null : h.AverageBuyPriceUsd,
-                h.IsFiat))
+            .Select(h =>
+            {
+                var usdValue = CryptoHoldingValuation.UsdValue(h);
+                return new CryptoHoldingDto(
+                    h.Asset,
+                    h.FreeQuantity,
+                    h.LockedQuantity,
+                    usdValue,
+                    h.Provider,
+                    h.IsFiat ? null : h.CostBasisUsd,
+                    h.IsFiat ? null : h.AverageBuyPriceUsd,
+                    h.IsFiat,
+                    AssetVisibility.ClassifyPosition(h.FreeQuantity + h.LockedQuantity, usdValue, prefs));
+            })
             .ToList();
 
         var provider = CryptoHoldingsResponse.ProviderOf(holdings.Select(h => h.Provider));

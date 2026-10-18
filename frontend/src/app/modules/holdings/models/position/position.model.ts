@@ -1,4 +1,5 @@
 import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
+import {type HiddenReason} from '../../../../shared/models/wealth/wealth.model';
 
 export interface BrokeragePositionDto {
   symbol: string;
@@ -15,6 +16,8 @@ export interface BrokeragePositionDto {
   currency?: string;
   /** The position's value in `currency` as the broker reported it; null for USD-only rows. */
   nativeValue?: Nullable<number>;
+  /** Why the list tucks this position away (display-only: it still counts in the total and weights). */
+  hiddenReason?: Nullable<HiddenReason>;
 }
 
 export interface BrokerageHoldingsDto {
@@ -36,6 +39,8 @@ export interface CryptoHoldingDto {
   provider: string;
   /** Fiat cash held on the venue (e.g. EUR on Revolut X): venue cash, never a crypto position. */
   isFiat: boolean;
+  /** Why the list tucks this holding away (display-only: it still counts in the total and weights). */
+  hiddenReason?: Nullable<HiddenReason>;
 }
 
 export interface CryptoHoldingsDto {
@@ -75,4 +80,6 @@ export interface Position {
   nativeCurrency?: string;
   /** `currentValue` in `nativeCurrency`, exactly as the provider reported it (never converted). */
   nativeValue?: Nullable<number>;
+  /** The API's verdict that the list tucks this row away; the page groups by it and never re-decides. */
+  hiddenReason?: Nullable<HiddenReason>;
 }

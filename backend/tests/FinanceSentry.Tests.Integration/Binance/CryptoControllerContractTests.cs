@@ -336,7 +336,7 @@ public class CryptoControllerRevolutXContractTests(CryptoApiFactory factory) : I
 
 public record ErrorShape(string Error, string ErrorCode);
 public record ConnectResponseShape(string Message, int HoldingsCount, DateTime SyncedAt);
-public record HoldingShape(string Asset, decimal FreeQuantity, decimal LockedQuantity, decimal UsdValue, string Provider);
+public record HoldingShape(string Asset, decimal FreeQuantity, decimal LockedQuantity, decimal UsdValue, string Provider, string? HiddenReason = null);
 public record HoldingsResponseShape(
     string Provider,
     DateTime? SyncedAt,

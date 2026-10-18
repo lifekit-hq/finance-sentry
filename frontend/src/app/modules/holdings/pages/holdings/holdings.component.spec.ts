@@ -19,6 +19,8 @@ const EQUITY_GROUP: PositionAssetGroup = {
   assetClass: 'equity',
   label: 'Equities',
   totalValue: 100,
+  hiddenRows: [],
+  hiddenTotal: 0,
   rows: [
     {
       symbol: 'DRAM',
@@ -31,6 +33,7 @@ const EQUITY_GROUP: PositionAssetGroup = {
       pnlUsd: 20.2,
       dayChangePct: 1.25,
       dayChangeUsd: 1.23,
+      hiddenReason: null,
       weightPercent: 100,
     },
   ],
@@ -40,6 +43,8 @@ const CRYPTO_GROUP: PositionAssetGroup = {
   assetClass: 'crypto',
   label: 'Crypto',
   totalValue: 50,
+  hiddenRows: [],
+  hiddenTotal: 0,
   rows: [
     {
       symbol: 'SOL',
@@ -52,6 +57,7 @@ const CRYPTO_GROUP: PositionAssetGroup = {
       pnlUsd: null,
       dayChangePct: null,
       dayChangeUsd: null,
+      hiddenReason: null,
       weightPercent: 100,
     },
   ],
@@ -379,6 +385,8 @@ describe('InvestmentsComponent — positions view', () => {
         assetClass: 'cash',
         label: 'Cash',
         totalValue: 300,
+        hiddenRows: [],
+        hiddenTotal: 0,
         rows: [
           {...EQUITY_GROUP.rows[0], symbol: 'USD Cash', currentPrice: null, dayChangePct: null},
         ],
@@ -424,10 +432,86 @@ describe('InvestmentsComponent — positions view', () => {
 
     it('opens nothing for the cash slice', () => {
       mockStore.positionsByAssetClass.set([
-        {assetClass: 'cash', label: 'Cash', totalValue: 300, rows: [EQUITY_GROUP.rows[0]]},
+        {
+          assetClass: 'cash',
+          label: 'Cash',
+          totalValue: 300,
+          hiddenRows: [],
+          hiddenTotal: 0,
+          rows: [EQUITY_GROUP.rows[0]],
+        },
       ]);
 
       expect(clickSegment(0)).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hidden positions', () => {
+    const DUST = {
+      ...EQUITY_GROUP.rows[0],
+      symbol: 'DUST',
+      currentValue: 0.5,
+      hiddenReason: 'small' as const,
+    };
+    const WITH_HIDDEN: PositionAssetGroup = {
+      ...EQUITY_GROUP,
+      totalValue: 100.5,
+      hiddenRows: [DUST],
+      hiddenTotal: 0.5,
+    };
+
+    function render(groups: PositionAssetGroup[]): HTMLElement {
+      mockStore.positionsByAssetClass.set(groups);
+      const fixture = TestBed.createComponent(InvestmentsComponent);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('closes a group that has hidden rows with a collapsed "N hidden" row and keeps them out of the list', () => {
+      const root = render([WITH_HIDDEN]);
+
+      const hidden = root.querySelector('[data-testid="holdings-hidden"]');
+      expect(hidden?.querySelector('summary')?.textContent).toContain('1 hidden · $0.50');
+      expect(hidden?.querySelector('details')?.open).toBe(false);
+      expect(
+        root.querySelectorAll(
+          '[data-testid="holdings-hidden-rows"] [data-testid="list-row"], [data-testid="holdings-hidden-rows"] tbody tr'
+        ).length
+      ).toBe(1);
+      expect(root.textContent).toContain('DRAM');
+    });
+
+    it('shows the group total over every row, hidden included', () => {
+      const root = render([WITH_HIDDEN]);
+
+      expect(root.querySelector('[data-testid="holdings-group"]')?.textContent).toContain(
+        '$100.50'
+      );
+    });
+
+    it('adds no hidden row to a group with nothing hidden', () => {
+      expect(render([EQUITY_GROUP]).querySelector('[data-testid="holdings-hidden"]')).toBeNull();
+    });
+
+    it('renders a group whose rows are all hidden as just the hidden row', () => {
+      const root = render([{...WITH_HIDDEN, rows: []}]);
+
+      expect(root.querySelector('[data-testid="holdings-hidden"]')).not.toBeNull();
+      expect(root.querySelectorAll('[data-testid="holdings-group"] > cmn-data-table').length).toBe(
+        0
+      );
+    });
+
+    it('opens the dossier of a class whose only position is hidden when its slice is clicked', () => {
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      mockStore.positionsByAssetClass.set([{...WITH_HIDDEN, rows: []}]);
+      const fixture = TestBed.createComponent(InvestmentsComponent);
+      fixture.detectChanges();
+      const donut = fixture.debugElement.query(By.directive(DonutChartComponent))
+        .componentInstance as DonutChartComponent;
+      donut.segmentClick.emit({index: 0, label: 'x', value: 1});
+
+      expect(navigate).toHaveBeenCalledWith(['/assets', 'DUST']);
     });
   });
 });

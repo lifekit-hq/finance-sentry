@@ -15,6 +15,7 @@ import {
   CmnCellDirective,
   CmnColumnComponent,
   DataTableComponent,
+  DisclosureRowComponent,
   DonutChartComponent,
   InstitutionAvatarComponent,
   SkeletonComponent,
@@ -30,7 +31,7 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {BrokerageGrowthComponent} from '../../components/brokerage-growth/brokerage-growth.component';
-import {type AssetClass} from '../../store/holdings.computed';
+import {type AssetClass, type PositionRow} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 
 const SKELETON_ROWS = 4;
@@ -46,6 +47,7 @@ const SKELETON_ROWS = 4;
     CmnColumnComponent,
     DataTableComponent,
     DecimalPipe,
+    DisclosureRowComponent,
     HeadlineBadgeComponent,
     MoneyPipe,
     NgTemplateOutlet,
@@ -74,6 +76,11 @@ export class InvestmentsComponent {
   public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
   public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
 
+  /** The shared position-table template receives its rows untyped; this gives the table its row type back. */
+  public asRows(rows: unknown): PositionRow[] {
+    return rows as PositionRow[];
+  }
+
   /** Removes the provider filter, which drops `?provider=` from the URL. */
   public clearProvider(): void {
     void this.router.navigate([], {queryParams: {provider: null}, queryParamsHandling: 'merge'});
@@ -94,8 +101,9 @@ export class InvestmentsComponent {
    */
   public openSegment(click: DonutSegmentClick): void {
     const group = this.store.positionsByAssetClass()[click.index];
-    if (group?.rows.length === 1) {
-      this.openDossier(group.assetClass, group.rows[0].symbol);
+    const positions = group ? [...group.rows, ...group.hiddenRows] : [];
+    if (group && positions.length === 1) {
+      this.openDossier(group.assetClass, positions[0].symbol);
     }
   }
 }

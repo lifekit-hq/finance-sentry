@@ -12,6 +12,7 @@ import {STALE_SOURCE_CODE} from '../../../shared/constants/headline/headline.con
 import {PROVIDER_CATALOG} from '../../../shared/constants/providers/providers.constants';
 import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {type Headline} from '../../../shared/models/headline/headline.model';
+import {type HiddenReason} from '../../../shared/models/wealth/wealth.model';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
@@ -50,13 +51,21 @@ export interface PositionRow {
   /** Today's move from the research quote; null when the row has no quote. */
   dayChangePct: Nullable<number>;
   dayChangeUsd: Nullable<number>;
+  /** Set by the API when the list tucks the row away; it still counts in totals and weights. */
+  hiddenReason: Nullable<HiddenReason>;
   weightPercent: number;
 }
 
 export interface PositionAssetGroup {
   assetClass: AssetClass;
   label: string;
+  /** Rows the list shows. */
   rows: PositionRow[];
+  /** Rows the API flagged hidden, closed behind one "N hidden" row; empty when nothing is. */
+  hiddenRows: PositionRow[];
+  /** Hidden rows' summed value; already inside `totalValue`. */
+  hiddenTotal: number;
+  /** The whole class: visible and hidden rows. */
   totalValue: number;
 }
 
@@ -145,6 +154,7 @@ export function holdingsComputed(store: StateSignals) {
         pnlUsd: p.pnlUsd,
         dayChangePct,
         dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
+        hiddenReason: p.hiddenReason ?? null,
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);
@@ -155,12 +165,18 @@ export function holdingsComputed(store: StateSignals) {
       }
     }
 
-    return ASSET_CLASS_ORDER.filter(cls => groups.has(cls)).map(cls => ({
-      assetClass: cls,
-      label: ASSET_CLASS_LABEL[cls],
-      rows: (groups.get(cls) ?? []).sort((a, b) => b.currentValue - a.currentValue),
-      totalValue: (groups.get(cls) ?? []).reduce((sum, r) => sum + r.currentValue, 0),
-    }));
+    return ASSET_CLASS_ORDER.filter(cls => groups.has(cls)).map(cls => {
+      const sorted = (groups.get(cls) ?? []).sort((a, b) => b.currentValue - a.currentValue);
+      const hiddenRows = sorted.filter(r => r.hiddenReason !== null);
+      return {
+        assetClass: cls,
+        label: ASSET_CLASS_LABEL[cls],
+        rows: sorted.filter(r => r.hiddenReason === null),
+        hiddenRows,
+        hiddenTotal: hiddenRows.reduce((sum, r) => sum + r.currentValue, 0),
+        totalValue: sorted.reduce((sum, r) => sum + r.currentValue, 0),
+      };
+    });
   });
 
   return {
