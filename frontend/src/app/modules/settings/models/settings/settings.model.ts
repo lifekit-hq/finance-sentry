@@ -13,6 +13,10 @@ export interface UserProfile {
   safeWithdrawalRate: number;
   realAnnualReturn: number;
   twoFactor: boolean;
+  hideEmptyBalances: boolean;
+  hideSmallBalances: boolean;
+  /** In the base currency; the server accepts above 0 up to `SMALL_BALANCE_THRESHOLD_MAX`. */
+  smallBalanceThreshold: number;
 }
 
 export interface UpdateProfileRequest {
@@ -26,4 +30,7 @@ export interface UpdateProfileRequest {
   watchlistAnalystAlerts: boolean;
   safeWithdrawalRate: number;
   realAnnualReturn: number;
+  hideEmptyBalances: boolean;
+  hideSmallBalances: boolean;
+  smallBalanceThreshold: number;
 }

@@ -32,6 +32,7 @@ import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {APP_SEED} from '../../constants/appearance/appearance.constants';
+import {SMALL_BALANCE_THRESHOLD_MAX} from '../../constants/asset-visibility/asset-visibility.constants';
 import {
   REAL_ANNUAL_RETURN_MAX_PERCENT,
   REAL_ANNUAL_RETURN_MIN_PERCENT,
@@ -43,6 +44,7 @@ import {type BaseCurrency} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {percentRange} from '../../validators/percent-range.validator';
+import {positiveAmount} from '../../validators/positive-amount.validator';
 
 const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
   {value: 'USD', label: 'USD — US Dollar'},
@@ -92,6 +94,8 @@ export class SettingsComponent {
   public readonly withdrawalRateError = `Enter a number from ${SAFE_WITHDRAWAL_RATE_MIN_PERCENT} to ${SAFE_WITHDRAWAL_RATE_MAX_PERCENT}.`;
   public readonly realReturnError = `Enter a number from ${REAL_ANNUAL_RETURN_MIN_PERCENT} to ${REAL_ANNUAL_RETURN_MAX_PERCENT}.`;
 
+  public readonly smallBalanceError = `Enter an amount above 0, up to ${SMALL_BALANCE_THRESHOLD_MAX}.`;
+
   public readonly profileLoaded = computed(() => this.store.profile() !== null);
 
   // Built once the profile has loaded (not on every profile edit, which would reset the typed text).
@@ -114,6 +118,18 @@ export class SettingsComponent {
     }
     const profile = untracked(() => this.store.profile());
     return new FormControl((profile?.lowBalanceThreshold ?? 0).toString(), {nonNullable: true});
+  });
+
+  public readonly smallThresholdControl = computed(() => {
+    this.store.profileRevision();
+    if (!this.profileLoaded()) {
+      return null;
+    }
+    const profile = untracked(() => this.store.profile());
+    return new FormControl((profile?.smallBalanceThreshold ?? 0).toString(), {
+      nonNullable: true,
+      validators: [positiveAmount(SMALL_BALANCE_THRESHOLD_MAX)],
+    });
   });
 
   // The controls hold percent text as typed; the fraction conversion happens only when saving.
@@ -191,6 +207,23 @@ export class SettingsComponent {
     }
     if (value !== p.lowBalanceThreshold) {
       this.store.applyChange({lowBalanceThreshold: value});
+    }
+  }
+
+  // Same commit rule as the low balance threshold; an amount the server would refuse stays on screen with its error.
+  public commitSmallThreshold(): void {
+    const p = this.store.profile();
+    const control = this.smallThresholdControl();
+    if (!p || !control) {
+      return;
+    }
+    if (control.invalid) {
+      control.markAsTouched();
+      return;
+    }
+    const value = Number(control.value);
+    if (value !== p.smallBalanceThreshold) {
+      this.store.applyChange({smallBalanceThreshold: value});
     }
   }
 
