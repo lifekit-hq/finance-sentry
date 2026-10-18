@@ -91,6 +91,7 @@ is the captain's: present the trade-off, never settle it.
 | What do I have? | `get_portfolio_snapshot`, `get_account_summary`, `get_net_worth_history` | money-semantics §1, §8 |
 | Where did money go? | `get_cashflow_report`, `list_transactions`, `get_budget_status` | money-semantics §5, §6 |
 | How is the book doing? | `get_book_performance`, `get_benchmark_track_record`, `get_track_record` | money-semantics §10 |
+| Are the proposals beating the S&P 500? | `get_ledger_scoreboard`, `list_recommendations` | money-semantics §10 |
 | What is it in, and is it within policy? | `get_allocation_vs_target`, `get_ips`, `check_risk_rules` | finance-framework §3.4 (M7, M8) |
 | Can I trust the feeds? | `get_sync_health` | finance-framework §5.7 |
 | What is the market doing? | `get_market_regime`, `get_sector_rotation`, `get_market_structure` | specs/ROADMAP.md |

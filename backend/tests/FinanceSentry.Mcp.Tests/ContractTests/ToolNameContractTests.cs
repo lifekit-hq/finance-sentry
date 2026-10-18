@@ -49,6 +49,7 @@ public sealed class ToolNameContractTests
         "get_pending_companion_events",
         "get_benchmark_track_record",
         "get_track_record",
+        "get_ledger_scoreboard",
         "get_relative_strength",
         "get_sector_rotation",
         "get_valuation_snapshot",

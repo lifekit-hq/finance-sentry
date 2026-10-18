@@ -7,6 +7,8 @@ using FinanceSentry.Modules.Research.Domain.Recommendations;
 /// <see cref="CreatedBy"/> is always Ledger; <see cref="Origin"/> says whether Ledger drafted it or the rule sweep did.
 /// <see cref="OrderText"/> is display text for the owner to place at the broker - nothing sends it.
 /// <see cref="ExcessReturnPct"/>: the name's return since the decision minus the S&amp;P 500's, null until scored.
+/// <see cref="DecisionValuePct"/>: what the owner's decision earned over the S&amp;P 500, signed by its direction
+/// (<see cref="RecommendationValue.DecisionValuePct"/>, the one definition the Decisions page reads).
 /// </summary>
 public sealed record RecommendationDto(
     Guid Id,
@@ -38,6 +40,7 @@ public sealed record RecommendationDto(
     decimal? SubjectReturnPct,
     decimal? BenchmarkReturnPct,
     decimal? ExcessReturnPct,
+    decimal? DecisionValuePct,
     DateTimeOffset? OutcomeScoredAt)
 {
     public const string LedgerAuthor = "Ledger";
@@ -71,7 +74,8 @@ public sealed record RecommendationDto(
         r.ExecutedAt,
         r.SubjectReturnPct,
         r.BenchmarkReturnPct,
-        r.SubjectReturnPct is decimal s && r.BenchmarkReturnPct is decimal b ? s - b : null,
+        RecommendationValue.ExcessReturnPct(r),
+        RecommendationValue.DecisionValuePct(r),
         r.OutcomeScoredAt);
 }
 

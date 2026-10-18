@@ -77,7 +77,7 @@ export class RecommendationUtils {
    * reads as the plain name figure ("name +3.2 pts vs S&P 500").
    */
   public static excessLine(rec: RecommendationDto): string {
-    const value = RecommendationUtils.decisionValue(rec);
+    const value = rec.decisionValuePct;
     if (value !== null) {
       return `decision ${RecommendationUtils.signed(value)} pts vs S&P 500`;
     }
@@ -88,34 +88,11 @@ export class RecommendationUtils {
 
   /** Gain when the decision added value against the S&P 500 since it was made, loss when it cost value; none at par or without one. */
   public static excessTone(rec: RecommendationDto): Nullable<OutcomeTone> {
-    const value = RecommendationUtils.decisionValue(rec);
+    const value = rec.decisionValuePct;
     if (value === null || value === 0) {
       return null;
     }
     return value > 0 ? 'gain' : 'loss';
-  }
-
-  /**
-   * What the owner's own decision earned over the S&P 500: name minus S&P 500 where exposure was kept or added
-   * (a confirmed Add or Hold, a rejected Trim or Exit), S&P 500 minus name where it was reduced or declined (a
-   * confirmed Trim or Exit, a rejected Add). Null when unscored, when a confirmed order was never placed, and for a
-   * rejected Hold, whose direction is unknown.
-   */
-  private static decisionValue(rec: RecommendationDto): Nullable<number> {
-    const excess = rec.excessReturnPct;
-    if (excess === null) {
-      return null;
-    }
-    if (rec.status === 'Confirmed') {
-      if (rec.execution === 'Unexecuted') {
-        return null;
-      }
-      return rec.action === 'Trim' || rec.action === 'Exit' ? 0 - excess : excess;
-    }
-    if (rec.status === 'Rejected' && rec.action !== 'Hold') {
-      return rec.action === 'Add' ? 0 - excess : excess;
-    }
-    return null;
   }
 
   private static signed(value: number): string {

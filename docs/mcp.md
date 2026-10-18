@@ -21,7 +21,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 72 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 73 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -62,6 +62,7 @@ The current runtime surface contains 72 tools. The canonical list is the `Agreed
 | `propose_recommendation` | Write | Research | `ticker`, `action`, `triggerKind`, `triggerRef?`, `rationale`, `confidence`, `invalidationTrigger`, `evidence?`, `sizeUsd?`, `expiresInDays?` | Queues one rule-anchored proposal (Add / Trim / Exit; Hold only answering a fired event, `triggerKind=EventVerdict`) in the owner's Decisions queue (#1069). The server checks the trigger is true now (ThesisBreak, IpsBand, RiskRule, RadarSignal, EventVerdict), sizes it from the book and a quote through the risk gate, and returns shares, USD, share of book before / after and the exact order text. One pending proposal per ticker - a newer one supersedes it. Silent: queueing pushes nothing. Never places, stages or transmits an order |
 | `list_recommendations` | Read | Research | - | The Decisions queue: pending proposals oldest first, and those decided, expired or superseded in the last 30 days with their execution and return vs the S&P 500 |
 | `decide_recommendation` | Write | Research | `id`, `verdict` (`Confirm`\|`Reject`), `note?` | Records the owner's own verdict; Reject needs the reason (kept as the counterfactual). Writes a price-stamped decision-journal event on the recommendation (no thesis is touched). Confirm records the decision only - the owner places the returned order text at the broker themselves |
+| `get_ledger_scoreboard` | Read | Research | - | The Ledger scoreboard, an arena of one (#986): Ledger as proposed, the owner as decided and the paper picks (User / Ledger / Scan), each over its own 30-day windows against the S&P 500 as the zero line - decided and executed counts, mean and median excess in points, the share that beat the S&P 500, the worst row, gross and net of `ThesisTrackRecord:Friction`, window start and n, with "too few to tell skill from luck (n of 30)" below 30 scored decisions. Lists the proposals that expired or were superseded without a decision |
 
 ### Headline records
 

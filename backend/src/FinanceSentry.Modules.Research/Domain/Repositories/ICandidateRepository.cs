@@ -22,5 +22,18 @@ public interface ICandidateRepository
     /// <summary>Every user's Active candidates past their expiry, for the expiry job. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<OpportunityCandidate>> ListExpiredUnscopedAsync(DateTimeOffset asOf, CancellationToken ct = default);
 
+    /// <summary>
+    /// Every one of the user's candidates in any status - each is a paper pick (#986) - for the Ledger scoreboard, which
+    /// the weekly brief reads with no person in scope. Opts out of the Owner query filter.
+    /// </summary>
+    Task<IReadOnlyList<OpportunityCandidate>> ListAllUnscopedAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Every user's candidates, in any status, created inside [<paramref name="from"/>, <paramref name="to"/>], for the
+    /// paper-pick horizon stamp. Opts out of the Owner query filter.
+    /// </summary>
+    Task<IReadOnlyList<OpportunityCandidate>> ListCreatedBetweenUnscopedAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
+
     Task UpdateAsync(OpportunityCandidate candidate, CancellationToken ct = default);
 }

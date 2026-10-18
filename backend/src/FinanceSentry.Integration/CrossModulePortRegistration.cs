@@ -48,6 +48,8 @@ public static class CrossModulePortRegistration
         services.AddScoped<IFiredEventSource, ResearchFiredEventAdapter>();
         // 414: thesis track record — bridges Research → Radar's weekly performance brief.
         services.AddScoped<ITrackRecordSource, ResearchTrackRecordSource>();
+        // #986: Ledger scoreboard headline — bridges Research → Radar's weekly performance brief.
+        services.AddScoped<ILedgerScoreboardSource, ResearchLedgerScoreboardSource>();
         return services;
     }
 }

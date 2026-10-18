@@ -248,6 +248,7 @@ public static class ResearchModule
         services.AddScoped<IRiskToleranceReader, RiskToleranceReader>();
         services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
         services.AddScoped<ITrackRecordReader, TrackRecordReader>();
+        services.AddScoped<ILedgerScoreboardReader, LedgerScoreboardReader>();
 
         services.AddScoped<IQuoteCacheRepository, QuoteCacheRepository>();
         services.AddScoped<INewsRepository, NewsRepository>();

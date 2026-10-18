@@ -241,7 +241,7 @@ bridge yet.
 | M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | drawdown only |
-| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates) |
+| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates); per decision, the Ledger scoreboard (`get_ledger_scoreboard`, a 30-day price excess per proposal or pick, money-semantics §10) |
 | M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration | — | tile + FIRE, two assumption sets (G7) |
 
 Choices the engine fixes once, so they stop being re-decided:
@@ -388,7 +388,7 @@ headline (S2b); the others wait on the source registry (R8).
 **Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
 the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
 recommendation or per flow rather than a book total or return (`get_benchmark_track_record`,
-`get_thesis_performance`, `get_track_record`, postmortems, `get_cashflow_report`, budgets, the family
+`get_thesis_performance`, `get_track_record`, `get_ledger_scoreboard`, postmortems, `get_cashflow_report`, budgets, the family
 clearing statement) and per-row figures (positions, accounts, tax lots); a net-worth change headline on
 `get_net_worth_history` (the tool returns a bare list); the holdings-based return on
 `get_book_performance` (`holdingsBasedReturn`; the method label for a chained, dividend-excluded holdings price

@@ -47,6 +47,7 @@ function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Recommend
     subjectReturnPct: null,
     benchmarkReturnPct: null,
     excessReturnPct: null,
+    decisionValuePct: null,
     outcomeScoredAt: null,
     ...overrides,
   };

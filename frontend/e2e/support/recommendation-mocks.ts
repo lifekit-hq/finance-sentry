@@ -17,6 +17,7 @@ const BASE = {
   subjectReturnPct: null,
   benchmarkReturnPct: null,
   excessReturnPct: null,
+  decisionValuePct: null,
   outcomeScoredAt: null,
 };
 
@@ -93,6 +94,7 @@ export const DECIDED = [
     subjectReturnPct: -4.1,
     benchmarkReturnPct: 1.2,
     excessReturnPct: -5.3,
+    decisionValuePct: 5.3,
   },
   {
     ...BASE,
@@ -120,6 +122,7 @@ export const DECIDED = [
     subjectReturnPct: 6.8,
     benchmarkReturnPct: 1.5,
     excessReturnPct: 5.3,
+    decisionValuePct: 5.3,
   },
 ];
 

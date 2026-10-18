@@ -14,7 +14,7 @@ public sealed record PerformanceBrief(string Headline, string Body);
 /// portfolio-scanner signals, and the thesis track record. Pure — no I/O, no clock.
 ///
 /// Layout, in reservation order so the highest-value lines survive the budget:
-/// headline · scoreboard · blank · track record · drift trends · blank · one suggested action.
+/// headline · scoreboard · blank · track record · Ledger scoreboard · drift trends · blank · one suggested action.
 /// Every body line is a bullet carrying its own figure; a bullet whose subject has an app page ends with the
 /// absolute link to it (<see cref="AppUrl.Bullet"/>), the rest stay plain.
 /// </summary>
@@ -48,7 +48,8 @@ public static class PerformanceBriefComposer
         BookPerformanceResult result,
         IReadOnlyList<RadarSignal> portfolioSignals,
         TrackRecordDelta? trackRecord,
-        string? appBaseUrl = null)
+        string? appBaseUrl = null,
+        LedgerScoreboardLine? ledgerScoreboard = null)
     {
         var headline = BuildHeadline(result);
         var lines = BuildScoreboard(result, appBaseUrl);
@@ -66,6 +67,12 @@ public static class PerformanceBriefComposer
             if (trackLine is not null)
             {
                 context.Add(trackLine);
+            }
+
+            var ledgerLine = BuildLedgerScoreboardLine(ledgerScoreboard, appBaseUrl);
+            if (ledgerLine is not null && available - 1 - context.Count > 0)
+            {
+                context.Add(ledgerLine);
             }
 
             var trendBudget = Math.Min(MaxTrendLines, available - 1 - context.Count);
@@ -192,6 +199,26 @@ public static class PerformanceBriefComposer
         var caveat = record.LowSample ? " (low sample)" : string.Empty;
         // Calls are judged per thesis, and no page lists them together, so the bullet stays unlinked.
         return AppUrl.Bullet($"Calls: {string.Join(", ", parts)}{caveat}", appBaseUrl, null);
+    }
+
+    /// <summary>
+    /// The Ledger scoreboard's headline (#986): Ledger's decided proposals graded as proposed against the S&amp;P 500, the
+    /// sample counted in decisions, with the too-few caveat below the minimum sample.
+    /// </summary>
+    private static string? BuildLedgerScoreboardLine(LedgerScoreboardLine? board, string? appBaseUrl)
+    {
+        if (board is null || board.Decided == 0)
+        {
+            return null;
+        }
+
+        var text = board.MeanExcessPct is decimal mean && board.Scored > 0
+            ? $"Ledger's decided proposals: n={board.Scored}, {mean:+0.0;-0.0;0.0} pts vs S&P 500 on average"
+            : $"Ledger's decided proposals: {board.Decided} decided, none scored yet";
+        var caveat = board.TooFewToTell ? $"; too few to tell ({board.Scored} of {board.MinimumSampleSize})" : string.Empty;
+
+        // The scoreboard lives in Ledger chat (get_ledger_scoreboard), not on a page, so the bullet stays unlinked.
+        return AppUrl.Bullet($"{text}{caveat}.", appBaseUrl, null);
     }
 
     /// <summary>
