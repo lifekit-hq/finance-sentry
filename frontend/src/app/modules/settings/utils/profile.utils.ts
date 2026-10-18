@@ -14,6 +14,9 @@ export class ProfileUtils {
       watchlistAnalystAlerts: profile.watchlistAnalystAlerts,
       safeWithdrawalRate: profile.safeWithdrawalRate,
       realAnnualReturn: profile.realAnnualReturn,
+      hideEmptyBalances: profile.hideEmptyBalances,
+      hideSmallBalances: profile.hideSmallBalances,
+      smallBalanceThreshold: profile.smallBalanceThreshold,
     };
   }
 

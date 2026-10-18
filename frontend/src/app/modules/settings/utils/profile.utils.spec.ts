@@ -16,6 +16,9 @@ const PROFILE: UserProfile = {
   safeWithdrawalRate: 0.04,
   realAnnualReturn: 0.05,
   twoFactor: true,
+  hideEmptyBalances: true,
+  hideSmallBalances: false,
+  smallBalanceThreshold: 1,
 };
 
 describe('ProfileUtils', () => {
@@ -31,6 +34,9 @@ describe('ProfileUtils', () => {
       watchlistAnalystAlerts: false,
       safeWithdrawalRate: 0.04,
       realAnnualReturn: 0.05,
+      hideEmptyBalances: true,
+      hideSmallBalances: false,
+      smallBalanceThreshold: 1,
     });
   });
 

@@ -25,6 +25,9 @@ const profile = {
   watchlistAnalystAlerts: false,
   safeWithdrawalRate: 0.04,
   realAnnualReturn: 0.05,
+  hideEmptyBalances: true,
+  hideSmallBalances: true,
+  smallBalanceThreshold: 1,
 } as unknown as UserProfile;
 
 const CAN_CLOSE: AccountClosureOptions = {canClose: true, reason: null, graceDays: 30};
@@ -254,6 +257,46 @@ describe('SettingsComponent Save assumptions button', () => {
     fixture.detectChanges();
     expect(saveButton().disabled).toBe(false);
   });
+});
+
+describe('SettingsComponent hide-below amount', () => {
+  function setupThreshold(text: string) {
+    const ctx = create();
+    const control = ctx.component.smallThresholdControl();
+    if (!control) {
+      throw new Error('threshold control missing');
+    }
+    control.setValue(text);
+    return {...ctx, control};
+  }
+
+  it('seeds the field with the stored amount', () => {
+    const {control} = setupThreshold('1');
+    expect(control.value).toBe('1');
+  });
+
+  it('applies a changed amount when the field is committed', () => {
+    const {store, component} = setupThreshold('5');
+    component.commitSmallThreshold();
+    expect(store.applyChange).toHaveBeenCalledWith({smallBalanceThreshold: 5});
+  });
+
+  it('sends nothing for the amount already stored', () => {
+    const {store, component} = setupThreshold('1.0');
+    component.commitSmallThreshold();
+    expect(store.applyChange).not.toHaveBeenCalled();
+  });
+
+  it.each(['0', '-2', '101', '', 'abc'])(
+    'keeps %j on screen with its error and sends nothing',
+    text => {
+      const {store, component, control} = setupThreshold(text);
+      component.commitSmallThreshold();
+      expect(store.applyChange).not.toHaveBeenCalled();
+      expect(control.invalid).toBe(true);
+      expect(control.touched).toBe(true);
+    }
+  );
 });
 
 describe('SettingsComponent name form', () => {

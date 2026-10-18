@@ -31,6 +31,7 @@ import {HeadlineBadgeComponent} from '../../../../shared/components/headline-bad
 import {DisclosureToggleDirective} from '../../../../shared/directives/disclosure-toggle.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {
+  type AccountBalanceItem,
   type AccountCategory,
   type Institution,
 } from '../../../../shared/models/wealth/wealth.model';
@@ -41,6 +42,7 @@ import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pi
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {RemoveClosedAccountDialogComponent} from '../../components/remove-closed-account-dialog/remove-closed-account-dialog.component';
@@ -267,6 +269,26 @@ export class AccountsListComponent implements OnInit {
 
   public disclosureKey(institution: Institution): string {
     return AccountsDisclosureUtils.key(institution);
+  }
+
+  public hiddenKey(institution: Institution): string {
+    return `${this.disclosureKey(institution)}:hidden`;
+  }
+
+  /** The "N hidden" row starts closed and stays as the owner left it on this device. */
+  public hiddenOpen(institution: Institution): boolean {
+    return this.store.institutionOpen()[this.hiddenKey(institution)] ?? false;
+  }
+
+  /** Both figures come from the API: the total is signed like the institution's own and already inside it. */
+  public hiddenLabel(institution: Institution): string {
+    const total = MoneyUtils.format(institution.hiddenTotal ?? 0, this.store.baseCurrency());
+    return `${institution.hiddenCount} hidden · ${total}`;
+  }
+
+  /** Whether any of a card's rows belongs to the visible (`hidden` false) or the hidden list. */
+  public hasRows(accounts: AccountBalanceItem[], hidden: boolean): boolean {
+    return accounts.some(account => !!account.hiddenReason === hidden);
   }
 
   public needsAttention(institution: Institution): boolean {

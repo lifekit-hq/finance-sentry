@@ -161,100 +161,31 @@
             </div>
 
             <ul class="bg-surface-bg">
-              @if (section.category === 'banking') {
-                @if (inst.cards && inst.cards.length > 0) {
-                  @for (card of inst.cards; track card.cardType) {
-                    <li class="border-t border-border-default">
-                      <div
-                        class="flex items-baseline justify-between gap-cmn-4 py-cmn-2 pl-cmn-12 pr-cmn-4"
-                      >
-                        <span class="font-medium text-cmn-sm text-text-primary">{{
-                          card.displayName
-                        }}</span>
-                        <span class="tabular-nums text-cmn-xs text-text-secondary">{{
-                          card.totalInBaseCurrency | money: store.baseCurrency()
-                        }}</span>
-                      </div>
-                      @for (account of card.accounts; track account.accountId) {
-                        <ng-container
-                          *ngTemplateOutlet="
-                            accountRow;
-                            context: {$implicit: account, title: account.currency}
-                          "
-                        />
-                      }
-                    </li>
-                  }
-                } @else {
-                  @for (account of inst.accounts; track account.accountId) {
-                    <li class="border-t border-border-default">
+              <ng-container
+                *ngTemplateOutlet="
+                  rows;
+                  context: {$implicit: inst, category: section.category, hidden: false}
+                "
+              />
+              @if (inst.hiddenCount) {
+                <li class="border-t border-border-default" data-testid="hidden-rows">
+                  <cmn-disclosure-row
+                    [label]="hiddenLabel(inst)"
+                    [open]="hiddenOpen(inst)"
+                    (fnsDisclosureToggle)="store.setInstitutionOpen(hiddenKey(inst), $event)"
+                  >
+                    <ul class="bg-surface-bg opacity-70" data-testid="hidden-rows-list">
                       <ng-container
                         *ngTemplateOutlet="
-                          accountRow;
-                          context: {$implicit: account, title: account.accountType}
+                          rows;
+                          context: {$implicit: inst, category: section.category, hidden: true}
                         "
                       />
-                    </li>
-                  }
-                }
-              } @else {
-                @for (
-                  account of inst.accounts;
-                  track account.accountId + (account.symbol ?? account.accountNumberLast4)
-                ) {
-                  @if (account.accountType === 'cash') {
-                    <li
-                      class="flex items-center justify-between gap-cmn-4 border-t border-border-default py-cmn-3 pl-cmn-12 pr-cmn-4"
-                      data-testid="cash-row"
-                    >
-                      <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
-                        <cmn-institution-avatar [name]="account.currency" size="sm" />
-                        <span class="truncate">{{ account.currency }}</span>
-                        <span
-                          class="shrink-0 rounded-full border border-border-default px-cmn-2 text-cmn-xs text-text-secondary"
-                          data-testid="cash-label"
-                          >Cash</span
-                        >
-                      </span>
-                      <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
-                    </li>
-                  } @else {
-                    <li class="border-t border-border-default">
-                      <button
-                        (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
-                        class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
-                        data-testid="position-row"
-                        type="button"
-                      >
-                        <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
-                          <cmn-institution-avatar
-                            [name]="account.symbol ?? account.accountNumberLast4"
-                            [logoUrl]="
-                              account.symbol ?? account.accountNumberLast4
-                                | assetLogo: account.provider
-                            "
-                            size="sm"
-                          />
-                          <span class="min-w-0">
-                            <span class="block truncate" data-testid="position-ticker">{{
-                              account.symbol ?? account.accountNumberLast4
-                            }}</span>
-                            <span
-                              class="block truncate text-cmn-xs text-text-secondary"
-                              data-testid="position-quantity"
-                              >{{ account | positionQuantity }}</span
-                            >
-                          </span>
-                        </span>
-                        <span
-                          class="shrink-0 text-cmn-sm tabular-nums font-medium text-text-primary"
-                          data-testid="position-value"
-                          >{{ account | positionValue: store.baseCurrency() }}</span
-                        >
-                      </button>
-                    </li>
-                  }
-                }
+                    </ul>
+                  </cmn-disclosure-row>
+                </li>
+              }
+              @if (section.category !== 'banking') {
                 <li class="border-t border-border-default">
                   <a
                     [queryParams]="{provider: inst.provider}"
@@ -335,6 +266,118 @@
     </cmn-card>
   }
 </div>
+
+<ng-template #rows let-inst let-category="category" let-hidden="hidden">
+  @if (category === 'banking') {
+    @if (inst.cards && inst.cards.length > 0) {
+      @for (card of inst.cards; track card.cardType) {
+        @if (hasRows(card.accounts, hidden)) {
+          <li class="border-t border-border-default">
+            @if (!hidden) {
+              <div
+                class="flex items-baseline justify-between gap-cmn-4 py-cmn-2 pl-cmn-12 pr-cmn-4"
+              >
+                <span class="font-medium text-cmn-sm text-text-primary">{{
+                  card.displayName
+                }}</span>
+                <span class="tabular-nums text-cmn-xs text-text-secondary">{{
+                  card.totalInBaseCurrency | money: store.baseCurrency()
+                }}</span>
+              </div>
+            }
+            @for (account of card.accounts; track account.accountId) {
+              @if (!!account.hiddenReason === hidden) {
+                <ng-container
+                  *ngTemplateOutlet="
+                    accountRow;
+                    context: {
+                      $implicit: account,
+                      title: hidden
+                        ? card.displayName + ' · ' + account.currency
+                        : account.currency,
+                    }
+                  "
+                />
+              }
+            }
+          </li>
+        }
+      }
+    } @else {
+      @for (account of inst.accounts; track account.accountId) {
+        @if (!!account.hiddenReason === hidden) {
+          <li class="border-t border-border-default">
+            <ng-container
+              *ngTemplateOutlet="
+                accountRow;
+                context: {$implicit: account, title: account.accountType}
+              "
+            />
+          </li>
+        }
+      }
+    }
+  } @else {
+    @for (
+      account of inst.accounts;
+      track account.accountId + (account.symbol ?? account.accountNumberLast4)
+    ) {
+      @if (!!account.hiddenReason === hidden) {
+        @if (account.accountType === 'cash') {
+          <li
+            class="flex items-center justify-between gap-cmn-4 border-t border-border-default py-cmn-3 pl-cmn-12 pr-cmn-4"
+            data-testid="cash-row"
+          >
+            <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
+              <cmn-institution-avatar [name]="account.currency" size="sm" />
+              <span class="truncate">{{ account.currency }}</span>
+              <span
+                class="shrink-0 rounded-full border border-border-default px-cmn-2 text-cmn-xs text-text-secondary"
+                data-testid="cash-label"
+                >Cash</span
+              >
+            </span>
+            <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
+          </li>
+        } @else {
+          <li class="border-t border-border-default">
+            <button
+              (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
+              class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
+              data-testid="position-row"
+              type="button"
+            >
+              <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
+                <cmn-institution-avatar
+                  [name]="account.symbol ?? account.accountNumberLast4"
+                  [logoUrl]="
+                    account.symbol ?? account.accountNumberLast4 | assetLogo: account.provider
+                  "
+                  size="sm"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate" data-testid="position-ticker">{{
+                    account.symbol ?? account.accountNumberLast4
+                  }}</span>
+                  <span
+                    class="block truncate text-cmn-xs text-text-secondary"
+                    data-testid="position-quantity"
+                    >{{ account | positionQuantity }}</span
+                  >
+                </span>
+              </span>
+              <span
+                class="shrink-0 text-cmn-sm tabular-nums font-medium text-text-primary"
+                data-testid="position-value"
+                >{{ account | positionValue: store.baseCurrency() }}</span
+              >
+            </button>
+          </li>
+        }
+      }
+    }
+  }
+</ng-template>
 
 <ng-template #accountRow let-account let-title="title">
   <button

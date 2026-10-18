@@ -657,6 +657,121 @@ describe('AccountsListComponent reconnect deep link', () => {
   });
 });
 
+describe('AccountsListComponent hidden rows', () => {
+  function account(
+    accountId: string,
+    balance: number,
+    hiddenReason?: 'empty' | 'small'
+  ): AccountBalanceItem {
+    return {
+      accountId,
+      bankName: 'Monobank',
+      accountType: 'checking',
+      accountNumberLast4: accountId.slice(-4),
+      currency: accountId.toUpperCase(),
+      provider: 'monobank',
+      category: 'banking',
+      currentBalance: balance,
+      balanceInBaseCurrency: balance,
+      syncStatus: 'synced',
+      lastSyncTimestamp: null,
+      hiddenReason,
+    };
+  }
+
+  const cardsInstitution: Partial<Institution> = {
+    provider: 'monobank',
+    syncStatus: 'synced',
+    hiddenCount: 2,
+    hiddenTotal: 0.4,
+    accounts: [],
+    cards: [
+      {
+        cardType: 'black',
+        displayName: 'Black card',
+        totalInBaseCurrency: 100.4,
+        syncStatus: 'synced',
+        accounts: [account('uah', 100), account('eur', 0.4, 'small'), account('usd', 0, 'empty')],
+      },
+      {
+        cardType: 'white',
+        displayName: 'White card',
+        totalInBaseCurrency: 0,
+        syncStatus: 'synced',
+        hiddenReason: 'empty',
+        accounts: [account('gbp', 0, 'empty')],
+      },
+    ],
+  };
+
+  const hiddenGroup = (element: HTMLElement): HTMLElement | null =>
+    element.querySelector('[data-testid="hidden-rows"]');
+  const rowsOf = (root: ParentNode | null): string[] =>
+    Array.from(root?.querySelectorAll('[data-testid="account-row"]') ?? []).map(
+      row => row.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+    );
+
+  it('ends a bank with one collapsed row counting what it tucked away', () => {
+    const element = setupFixture({...cardsInstitution, hiddenCount: 3})
+      .nativeElement as HTMLElement;
+
+    expect(hiddenGroup(element)?.querySelector('summary')?.textContent).toContain(
+      '3 hidden · $0.40'
+    );
+    expect(hiddenGroup(element)?.querySelector('details')?.open).toBe(false);
+  });
+
+  it('lists only the visible rows and cards above it, and the hidden ones inside it', () => {
+    const element = setupFixture({...cardsInstitution, hiddenCount: 3})
+      .nativeElement as HTMLElement;
+
+    expect(element.textContent).toContain('Black card');
+    expect(element.textContent?.split('3 hidden')[0]).not.toContain('White card');
+    expect(rowsOf(element).filter(row => row.startsWith('UAH'))).toHaveLength(1);
+    const hidden = rowsOf(hiddenGroup(element));
+    expect(hidden).toHaveLength(3);
+    expect(hidden.join('|')).toContain('Black card · EUR');
+    expect(hidden.join('|')).toContain('White card · GBP');
+  });
+
+  it('shows no hidden row when nothing is hidden', () => {
+    const element = setupFixture({
+      syncStatus: 'synced',
+      accounts: [account('uah', 100)],
+    }).nativeElement as HTMLElement;
+
+    expect(hiddenGroup(element)).toBeNull();
+  });
+
+  it('opens when this device left it open, and records the toggle', () => {
+    const setInstitutionOpen = vi.fn();
+    const fixture = setupFixture({...cardsInstitution, hiddenCount: 3}, [], {
+      open: {'monobank:inst-1:hidden': true},
+      setInstitutionOpen,
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const details = hiddenGroup(element)?.querySelector('details') as HTMLDetailsElement;
+
+    expect(details.open).toBe(true);
+
+    details.open = false;
+    details.dispatchEvent(new Event('toggle'));
+    expect(setInstitutionOpen).toHaveBeenCalledWith('monobank:inst-1:hidden', false);
+  });
+
+  it('groups a flat bank list and a broker the same way, by the API flag', () => {
+    const element = setupFixture({
+      syncStatus: 'synced',
+      hiddenCount: 1,
+      hiddenTotal: 0,
+      accounts: [account('uah', 100), account('eur', 0, 'empty')],
+    }).nativeElement as HTMLElement;
+
+    expect(rowsOf(hiddenGroup(element))).toHaveLength(1);
+    expect(element.querySelectorAll('[data-testid="account-row"]')).toHaveLength(2);
+  });
+});
+
 describe('AccountsListComponent closed accounts', () => {
   const closedRow: ClosedAccountRow = {
     accountId: 'closed-1',

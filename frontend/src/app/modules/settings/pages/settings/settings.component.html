@@ -193,6 +193,50 @@
             id="s-currency"
           />
         </cmn-form-field>
+        <div class="mt-cmn-5 space-y-cmn-5">
+          <cmn-setting-row
+            label="Hide empty balances"
+            description="Accounts and cards with nothing in them."
+          >
+            <cmn-toggle
+              [checked]="profile.hideEmptyBalances"
+              (toggled)="store.applyChange({hideEmptyBalances: $event})"
+              label="Hide empty balances"
+            />
+          </cmn-setting-row>
+          <cmn-setting-row
+            label="Hide small balances"
+            description='Like Binance&apos;s "hide small assets".'
+          >
+            <cmn-toggle
+              [checked]="profile.hideSmallBalances"
+              (toggled)="store.applyChange({hideSmallBalances: $event})"
+              label="Hide small balances"
+            />
+          </cmn-setting-row>
+          @if (profile.hideSmallBalances && smallThresholdControl(); as threshold) {
+            <cmn-form-field
+              [control]="threshold"
+              [errorMessage]="threshold.invalid ? smallBalanceError : ''"
+              [label]="'Hide below (' + profile.baseCurrency + ')'"
+              (focusout)="commitSmallThreshold()"
+              (keydown.enter)="commitSmallThreshold()"
+              class="block"
+              fieldId="s-small-balance"
+            >
+              <cmn-input
+                [formControl]="threshold"
+                id="s-small-balance"
+                type="text"
+                inputmode="decimal"
+              />
+            </cmn-form-field>
+          }
+          <p class="text-cmn-xs text-text-secondary leading-relaxed">
+            Hidden balances still count in your totals. Find them under 'hidden' at the end of each
+            institution.
+          </p>
+        </div>
       </cmn-settings-section>
 
       <cmn-settings-section
