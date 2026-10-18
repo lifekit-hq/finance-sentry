@@ -508,9 +508,11 @@ public sealed record SourcePosition(
 
 // The raw event as the provider reports it. The engine classifies it into the five flow classes
 // per scope at measure time (3.2 rule 1); the adapter never decides "external" or "internal".
+// Built in code: FinanceSentry.Core/Interfaces/SourceEvent.cs.
 public sealed record SourceEvent(
-    DateOnly Date, string ProviderType, decimal Amount, string Unit,
-    string? CounterpartyRef, string? TxRef);
+    DateTimeOffset OccurredAtUtc, string ProviderType, decimal Amount, string Unit,
+    string? CounterpartyRef, string? TxRef,
+    string? Network, decimal? Fee, string? FeeUnit, string? Status);
 
 public interface IWealthSource
 {
@@ -525,6 +527,12 @@ public interface IWealthSource
 - **Owner scoping.** The daily snapshot job calls `ReadAsync` with no principal, so implementations use the
   `…Unscoped…` repository reads, each with its own `UserId` predicate
   ([backend-rules.md](claude/backend-rules.md), owner query filter).
+- **`SourceEvent` fields.** `OccurredAtUtc` is a UTC instant, not a date: the 24 h transfer-match window and
+  in-transit detection need the time of day (a date-only provider reports midnight UTC). `TxRef` is the raw
+  hash as reported and is normalized only at match time, never stored normalized. `Network`, `Fee` and
+  `FeeUnit` are null when the venue does not report them; `FeeUnit` can differ from `Unit` (a BNB fee on a
+  USDT trade). `Status` is the provider's own string, kept raw like `ProviderType`. The fields cover exchanges
+  only (Binance, Revolut X); self-custody and chain-indexer fields are out of scope.
 - **Classification happens in the engine, not the adapter.** Adapters pass on the provider's own type
   string (IBKR Flex already stores it raw in `BrokerageCashTransaction.TransactionType`). A per-provider
   map turns those strings into the five classes. Sum *signed* amounts per class and decide income and fee by
