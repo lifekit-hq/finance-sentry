@@ -34,7 +34,10 @@ public class ProfileController(
             request.SyncFailureAlerts,
             request.WatchlistAnalystAlerts,
             request.SafeWithdrawalRate,
-            request.RealAnnualReturn);
+            request.RealAnnualReturn,
+            request.HideEmptyBalances,
+            request.HideSmallBalances,
+            request.SmallBalanceThreshold);
         var profile = await updateProfileHandler.Handle(command, ct);
         return Ok(profile);
     }

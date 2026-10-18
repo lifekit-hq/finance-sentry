@@ -38,4 +38,13 @@ public class ApplicationUser : IdentityUser
 
     /// <summary>Real (inflation-adjusted) annual return assumed for the FIRE projection.</summary>
     public decimal RealAnnualReturn { get; set; } = 0.05m;
+
+    /// <summary>Display rule: tuck away rows whose balance is exactly zero. Hidden rows still count in every total.</summary>
+    public bool HideEmptyBalances { get; set; } = true;
+
+    /// <summary>Display rule: tuck away rows worth less than <see cref="SmallBalanceThreshold"/>. Off by default.</summary>
+    public bool HideSmallBalances { get; set; }
+
+    /// <summary>The "hide below" amount for <see cref="HideSmallBalances"/>, in the user's base currency.</summary>
+    public decimal SmallBalanceThreshold { get; set; } = 1m;
 }

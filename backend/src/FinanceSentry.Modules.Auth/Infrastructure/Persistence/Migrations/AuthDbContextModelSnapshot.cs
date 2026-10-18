@@ -97,6 +97,14 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence.Migrations
                     b.Property<string>("GoogleId")
                         .HasColumnType("text");
 
+                    b.Property<bool>("HideEmptyBalances")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("HideSmallBalances")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LastName")
                         .HasColumnType("text");
 
@@ -141,6 +149,11 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
+
+                    b.Property<decimal>("SmallBalanceThreshold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(1m);
 
                     b.Property<bool>("SyncFailureAlerts")
                         .HasColumnType("boolean");
