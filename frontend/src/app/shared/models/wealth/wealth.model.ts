@@ -18,6 +18,8 @@ export type SyncStatus =
   | 'reconnect_needed'
   | 'dormant';
 
+export type HiddenReason = 'empty' | 'small';
+
 export interface AccountBalanceItem extends AccountIdentity {
   provider: string;
   category: AccountCategory;
@@ -31,12 +33,14 @@ export interface AccountBalanceItem extends AccountIdentity {
   nativeValue?: Nullable<number>;
   /** A position's full ticker (`GOOGL`, `BRK.B`); `accountNumberLast4` is cut to four characters. Absent on bank accounts. */
   symbol?: Nullable<string>;
+  /** Why the list tucks this row away (display-only: it still counts in every total); absent when it stays visible. */
+  hiddenReason?: Nullable<HiddenReason>;
 }
 
 /**
  * A physical card within an institution, grouping its per-currency sub-accounts.
  * Populated by the backend only for providers with a card product (Monobank
- * black/white/…); absent otherwise. Zero-balance sub-accounts are already excluded.
+ * black/white/…); absent otherwise. Empty sub-accounts and cards are included, flagged by `hiddenReason`.
  */
 export interface CardGroup {
   cardType: string;
@@ -44,6 +48,7 @@ export interface CardGroup {
   totalInBaseCurrency: number;
   syncStatus: SyncStatus;
   accounts: AccountBalanceItem[];
+  hiddenReason?: Nullable<HiddenReason>;
 }
 
 /**
@@ -63,6 +68,9 @@ export interface Institution {
   lastSuccessfulSyncTimestamp: Nullable<string>;
   accounts: AccountBalanceItem[];
   cards?: Nullable<CardGroup[]>;
+  /** Rows the list tucks away and their signed sum; both are already inside `totalInBaseCurrency`. */
+  hiddenCount?: number;
+  hiddenTotal?: number;
 }
 
 export interface CategorySummary {

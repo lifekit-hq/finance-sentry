@@ -181,9 +181,10 @@ public class TransactionSummaryContractTests(WealthApiFactory factory) : IClassF
 
 public record AppliedFiltersShape(string? Category, string? Provider);
 public record AccountShape(Guid Id, string BankName, string Provider, string Category,
-    decimal? CurrentBalance, decimal? BalanceInBaseCurrency, string SyncStatus);
+    decimal? CurrentBalance, decimal? BalanceInBaseCurrency, string SyncStatus, string? HiddenReason);
 public record InstitutionShape(Guid InstitutionId, string Provider, string Name,
-    decimal TotalInBaseCurrency, string SyncStatus, List<AccountShape> Accounts);
+    decimal TotalInBaseCurrency, string SyncStatus, List<AccountShape> Accounts,
+    int HiddenCount, decimal HiddenTotal);
 public record CategoryShape(string Category, decimal TotalInBaseCurrency, List<InstitutionShape> Institutions);
 public record WealthSummaryShape(decimal TotalNetWorth, string BaseCurrency,
     List<CategoryShape> Categories, AppliedFiltersShape AppliedFilters);

@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Domain.Services;
 
 public record AppliedFiltersDto(string? Category, string? Provider);
@@ -27,7 +28,8 @@ public record AccountBalanceDto(
     string? ProductType = null,
     string? NativeCurrency = null,
     decimal? NativeValue = null,
-    string? Symbol = null);
+    string? Symbol = null,
+    string? HiddenReason = null); // AssetVisibility.Empty / Small: display-only, the row still counts in every total
 
 /// <summary>
 /// A physical card within an institution, grouping its per-currency sub-accounts. Populated
@@ -38,7 +40,13 @@ public record CardGroupDto(
     string DisplayName,
     decimal TotalInBaseCurrency,
     string SyncStatus,
-    IReadOnlyList<AccountBalanceDto> Accounts);
+    IReadOnlyList<AccountBalanceDto> Accounts)
+{
+    /// <summary>Set when every sub-account is hidden: the whole card is, for the same reason.</summary>
+    public string? HiddenReason => Accounts.Count > 0 && Accounts.All(a => a.HiddenReason is not null)
+        ? Accounts.All(a => a.HiddenReason == AssetVisibility.Empty) ? AssetVisibility.Empty : AssetVisibility.Small
+        : null;
+}
 
 /// <summary>
 /// An institution the user has connected: one Monobank customer, one
@@ -55,7 +63,16 @@ public record InstitutionDto(
     DateTime? LastSyncTimestamp,
     DateTime? LastSuccessfulSyncTimestamp,
     IReadOnlyList<AccountBalanceDto> Accounts,
-    IReadOnlyList<CardGroupDto>? Cards = null);
+    IReadOnlyList<CardGroupDto>? Cards = null)
+{
+    // Hidden rows stay in every total; these say how many rows the list tucked away and what they add up to
+    // (signed like the total, in the same currency as the rows), so the arithmetic stays visible.
+    public int HiddenCount => Accounts.Count(a => a.HiddenReason is not null);
+
+    public decimal HiddenTotal => Accounts
+        .Where(a => a.HiddenReason is not null)
+        .Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceInBaseCurrency ?? 0m));
+}
 
 public record CategorySummaryDto(
     string Category,
