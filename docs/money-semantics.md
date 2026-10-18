@@ -352,6 +352,13 @@ and AI all sum every row, hidden or not.
 (every sub-account hidden) and the institution's `HiddenCount` / `HiddenTotal` (signed, in the response currency,
 already inside the institution total). Monobank cards and pockets are all returned, flagged.
 
+**Presentation** (frontend, display only): Accounts keeps flagged rows out of an institution's main list and
+gathers them under one collapsed `N hidden · $X` row at the end of the institution (`HiddenCount` and signed
+`HiddenTotal`, formatted by `MoneyUtils.format` in the base currency), closed by default and remembered per device.
+The three preferences are edited in Settings → Preferences, saved with the profile; the threshold must be above 0 and
+at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Only Accounts applies
+them so far.
+
 ## 3. Currency conversion
 
 - Convert **once, at the reader/query boundary**, via `CurrencyConverter.ToUsd(amount,
