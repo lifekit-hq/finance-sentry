@@ -5,6 +5,53 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.16.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.15.0...v1.16.0) (2026-10-19)
+
+
+### Features
+
+* **agent:** Ledger persona to committed verdicts and direct vault writes ([#1150](https://github.com/lifekit-hq/finance-sentry/issues/1150)) ([25a648d](https://github.com/lifekit-hq/finance-sentry/commit/25a648d3a85aef020477fe0439b410355939a757))
+* **auth:** create a Member on first Logto sign-in with the app role ([#1142](https://github.com/lifekit-hq/finance-sentry/issues/1142)) ([e1f2fb5](https://github.com/lifekit-hq/finance-sentry/commit/e1f2fb58f0a2a554739bf7eaddbbc1ad7a5e85dd))
+* **auth:** store asset-visibility settings on the profile ([#1145](https://github.com/lifekit-hq/finance-sentry/issues/1145)) ([7c39fa7](https://github.com/lifekit-hq/finance-sentry/commit/7c39fa74d44232e38462d3641f01f6c3044df501))
+* **bank-sync:** closed accounts section and card lifecycle notes on Accounts ([#1141](https://github.com/lifekit-hq/finance-sentry/issues/1141)) ([efcc135](https://github.com/lifekit-hq/finance-sentry/commit/efcc1350aeba0f170dd20ab54dccd079305cd393))
+* **bank-sync:** one Accounts row for every category, status on the avatar, brokers open in place ([#1138](https://github.com/lifekit-hq/finance-sentry/issues/1138)) ([2e80369](https://github.com/lifekit-hq/finance-sentry/commit/2e80369885906f6cae1e7b892d356f8869143e4f))
+* **bank-sync:** retire, reopen and exclude vanished accounts from live totals (card lifecycle 2/3) ([#1135](https://github.com/lifekit-hq/finance-sentry/issues/1135)) ([0c83f1d](https://github.com/lifekit-hq/finance-sentry/commit/0c83f1d7358bb62efed97564dd316d55a5070c11))
+* **bank-sync:** show the replaced card line on an in-place card reissue ([#1143](https://github.com/lifekit-hq/finance-sentry/issues/1143)) ([111ac26](https://github.com/lifekit-hq/finance-sentry/commit/111ac2682a26abdf79b9101155fcd3e2af360354))
+* **bank-sync:** store IBAN, PANs and card expiry and log would-retire accounts (card lifecycle 1/3) ([#1133](https://github.com/lifekit-hq/finance-sentry/issues/1133)) ([ff50a66](https://github.com/lifekit-hq/finance-sentry/commit/ff50a666b7dfbe6d0861195c6edc36f4427308e1))
+* **banksync:** map every MCC in code and fix recategorization side issues ([#1151](https://github.com/lifekit-hq/finance-sentry/issues/1151)) ([9909022](https://github.com/lifekit-hq/finance-sentry/commit/99090222547bbccc466d5dd460cebf336d3a21c3))
+* **connections:** probe suspect and Dormant connections and slow Dormant sync cadence ([#1124](https://github.com/lifekit-hq/finance-sentry/issues/1124)) ([6276236](https://github.com/lifekit-hq/finance-sentry/commit/62762369fe7b5fa2ac0e32af4c8352c638e18c20))
+* **connections:** surface connection health to users (retrying, reconnect needed, dormant) ([#1128](https://github.com/lifekit-hq/finance-sentry/issues/1128)) ([f55c141](https://github.com/lifekit-hq/finance-sentry/commit/f55c1415bee5ae98d2d2b6aa4d1c391626c74e46))
+* **core:** M8 risk statistics to empyrical definitions ([#1156](https://github.com/lifekit-hq/finance-sentry/issues/1156)) ([9b2cf47](https://github.com/lifekit-hq/finance-sentry/commit/9b2cf471020e909f30ea07f59caf1725207ebff8))
+* **core:** SourceEvent contract with UTC timestamp, network, fee and status ([#1153](https://github.com/lifekit-hq/finance-sentry/issues/1153)) ([e827ba6](https://github.com/lifekit-hq/finance-sentry/commit/e827ba61a3829ac459829d4ccfc778b2e2776d4f))
+* **crypto-sync:** ingest venue fiat and Revolut X transfer flows for crypto contributions vs growth ([#1129](https://github.com/lifekit-hq/finance-sentry/issues/1129)) ([9bf2bb1](https://github.com/lifekit-hq/finance-sentry/commit/9bf2bb196dbc3cd1ef6e5bb7153ce1923f6a7f2b))
+* **crypto-sync:** read Binance on-chain legs and match transfers across venues ([#1130](https://github.com/lifekit-hq/finance-sentry/issues/1130)) ([a1c71ec](https://github.com/lifekit-hq/finance-sentry/commit/a1c71ece5b7b4523ac7782385dfa0fc363331bd1))
+* **crypto-sync:** read earn, airdrop and dust events into the growth split ([#1131](https://github.com/lifekit-hq/finance-sentry/issues/1131)) ([c48eea6](https://github.com/lifekit-hq/finance-sentry/commit/c48eea68b6c7adfddd57007ec43fc5834e42ab07))
+* **crypto:** keep the Binance trade commission and book it as a fee ([#1155](https://github.com/lifekit-hq/finance-sentry/issues/1155)) ([e53742c](https://github.com/lifekit-hq/finance-sentry/commit/e53742c7d12cf425bf6aee6bad11dfede8a39c0d))
+* **frontend:** asset-visibility settings and collapsed hidden rows on Accounts ([#1148](https://github.com/lifekit-hq/finance-sentry/issues/1148)) ([6aaa98d](https://github.com/lifekit-hq/finance-sentry/commit/6aaa98dae6cabd6b43075504b3c0dcb84c1dc589))
+* **frontend:** continuous paging, shaped skeletons and kept content on revisit ([#1125](https://github.com/lifekit-hq/finance-sentry/issues/1125)) ([bd8efd6](https://github.com/lifekit-hq/finance-sentry/commit/bd8efd61851229efaa06146eafe92ca20c6418be))
+* **frontend:** disable phone zoom and open dialogs as bottom sheets on [@lifekit-hq](https://github.com/lifekit-hq) 3.7.0 ([#1140](https://github.com/lifekit-hq/finance-sentry/issues/1140)) ([d919b82](https://github.com/lifekit-hq/finance-sentry/commit/d919b82c0467038ebbf2c66df56128d0b2235e88))
+* **frontend:** specific empty states with a way out, and a fixed ledger summary ([#1139](https://github.com/lifekit-hq/finance-sentry/issues/1139)) ([b45eb0e](https://github.com/lifekit-hq/finance-sentry/commit/b45eb0ed3a40677c752ddc7bfe7b06352d2af171))
+* **frontend:** sticky Accounts section headers, 44px menu targets and remembered disclosure ([#1121](https://github.com/lifekit-hq/finance-sentry/issues/1121)) ([59eac2c](https://github.com/lifekit-hq/finance-sentry/commit/59eac2c306982b8229993ad4679b06591a2f6122))
+* **investments:** hide empty and small positions behind a collapsed row per asset class ([#1149](https://github.com/lifekit-hq/finance-sentry/issues/1149)) ([4de08d3](https://github.com/lifekit-hq/finance-sentry/commit/4de08d3bc69e2bfcaf03e82ea3aea17afa49af3b))
+* **research:** Ledger scoreboard - an arena of one ([#986](https://github.com/lifekit-hq/finance-sentry/issues/986)) ([#1152](https://github.com/lifekit-hq/finance-sentry/issues/1152)) ([050da56](https://github.com/lifekit-hq/finance-sentry/commit/050da5636462d9bda49e35e45c5daefebaa9b7b5))
+* **research:** one-word scorecard verdict with drill-down on dossier and recommendation card ([#1120](https://github.com/lifekit-hq/finance-sentry/issues/1120)) ([5299fe7](https://github.com/lifekit-hq/finance-sentry/commit/5299fe7baa4d306d10e8bf71b4c170cb4307e2ba))
+* **wealth:** annotate hidden rows in the wealth summary with a visibility rule ([#1147](https://github.com/lifekit-hq/finance-sentry/issues/1147)) ([c721986](https://github.com/lifekit-hq/finance-sentry/commit/c72198690466ddd457c0d41261629c33cdac0828))
+* **wealth:** brokerage contributions vs growth and time-weighted Book vs SPY ([#1123](https://github.com/lifekit-hq/finance-sentry/issues/1123)) ([3867f96](https://github.com/lifekit-hq/finance-sentry/commit/3867f96b401fb4ffede028232ced92ab8e9af8f6))
+* **wealth:** enter Steam and other values by hand as L3 in-economy holdings ([#1154](https://github.com/lifekit-hq/finance-sentry/issues/1154)) ([fdc952a](https://github.com/lifekit-hq/finance-sentry/commit/fdc952af633a890fb4d94319721f50285ee543d1))
+* **wealth:** R7 presentation patterns - contributions vs growth, timing gap, growth of 10,000 ([#1157](https://github.com/lifekit-hq/finance-sentry/issues/1157)) ([17d3ef0](https://github.com/lifekit-hq/finance-sentry/commit/17d3ef0dcc80e2a06354ac138c9124ace8213512))
+
+
+### Bug Fixes
+
+* **bank-sync:** show every negative on Accounts with a minus sign instead of "Owes" ([#1134](https://github.com/lifekit-hq/finance-sentry/issues/1134)) ([0a4e398](https://github.com/lifekit-hq/finance-sentry/commit/0a4e398d84e0f3ba22ee70cb0838c5c1e2411409))
+* **brokerage-sync:** keep brokerage link day across IBKR credential relink ([#1127](https://github.com/lifekit-hq/finance-sentry/issues/1127)) ([f507db1](https://github.com/lifekit-hq/finance-sentry/commit/f507db139e2f367cb7d3857b307dd87aea5d0fd5))
+* **crypto-sync:** fetch chain details and match transfers for Revolut X external_crypto sends ([#1137](https://github.com/lifekit-hq/finance-sentry/issues/1137)) ([c3e1b96](https://github.com/lifekit-hq/finance-sentry/commit/c3e1b9628a3ddca885c37ead27fb3297f49eb78f))
+* **crypto-sync:** read Binance numeric positionId and wrap unreadable success bodies as BinanceException ([#1136](https://github.com/lifekit-hq/finance-sentry/issues/1136)) ([73a3cf6](https://github.com/lifekit-hq/finance-sentry/commit/73a3cf6f075f5894463d0b5d1a6699d8572b55cc))
+* **frontend:** pin libexpat to the CVE-2026-77214 fix in the prod image ([#1146](https://github.com/lifekit-hq/finance-sentry/issues/1146)) ([fec2c10](https://github.com/lifekit-hq/finance-sentry/commit/fec2c1045ae37268b9d31e93803a92fcdb54e780))
+* **frontend:** restore route view transitions and drop crossfade stopgaps ([#1144](https://github.com/lifekit-hq/finance-sentry/issues/1144)) ([8bcb005](https://github.com/lifekit-hq/finance-sentry/commit/8bcb005f155128883b000aa2147551d6901e99ae))
+* **frontend:** static placeholders and history Retry after a failed dashboard range change ([#1126](https://github.com/lifekit-hq/finance-sentry/issues/1126)) ([47b5b29](https://github.com/lifekit-hq/finance-sentry/commit/47b5b297cdcbb51fd3ffca4208f880e196faebf2))
+* **wealth:** stop a closed Monobank sub-account failing its institution; show negative net-worth categories ([#1132](https://github.com/lifekit-hq/finance-sentry/issues/1132)) ([1097eee](https://github.com/lifekit-hq/finance-sentry/commit/1097eee9fc2b7ce3672eb7cca730547a7e34efa0))
+
 ## [1.15.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.14.0...v1.15.0) (2026-10-15)
 
 
