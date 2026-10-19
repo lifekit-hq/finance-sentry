@@ -76,7 +76,7 @@ rule or shape agreed but not implemented), **missing**.
 
 This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1, a
 per-source row written beside every snapshot, R8 PR 2, and read back by history, the dashboard, MCP and FIRE,
-R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the
+R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6, M8 and M9 (3.4); the
 headline record (3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The stored
 total is the sum of every registered source's resolved figure; the three sleeve columns are frozen by
 R8 PR 4: kept for history, never extended (5.6).
@@ -240,7 +240,7 @@ bridge yet.
 | M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
 | M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
-| M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | drawdown only |
+| M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
 | M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates); per decision, the Ledger scoreboard (`get_ledger_scoreboard`, a 30-day price excess per proposal or pick, money-semantics §10) |
 | M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration | — | tile + FIRE, two assumption sets (G7) |
 
@@ -253,7 +253,7 @@ Choices the engine fixes once, so they stop being re-decided:
 - **Return base:** a window starting at a value of zero (a new account) has no percent. Show the money
   figures with reason `ZERO_BASE`.
 
-**The engine.** `backend/src/FinanceSentry.Core/Measures/` holds M1-M6 and M9 as pure static calculators,
+**The engine.** `backend/src/FinanceSentry.Core/Measures/` holds M1-M6, M8 and M9 as pure static calculators,
 built the way `BookDrawdownCalculator` is: no I/O, no clock, no shared precision setting. Inputs are USD
 values (C4: conversion for display is not the engine's job) and flows already classified into the five
 classes for the scope asked; classifying provider events (3.2 rule 1, 5.2) comes before it and is not built.
@@ -270,6 +270,21 @@ also fixes:
 - **A negative value** anywhere in a TWR window fails `NegativeBase`: a ratio through a negative base has no
   meaning. Value appearing in an empty scope with no recorded inflow is listed as unexplained and left out of
   the chain (rule 4), never chained as a return.
+- **M8 (`RiskStatistics`)** is our own implementation of the empyrical definitions, with empyrical-reloaded
+  0.7.0 as the offline oracle for its golden fixtures (nothing of it, or of LEAN's `Statistics.cs`, is in the
+  repo). The observations are the time-weighted returns of each calendar month that opens and closes on a
+  month-end close (the first, partial month gives none; a month-end close is the month's last calendar day or the
+  last weekday before a weekend month-end, so a mid-month close is a stub and the returns beside it are left out,
+  which can leave gaps in the series; a gap of a month with no valuation at all fails `MissingValue` rather than
+  being bridged into a two-month return). Volatility is the sample standard deviation (n − 1) × √12; downside deviation is √(mean of
+  min(r, 0)² over *all* observations) × √12 at a target of 0, so up-months count as zero shortfall instead of
+  leaving the denominator; fewer than two returns fails `NotEnoughHistory`. Whole-history volatility and downside deviation use every
+  valid return. The three-year volatility is over the 36 calendar months ending at the last valid month-end and
+  fails `NotEnoughHistory` if any of those 36 monthly returns is missing or excluded, so 36 returns spread over a
+  longer span never qualify (GIPS 4.A.1.j): the surface shows "not enough history",
+  never a number. Max drawdown is the deepest fall of the chained time-weighted sub-period index (every valued
+  close, so a dip inside a month shows), as a positive fraction; the index opens at 1, so a fall in the first
+  step counts. `GrowthIndex` holds that chaining and `BookDrawdownCalculator` uses it for its current drawdown.
 - **M6 splits each gain** into a price effect and a currency effect. With the position's local-currency
   amounts (each buy's and sell's, a sell's rate, and the held value with its rate), the price effect is the
   local gain converted at the end (or sale) rate and the currency effect is the USD gain minus it. A position

@@ -112,7 +112,7 @@ public static class HeadlineQualityMapper
         MeasureFailure.ZeroBase => HeadlineReasonCode.ZeroBase,
         MeasureFailure.NegativeBase => HeadlineReasonCode.NegativeBase,
         MeasureFailure.ScopeChanged => HeadlineReasonCode.ScopeChanged,
-        MeasureFailure.MissingValue or MeasureFailure.InsufficientData => HeadlineReasonCode.ShortHistory,
+        MeasureFailure.MissingValue or MeasureFailure.InsufficientData or MeasureFailure.NotEnoughHistory => HeadlineReasonCode.ShortHistory,
         _ => HeadlineReasonCode.NotMeasurable,
     };
 

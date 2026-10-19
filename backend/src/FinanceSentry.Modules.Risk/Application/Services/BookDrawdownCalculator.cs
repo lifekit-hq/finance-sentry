@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Risk.Application.Services;
 
+using FinanceSentry.Core.Measures;
 using FinanceSentry.Modules.Risk.Domain;
 
 /// <summary>
@@ -34,20 +35,14 @@ public static class BookDrawdownCalculator
             .ToList();
         captures.Add(ToCapture(live.Select(p => (p.Symbol, p.Sleeve, p.Quantity, p.UsdValue))));
 
-        var index = 1m;
-        var peak = 1m;
-        var steps = 0;
+        var steps = new List<decimal>();
         for (var i = 1; i < captures.Count; i++)
         {
-            if (Step(captures[i - 1], captures[i]) is not { } stepReturn)
-                continue;
-
-            index *= 1m + stepReturn;
-            peak = Math.Max(peak, index);
-            steps++;
+            if (Step(captures[i - 1], captures[i]) is { } stepReturn)
+                steps.Add(stepReturn);
         }
 
-        return steps == 0 ? null : Math.Round(1m - (index / peak), DrawdownDecimals);
+        return GrowthIndex.Drawdown(steps) is { } drawdown ? Math.Round(drawdown.Current, DrawdownDecimals) : null;
     }
 
     private static decimal? Step(Dictionary<string, Holding> earlier, Dictionary<string, Holding> later)

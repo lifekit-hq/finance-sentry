@@ -1184,6 +1184,17 @@ snapshots, so the measure is the invested book's decline, not net worth); snapsh
 fast a fall is seen; a position with no snapshot price at a capture is dropped from that step; the
 split guard is a heuristic. The tolerance lives on the IPS, so it is checked whether or not a risk rule set exists.
 
+### Risk statistics (M8)
+
+Volatility, downside deviation and max drawdown over a scope are computed by the measure engine
+(`RiskStatistics`, finance-framework §3.4) from the scope's flow-neutral time-weighted returns, never from raw
+balances: a deposit or withdrawal is not a gain, a loss or a swing. Monthly observations are annualised by
+√12; volatility is the sample (n − 1) standard deviation; downside deviation averages the squared shortfall below
+0 over all observations (empyrical's definition, not below-target-only). The three-year figure needs 36 monthly
+returns and is "not enough history" until then; a series too short for any figure, a zero or negative opening
+value, a missing month or an invalid input yields a typed reason, never `0`. Not yet shown on any surface. The
+holdings-based current drawdown of section 5b is a separate measurement of the invested book and keeps its rules.
+
 ## 9. Known approximations (accepted)
 
 - Everything is UTC; no user-timezone normalization of transaction dates or month edges. The one exception is
