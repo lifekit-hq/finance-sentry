@@ -62,6 +62,8 @@ public class ManualHoldingsContractTests(WealthApiFactory factory) : IClassFixtu
 
         (await client.DeleteAsync($"{Route}/{id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await client.GetFromJsonAsync<List<ManualHoldingShape>>(Route))!.Should().BeEmpty();
+        (await client.DeleteAsync($"{Route}/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound, "a removed entry is gone to the person");
+        (await client.PutAsJsonAsync($"{Route}/{id}", Steam(amount: 1m))).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

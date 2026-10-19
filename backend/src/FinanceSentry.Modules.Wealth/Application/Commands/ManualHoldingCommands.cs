@@ -68,7 +68,8 @@ public class DeleteManualHoldingCommandHandler(IManualHoldingRepository holdings
     {
         var holding = await holdings.GetAsync(command.UserId, command.Id, cancellationToken)
             ?? throw new ManualHoldingNotFoundException();
-        await holdings.DeleteAsync(holding, cancellationToken);
+        holding.Remove();
+        await holdings.SaveAsync(cancellationToken);
         return Unit.Value;
     }
 }

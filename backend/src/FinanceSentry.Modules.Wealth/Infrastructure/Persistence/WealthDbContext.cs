@@ -9,6 +9,9 @@ using Microsoft.EntityFrameworkCore;
 public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrentUser currentUser)
     : OwnerScopedDbContext(options, currentUser)
 {
+    /// <summary>Name of the soft-delete filter on <see cref="ManualHolding"/>; the scope-change reader opts out by name.</summary>
+    public const string ManualHoldingActiveFilterName = "NotRemoved";
+
     private const int MoneyPrecision = 18;
     private const int MoneyScale = 2;
 
@@ -83,6 +86,7 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         // stored by name (the enum convention). Reliability is always L3, so it is not a column.
         var manual = modelBuilder.Entity<ManualHolding>();
         manual.ToTable("manual_holdings");
+        manual.HasQueryFilter(ManualHoldingActiveFilterName, x => x.RemovedAt == null);
         manual.HasKey(x => x.Id);
         manual.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
         manual.Property(x => x.Label).HasColumnName("label").IsRequired().HasMaxLength(ManualHoldingLimits.LabelMaxLength);
@@ -92,6 +96,7 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         manual.Property(x => x.Convertibility).HasColumnName("convertibility").IsRequired().HasMaxLength(16);
         manual.Property(x => x.CreatedAt).HasColumnName("created_at");
         manual.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        manual.Property(x => x.RemovedAt).HasColumnName("removed_at");
         manual.HasIndex(x => x.UserId).HasDatabaseName("idx_manual_holdings_user");
     }
 }

@@ -60,6 +60,10 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("label");
 
+                    b.Property<DateTimeOffset?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_at");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

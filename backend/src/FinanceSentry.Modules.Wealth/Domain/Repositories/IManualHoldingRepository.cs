@@ -8,8 +8,11 @@ public interface IManualHoldingRepository
     /// Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<ManualHolding>> ListUnscopedAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>The person's holdings including removed ones, for dating the scope changes they caused.
+    /// Opts out of the Owner query filter and the removed filter.</summary>
+    Task<IReadOnlyList<ManualHolding>> ListIncludingRemovedUnscopedAsync(Guid userId, CancellationToken ct = default);
+
     Task<ManualHolding?> GetAsync(Guid userId, Guid id, CancellationToken ct = default);
     Task AddAsync(ManualHolding holding, CancellationToken ct = default);
     Task SaveAsync(CancellationToken ct = default);
-    Task DeleteAsync(ManualHolding holding, CancellationToken ct = default);
 }

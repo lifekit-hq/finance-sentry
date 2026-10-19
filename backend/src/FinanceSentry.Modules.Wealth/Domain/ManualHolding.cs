@@ -22,6 +22,9 @@ public sealed class ManualHolding : IHasUpdatedAt, IUserOwned
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>When the person removed the entry; a removed entry is kept only to date the scope change it caused.</summary>
+    public DateTimeOffset? RemovedAt { get; private set; }
+
     /// <summary>A typed-in figure is an estimate by definition (L3), so it is not stored.</summary>
     public Reliability Reliability => Reliability.L3Estimated;
 
@@ -48,6 +51,11 @@ public sealed class ManualHolding : IHasUpdatedAt, IUserOwned
         Currency = currency.ToUpperInvariant();
         AsOf = asOf;
         Convertibility = convertibility;
+    }
+
+    public void Remove()
+    {
+        RemovedAt = DateTimeOffset.UtcNow;
     }
 }
 

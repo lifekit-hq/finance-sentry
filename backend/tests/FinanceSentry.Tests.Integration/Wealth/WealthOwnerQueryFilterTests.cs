@@ -166,9 +166,12 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
     {
         await using (var seed = CreateContext())
         {
+            var removed = ManualHolding.Create(_userA, "Old wallet", 500m, "USD", Today, Convertibility.InEconomy);
+            removed.Remove();
             seed.ManualHoldings.AddRange(
                 ManualHolding.Create(_userA, "Steam wallet", 40m, "USD", Today, Convertibility.InEconomy),
-                ManualHolding.Create(_userB, "Steam wallet", 90m, "USD", Today, Convertibility.InEconomy));
+                ManualHolding.Create(_userB, "Steam wallet", 90m, "USD", Today, Convertibility.InEconomy),
+                removed);
             await seed.SaveChangesAsync();
         }
 
@@ -187,6 +190,11 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         var reading = await new ManualWealthSource(unscoped).ReadAsync(_userA);
         reading.TotalValueUsd.Should().Be(40m, "the snapshot job reads the named user's entries with no person in scope");
         reading.Reliability.Should().Be(Reliability.L3Estimated);
+
+        var changes = await new ManualHoldingScopeChangeReader(unscoped).GetChangesSinceAsync(_userA, DateTime.UtcNow.AddDays(-1));
+        changes.Select(c => c.Kind).Should().BeEquivalentTo(
+            [AccountScopeChangeKinds.Linked, AccountScopeChangeKinds.Linked, AccountScopeChangeKinds.Removed],
+            "a removed entry is skipped by every read of current holdings and dated by the scope-change reader");
     }
 
     [DockerRequiredFact]

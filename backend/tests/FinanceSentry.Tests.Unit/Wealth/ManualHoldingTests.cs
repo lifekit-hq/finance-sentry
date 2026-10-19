@@ -6,6 +6,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Services;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Commands;
+using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Application.Validators;
 using FinanceSentry.Modules.Wealth.Domain;
@@ -74,12 +75,45 @@ public sealed class ManualHoldingTests
     {
         var added = ManualHolding.Create(UserId, "Steam wallet", 40m, "USD", Today, Convertibility.InEconomy);
         var repo = new Mock<IManualHoldingRepository>();
-        repo.Setup(r => r.ListUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([added]);
+        repo.Setup(r => r.ListIncludingRemovedUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([added]);
         var reader = new ManualHoldingScopeChangeReader(repo.Object);
 
         (await reader.GetChangesSinceAsync(UserId, DateTime.UtcNow.AddDays(-1))).Should().Equal(
             new AccountScopeChange("manual", AccountScopeChangeKinds.Linked, added.CreatedAt.UtcDateTime));
         (await reader.GetChangesSinceAsync(UserId, DateTime.UtcNow.AddDays(1))).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ARemovedEntry_IsARemovedScopeChange_AtItsRemovalTime_AndWithholdsTheChangePercent()
+    {
+        var removed = ManualHolding.Create(UserId, "Steam wallet", 500m, "USD", Today, Convertibility.InEconomy);
+        removed.Remove();
+        removed.RemovedAt.Should().NotBeNull();
+        var repo = new Mock<IManualHoldingRepository>();
+        repo.Setup(r => r.ListIncludingRemovedUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([removed]);
+        var reader = new ManualHoldingScopeChangeReader(repo.Object);
+
+        var changes = await reader.GetChangesSinceAsync(UserId, removed.CreatedAt.UtcDateTime.AddDays(-30));
+        changes.Should().Equal(
+            new AccountScopeChange("manual", AccountScopeChangeKinds.Linked, removed.CreatedAt.UtcDateTime),
+            new AccountScopeChange("manual", AccountScopeChangeKinds.Removed, removed.RemovedAt!.Value.UtcDateTime));
+        (await reader.GetChangesSinceAsync(UserId, removed.RemovedAt.Value.UtcDateTime.AddDays(1))).Should().BeEmpty();
+
+        // The entry sat in the book for a month and was removed: the $500 drop is not a decline.
+        var first = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 9, 1), TotalNetWorth = 1_500m };
+        var last = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_000m };
+        var snapshots = new Mock<INetWorthSnapshotRepository>();
+        snapshots.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([first, last]);
+        var scopeReader = new Mock<IAccountScopeChangeReader>();
+        scopeReader.Setup(r => r.GetChangesSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("manual", AccountScopeChangeKinds.Removed, new DateTime(2026, 9, 25, 8, 0, 0, DateTimeKind.Utc))]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(snapshots.Object, [scopeReader.Object])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        response.ScopeChanges.Should().ContainSingle().Which.Kind.Should().Be("removed");
+        response.ChangeHeadline!.Percent.Should().BeNull();
+        response.ChangeHeadline.Reasons.Select(r => r.Code).Should().Contain(HeadlineReasonCode.ScopeChanged);
     }
 
     [Fact]
