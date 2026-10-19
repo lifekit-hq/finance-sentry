@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -11,6 +13,7 @@ public sealed class RejectCandidateTool(
     ICommandHandler<RejectCandidateCommand, RejectCandidateResult> handler,
     IIdentityResolver identity)
 {
+    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "reject_candidate")]
     [Description("Rejects an active candidate with a reason. The candidate and its scorecard are kept (never deleted) so they remain queryable for the track record and counterfactuals. Records a Rejected lifecycle event.")]
     public async Task<RejectCandidateResult?> ExecuteAsync(

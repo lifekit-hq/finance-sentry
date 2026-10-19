@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -11,6 +13,7 @@ public sealed class DeleteThesisTool(
     ICommandHandler<DeleteThesisCommand, bool> handler,
     IIdentityResolver identity)
 {
+    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "delete_thesis")]
     [Description("Deletes an investment thesis by id. Returns true when a row was deleted.")]
     public async Task<bool> ExecuteAsync(

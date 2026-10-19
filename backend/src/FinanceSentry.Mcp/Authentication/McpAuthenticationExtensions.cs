@@ -17,7 +17,8 @@ namespace FinanceSentry.Mcp.Authentication;
 /// account must still pass <see cref="AuthPolicies.RequireMcpService"/>, so revoking the token or the
 /// permission takes effect on its next request; short-lived OAuth access tokens skip both checks. The endpoint
 /// policy (<see cref="AuthPolicies.RequireMcpAccess"/>) gates each token kind by its own permission: personal
-/// tokens by <c>mcp.connect</c>, service tokens by <c>mcp.service</c> alone.
+/// tokens by <c>mcp.connect</c>, service tokens by <c>mcp.service</c> alone. Tools that change Research data
+/// additionally require <see cref="AuthPolicies.RequireMcpPersonalToken"/>, which no service token passes.
 /// </summary>
 public static class McpAuthenticationExtensions
 {
@@ -33,7 +34,10 @@ public static class McpAuthenticationExtensions
             .RequireAuthenticatedUser()
             .RequireAssertion(context => context.User.HasClaim(
                 Permissions.ClaimType,
-                context.User.HasClaim(ScopeClaim, ServiceTokenScope) ? Permissions.McpService : Permissions.McpConnect)));
+                context.User.HasClaim(ScopeClaim, ServiceTokenScope) ? Permissions.McpService : Permissions.McpConnect)))
+            .AddPolicy(AuthPolicies.RequireMcpPersonalToken, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => !context.User.HasClaim(ScopeClaim, ServiceTokenScope)));
 
         return services.AddAccessTokenAuthentication(AuthAudiences.Mcp, options =>
         {
