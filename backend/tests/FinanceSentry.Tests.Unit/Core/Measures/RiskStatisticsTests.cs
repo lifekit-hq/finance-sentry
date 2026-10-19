@@ -254,6 +254,46 @@ public class RiskStatisticsTests
     }
 
     [Fact]
+    public void InteriorMidMonthClose_BreaksTheChainAndItsAdjacentReturnsAreLeftOut()
+    {
+        List<ValuePoint> values =
+        [
+            Close(Day(2023, 1, 31), 1000m),
+            Close(Day(2023, 2, 10), 1500m),
+            Close(Day(2023, 3, 31), 1100m),
+            Close(Day(2023, 4, 30), 1111m),
+            Close(Day(2023, 5, 31), 1100m),
+            Close(Day(2023, 6, 30), 1122m),
+        ];
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Select(m => (m.From, m.To)).Should().Equal(
+            (Day(2023, 3, 31), Day(2023, 4, 30)),
+            (Day(2023, 4, 30), Day(2023, 5, 31)),
+            (Day(2023, 5, 31), Day(2023, 6, 30)));
+        ((double)result.Volatility.Value!.Value).Should().BeGreaterThan(0).And.BeLessThan(0.1);
+    }
+
+    [Fact]
+    public void InteriorMidMonthClose_LeavesTooFewReturnsForAFigure()
+    {
+        List<ValuePoint> values =
+        [
+            Close(Day(2023, 1, 31), 1000m),
+            Close(Day(2023, 2, 10), 1500m),
+            Close(Day(2023, 3, 31), 1100m),
+            Close(Day(2023, 4, 30), 1111m),
+        ];
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Should().ContainSingle();
+        result.Volatility.Failure.Should().Be(MeasureFailure.NotEnoughHistory);
+        result.MaxDrawdown.Value.Should().NotBeNull();
+    }
+
+    [Fact]
     public void WeekendMonthEnd_StillEndsItsMonth()
     {
         // 31 Mar 2023 is a Friday; 30 Jun 2023 a Friday; 31 Jul 2022 a Sunday, so Friday 29 Jul ends July.

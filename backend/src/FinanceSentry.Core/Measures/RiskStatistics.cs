@@ -41,8 +41,9 @@ public static class RiskStatistics
     private const int MinimumObservations = 2;
 
     /// <param name="values">The scope's closes, any order. A month's return runs from the last valued close of
-    /// the month before to the last valued close of that month, so the first, partial month gives none. A first
-    /// or last close that does not end its month (see <c>EndsItsMonth</c>) is a stub and starts or ends no month.</param>
+    /// the month before to the last valued close of that month, so the first, partial month gives none. A month
+    /// is measured only between two closes that end their month (see <c>EndsItsMonth</c>); a mid-month close is a
+    /// stub that breaks the chain, and the returns beside it are left out.</param>
     /// <param name="flows">Classified flows; only external ones dated inside the window are used.</param>
     public static RiskResult Measure(IReadOnlyList<ValuePoint> values, IReadOnlyList<ClassifiedFlow> flows)
     {
@@ -56,15 +57,14 @@ public static class RiskStatistics
             .GroupBy(p => (p.Date.Year, p.Date.Month))
             .Select(g => g.Last())
             .ToList();
-        if (monthEnds.Count > 0 && !EndsItsMonth(monthEnds[0].Date))
-            monthEnds.RemoveAt(0);
-        if (monthEnds.Count > 0 && !EndsItsMonth(monthEnds[^1].Date))
-            monthEnds.RemoveAt(monthEnds.Count - 1);
         var months = new List<SubPeriodReturn>();
         for (var i = 1; i < monthEnds.Count; i++)
         {
             var opening = monthEnds[i - 1];
             var closing = monthEnds[i];
+            if (!EndsItsMonth(opening.Date) || !EndsItsMonth(closing.Date))
+                continue;
+
             if (MonthIndex(closing.Date) - MonthIndex(opening.Date) != 1)
                 return Failed(MeasureFailure.MissingValue, whole);
 

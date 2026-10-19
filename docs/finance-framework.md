@@ -273,8 +273,7 @@ also fixes:
 - **M8 (`RiskStatistics`)** is our own implementation of the empyrical definitions, with empyrical-reloaded
   0.7.0 as the offline oracle for its golden fixtures (nothing of it, or of LEAN's `Statistics.cs`, is in the
   repo). The observations are time-weighted returns between consecutive calendar month-ends (the first, partial
-  month gives none, and a first or last close that is not the month's last calendar day, or the last weekday
-  before a weekend month-end, is a stub that starts or ends no month; a month with no valuation fails `MissingValue` rather than being bridged into a two-month
+  month gives none; a return is taken only between two closes that are the month's last calendar day or the last weekday before a weekend month-end, so a mid-month close is a stub that breaks the chain and the returns beside it are left out; a month with no valuation fails `MissingValue` rather than being bridged into a two-month
   return). Volatility is the sample standard deviation (n − 1) × √12; downside deviation is √(mean of
   min(r, 0)² over *all* observations) × √12 at a target of 0, so up-months count as zero shortfall instead of
   leaving the denominator; fewer than two returns fails `NotEnoughHistory`. The three-year volatility is the last 36
