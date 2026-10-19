@@ -4,7 +4,7 @@ import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {Subject} from 'rxjs';
+import {of, Subject} from 'rxjs';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {
@@ -65,6 +65,9 @@ function setup() {
       historyCalls.push(call);
       return call;
     }),
+    // The bridge card under the hero has its own store and is not under test here: it settles at once
+    // with no bridge to draw, so its skeleton never counts as the page shimmering.
+    getNetWorthBridge: vi.fn(() => of({quality: 'UNAVAILABLE', reasons: [], currency: 'USD'})),
   };
   TestBed.configureTestingModule({
     providers: [

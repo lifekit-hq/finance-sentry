@@ -87,6 +87,29 @@ const HISTORY = [
   ...(split && {cashTotal: split[0], brokerageInvested: split[1], cryptoInvested: split[2]}),
 }));
 
+// The bridge over the default range (15 Jul 47,000 → 15 Sep 50,000), the residual within tolerance.
+const BRIDGE = {
+  from: '2026-07-15',
+  to: '2026-09-15',
+  startValue: 47_000,
+  endValue: 50_000,
+  savings: 1_900,
+  investmentReturn: 900,
+  market: 870,
+  income: 40,
+  fees: 10,
+  taxes: 0,
+  fxTranslation: 150,
+  revaluation: 0,
+  newlyLinked: 0,
+  unlinked: 0,
+  residual: 50,
+  residualAboveTolerance: false,
+  quality: 'COMPLETE',
+  reasons: [],
+  currency: 'USD',
+};
+
 async function openDashboard(page: Page): Promise<void> {
   await page.clock.install({time: FROZEN_NOW});
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
@@ -95,12 +118,14 @@ async function openDashboard(page: Page): Promise<void> {
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: HISTORY, hasHistory: true}))
   );
+  await page.route(`${API}/net-worth/bridge**`, route => route.fulfill(json(BRIDGE)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
   await mockAccounts(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
   await expect(page.getByTestId('investments-card-total')).toBeVisible();
+  await expect(page.getByTestId('net-worth-bridge-end')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.clock.runFor(CHART_SETTLE_MS);

@@ -1,0 +1,100 @@
+<cmn-card data-testid="net-worth-bridge">
+  <cmn-async-state
+    [status]="store.status()"
+    [errorMessage]="store.errorMessage()"
+    (retry)="store.retry()"
+    retryable
+  >
+    <div skeleton class="space-y-cmn-3">
+      <cmn-skeleton height="1rem" width="45%" />
+      <cmn-skeleton height="0.875rem" width="100%" />
+      <cmn-skeleton height="0.875rem" width="100%" />
+      <cmn-skeleton height="0.875rem" width="100%" />
+    </div>
+
+    <div class="flex items-baseline justify-between gap-cmn-2">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+        What moved net worth
+      </h2>
+      @if (store.headline(); as headline) {
+        <fns-headline-badge
+          [headline]="headline"
+          label="Net worth bridge"
+          data-testid="net-worth-bridge-quality"
+        />
+      }
+    </div>
+
+    @if (store.unavailableMessage(); as message) {
+      <p
+        class="mt-cmn-1 text-cmn-sm text-text-secondary"
+        data-testid="net-worth-bridge-unavailable"
+      >
+        {{ message }}
+      </p>
+    } @else if (store.headline(); as headline) {
+      <p class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="net-worth-bridge-window">
+        {{ headline.window.from | date: 'd MMM y' }} to {{ headline.window.to | date: 'd MMM y' }}
+      </p>
+
+      @if (store.degraded(); as degraded) {
+        <cmn-alert
+          [title]="degraded.reason"
+          class="mt-cmn-3 block"
+          variant="warning"
+          data-testid="net-worth-bridge-degraded"
+        >
+          {{ degraded.detail }}
+        </cmn-alert>
+      }
+
+      <!--
+        shortcut: the waterfall is drawn here with positioned bars; move it to a @lifekit-hq/ui waterfall
+        chart once the library has one. Every row reads as text, so the bars stay hidden from assistive tech.
+      -->
+      <ul class="mt-cmn-4 space-y-cmn-3" aria-label="Net worth bridge">
+        @for (step of store.steps(); track step.key) {
+          @let isDegradedResidual = step.kind === 'residual' && !!store.degraded();
+          <li [attr.data-testid]="'net-worth-bridge-' + step.key">
+            <div class="flex items-baseline justify-between gap-cmn-2 text-cmn-sm">
+              <span [class.font-semibold]="step.kind === 'total'" class="text-text-primary">
+                {{ step.label }}
+              </span>
+              <span
+                [class]="isDegradedResidual ? degradedAmountClass : amountClass[step.kind]"
+                class="tabular-nums"
+                data-testid="net-worth-bridge-amount"
+              >
+                @if (step.kind === 'total') {
+                  {{ step.amount | money: headline.currency }}
+                } @else {
+                  {{ step.amount | money: headline.currency : {signed: true} }}
+                }
+              </span>
+            </div>
+            @if (step.detail) {
+              <p class="text-cmn-xs text-text-secondary" data-testid="net-worth-bridge-detail">
+                {{ step.detail }}
+              </p>
+            }
+            <div class="relative mt-cmn-1 h-2 rounded-sm bg-surface-raised" aria-hidden="true">
+              @if (step.kind === 'total') {
+                <span
+                  [style.left.%]="step.offset"
+                  class="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-text-primary"
+                ></span>
+              } @else {
+                <span
+                  [class]="isDegradedResidual ? degradedBarClass : barClass[step.kind]"
+                  [style.left.%]="step.offset"
+                  [style.width.%]="step.width"
+                  class="absolute inset-y-0 min-w-0.5 rounded-sm"
+                ></span>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </cmn-async-state>
+</cmn-card>

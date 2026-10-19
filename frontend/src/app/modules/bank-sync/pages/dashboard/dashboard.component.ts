@@ -37,6 +37,7 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {InvestmentsCardComponent} from '../../../holdings/components/investments-card/investments-card.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
+import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {
   CASH_FLOW_SERIES_TYPES,
   HISTORY_RANGE_LABELS,
@@ -82,6 +83,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     InvestmentsCardComponent,
     MerchantCategoryPipe,
     MoneyPipe,
+    NetWorthBridgeComponent,
     RouterLink,
     SkeletonComponent,
   ],
@@ -312,6 +314,12 @@ const HISTORY_RANGES: ChipRowOption[] = [
               />
             </div>
           </cmn-card>
+
+          <!--
+            Why the hero's figure moved over the same range (M5): savings, investment return, currency
+            moves and accounts linked or removed, with whatever they leave unexplained on its own row.
+          -->
+          <fns-net-worth-bridge />
 
           <fns-investments-card />
 

@@ -31,6 +31,32 @@ const HISTORY = [
   cryptoInvested,
 }));
 
+/**
+ * The net-worth bridge over the two snapshots above (49,900 → 50,000): the lines sum to the change, and the
+ * 30 left unexplained sits inside the 0.2% tolerance, so the bridge is complete.
+ */
+export const NET_WORTH_BRIDGE = {
+  from: '2026-09-01',
+  to: '2026-09-15',
+  startValue: 49_900,
+  endValue: 50_000,
+  savings: 300,
+  investmentReturn: -150,
+  market: -120,
+  income: 10,
+  fees: 40,
+  taxes: 0,
+  fxTranslation: -80,
+  revaluation: 0,
+  newlyLinked: 0,
+  unlinked: 0,
+  residual: 30,
+  residualAboveTolerance: false,
+  quality: 'COMPLETE',
+  reasons: [],
+  currency: 'USD',
+};
+
 /** Everything Home reads, over the shared accounts and holdings mocks; the caller opens `/dashboard`. */
 export async function mockHome(page: Page): Promise<void> {
   await mockDossierApis(page);
@@ -39,6 +65,7 @@ export async function mockHome(page: Page): Promise<void> {
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: HISTORY, hasHistory: true}))
   );
+  await page.route(`${API}/net-worth/bridge**`, route => route.fulfill(json(NET_WORTH_BRIDGE)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
   await mockAccounts(page);
