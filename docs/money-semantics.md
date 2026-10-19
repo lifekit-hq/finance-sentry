@@ -1010,15 +1010,11 @@ are closed periods.
   total on every day and a long range shows the split only where it exists. A window with no split
   day at all keeps the old Banking / Brokerage / Crypto sleeve stack. The figure under the headline
   is labelled **Change** (last minus first `totalNetWorth` in the range, in amount and percent): it
-  is a change in net worth, savings and cash included, not a return. Beside it, **Invested change**
-  is the change in `brokerageInvested + cryptoInvested` from the first to the last day that has a
-  split in the range (percent of the starting invested value, omitted when that is 0). It is a change
-  in invested value, so deposits into the brokerage or a venue count in it - it is not a return - and
-  it is hidden when the range has fewer than two days with a split. It carries the headline's range
-  label when the split covers the whole range, and "since <first split date>" when the split starts
-  later. While scrubbing, it runs from the
-  first split day to the scrubbed day, and is hidden when the scrubbed day has no split. The
-  "At this pace" projection is untouched (built from savings, not from this line).
+  is a change in net worth, savings and cash included, not a return. There is no separate
+  invested-change line: the Home **Investments** card carries the invested book's figures instead
+  (its "Invested" header is the positions' value without the `cash` asset class, the same book as
+  `investedUsd` in §8 and the hero sub-line; contributions vs growth below). The "At this pace"
+  projection is untouched (built from savings, not from this line).
 - **Scope changes hide the change percentage**: `/net-worth/history` also returns `scopeChanges`
   (`source`, `kind` = `linked` | `removed`, `at` date, UTC) - the accounts or connections that
   entered or left the book on or after the first returned snapshot, collected from one
@@ -1031,7 +1027,7 @@ are closed periods.
   accounts only - their last update stands in for the deactivation time, so a later write to an
   already-deactivated account reads as a removal - because credentials record no deactivation time;
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
-  `CreatedAt` is re-stamped). The **Invested change** line is unaffected.
+  `CreatedAt` is re-stamped).
 - **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Investments tab's
   "Contributed vs growth" section; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
