@@ -1174,7 +1174,10 @@ controller applies the base currency. Where each line comes from:
   income less spending, counterparty and transfer corrected) over the days after the opening close through the
   closing one. The breakdown's invested bucket (bank money sent to a broker) is not savings: it reaches the
   sleeve as a contribution and the two meet in the residual, netting to zero for a transfer between two parts in
-  scope.
+  scope. Each account counts from its link day (`BankAccount.CreatedAt`) to its removal day (`UpdatedAt` of an
+  inactive row): a transaction dated before the link is imported history whose balance reaches the bridge as
+  newly linked, and one dated after the removal belongs to a balance that left as unlinked, so neither is savings.
+  An account the breakdown cannot place keeps all its transactions.
 - **Investment return**: each sleeve's own growth split (`GetSleeveGrowthQuery`, brokerage and crypto, over the
   same window): market = growth − income + fees + taxes, so the engine's market + income − fees − taxes is that
   growth again. A sleeve whose flows are unknown contributes nothing (its whole change stays in the residual) and

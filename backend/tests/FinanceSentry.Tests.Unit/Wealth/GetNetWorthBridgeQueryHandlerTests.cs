@@ -1,13 +1,21 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Fx;
+using FinanceSentry.Modules.BankSync.Application.Queries;
+using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
 
@@ -77,11 +85,25 @@ public class GetNetWorthBridgeQueryHandlerTests
         => _sleeves.Setup(h => h.Handle(It.Is<GetSleeveGrowthQuery>(q => q.Sleeve == sleeve), It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
-    private Task<NetWorthBridgeResponse> Handle()
+    private Task<NetWorthBridgeResponse> Handle(
+        IHonestMonthlyFlowReader? flow = null, params IAccountScopeChangeReader[] moreLinks)
         => new GetNetWorthBridgeQueryHandler(
-                _snapshots.Object, _sleeves.Object, _honestFlow.Object, _accounts.Object, _transactions.Object, _rates.Object,
-                [_bankLinks.Object, _brokerageLinks.Object])
+                _snapshots.Object, _sleeves.Object, flow ?? _honestFlow.Object, _accounts.Object, _transactions.Object, _rates.Object,
+                [_bankLinks.Object, _brokerageLinks.Object, .. moreLinks])
             .Handle(new GetNetWorthBridgeQuery(UserId), CancellationToken.None);
+
+    private Mock<IAccountScopeChangeReader> ManualLinks(DateOnly day)
+    {
+        var links = new Mock<IAccountScopeChangeReader>();
+        links.SetupGet(r => r.WealthSourceId).Returns(WealthSourceIds.Manual);
+        links.Setup(r => r.GetChangesSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("manual", AccountScopeChangeKinds.Linked, day.ToDateTime(new TimeOnly(10, 0)))]);
+        return links;
+    }
+
+    private void BankRemovedOn(DateOnly day)
+        => _bankLinks.Setup(r => r.GetChangesSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("truelayer", AccountScopeChangeKinds.Removed, day.ToDateTime(new TimeOnly(10, 0)))]);
 
     private static decimal? Explained(NetWorthBridgeResponse r)
         => r.Savings + r.InvestmentReturn + r.FxTranslation + r.Revaluation + r.NewlyLinked - r.Unlinked;
@@ -221,4 +243,131 @@ public class GetNetWorthBridgeQueryHandlerTests
         result.Quality.Should().Be(HeadlineQuality.Unavailable);
         result.Reasons.Should().ContainSingle(r => r.Code == HeadlineReasonCode.ShortHistory);
     }
+
+    [Fact]
+    public async Task ABankAccountRemovedMidWindow_TakesItsBalanceOutAsUnlinked_WithNoResidual()
+    {
+        // 300 of the 1,000 banking balance left with an account removed on day 5; nothing else moved.
+        BankRemovedOn(Day(5));
+        Setup(0m, Close(0, banking: 1_000m), Close(4, banking: 1_000m), Close(6, banking: 700m), Close(10, banking: 700m));
+
+        var result = await Handle();
+
+        result.Unlinked.Should().Be(300m);
+        result.NewlyLinked.Should().Be(0m);
+        result.Residual.Should().Be(0m);
+        result.ResidualAboveTolerance.Should().BeFalse();
+        result.Reasons.Should().Contain(r => r.Code == HeadlineReasonCode.ScopeChanged);
+        (Explained(result) + result.Residual).Should().Be(result.EndValue - result.StartValue);
+    }
+
+    [Fact]
+    public async Task ABankingPartEmptiedByARemoval_TakesItsLastValueOutAsUnlinked()
+    {
+        // The only account is removed on day 5: the part reads zero from the day after, and no withdrawal explains that.
+        BankRemovedOn(Day(5));
+        Setup(0m, Close(0, banking: 1_000m), Close(4, banking: 1_000m), Close(6, banking: 0m), Close(10, banking: 0m));
+
+        var result = await Handle();
+
+        result.Unlinked.Should().Be(1_000m);
+        result.Residual.Should().Be(0m);
+        result.ResidualAboveTolerance.Should().BeFalse();
+        (Explained(result) + result.Residual).Should().Be(result.EndValue - result.StartValue);
+    }
+
+    [Fact]
+    public async Task AManualHoldingAddedMidWindow_BringsItsFirstValueInAsNewlyLinked_AndRevaluesAfterwards()
+    {
+        // The manual part is empty until the day-5 link; its first close of 200 is the linked value, the later 30 a revaluation.
+        var manual = ManualLinks(Day(5));
+        Setup(
+            0m,
+            Close(0, banking: 1_000m),
+            Close(4, banking: 1_000m),
+            Close(6, banking: 1_000m, other: 200m),
+            Close(10, banking: 1_000m, other: 230m));
+
+        var result = await Handle(moreLinks: manual.Object);
+
+        result.NewlyLinked.Should().Be(200m);
+        result.Revaluation.Should().Be(30m);
+        result.Residual.Should().Be(0m);
+        result.ResidualAboveTolerance.Should().BeFalse();
+        (Explained(result) + result.Residual).Should().Be(result.EndValue - result.StartValue);
+    }
+
+    [Fact]
+    public async Task AManualHoldingRemovedMidWindow_TakesItsLastValueOutAsUnlinked()
+    {
+        var manual = ManualLinks(Day(5));
+        Setup(
+            0m,
+            Close(0, banking: 1_000m, other: 300m),
+            Close(4, banking: 1_000m, other: 300m),
+            Close(6, banking: 1_000m),
+            Close(10, banking: 1_000m));
+
+        var result = await Handle(moreLinks: manual.Object);
+
+        result.Unlinked.Should().Be(300m);
+        result.Revaluation.Should().Be(0m);
+        result.Residual.Should().Be(0m);
+        (Explained(result) + result.Residual).Should().Be(result.EndValue - result.StartValue);
+    }
+
+    [Fact]
+    public async Task ABankAccountLinkedMidWindowWithImportedHistory_CountsOnlyItsFlowsFromTheLinkOnInSavings()
+    {
+        // B is linked on day 5 with 500 and a 90-day import: a 300 salary dated day 2 predates the link, so that history is
+        // part of the balance that arrives as newly linked, not savings. A's own 100 and 50 are the window's savings.
+        await using var db = new BankSyncDbContext(
+            new DbContextOptionsBuilder<BankSyncDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options,
+            NoCurrentUser.Instance);
+        var held = BankAccountRow(Day(-100).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        var linked = BankAccountRow(Day(5).ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc));
+        db.BankAccounts.AddRange(held, linked);
+        await db.SaveChangesAsync();
+        var breakdown = new Mock<IFlowBreakdownService>();
+        breakdown.Setup(b => b.GetRangeBreakdownAsync(
+                UserId, Day(1), Day(10), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FlowBreakdown(string.Empty,
+            [
+                FlowItem(held, Day(3), 100m),
+                FlowItem(linked, Day(2), 300m),
+                FlowItem(held, Day(8), 50m),
+            ]));
+        _bankLinks.Setup(r => r.GetChangesSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("truelayer", AccountScopeChangeKinds.Linked, Day(5).ToDateTime(new TimeOnly(12, 0)))]);
+        _snapshots.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                Close(0, banking: 1_000m),
+                Close(4, banking: 1_100m),
+                Close(6, banking: 1_600m),
+                Close(10, banking: 1_650m),
+            ]);
+        var flow = new HonestMonthlyFlowReader(
+            Mock.Of<IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>>>(), breakdown.Object, db);
+
+        var result = await Handle(flow);
+
+        result.Savings.Should().Be(150m);
+        result.NewlyLinked.Should().Be(500m);
+        result.Residual.Should().Be(0m);
+        result.ResidualAboveTolerance.Should().BeFalse();
+        result.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.ResidualAboveTolerance);
+        (Explained(result) + result.Residual).Should().Be(result.EndValue - result.StartValue);
+    }
+
+    private static BankAccount BankAccountRow(DateTime createdAt)
+    {
+        var account = new BankAccount(UserId, Guid.NewGuid().ToString("N"), "Bank", "checking", "1234", "Owner", "USD", UserId, "truelayer");
+        typeof(Entity).GetProperty(nameof(Entity.Id))!.SetValue(account, Guid.NewGuid());
+        typeof(Entity).GetProperty(nameof(Entity.CreatedAt))!.SetValue(account, createdAt);
+        return account;
+    }
+
+    private static FlowBreakdownItem FlowItem(BankAccount account, DateOnly day, decimal usd)
+        => new(Guid.NewGuid(), account.Id, "Bank", "1234", "USD", usd, usd, day.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc),
+            "salary", null, null, "in", FlowBuckets.Income, null, null);
 }

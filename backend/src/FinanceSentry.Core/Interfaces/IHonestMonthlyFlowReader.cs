@@ -18,7 +18,8 @@ public interface IHonestMonthlyFlowReader
     /// <summary>
     /// The same honest net (inflow less outflow, counterparty and transfer corrected, USD) over the UTC days
     /// <paramref name="from"/> through <paramref name="to"/>, both inclusive: the savings line of the net-worth
-    /// bridge (M5) for a window that is not a whole month.
+    /// bridge (M5) for a window that is not a whole month. An account counts only from its link day to its removal day: its
+    /// earlier imported history and any later transactions reach the bridge through its newly linked / unlinked line.
     /// </summary>
     Task<decimal> GetWindowNetAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default);
 }

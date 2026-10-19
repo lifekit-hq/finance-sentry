@@ -101,4 +101,54 @@ public class ScopeLinksTests
         bridge.Values.Select(v => v.Date).Should().Equal(Day(0), Day(1));
         bridge.VanishedDays.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Bridge_ALinkThatRaisedTheValue_IsLinkedIn()
+    {
+        var deposit = new ClassifiedFlow(Day(3), FlowClass.ExternalInflow, 10m);
+
+        var bridge = ScopeLinks.Bridge(
+            [Value(0, 100m), Value(1, 102m), Value(2, 140m), Value(3, 162m), Value(4, 170m)], [deposit], [Day(2)]);
+
+        bridge.LinkedInUsd.Should().Be(50m);
+        bridge.LinkedOutUsd.Should().Be(0m);
+        bridge.NewlyLinkedUsd.Should().Be(50m);
+    }
+
+    [Fact]
+    public void Bridge_ARemovalThatLoweredTheValue_IsLinkedOut_AndNewlyLinkedIsNegative()
+    {
+        var bridge = ScopeLinks.Bridge([Value(0, 200m), Value(1, 200m), Value(2, 150m), Value(3, 120m), Value(4, 121m)], [], [Day(2)]);
+
+        bridge.LinkedInUsd.Should().Be(0m);
+        bridge.LinkedOutUsd.Should().Be(80m);
+        bridge.NewlyLinkedUsd.Should().Be(-80m);
+        bridge.Flows.Should().Contain(new ClassifiedFlow(Day(3), FlowClass.ExternalOutflow, 80m));
+    }
+
+    [Fact]
+    public void Bridge_ALinkAndARemoval_KeepBothSidesAndNetThemInNewlyLinked()
+    {
+        var deposit = new ClassifiedFlow(Day(3), FlowClass.ExternalInflow, 10m);
+
+        var bridge = ScopeLinks.Bridge(
+            [Value(0, 100m), Value(1, 102m), Value(2, 140m), Value(3, 162m), Value(4, 170m), Value(5, 150m), Value(6, 100m)],
+            [deposit], [Day(2), Day(5)]);
+
+        bridge.LinkedInUsd.Should().Be(50m);
+        bridge.LinkedOutUsd.Should().Be(70m);
+        bridge.NewlyLinkedUsd.Should().Be(-20m);
+    }
+
+    [Fact]
+    public void Bridge_ALinkStretchWhoseChangeTheRecordedFlowsExplain_IsNeitherLinkedInNorOut()
+    {
+        var deposit = new ClassifiedFlow(Day(3), FlowClass.ExternalInflow, 60m);
+
+        var bridge = ScopeLinks.Bridge([Value(0, 100m), Value(1, 102m), Value(2, 140m), Value(3, 162m)], [deposit], [Day(2)]);
+
+        bridge.LinkedInUsd.Should().Be(0m);
+        bridge.LinkedOutUsd.Should().Be(0m);
+        bridge.ScopeChanged.Should().BeTrue();
+    }
 }
