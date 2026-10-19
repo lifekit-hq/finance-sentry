@@ -72,7 +72,7 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   valued 1:1 and logged. It counts toward the venue's value and net worth, and in
   `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
   position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Accounts accordions
-  groups it in the **Cash** slice (with broker cash, below) with no unit price
+  group it in the **Cash** row (with broker cash, below) with no unit price
   (`holdings.computed.ts`).
 - **Cost basis — Binance** is reconstructed from the full fill history
   (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
@@ -358,8 +358,8 @@ already inside the institution total). Monobank cards and pockets are all return
 gathers them under one collapsed `N hidden · $X` row at the end of the institution (`HiddenCount` and signed
 `HiddenTotal`, formatted by `MoneyUtils.format` in the base currency), closed by default and remembered per device.
 The three preferences are edited in Settings → Preferences, saved with the profile; the threshold must be above 0 and
-at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts and Investments
-apply them.
+at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts applies
+them.
 
 `/crypto/holdings` and `/brokerage/holdings` (the Accounts accordions and the Home Investments card) annotate each position with `HiddenReason` the
 same way, through the same `Classify` (`AssetVisibility.ClassifyPosition` wraps it). Their DTOs are in USD, so the
