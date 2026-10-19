@@ -392,6 +392,20 @@ describe('holdingsComputed hidden positions', () => {
   });
 });
 
+describe('holdingsComputed invested total', () => {
+  it('leaves cash out of the invested total but keeps it in the position total', () => {
+    const c = build([
+      position({symbol: 'AAA', currentValue: 300, assetClass: 'equity'}),
+      position({symbol: 'BTC', currentValue: 100, assetClass: 'crypto'}),
+      position({symbol: 'USD Cash', currentValue: 50, assetClass: 'cash'}),
+      position({symbol: 'USD', currentValue: 25, assetClass: 'cash', isVenueCash: true}),
+    ]);
+
+    expect(c.investedPositionsValue()).toBe(400);
+    expect(c.totalPositionsValue()).toBe(475);
+  });
+});
+
 describe('holdingsComputed top holdings', () => {
   const stock = (
     symbol: string,

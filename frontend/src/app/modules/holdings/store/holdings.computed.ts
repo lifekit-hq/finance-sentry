@@ -131,6 +131,13 @@ export function holdingsComputed(store: StateSignals) {
   const totalPositionsValue = computed(() =>
     visiblePositions().reduce((sum, p) => sum + p.currentValue, 0)
   );
+  // Everything but the cash asset class (broker cash, venue fiat): the book's `investedUsd`
+  // (money-semantics §8), so Home's card and its hero sub-line state one figure.
+  const investedPositionsValue = computed(() =>
+    visiblePositions()
+      .filter(p => p.assetClass !== 'cash')
+      .reduce((sum, p) => sum + p.currentValue, 0)
+  );
 
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
     const positions = visiblePositions();
@@ -201,6 +208,7 @@ export function holdingsComputed(store: StateSignals) {
     isProviderFeedFailed,
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
+    investedPositionsValue,
     // The total's record: its badge, and N/A (never 0) when every feed failed.
     totalHeadline: computed((): Nullable<Headline> => store.headline()),
     isTotalUnavailable: computed(
