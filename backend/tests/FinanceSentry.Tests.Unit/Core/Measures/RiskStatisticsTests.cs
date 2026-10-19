@@ -213,6 +213,63 @@ public class RiskStatisticsTests
         result.MaxDrawdown.Value.Should().BeNull();
     }
 
+    [Fact]
+    public void TrailingMidMonthClose_IsAStubAndIsNotAMonthlyReturn()
+    {
+        var values = MonthEnds(FixtureA);
+        values.Add(Close(Day(2024, 1, 19), 5000m));
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Select(m => m.Return).Should().Equal(FixtureA);
+        ((double)result.Volatility.Value!.Value).Should().BeApproximately(0.07669301260100676, Tolerance);
+        result.MonthlyReturns[^1].To.Should().Be(Day(2023, 12, 31));
+    }
+
+    [Fact]
+    public void LeadingMidMonthClose_IsAStubAndIsNotAMonthlyReturn()
+    {
+        var values = MonthEnds(FixtureA);
+        values.Insert(0, Close(Day(2022, 12, 10), 5000m));
+        values.RemoveAt(1);
+        values.Insert(1, Close(Day(2022, 12, 20), 1000m));
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Should().HaveCount(FixtureA.Length - 1);
+        result.MonthlyReturns[0].From.Should().Be(Day(2023, 1, 31));
+        result.MonthlyReturns.Select(m => m.Return).Should().Equal(FixtureA.Skip(1));
+    }
+
+    [Fact]
+    public void StubsDoNotCountTowardTheThirtySixMonthThreshold()
+    {
+        var values = MonthEnds(FixtureB.Take(35).ToArray());
+        values.Add(Close(Day(2025, 12, 15), 1m));
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Should().HaveCount(35);
+        result.ThreeYearVolatility.Failure.Should().Be(MeasureFailure.NotEnoughHistory);
+    }
+
+    [Fact]
+    public void WeekendMonthEnd_StillEndsItsMonth()
+    {
+        // 31 Mar 2023 is a Friday; 30 Jun 2023 a Friday; 31 Jul 2022 a Sunday, so Friday 29 Jul ends July.
+        List<ValuePoint> values =
+        [
+            Close(Day(2022, 7, 29), 1000m),
+            Close(Day(2022, 8, 31), 1010m),
+            Close(Day(2022, 9, 30), 1020m),
+        ];
+
+        var result = RiskStatistics.Measure(values, []);
+
+        result.MonthlyReturns.Should().HaveCount(2);
+        result.MonthlyReturns[0].From.Should().Be(Day(2022, 7, 29));
+    }
+
     // Month-end closes that realise the given monthly returns from 1,000 at the close of 31 Dec 2022.
     private static List<ValuePoint> MonthEnds(decimal[] returns) => MonthEndsWithFlows(returns, []);
 

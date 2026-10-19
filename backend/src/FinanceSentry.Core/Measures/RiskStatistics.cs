@@ -41,7 +41,8 @@ public static class RiskStatistics
     private const int MinimumObservations = 2;
 
     /// <param name="values">The scope's closes, any order. A month's return runs from the last valued close of
-    /// the month before to the last valued close of that month, so the first, partial month gives none.</param>
+    /// the month before to the last valued close of that month, so the first, partial month gives none. A first
+    /// or last close that does not end its month (see <c>EndsItsMonth</c>) is a stub and starts or ends no month.</param>
     /// <param name="flows">Classified flows; only external ones dated inside the window are used.</param>
     public static RiskResult Measure(IReadOnlyList<ValuePoint> values, IReadOnlyList<ClassifiedFlow> flows)
     {
@@ -55,6 +56,10 @@ public static class RiskStatistics
             .GroupBy(p => (p.Date.Year, p.Date.Month))
             .Select(g => g.Last())
             .ToList();
+        if (monthEnds.Count > 0 && !EndsItsMonth(monthEnds[0].Date))
+            monthEnds.RemoveAt(0);
+        if (monthEnds.Count > 0 && !EndsItsMonth(monthEnds[^1].Date))
+            monthEnds.RemoveAt(monthEnds.Count - 1);
         var months = new List<SubPeriodReturn>();
         for (var i = 1; i < monthEnds.Count; i++)
         {
@@ -87,6 +92,19 @@ public static class RiskStatistics
                 : MeasuredRate.Fails(MeasureFailure.InsufficientData),
             whole.MissingValueDays,
             whole.UnexplainedDays);
+    }
+
+    // A close ends its month when only weekend days follow it there; a holiday gap cannot be verified, so a
+    // first or last close before one is a stub, not a month-end.
+    private static bool EndsItsMonth(DateOnly date)
+    {
+        for (var day = date.AddDays(1); day.Month == date.Month; day = day.AddDays(1))
+        {
+            if (day.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+                return false;
+        }
+
+        return true;
     }
 
     private static int MonthIndex(DateOnly date) => (date.Year * MonthsPerYear) + date.Month;
