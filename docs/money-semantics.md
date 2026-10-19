@@ -913,8 +913,9 @@ are closed periods.
   wealth summary lists the entries as an "other" category. Bank-side charges to the platform stay spending
   (§5); an entry joins the history as a scope change (`linked`, on its creation day: the change across that
   day keeps its amount and withholds the percent with `SCOPE_CHANGED`), and a later edit is a revaluation
-  of the same entry. The app's form records the as-of date as the day of the save; a deleted entry is
-  removed outright, so its removal is not a reported scope change.
+  of the same entry. The app's form records the as-of date as the day of the save. A deleted entry is
+  soft-deleted (`RemovedAt`): current reads exclude it, and it leaves the history as a `removed` scope change
+  on its removal day (`ManualHoldingScopeChangeReader`), so the drop is not reported as a decline.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point
