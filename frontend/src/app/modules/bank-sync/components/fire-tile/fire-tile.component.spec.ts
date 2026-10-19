@@ -21,6 +21,11 @@ function fire(overrides: Partial<FireProjection> = {}): FireProjection {
     monthsToFire: 150.2,
     hasStaleSleeves: false,
     baseCurrency: 'USD',
+    realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+    monthsToFireRange: {low: 120.4, central: 150.2, high: 196.8},
+    earliestDate: '2038-11-26',
+    latestDate: '2042-10-26',
+    completeMonths: 6,
     ...overrides,
   };
 }
@@ -43,9 +48,14 @@ describe('FireTileComponent', () => {
     expect(el.querySelector('[data-testid="fire-runway"]')?.textContent).toContain(
       '12 years 7 months'
     );
+    expect(el.querySelector('[data-testid="fire-runway"]')?.textContent).toContain(
+      'between Nov 2038 and Oct 2042'
+    );
     const assumptions = el.querySelector('[data-testid="fire-assumptions"]')?.textContent ?? '';
     expect(assumptions).toContain('4% safe withdrawal rate');
     expect(assumptions).toContain('5% real (after-inflation) annual return');
+    expect(assumptions).toContain('the date range uses 2% to 8%');
+    expect(assumptions).toContain('Hypothetical, not a guarantee.');
   });
 
   it('explains the missing date when nothing is being saved', () => {

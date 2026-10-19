@@ -4,6 +4,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using Microsoft.AspNetCore.Authorization;
@@ -17,8 +18,10 @@ public class WealthController(
     IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
     IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> sleeveGrowthHandler,
+    IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> netWorthProjectionHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> _netWorthProjectionHandler = netWorthProjectionHandler ?? throw new ArgumentNullException(nameof(netWorthProjectionHandler));
     private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
@@ -113,7 +116,7 @@ public class WealthController(
     }
 
     // Same rule as the summary: the projection speaks USD, the base currency is applied once, here.
-    // Rates and the date are untouched; only the five money amounts are re-expressed.
+    // Rates, months and dates are untouched; only the four money amounts are re-expressed.
     private static FireProjectionResponse InBaseCurrency(FireProjectionResponse fire, string baseCurrency)
     {
         if (baseCurrency == "USD")
@@ -126,6 +129,36 @@ public class WealthController(
             CurrentNetWorth = Fx(fire.CurrentNetWorth),
             MonthlySavings = Fx(fire.MonthlySavings),
             AnnualSpend = Fx(fire.AnnualSpend),
+            BaseCurrency = baseCurrency,
+        };
+    }
+
+    /// <summary>
+    /// The twelve-month net-worth projection (M10): a range at the shared low / central / high return assumption,
+    /// with the inputs that produced it: <c>GET /api/v1/wealth/projection</c>.
+    /// </summary>
+    [HttpGet("projection")]
+    public async Task<IActionResult> GetNetWorthProjection(CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _netWorthProjectionHandler.Handle(new GetNetWorthProjectionQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    private static NetWorthProjectionResponse InBaseCurrency(NetWorthProjectionResponse projection, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return projection with { BaseCurrency = baseCurrency };
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        return projection with
+        {
+            CurrentNetWorth = Fx(projection.CurrentNetWorth),
+            MonthlySavings = Fx(projection.MonthlySavings),
+            ProjectedNetWorth = projection.ProjectedNetWorth is { } range
+                ? new ProjectionRange(Fx(range.Low), Fx(range.Central), Fx(range.High))
+                : null,
             BaseCurrency = baseCurrency,
         };
     }

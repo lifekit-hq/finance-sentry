@@ -21,6 +21,11 @@ const PROJECTION: FireProjection = {
   monthsToFire: 150.2,
   hasStaleSleeves: false,
   baseCurrency: 'USD',
+  realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+  monthsToFireRange: {low: 120.4, central: 150.2, high: 196.8},
+  earliestDate: '2038-11-26',
+  latestDate: '2042-10-26',
+  completeMonths: 6,
 };
 
 describe('FireStore', () => {

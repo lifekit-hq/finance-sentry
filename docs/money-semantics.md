@@ -9,7 +9,7 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
+Last verified: 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
 2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
 2026-10-15.
 
@@ -376,9 +376,9 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
 - Every DTO crossing an aggregation boundary carries a `…Usd` field; aggregations sum only
   that field.
 - **Presentation currency (#851).** Aggregation stays USD. The dashboard (`GET dashboard/aggregated`),
-  net-worth history, wealth-summary and FIRE-projection (`GET wealth/fire`) controllers re-express those USD figures in the profile
+  net-worth history, wealth-summary and projection (`GET wealth/fire`, `GET wealth/projection`) controllers re-express those USD figures in the profile
   `baseCurrency` once, at the response boundary (`CurrencyConverter.FromUsd`), and return the code
-  (`baseCurrency` / `currency`; FIRE amounts carry no `…Usd` name and are plain base-currency amounts). USD, an unset profile, or a currency with no rate (e.g. BTC)
+  (`baseCurrency` / `currency`; projection amounts carry no `…Usd` name and are plain base-currency amounts). USD, an unset profile, or a currency with no rate (e.g. BTC)
   resolves to USD (`CurrencyConverter.ResolveBase`). The `…Usd` field names are historical: on
   those responses they hold base-currency amounts. MCP tools and the Telegram FIRE brief read the
   handlers directly and stay USD.
@@ -1015,8 +1015,8 @@ are closed periods.
   is a change in net worth, savings and cash included, not a return. There is no separate
   invested-change line: the Home **Investments** card carries the invested book's figures instead
   (its "Invested" header is the positions' value without the `cash` asset class, the same book as
-  `investedUsd` in §8 and the hero sub-line; contributions vs growth below). The "At this pace"
-  projection is untouched (built from savings, not from this line).
+  `investedUsd` in §8 and the hero sub-line; contributions vs growth below). The twelve-month
+  projection is untouched (built from savings, not from this line; §11).
 - **Scope changes hide the change percentage**: `/net-worth/history` also returns `scopeChanges`
   (`source`, `kind` = `linked` | `removed`, `at` date, UTC) - the accounts or connections that
   entered or left the book on or after the first returned snapshot, collected from one
@@ -1444,35 +1444,69 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   - **In the brief.** The same bullet carries `Holdings-based return X vs S&P 500 price return Y`, or
     `Holdings-based return N/A (<reason>)` when there is no number.
 
-## 11. FIRE projection (#433)
+## 11. Projections: the twelve-month figure and FIRE (#433, M10)
 
-`GET /wealth/fire` (`GetFireProjectionQuery`, math in `FireCalculator`) projects the date net worth
-reaches the financial-independence target. Computed on read; nothing is persisted.
+Both projections run on one engine, `Projection` (`FinanceSentry.Core/Measures/Projection.cs`, M10), and read
+their inputs through one reader, `ProjectionInputsReader` (Wealth module), so they share the assumption set,
+the savings path and the starting net worth (decision C8; gap G7 closed). Computed on read; nothing is persisted.
 
 - **Inputs.** The latest net-worth snapshot (§8) and the per-user monthly flow from
   `IHonestMonthlyFlowReader` (the counterparty- and transfer-corrected flows of §5/§5.1, USD per §3).
-  Only COMPLETE months in the trailing six count (the in-progress month is dropped); fewer than 3
-  gives `InsufficientHistory` and no projection.
+  Only COMPLETE months in the trailing six count (the in-progress month is dropped); fewer than 3, or no
+  snapshot, gives `InsufficientHistory` and no projection.
+- **Savings path** = the median of the complete months' `NetUsd`. Even-length samples average the two
+  middle values. The response carries how many complete months it was taken over (`completeMonths`).
+- **The assumption set** (`ProjectionAssumptions`) is per-user (`IUserFireAssumptionsReader`), defaulting
+  to a 4% safe withdrawal rate and a 5% real annual return. Both the Settings form and `PUT /profile`
+  (`UpdateProfileCommandValidator`, 400 when out of range) bound them to 0.5-10% and 0-15%.
+- **The return is a range** (`realAnnualReturnRange`): low / central / high = the person's return − 3
+  points / the return / + 3 points, the low bound floored at 0% real (and never above the central one).
+  On the defaults that is 2% / 5% / 8%. The three-point spread is the UK FCA's (COBS 13 Annex 2 lower,
+  intermediate and higher projection rates, 2% / 5% / 8%); the US standards the framework cites (FINRA
+  2210(d)(1)(F) / 2214, the DOL lifetime income illustration) fix how a projection is disclosed, not its
+  bounds. The withdrawal rate is a single value, not a range.
+- **Compounding.** Every projection compounds the current balance and level monthly contributions at the
+  real return converted to a monthly rate (`(1 + r)^(1/12) − 1`): after `n` months the value is
+  `NW·(1 + rm)^n + c·((1 + rm)^n − 1) / rm`, or `NW + c·n` at a zero return. The return is real, so every
+  projected figure is in today's money.
+- **Disclosure.** Each projection states its assumptions in words next to it, with the range and
+  "Hypothetical, not a guarantee." (`PROJECTION_DISCLOSURE` in `projection.utils.ts`; the FIRE brief ends
+  with the same sentence).
+- **Currency.** The handlers compute in USD; `WealthController` re-expresses the amounts in the profile base
+  currency and returns `baseCurrency` (§3). Rates and month counts are not converted. The monthly brief
+  reads the FIRE handler directly and stays USD.
+- `HasStaleSleeves` is true on both when any of the latest snapshot's sources is stale (`STALE_SOURCE` on
+  its per-source rows, or `StaleSleeves` on a snapshot taken before them, §8). Neither projection carries
+  a headline record yet (finance-framework §3.6). Both tiles show a warning notice while it is set (the
+  twelve-month line only while it shows a figure).
+
+### Twelve-month projection (dashboard hero)
+
+`GET /wealth/projection` (`GetNetWorthProjectionQuery`) returns the net worth twelve months out
+(`projectedNetWorth`: low / central / high) from the latest snapshot plus the savings path, compounded at
+each of the three returns. A negative savings path still projects: the range shows the drawdown. The hero
+reads "In 12 months: about $X ($low to $high)" with the assumptions line beneath it
+(`fns-net-worth-projection`); `InsufficientHistory` renders nothing in the line's fixed slot. Before M10
+this figure was computed in the browser as median monthly savings × 12 with no market return.
+
+### FIRE projection
+
+`GET /wealth/fire` (`GetFireProjectionQuery`, math in `Projection.FinancialIndependence`) projects the date
+net worth reaches the financial-independence target.
+
 - **Annual spend** = 12 × the median of the complete months' `OutflowUsd` (total honest outflow, the
-  same figure the savings rate uses). **Monthly savings** = the median of their `NetUsd`. Even-length
-  samples average the two middle values.
+  same figure the savings rate uses).
 - **Target** = annual spend ÷ safe withdrawal rate. A non-positive rate is guarded to a zero target
   (reads as already reached).
-- **Assumptions** are per-user (`IUserFireAssumptionsReader`), defaulting to a 4% safe withdrawal rate
-  and a 5% real annual return. Both the Settings form and `PUT /profile`
-  (`UpdateProfileCommandValidator`, 400 when out of range) bound them to 0.5-10% and 0-15%.
 - **Outcome.** Net worth ≥ target → `AlreadyReached`; else savings ≤ 0 → `NotSaving` (no date); else
-  `Projected`. Months to target solve the future value of the current balance plus level monthly
-  contributions, both compounding at the real return converted to a monthly rate
-  (`(1 + r)^(1/12) − 1`): `ln((target·rm + c) / (NW·rm + c)) / ln(1 + rm)`. A zero return, or a
-  non-positive denominator (deeply negative net worth), falls back to `(target − NW) / c`. The date is
-  today plus the months rounded up.
-- Unlike the 12-month net-worth projection tile, contributions compound here, because at a FIRE
-  horizon (years to decades) ignoring compounding is most of the answer.
-- `HasStaleSleeves` is true when any of the latest snapshot's sources is stale (`STALE_SOURCE` on its
-  per-source rows, or `StaleSleeves` on a snapshot taken before them, §8): the figure is shown, with a notice.
-- **Currency.** The handler computes in USD; `WealthController` re-expresses the five amounts in the profile base currency and returns `baseCurrency` (§3). The monthly brief reads the handler directly and stays USD.
+  `Projected`. Months to target solve the compounding formula above for `n` at each of the three returns:
+  `ln((target·rm + c) / (NW·rm + c)) / ln(1 + rm)`. A zero return, or a non-positive denominator (deeply
+  negative net worth), falls back to `(target − NW) / c`. A date is today plus the months rounded up.
+  `projectedDate` / `monthsToFire` are the central return's; `monthsToFireRange`, `earliestDate` (high
+  return) and `latestDate` (low return) the range. The tile reads "About X from now: between <earliest>
+  and <latest> at a 2% to 8% return", collapsing to the central figure when both ends fall in one month.
 - **Monthly brief.** `FireBriefJob` (1st of the month, 09:00 UTC) reads this same projection per user and
   raises an Info alert with a 10-cell gauge (`NetWorth ÷ Target`, clamped to 0-100%) plus the same
-  assumptions in words. `InsufficientHistory` sends nothing; the job reads the snapshot with no person
-  in scope, so the query uses the `…Unscoped…` snapshot read keyed on the user id.
+  assumptions in words, the months range and the disclosure. `InsufficientHistory` sends nothing; the job
+  reads the snapshot with no person in scope, so the reader uses the `…Unscoped…` snapshot read keyed on
+  the user id.

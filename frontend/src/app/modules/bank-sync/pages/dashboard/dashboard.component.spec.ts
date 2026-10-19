@@ -41,7 +41,6 @@ function fakeStore(
     isFirstLoad: signal(false),
     isHistoryFirstLoad: signal(false),
     hasCashFlow: signal(false),
-    hasProjection: signal(false),
     historyHasHistory: signal(true),
     errorMessage: signal(''),
     hasError: signal(false),

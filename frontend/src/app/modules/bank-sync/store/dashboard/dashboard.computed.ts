@@ -21,10 +21,6 @@ import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
-  MIN_PROJECTION_MONTHS,
-  PROJECTION_HORIZON_MONTHS,
-} from '../../constants/dashboard/dashboard.constants';
-import {
   type DashboardData,
   type HistoryRange,
   type MonthlyFlow,
@@ -107,24 +103,7 @@ const INCOME_LANDED_FRACTION = 0.5;
 // Need at least a start and end snapshot to state a change over the window.
 const MIN_POINTS_FOR_DELTA = 2;
 
-// An even-length sample has two middle values; the median is their average.
-const MEDIAN_HALVES = 2;
-
-/**
- * Median of a non-empty sample. The projection uses this rather than a mean because the
- * complete-month window is only a handful of months deep and one artifact month — June 2026
- * carries a duplicated salary (#400 audit) — moves a mean by hundreds of dollars a month
- * while leaving a median where the typical month actually sits.
- */
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / MEDIAN_HALVES);
-  return sorted.length % MEDIAN_HALVES === 0
-    ? (sorted[mid - 1] + sorted[mid]) / MEDIAN_HALVES
-    : sorted[mid];
-}
-
-// Cents on a twelve-month forecast are noise.
+// Cents on a headline amount are noise.
 const WHOLE_DOLLARS = {maxFractionDigits: 0} as const;
 const CHANGE_PERCENT_DIGITS = 1;
 
@@ -241,20 +220,6 @@ export function dashboardComputed(store: StateSignals) {
       ? null
       : savingsRateOf(totals);
   });
-
-  // Forecasting the net-worth line itself would be forecasting the market — most of the book
-  // is market-marked and its daily swings dwarf a month of savings. So the projection is built
-  // from what the user actually controls (contributions) and assumes no market return.
-  const completeMonthCount = computed(() => completeMonths().length);
-  const hasProjection = computed(() => completeMonthCount() >= MIN_PROJECTION_MONTHS);
-
-  const medianMonthlySavings = computed(() => {
-    const months = completeMonths();
-    return months.length === 0 ? 0 : median(months.map(([, v]) => v.inflow - v.outflow));
-  });
-
-  // Named once so the headline reads straight off the same figure the basis label describes.
-  const projectedContributions = computed(() => medianMonthlySavings() * PROJECTION_HORIZON_MONTHS);
 
   const snapshotLabeller = computed((): ((s: NetWorthSnapshotDto) => string) => {
     const history = validHistory();
@@ -584,23 +549,6 @@ export function dashboardComputed(store: StateSignals) {
         },
       ];
     }),
-
-    // Below three complete months the tile does not render at all — a projection off one or
-    // two months is noise wearing a number's clothes.
-    hasProjection,
-
-    projectedNetWorthFormatted: computed(() =>
-      MoneyUtils.format(
-        (store.data()?.totalNetWorthUsd ?? 0) + projectedContributions(),
-        baseCurrency(),
-        WHOLE_DOLLARS
-      )
-    ),
-
-    // Always plural: the line is gated at three months, so the singular can never surface.
-    projectionBasisLabel: computed(
-      () => `Median saved per month, based on ${completeMonthCount()} complete months`
-    ),
 
     // Gated on the same complete-month window the charts plot: a user whose only data is
     // the in-progress month has nothing to chart yet, and rendering an empty frame reads

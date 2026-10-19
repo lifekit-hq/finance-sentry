@@ -1,0 +1,31 @@
+<!--
+  Projected from contributions, never from the net-worth line: most of the book is market-marked,
+  so a trend fitted to that line would forecast the market and call it a savings forecast. The
+  figure keeps its fixed one-line slot (empty below three complete months, InsufficientHistory) so
+  the hero does not move; the assumptions follow it in words only while there is a figure (C8).
+-->
+<div class="h-4 leading-4" data-testid="net-worth-projection-slot">
+  @if (store.isLoading()) {
+    <cmn-skeleton height="0.875rem" width="55%" />
+  } @else if (store.visible()) {
+    <p class="text-cmn-xs leading-4 text-text-secondary" data-testid="net-worth-projection">
+      In {{ store.horizonMonths() }} months: about
+      <span class="font-medium text-text-primary">{{ store.central() }}</span>
+      ({{ store.range() }})
+    </p>
+  }
+</div>
+@if (store.visible()) {
+  <p
+    class="mt-cmn-1 text-cmn-xs leading-4 text-text-secondary"
+    data-testid="net-worth-projection-assumptions"
+  >
+    {{ store.assumptions() }}
+  </p>
+  @if (store.hasStaleSleeves()) {
+    <cmn-alert class="mt-cmn-1 block" variant="warning" data-testid="net-worth-projection-stale"
+      >Some account data is stale — carried forward from the last successful sync, so this
+      projection is an estimate.</cmn-alert
+    >
+  }
+}

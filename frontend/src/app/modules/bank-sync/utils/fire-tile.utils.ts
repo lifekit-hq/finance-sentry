@@ -2,6 +2,7 @@ import {APP_LOCALE} from '../../../shared/constants/date/date.constants';
 import {MoneyUtils} from '../../../shared/utils/money.utils';
 import {PercentUtils} from '../../../shared/utils/percent.utils';
 import {type FireProjection} from '../models/fire/fire.model';
+import {PROJECTION_DISCLOSURE, ProjectionUtils} from './projection.utils';
 
 const MONTHS_PER_YEAR = 12;
 const FULL_PERCENT = 100;
@@ -62,11 +63,24 @@ export class FireTileUtils {
     }
   }
 
-  /** The runway under the headline, only while a date exists. */
+  /**
+   * The runway under the headline, only while a date exists, with the dates the high and the low
+   * return give (C8: a projection is shown as a range).
+   */
   public static runway(fire: FireProjection): Nullable<string> {
-    return fire.status === 'Projected' && fire.monthsToFire !== null
-      ? `About ${FireTileUtils.formatDuration(fire.monthsToFire)} from now`
-      : null;
+    if (fire.status !== 'Projected' || fire.monthsToFire === null) {
+      return null;
+    }
+    const runway = `About ${FireTileUtils.formatDuration(fire.monthsToFire)} from now`;
+    if (!fire.earliestDate || !fire.latestDate) {
+      return runway;
+    }
+    const earliest = FireTileUtils.formatDate(fire.earliestDate);
+    const latest = FireTileUtils.formatDate(fire.latestDate);
+    return earliest === latest
+      ? runway
+      : `${runway}: between ${earliest} and ${latest} ` +
+          `at a ${ProjectionUtils.returnRange(fire.realAnnualReturnRange)} return`;
   }
 
   /** Every input and both assumptions, spelled out so the reader can check the arithmetic. */
@@ -80,8 +94,9 @@ export class FireTileUtils {
       `over complete months) divided by a ${swr}% safe withdrawal rate. ` +
       `Assumes a ${ret}% real (after-inflation) annual return on your ` +
       `${money(fire.currentNetWorth)} net worth and on future savings of ` +
-      `${money(fire.monthlySavings)} a month (your median over complete months), ` +
-      'compounded monthly.'
+      `${money(fire.monthlySavings)} a month (your median over ` +
+      `${fire.completeMonths} complete months), compounded monthly; the date range uses ` +
+      `${ProjectionUtils.returnRange(fire.realAnnualReturnRange)}. ${PROJECTION_DISCLOSURE}`
     );
   }
 }

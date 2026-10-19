@@ -37,6 +37,7 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {InvestmentsCardComponent} from '../../../holdings/components/investments-card/investments-card.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
+import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
 import {
   CASH_FLOW_SERIES_TYPES,
   HISTORY_RANGE_LABELS,
@@ -80,6 +81,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     HeadlineBadgeComponent,
     IconComponent,
     InvestmentsCardComponent,
+    NetWorthProjectionComponent,
     MerchantCategoryPipe,
     MoneyPipe,
     RouterLink,
@@ -243,27 +245,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                   </div>
                 }
               </div>
-              <!--
-                Projected from contributions, never from the net-worth line: most of the book is
-                market-marked, so a trend fitted to that line would forecast the market and call
-                it a savings forecast. Empty below three complete months (hasProjection()).
-              -->
-              <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
-                @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
-                  <cmn-skeleton [className]="eitherPlaceholder()" height="0.875rem" width="55%" />
-                } @else if (store.hasProjection()) {
-                  <p
-                    [title]="store.projectionBasisLabel()"
-                    class="text-cmn-xs leading-4 text-text-secondary"
-                  >
-                    At this pace:
-                    <span class="font-medium text-text-primary">{{
-                      store.projectedNetWorthFormatted()
-                    }}</span>
-                    in 12 months
-                  </p>
-                }
-              </div>
+              <fns-net-worth-projection />
               @if (store.historyErrorMessage()) {
                 <div class="flex items-center gap-cmn-2" data-testid="net-worth-history-error">
                   <cmn-alert variant="error" class="min-w-0 flex-1">{{

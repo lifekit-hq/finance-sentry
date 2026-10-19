@@ -3,8 +3,8 @@ import {expect, type Locator, type Page, test} from '@playwright/test';
 import {API, AUTH_RESPONSE} from './support/dossier-mocks';
 
 // The hero card must keep one height across every range and across loading: the delta and the
-// "At this pace" lines own fixed slots, so a range where a line does not apply (or whose history is
-// still in flight) never moves the content below the figure.
+// twelve-month projection lines own fixed slots, so a range where a line does not apply (or whose
+// history is still in flight) never moves the content below the figure.
 const RANGES = ['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL'];
 const HISTORY_LATENCY_MS = 400;
 const SAMPLE_WINDOW_MS = HISTORY_LATENCY_MS + 500;
