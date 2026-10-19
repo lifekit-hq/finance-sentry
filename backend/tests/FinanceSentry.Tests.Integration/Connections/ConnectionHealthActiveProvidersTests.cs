@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 using Xunit;
 
 /// <summary>
-/// The API host's committed configuration puts only IBKR under policy-driven alerting (Option B, S3);
+/// The API host's committed configuration puts only IBKR (TWS and Flex) under policy-driven alerting;
 /// every other provider stays in shadow mode until it is added to <c>ConnectionHealth:ActiveProviders</c>.
 /// </summary>
 public class ConnectionHealthActiveProvidersTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
@@ -21,7 +21,8 @@ public class ConnectionHealthActiveProvidersTests(AuthApiFactory factory) : ICla
         var options = factory.Services.GetRequiredService<IOptionsMonitor<ConnectionHealthOptions>>().CurrentValue;
 
         options.IsActive("ibkr").Should().BeTrue();
-        foreach (var shadow in new[] { "ibkr-flex", "binance", "revolut_x", "monobank", "truelayer", "inzhur" })
+        options.IsActive("ibkr-flex").Should().BeTrue();
+        foreach (var shadow in new[] { "binance", "revolut_x", "monobank", "truelayer", "inzhur" })
             options.IsActive(shadow).Should().BeFalse("{0} stays in shadow mode", shadow);
     }
 

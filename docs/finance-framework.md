@@ -40,7 +40,7 @@ rule or shape agreed but not implemented), **missing**.
 | Id | Question | State |
 |---|---|---|
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
-| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues, S2c the earn, airdrop and dust events (G6). |
+| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | (c) decided, captain 2026-10-15: `ibkr-flex` is in `ActiveProviders`. The rest is open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues, S2c the earn, airdrop and dust events (G6). |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
 
 ---
@@ -901,7 +901,7 @@ settings the way Flex does in `BrokerageSyncModule`):
 | Source | In the call | Across runs | Classification | Settings (`ConnectionHealth:Sources:<source>`) | Policy-driven alerts |
 |---|---|---|---|---|---|
 | IBKR | No retries (signed); drops its cached session token on a 401/403 | Every 15 min; ActionRequired pauses it, one probe a day; Dormant, one run a day; a suspect 401/403 probed (session token) from the next :07/:37 tick at least 1 min after the failure, at most once per 30 min while suspect | 401/403 suspect; "backend down" 401 transient | shared defaults | Yes |
-| IBKR Flex | No retries; limiter 1 call/s and 10/min; polls while generating | Daily 06:00; early re-checks after 1 h and 4 h; NotReady retried every 2 h until the next run | 1012–1015 definitive; 1020 suspect; 1003 NotReady; 1018 RateLimited; 1001, 1004–1009, 1019, 1021 transient | `EarlyRechecks` 1 h, 4 h; `NotReadyDeadline` 48 h; `NotReadyRetryAfter` 2 h | Shadow (`ibkr-flex` not yet in `ActiveProviders`) |
+| IBKR Flex | No retries; limiter 1 call/s and 10/min; polls while generating | Daily 06:00; early re-checks after 1 h and 4 h; NotReady retried every 2 h until the next run | 1012–1015 definitive; 1020 suspect; 1003 NotReady; 1018 RateLimited; 1001, 1004–1009, 1019, 1021 transient | `EarlyRechecks` 1 h, 4 h; `NotReadyDeadline` 48 h; `NotReadyRetryAfter` 2 h | Active (`ibkr-flex` in `ActiveProviders`) |
 | Monobank | Only 429, within 180 s | Per-account schedule, every 30 min | 403 suspect; rate limit RateLimited | shared defaults | Shadow |
 | TrueLayer | 2 retries on GETs; the token POST never | Same schedule | `invalid_grant` with consent marker definitive; 401/403 suspect; 404 ResourceGone | shared defaults | Shadow |
 | Binance, Revolut X | No retries (signed) | Every 15 min | Revolut X 401/403 suspect; unreadable key definitive | shared defaults | Shadow |
