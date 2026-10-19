@@ -127,3 +127,18 @@ test:
     Gather UI evidence only when files under `frontend/` changed, and only for the affected screens.
     Changes that touch neither `backend/` nor `frontend/` (docs, workflows, tooling) need no scenario run; the pre-check command is enough.
     Run scenarios only against the locally started stack and its throwaway database; never drive them against production data or a deployed environment.
+
+# House review rules, injected into the review step when a changed file matches
+# `path`. Read only from the default branch. A bare `**` has no slash, so the
+# matcher treats it as a basename glob and it matches every changed file.
+review:
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Block only on what would break: wrong behavior, a broken contract, money or data loss, a security gap, or changed behavior with no test. Do not raise style, naming, wording or cleanup findings. Every finding names file:line, the input that fails and what goes wrong. If nothing blocks, say so plainly.
+    - path: "backend/**"
+      instructions: |
+        Money values follow docs/money-semantics.md; flag a violation, do not restate the rule.
+    - path: "frontend/**"
+      instructions: |
+        Money values follow docs/money-semantics.md; flag a violation, do not restate the rule.
