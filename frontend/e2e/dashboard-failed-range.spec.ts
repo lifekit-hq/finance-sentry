@@ -68,6 +68,12 @@ async function mockApis(page: Page, failing: 'dashboard' | 'history') {
           })
         );
   });
+  // The net-worth bridge card follows the same range; it is not the request under test.
+  await page.route(`${API}/net-worth/bridge**`, route =>
+    route.fulfill(
+      json({quality: 'UNAVAILABLE', reasons: [{code: 'SHORT_HISTORY'}], currency: 'USD'})
+    )
+  );
   return {heal: (): void => void (healed = true)};
 }
 

@@ -12,6 +12,7 @@ import {
   type NetWorthHistoryResponse,
 } from '../models/dashboard/dashboard.model';
 import {type FlowBreakdown} from '../models/flow-breakdown/flow-breakdown.model';
+import {type NetWorthBridgeResponse} from '../models/net-worth-bridge/net-worth-bridge.model';
 import {SyncStatusResponse, TriggerSyncResponse} from '../models/sync/sync.model';
 import {
   type GetAllTransactionsParams,
@@ -151,6 +152,14 @@ export class BankSyncService extends ApiService {
   public getNetWorthHistory(range: HistoryRange): Observable<NetWorthHistoryResponse> {
     const params = DateRangeUtils.toHttpParams(DateRangeUtils.fromRelativeRange(range));
     return this.http.get<NetWorthHistoryResponse>(`${environment.apiBaseUrl}/net-worth/history`, {
+      params,
+    });
+  }
+
+  /** The net-worth bridge (M5) over the same window as `getNetWorthHistory`. */
+  public getNetWorthBridge(range: HistoryRange): Observable<NetWorthBridgeResponse> {
+    const params = DateRangeUtils.toHttpParams(DateRangeUtils.fromRelativeRange(range));
+    return this.http.get<NetWorthBridgeResponse>(`${environment.apiBaseUrl}/net-worth/bridge`, {
       params,
     });
   }
