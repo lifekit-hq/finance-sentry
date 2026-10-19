@@ -77,6 +77,7 @@ public static class WealthModule
         services.AddScoped<NetWorthSplitBackfillService>();
         services.AddScoped<INetWorthSnapshotJobScheduler, NetWorthSnapshotJobScheduler>();
         services.AddScoped<IWealthAggregationService, WealthAggregationService>();
+        services.AddScoped<ProjectionInputsReader>();
 
         services.AddScoped<NetWorthSnapshotJob>();
         services.AddScoped<FireBriefJob>();

@@ -2,10 +2,8 @@ namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using System.Text.Json.Serialization;
 using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Core.Utils;
-using FinanceSentry.Modules.Wealth.Domain;
-using FinanceSentry.Modules.Wealth.Domain.Repositories;
+using FinanceSentry.Core.Measures;
+using FinanceSentry.Modules.Wealth.Application.Services;
 
 /// <summary>
 /// A FIRE (financial independence) date is reachable, already reached, not reachable at the
@@ -28,6 +26,13 @@ public enum FireProjectionStatus
 /// is persisted, so changing an assumption changes the next read with no job run. The handler
 /// computes in USD; the API controller re-expresses every amount in the profile base currency and
 /// sets <paramref name="BaseCurrency"/> to the code the figures are actually in.
+/// <para>
+/// The projection is a range (M10, C8): <paramref name="RealAnnualReturn"/>, <paramref name="ProjectedDate"/>
+/// and <paramref name="MonthsToFire"/> are the central case, <paramref name="RealAnnualReturnRange"/> the
+/// shared low / central / high return assumption, and <paramref name="MonthsToFireRange"/>,
+/// <paramref name="EarliestDate"/> and <paramref name="LatestDate"/> the outcome at the high and low return.
+/// <paramref name="CompleteMonths"/> is how many complete months the median spend and savings are taken over.
+/// </para>
 /// </summary>
 public record FireProjectionResponse(
     FireProjectionStatus Status,
@@ -40,71 +45,52 @@ public record FireProjectionResponse(
     DateOnly? ProjectedDate,
     decimal? MonthsToFire,
     bool HasStaleSleeves,
-    string BaseCurrency = "USD");
+    string BaseCurrency = "USD",
+    ProjectionRange RealAnnualReturnRange = default,
+    ProjectionRange? MonthsToFireRange = null,
+    DateOnly? EarliestDate = null,
+    DateOnly? LatestDate = null,
+    int CompleteMonths = 0);
 
 public record GetFireProjectionQuery(Guid UserId) : IQuery<FireProjectionResponse>;
 
 public class GetFireProjectionQueryHandler(
-    INetWorthSnapshotRepository snapshots,
-    IHonestMonthlyFlowReader monthlyFlow,
-    IUserFireAssumptionsReader assumptions,
+    ProjectionInputsReader inputs,
     TimeProvider clock) : IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>
 {
-    private static readonly FireAssumptions DefaultAssumptions = new(0.04m, 0.05m);
-
-    /// <summary>
-    /// Below this many COMPLETE months of flow history, a median is noise wearing a number's
-    /// clothes — the same floor the net-worth projection tile uses
-    /// (<c>MIN_PROJECTION_MONTHS</c> in <c>dashboard.constants.ts</c>).
-    /// </summary>
-    private const int MinCompleteMonths = 3;
-
     private const int MonthsPerYear = 12;
-    private const int FlowLookbackMonths = 6;
 
-    private readonly INetWorthSnapshotRepository _snapshots = snapshots;
-    private readonly IHonestMonthlyFlowReader _monthlyFlow = monthlyFlow;
-    private readonly IUserFireAssumptionsReader _assumptions = assumptions;
+    private readonly ProjectionInputsReader _inputs = inputs;
     private readonly TimeProvider _clock = clock;
 
     public async Task<FireProjectionResponse> Handle(GetFireProjectionQuery query, CancellationToken cancellationToken)
     {
-        var userAssumptions = await _assumptions.GetAsync(query.UserId, cancellationToken) ?? DefaultAssumptions;
+        var inputs = await _inputs.ReadAsync(query.UserId, cancellationToken);
+        var assumptions = inputs.Assumptions;
 
-        // Unscoped read, keyed on the caller's own id: the monthly brief job runs with no principal, so the
-        // owner-filtered read would find no snapshot there. Requests pass the id of their own principal.
-        var snapshot = await _snapshots.GetLatestByUserIdUnscopedAsync(query.UserId, cancellationToken);
-        var flows = await _monthlyFlow.GetMonthlyFlowAsync(query.UserId, FlowLookbackMonths, cancellationToken);
-
-        var currentMonthKey = _clock.GetUtcNow().ToString("yyyy-MM");
-        var completeMonths = flows.Where(f => f.Month != currentMonthKey).ToList();
-        // Stale when any of the snapshot's sources failed to read or was carried forward (per-source reasons).
-        var hasStaleSleeves = snapshot is not null && SnapshotSources
-            .Of(snapshot, await _snapshots.GetSourcesUnscopedAsync(query.UserId, [snapshot.Id], cancellationToken))
-            .StaleSources.Count > 0;
-
-        if (snapshot is null || completeMonths.Count < MinCompleteMonths)
+        if (inputs.Snapshot is null || inputs.SavingsPath is null)
         {
             return new FireProjectionResponse(
                 FireProjectionStatus.InsufficientHistory,
                 Target: 0m,
-                CurrentNetWorth: snapshot?.TotalNetWorth ?? 0m,
+                CurrentNetWorth: inputs.Snapshot?.TotalNetWorth ?? 0m,
                 MonthlySavings: 0m,
                 AnnualSpend: 0m,
-                userAssumptions.SafeWithdrawalRate,
-                userAssumptions.RealAnnualReturn,
+                assumptions.SafeWithdrawalRate,
+                assumptions.RealAnnualReturn,
                 ProjectedDate: null,
                 MonthsToFire: null,
-                hasStaleSleeves,
-                "USD");
+                inputs.HasStaleSleeves,
+                "USD",
+                assumptions.RealAnnualReturns,
+                CompleteMonths: inputs.CompleteMonths.Count);
         }
 
-        var annualSpend = MonthsPerYear * Median(completeMonths.Select(f => f.OutflowUsd));
-        var monthlySavings = Median(completeMonths.Select(f => f.NetUsd));
+        var annualSpend = MonthsPerYear * Projection.Median(inputs.CompleteMonths.Select(f => f.OutflowUsd));
+        var monthlySavings = inputs.SavingsPath.MonthlySavingsUsd;
 
-        var calculation = FireCalculator.Calculate(
-            annualSpend, userAssumptions.SafeWithdrawalRate, monthlySavings,
-            snapshot.TotalNetWorth, userAssumptions.RealAnnualReturn);
+        var calculation = Projection.FinancialIndependence(
+            annualSpend, inputs.Snapshot.TotalNetWorth, monthlySavings, assumptions);
 
         var status = calculation.Status switch
         {
@@ -113,31 +99,28 @@ public class GetFireProjectionQueryHandler(
             _ => FireProjectionStatus.Projected,
         };
 
-        var projectedDate = calculation.MonthsToFire is { } months
-            ? DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime).AddMonths((int)Math.Ceiling((double)months))
-            : (DateOnly?)null;
-
+        var months = calculation.MonthsToTarget;
         return new FireProjectionResponse(
             status,
-            calculation.Target,
-            snapshot.TotalNetWorth,
+            calculation.TargetUsd,
+            inputs.Snapshot.TotalNetWorth,
             monthlySavings,
             annualSpend,
-            userAssumptions.SafeWithdrawalRate,
-            userAssumptions.RealAnnualReturn,
-            projectedDate,
-            calculation.MonthsToFire,
-            hasStaleSleeves,
-            "USD");
+            assumptions.SafeWithdrawalRate,
+            assumptions.RealAnnualReturn,
+            DateAfter(months?.Central),
+            months?.Central,
+            inputs.HasStaleSleeves,
+            "USD",
+            assumptions.RealAnnualReturns,
+            months,
+            DateAfter(months?.Low),
+            DateAfter(months?.High),
+            inputs.SavingsPath.CompleteMonths);
     }
 
-    /// <summary>Even-length samples average the two middle values, mirroring the frontend's median helper (<c>dashboard.computed.ts</c>).</summary>
-    private static decimal Median(IEnumerable<decimal> values)
-    {
-        var sorted = values.OrderBy(v => v).ToList();
-        var mid = sorted.Count / 2;
-        return sorted.Count % 2 == 0
-            ? (sorted[mid - 1] + sorted[mid]) / 2m
-            : sorted[mid];
-    }
+    /// <summary>Today plus the months rounded up; null when there are no months.</summary>
+    private DateOnly? DateAfter(decimal? months) => months is { } value
+        ? DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime).AddMonths((int)Math.Ceiling((double)value))
+        : null;
 }

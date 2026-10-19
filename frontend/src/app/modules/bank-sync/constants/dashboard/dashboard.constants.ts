@@ -64,15 +64,6 @@ export const HISTORY_RANGE_TILE_HEADINGS: Record<HistoryRange, string> = {
   all: 'All time',
 };
 
-/** How far forward the net-worth projection line looks. Fixed — there is no goal entity yet. */
-export const PROJECTION_HORIZON_MONTHS = 12;
-
-/**
- * A projection off one or two months is noise wearing a number's clothes, so the line stays
- * hidden until the complete-month window is at least this deep.
- */
-export const MIN_PROJECTION_MONTHS = 3;
-
 /**
  * Where a click on a net-worth band opens: the page that lists the accounts behind it. Keyed by
  * the series label the chart emits; the "No split" band is a total with no single owner page, so

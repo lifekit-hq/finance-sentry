@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
+using FinanceSentry.Core.Measures;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using FluentAssertions;
@@ -15,7 +16,9 @@ public sealed class FireBriefComposerTests
         bool stale = false) =>
         new(status, target, netWorth, savings, AnnualSpend: 48_000m, SafeWithdrawalRate: 0.04m,
             RealAnnualReturn: 0.05m, ProjectedDate: new DateOnly(2041, 3, 1), MonthsToFire: 173m,
-            HasStaleSleeves: stale);
+            HasStaleSleeves: stale,
+            RealAnnualReturnRange: new ProjectionRange(0.02m, 0.05m, 0.08m),
+            MonthsToFireRange: status == FireProjectionStatus.Projected ? new ProjectionRange(148m, 173m, 207m) : null);
 
     [Fact]
     public void Projected_ShowsGaugeDateAndEveryAssumption()
@@ -25,9 +28,10 @@ public sealed class FireBriefComposerTests
         brief.Headline.Should().Be("FIRE brief: projected March 2041");
         brief.Body.Should().Contain("[██░░░░░░░░] 25% of target");
         brief.Body.Should().Contain("Net worth $300k of a $1.2m target.");
-        brief.Body.Should().Contain("About 14y 5m away at $2k/month saved.");
+        brief.Body.Should().Contain("About 14y 5m away at $2k/month saved (12y 4m to 17y 3m across the return range).");
         brief.Body.Should().Contain("4% safe withdrawal rate");
-        brief.Body.Should().Contain("5% real annual return");
+        brief.Body.Should().Contain("5% real annual return (range 2% to 8%)");
+        brief.Body.Should().Contain("Hypothetical, not a guarantee.");
         brief.Body.Should().Contain("$48k/year spend (12 × median monthly outflow)");
     }
 

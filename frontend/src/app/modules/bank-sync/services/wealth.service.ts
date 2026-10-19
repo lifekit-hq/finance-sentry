@@ -8,6 +8,7 @@ import {
   type ManualHolding,
   type ManualHoldingInput,
 } from '../models/manual-holding/manual-holding.model';
+import {type NetWorthProjection} from '../models/projection/projection.model';
 
 const MANUAL_HOLDINGS_PATH = 'manual-holdings';
 
@@ -23,6 +24,10 @@ export class WealthService extends ApiService {
 
   public getFireProjection(): Observable<FireProjection> {
     return this.get<FireProjection>('fire');
+  }
+
+  public getNetWorthProjection(): Observable<NetWorthProjection> {
+    return this.get<NetWorthProjection>('projection');
   }
 
   public getManualHoldings(): Observable<ManualHolding[]> {

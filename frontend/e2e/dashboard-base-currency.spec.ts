@@ -49,6 +49,23 @@ const EUR_FIRE = {
   monthsToFire: 300,
   hasStaleSleeves: false,
   baseCurrency: 'EUR',
+  realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+  monthsToFireRange: {low: 240, central: 300, high: 380},
+  earliestDate: '2046-03-01',
+  latestDate: '2057-11-01',
+  completeMonths: 3,
+};
+
+const EUR_PROJECTION = {
+  status: 'Projected',
+  horizonMonths: 12,
+  currentNetWorth: 2000,
+  monthlySavings: 900,
+  completeMonths: 3,
+  projectedNetWorth: {low: 12_960, central: 13_140, high: 13_320},
+  realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+  hasStaleSleeves: false,
+  baseCurrency: 'EUR',
 };
 
 const EUR_TRANSACTIONS = {
@@ -88,6 +105,7 @@ async function mockApis(page: Page): Promise<void> {
     route.fulfill(json({snapshots: [], hasHistory: false}))
   );
   await page.route(`${API}/wealth/fire`, route => route.fulfill(json(EUR_FIRE)));
+  await page.route(`${API}/wealth/projection`, route => route.fulfill(json(EUR_PROJECTION)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route =>
     route.fulfill(
@@ -125,6 +143,18 @@ test.describe('Base-currency totals (#851)', () => {
     await expect(assumptions).toContainText('€37,200.00');
     await expect(assumptions).toContainText('€2,000.00 net worth');
     await expect(assumptions).toContainText('€900.00 a month');
+    await expect(assumptions).not.toContainText('$');
+  });
+
+  test('twelve-month projection and its assumptions read in euros', async ({page}) => {
+    await page.goto('/dashboard');
+
+    const line = page.getByTestId('net-worth-projection');
+    await expect(line).toContainText('€13,140');
+    await expect(line).toContainText('€12,960 to €13,320');
+    const assumptions = page.getByTestId('net-worth-projection-assumptions');
+    await expect(assumptions).toContainText('€2,000 net worth plus €900 a month');
+    await expect(line).not.toContainText('$');
     await expect(assumptions).not.toContainText('$');
   });
 

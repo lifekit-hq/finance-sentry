@@ -48,6 +48,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -104,6 +105,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
             fire.Object,
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -145,6 +147,61 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.AnnualSpend.Should().Be(43.2m);
     }
 
+    private static async Task<NetWorthProjectionResponse> GetProjection(string? profileCurrency)
+    {
+        var projection = new Mock<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>();
+        projection.Setup(h => h.Handle(It.IsAny<GetNetWorthProjectionQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new NetWorthProjectionResponse(
+                NetWorthProjectionStatus.Projected, HorizonMonths: 12, CurrentNetWorth: 540m, MonthlySavings: 108m,
+                CompleteMonths: 3, ProjectedNetWorth: new ProjectionRange(1080m, 1296m, 1512m),
+                RealAnnualReturnRange: new ProjectionRange(0.02m, 0.05m, 0.08m), HasStaleSleeves: false));
+        var reader = new Mock<IUserBaseCurrencyReader>();
+        reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
+
+        var controller = new WealthController(
+            Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            projection.Object,
+            reader.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", UserId.ToString())], "test")),
+                },
+            },
+        };
+
+        var ok = (OkObjectResult)await controller.GetNetWorthProjection(CancellationToken.None);
+        return (NetWorthProjectionResponse)ok.Value!;
+    }
+
+    [Fact]
+    public async Task Projection_EuroBase_ConvertsEveryAmountAndTheWholeRange_NotTheRates()
+    {
+        var result = await GetProjection("EUR");
+
+        result.BaseCurrency.Should().Be("EUR");
+        result.CurrentNetWorth.Should().Be(500m);
+        result.MonthlySavings.Should().Be(100m);
+        result.ProjectedNetWorth.Should().Be(new ProjectionRange(1000m, 1200m, 1400m));
+        result.RealAnnualReturnRange.Should().Be(new ProjectionRange(0.02m, 0.05m, 0.08m));
+    }
+
+    [Theory]
+    [InlineData("USD")]
+    [InlineData(null)]
+    public async Task Projection_UsdOrUnsetBase_LeavesAmountsUntouched(string? profile)
+    {
+        var result = await GetProjection(profile);
+
+        result.BaseCurrency.Should().Be("USD");
+        result.ProjectedNetWorth.Should().Be(new ProjectionRange(1080m, 1296m, 1512m));
+    }
+
     private static async Task<SleeveGrowthResponse> GetGrowth(string? profileCurrency)
     {
         var from = new DateOnly(2026, 7, 1);
@@ -163,6 +220,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
             growth.Object,
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext

@@ -77,14 +77,27 @@ public static class FireBriefComposer
         FireProjectionStatus.AlreadyReached => "Your net worth already covers the target.",
         FireProjectionStatus.NotSaving =>
             $"At {FormatUsd(projection.MonthlySavings)}/month saved the target is out of reach.",
-        _ => $"About {FormatDuration(projection.MonthsToFire)} away at {FormatUsd(projection.MonthlySavings)}/month saved.",
+        _ => $"About {FormatDuration(projection.MonthsToFire)} away at {FormatUsd(projection.MonthlySavings)}/month saved"
+            + BuildMonthsRange(projection) + ".",
     };
+
+    // The range (C8): the high return reaches the target soonest, the low return latest.
+    private static string BuildMonthsRange(FireProjectionResponse projection) =>
+        projection.MonthsToFireRange is { } range && range.Low != range.High
+            ? $" ({FormatDuration(range.Low)} to {FormatDuration(range.High)} across the return range)"
+            : "";
 
     private static string BuildAssumptionsLine(FireProjectionResponse projection) =>
         string.Create(CultureInfo.InvariantCulture,
             $"Assumes {FormatPercent(projection.SafeWithdrawalRate)} safe withdrawal rate, " +
-            $"{FormatPercent(projection.RealAnnualReturn)} real annual return, and " +
-            $"{FormatUsd(projection.AnnualSpend)}/year spend (12 × median monthly outflow).");
+            $"{FormatPercent(projection.RealAnnualReturn)} real annual return{BuildReturnRange(projection)}, and " +
+            $"{FormatUsd(projection.AnnualSpend)}/year spend (12 × median monthly outflow). " +
+            $"Hypothetical, not a guarantee.");
+
+    private static string BuildReturnRange(FireProjectionResponse projection) =>
+        projection.RealAnnualReturnRange is { } range && range.Low != range.High
+            ? $" (range {FormatPercent(range.Low)} to {FormatPercent(range.High)})"
+            : "";
 
     private static string FormatPercent(decimal fraction) =>
         string.Create(CultureInfo.InvariantCulture, $"{fraction * PercentScale:0.##}%");

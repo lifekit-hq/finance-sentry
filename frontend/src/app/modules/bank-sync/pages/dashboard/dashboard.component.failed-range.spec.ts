@@ -118,10 +118,12 @@ function setup() {
     },
     retryButton: (): HTMLElement | null =>
       el.querySelector('[data-testid="net-worth-history-error"] cmn-button button'),
-    // The Investments card loads its own positions, outside the range request this spec exercises.
+    // The Investments card and the twelve-month projection load their own data, outside the range
+    // request this spec exercises.
     shimmering: (): number =>
-      el.querySelectorAll('.cmn-skeleton-sweep:not(.after\\:hidden):not(fns-investments-card *)')
-        .length,
+      el.querySelectorAll(
+        '.cmn-skeleton-sweep:not(.after\\:hidden):not(fns-investments-card *):not(fns-net-worth-projection *)'
+      ).length,
     placeholders: (): number => el.querySelectorAll('.cmn-skeleton-sweep.after\\:hidden').length,
   };
 }
