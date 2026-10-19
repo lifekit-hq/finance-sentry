@@ -163,11 +163,57 @@ export const BROKERAGE_GROWTH = {
   currency: 'USD',
 };
 
-/** The accounts page reads the wealth summary and both holdings feeds; the Home investments card also reads the brokerage growth split. */
+/** The crypto venues' contributions-vs-growth split; no time-weighted return measured yet. */
+export const CRYPTO_GROWTH = {
+  ...BROKERAGE_GROWTH,
+  startValue: 2600,
+  endValue: 3200,
+  contributed: 500,
+  growth: 100,
+  income: 12,
+  fees: 4,
+  taxes: 0,
+  moneyWeightedReturn: 0.0352,
+  timeWeightedReturn: null,
+  headline: {...BROKERAGE_GROWTH.headline, amount: 100, percent: 3.52, scope: 'sleeve:crypto'},
+};
+
+/** The brokerage book against SPY over the four lookback windows (P2 reads the longest measured). */
+export const BOOK_PERFORMANCE = {
+  periods: [
+    {
+      period: 2,
+      bookTwr: 0.031,
+      spyTwr: 0.024,
+      delta: 0.007,
+      bookTwrFrom: '2026-06-14',
+      bookTwrTo: '2026-09-14',
+      bookTwrReasons: [],
+      bookTwrQuality: 'COMPLETE',
+    },
+    {
+      period: 3,
+      bookTwr: 0.1251,
+      spyTwr: 0.1532,
+      delta: -0.0281,
+      bookTwrFrom: '2025-09-14',
+      bookTwrTo: '2026-09-14',
+      bookTwrReasons: [],
+      bookTwrQuality: 'COMPLETE',
+    },
+  ],
+  asOf: '2026-09-14',
+};
+
+/**
+ * The accounts page and the Home investments card read the wealth summary and both holdings feeds;
+ * the card also reads both growth splits and the book against SPY. */
 export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/summary', WEALTH_SUMMARY_FULL);
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);
   await mockGet(page, 'crypto/holdings', CRYPTO_HOLDINGS_FULL);
   await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
+  await mockGet(page, 'wealth/crypto/growth', CRYPTO_GROWTH);
+  await mockGet(page, 'radar/book-performance', BOOK_PERFORMANCE);
   await mockGet(page, 'wealth/manual-holdings', []);
 }

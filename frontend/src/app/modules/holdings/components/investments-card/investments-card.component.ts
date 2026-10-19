@@ -23,12 +23,13 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {HoldingsStore} from '../../store/holdings.store';
 import {BrokerageGrowthComponent} from '../brokerage-growth/brokerage-growth.component';
+import {GrowthOfTenThousandComponent} from '../growth-of-ten-thousand/growth-of-ten-thousand.component';
 
 const SKELETON_ROWS = 5;
 
 /**
  * Home's Investments card: the invested total with its quality badge, the allocation by asset
- * class, the brokerage sleeve's contributions against growth, and the largest holdings, each
+ * class, the brokerage and crypto sleeves' contributions against growth, the growth of 10,000 against SPY, and the largest holdings, each
  * opening its dossier. Renders nothing for a book with no positions and no failed feed.
  */
 @Component({
@@ -40,6 +41,7 @@ const SKELETON_ROWS = 5;
     CardComponent,
     DecimalPipe,
     DonutChartComponent,
+    GrowthOfTenThousandComponent,
     HeadlineBadgeComponent,
     InstitutionAvatarComponent,
     ListItemRowComponent,

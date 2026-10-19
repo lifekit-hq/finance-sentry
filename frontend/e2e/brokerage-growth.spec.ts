@@ -31,6 +31,33 @@ test.describe('Home investments card: contributions vs growth', () => {
     );
   });
 
+  test('splits the crypto change on its own card', async ({page}) => {
+    await mockHome(page);
+    await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
+    await page.goto('/dashboard');
+
+    await expect(page.getByTestId('crypto-growth-since')).toContainText(
+      'Binance and Revolut X since 30 Jun 2026'
+    );
+    await expect(page.getByTestId('crypto-growth-contributed')).toHaveText('+$500.00');
+    await expect(page.getByTestId('crypto-growth-growth')).toContainText('(+3.5%)');
+    await expect(page.getByTestId('crypto-growth-timing-gap')).toHaveCount(0);
+  });
+
+  test('puts 10,000 into the book and into SPY over the longest measured window', async ({
+    page,
+  }) => {
+    await mockHome(page);
+    await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
+    await page.goto('/dashboard');
+
+    await expect(page.getByTestId('growth-of-ten-thousand-since')).toHaveText(
+      /Put in on 14 Sept? 2025, worth on 14 Sept? 2026\./
+    );
+    await expect(page.getByTestId('growth-of-ten-thousand-book')).toHaveText('$11,251.00 (+12.5%)');
+    await expect(page.getByTestId('growth-of-ten-thousand-spy')).toHaveText('$11,532.00 (+15.3%)');
+  });
+
   test('says no contributions are recorded yet instead of reading every deposit as growth', async ({
     page,
   }) => {

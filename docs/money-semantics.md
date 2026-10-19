@@ -1061,8 +1061,8 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the former Investments tab's "Crypto: contributed vs
-  growth" card (retired, no screen reads it now); finance-framework M2
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Home Investments card's "Crypto: contributed vs
+  growth" card, the same component as the brokerage one; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).
@@ -1310,7 +1310,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the former Investments tab read for its "growth of 10,000" card (finance-framework P2; retired, no screen reads it now): the longest period
+  which the Home Investments card reads for its "growth of 10,000" card (finance-framework P2): the longest period
   with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
   10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
   to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply

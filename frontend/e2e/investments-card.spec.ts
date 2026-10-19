@@ -9,7 +9,7 @@ import {mockGet} from './support/visual-baseline';
 // carries an "Invested change" line, the card holds a fixed-height skeleton while positions load,
 // and each top holding opens its dossier.
 const POSITIONS_LATENCY_MS = 600;
-const SKELETON_HEIGHT_PX = 640;
+const SKELETON_HEIGHT_PX = 1280;
 const PHONE = {width: 390, height: 1500};
 
 async function openHome(page: Page, positionsLatencyMs = 0): Promise<void> {
