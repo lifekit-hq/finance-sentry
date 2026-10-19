@@ -56,10 +56,6 @@ function fakeStore(
     netWorthChangeUnavailable: signal(false),
     netWorthChangeFormatted: signal(null),
     netWorthChangePercentFormatted: signal(null),
-    investedChangeFormatted: signal(''),
-    investedChangePercentFormatted: signal(''),
-    investedChangeDirection: signal(0),
-    investedChangeSinceFormatted: signal(null),
     netWorthChartLabel: signal('Net worth by sleeve'),
     bookSplitFormatted: signal(bookSplit),
     ...overrides,
@@ -161,48 +157,19 @@ describe('DashboardComponent range presets', () => {
     expect(el.querySelector('[data-testid="net-worth-split"]')).toBeNull();
   });
 
-  it('labels the net-worth figure a change, with the invested change on the line below', () => {
+  it('labels the net-worth figure a change and carries no invested-change line', () => {
     const el = render('3m', undefined, null, {
       netWorthChangeFormatted: signal('+$320'),
       netWorthChangePercentFormatted: signal('+3.2%'),
       netWorthChangeDirection: signal(1),
       scrubDateFormatted: signal(null),
-      investedChangeFormatted: signal('+$500'),
-      investedChangePercentFormatted: signal('+8.3%'),
-      investedChangeDirection: signal(1),
     }).el;
     const change = el.querySelector('[data-testid="net-worth-change"]');
-    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
 
     expect(change?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Change +$320 (+3.2%) · 3M');
-    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Invested change +$500 (+8.3%) · 3M'
-    );
-    expect(change?.compareDocumentPosition(invested as Node)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-  });
-
-  it('dates the invested change from its first split day when that is after the range start', () => {
-    const el = render('1y', undefined, null, {
-      scrubDateFormatted: signal(null),
-      investedChangeFormatted: signal('+$500'),
-      investedChangePercentFormatted: signal('+8.3%'),
-      investedChangeDirection: signal(1),
-      investedChangeSinceFormatted: signal('since Jul 8, 2026'),
-    }).el;
-    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
-
-    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Invested change +$500 (+8.3%) · since Jul 8, 2026'
-    );
-  });
-
-  it('keeps the invested-change slot but leaves it empty below two split days', () => {
-    const el = render().el;
-
-    expect(el.querySelector('[data-testid="net-worth-invested-change-slot"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="net-worth-invested-change"]')).toBeNull();
+    expect(el.querySelector('[data-testid="net-worth-invested-change-slot"]')).toBeNull();
+    expect(el.textContent).not.toContain('Invested change');
   });
 
   it('scrubs the hero figure to the point under the pointer and snaps back on release', () => {

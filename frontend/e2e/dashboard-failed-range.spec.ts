@@ -1,5 +1,6 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {mockAccounts} from './support/accounts-mocks';
 import {API, AUTH_RESPONSE} from './support/dossier-mocks';
 
 // A range change whose request fails must settle: static placeholders (no sheen), never the old
@@ -47,6 +48,8 @@ async function mockApis(page: Page, failing: 'dashboard' | 'history') {
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
+  // The Home Investments card reads the holdings feeds and growth split on its own.
+  await mockAccounts(page);
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
   await page.route(`${API}/dashboard/aggregated**`, route => {
     const oneYear = route.request().url().includes('months=12');

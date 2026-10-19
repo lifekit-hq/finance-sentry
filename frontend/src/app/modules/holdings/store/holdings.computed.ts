@@ -29,6 +29,9 @@ interface StateSignals {
 
 const WEIGHT_TO_PERCENT = 100;
 
+/** How many positions the Home Investments card lists. */
+export const TOP_HOLDINGS_COUNT = 5;
+
 // The headline names a failed read by feed ('brokerage' | 'crypto'), not by provider.
 const CRYPTO_FEED = 'crypto';
 const BROKERAGE_FEED = 'brokerage';
@@ -128,6 +131,13 @@ export function holdingsComputed(store: StateSignals) {
   const totalPositionsValue = computed(() =>
     visiblePositions().reduce((sum, p) => sum + p.currentValue, 0)
   );
+  // Everything but the cash asset class (broker cash, venue fiat): the book's `investedUsd`
+  // (money-semantics §8), so Home's card and its hero sub-line state one figure.
+  const investedPositionsValue = computed(() =>
+    visiblePositions()
+      .filter(p => p.assetClass !== 'cash')
+      .reduce((sum, p) => sum + p.currentValue, 0)
+  );
 
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
     const positions = visiblePositions();
@@ -198,6 +208,7 @@ export function holdingsComputed(store: StateSignals) {
     isProviderFeedFailed,
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
+    investedPositionsValue,
     // The total's record: its badge, and N/A (never 0) when every feed failed.
     totalHeadline: computed((): Nullable<Headline> => store.headline()),
     isTotalUnavailable: computed(
@@ -208,6 +219,15 @@ export function holdingsComputed(store: StateSignals) {
       () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null
     ),
     positionsByAssetClass,
+    // Largest positions across every venue, for the Home card: cash balances have no dossier and
+    // hidden rows are tucked away, so neither is listed (both still count in the weights).
+    topHoldings: computed((): PositionRow[] =>
+      positionsByAssetClass()
+        .filter(group => group.assetClass !== 'cash')
+        .flatMap(group => group.rows)
+        .sort((a, b) => b.currentValue - a.currentValue)
+        .slice(0, TOP_HOLDINGS_COUNT)
+    ),
     allocationSegments: computed((): DonutSegment[] =>
       positionsByAssetClass().map(group => ({
         label: group.label,

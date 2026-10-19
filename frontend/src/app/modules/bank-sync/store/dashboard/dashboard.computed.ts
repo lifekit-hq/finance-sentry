@@ -431,20 +431,6 @@ export function dashboardComputed(store: StateSignals) {
     return removed ? 'Includes removed accounts' : '';
   });
 
-  // Change in the invested book (every source's positions, cash excluded), over the days that
-  // have a split only: from the first split day to the last, or to the scrubbed day. It is a
-  // change in invested value, deposits included, not a return. Null until two split days exist
-  // (and while scrubbing a day with no split, or one before the first split day).
-  const investedChange = computed((): Change | null => {
-    const splits = splitHistory();
-    const first = splits.findIndex(split => split !== null);
-    const scrub = store.scrubIndex();
-    const endIndex = scrub ?? splits.map(split => split !== null).lastIndexOf(true);
-    const start = splits[first];
-    const end = splits[endIndex];
-    return start && end && endIndex > first ? changeOf(start.invested, end.invested) : null;
-  });
-
   // The live net worth as a typed record, with the latest snapshot's stale sources added when the
   // API's own record does not already name them (and one built around the amount on an older
   // build). The stale sources are the ones its per-source rows mark STALE_SOURCE, or its stale
@@ -559,24 +545,6 @@ export function dashboardComputed(store: StateSignals) {
     netWorthScopeNote,
     // Sign of the change, for colouring: 1 up, -1 down, 0 flat or unknown.
     netWorthChangeDirection: computed(() => Math.sign(netWorthChange()?.delta ?? 0)),
-
-    // The invested book's change beside it; '' (line hidden) below two days with a split.
-    investedChangeFormatted: computed(() => {
-      const change = investedChange();
-      return change
-        ? MoneyUtils.format(change.delta, baseCurrency(), {...WHOLE_DOLLARS, signed: true})
-        : '';
-    }),
-    investedChangePercentFormatted: computed(() => formatPercent(investedChange()?.percent)),
-    investedChangeDirection: computed(() => Math.sign(investedChange()?.delta ?? 0)),
-    // "since <first split day>" when the split starts after the loaded window does; null when it
-    // covers the whole window, so the page labels it with the headline's own range.
-    investedChangeSinceFormatted: computed((): string | null => {
-      const first = splitHistory().findIndex(split => split !== null);
-      return first > 0
-        ? `since ${FULL_DATE_FORMATTER.format(new Date(validHistory()[first].snapshotDate))}`
-        : null;
-    }),
 
     windowSpendingFormatted: computed(() => {
       const totals = windowTotals();

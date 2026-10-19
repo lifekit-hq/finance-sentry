@@ -391,3 +391,54 @@ describe('holdingsComputed hidden positions', () => {
     expect(group.rows.length).toBe(2);
   });
 });
+
+describe('holdingsComputed invested total', () => {
+  it('leaves cash out of the invested total but keeps it in the position total', () => {
+    const c = build([
+      position({symbol: 'AAA', currentValue: 300, assetClass: 'equity'}),
+      position({symbol: 'BTC', currentValue: 100, assetClass: 'crypto'}),
+      position({symbol: 'USD Cash', currentValue: 50, assetClass: 'cash'}),
+      position({symbol: 'USD', currentValue: 25, assetClass: 'cash', isVenueCash: true}),
+    ]);
+
+    expect(c.investedPositionsValue()).toBe(400);
+    expect(c.totalPositionsValue()).toBe(475);
+  });
+});
+
+describe('holdingsComputed top holdings', () => {
+  const stock = (
+    symbol: string,
+    provider: string,
+    currentValue: number,
+    extra?: Partial<Position>
+  ) => position({symbol, provider, currentValue, assetClass: 'equity', ...extra});
+
+  it('lists the five largest non-cash positions across venues, biggest first', () => {
+    const c = build([
+      stock('AAA', 'ibkr', 100),
+      stock('BBB', 'ibkr', 700),
+      position({symbol: 'BTC', provider: 'binance', currentValue: 900}),
+      stock('CCC', 'ibkr', 300),
+      stock('DDD', 'ibkr', 500),
+      stock('EEE', 'ibkr', 200),
+      position({symbol: 'USD', currentValue: 5_000, assetClass: 'cash', isVenueCash: true}),
+    ]);
+
+    expect(c.topHoldings().map(r => r.symbol)).toEqual(['BTC', 'BBB', 'DDD', 'CCC', 'EEE']);
+  });
+
+  it('leaves out rows the API tucked away but weighs them in the total', () => {
+    const c = build([
+      stock('AAA', 'ibkr', 900),
+      stock('DUST', 'ibkr', 100, {hiddenReason: 'small'}),
+    ]);
+
+    expect(c.topHoldings().map(r => r.symbol)).toEqual(['AAA']);
+    expect(c.topHoldings()[0].weightPercent).toBe(90);
+  });
+
+  it('is empty without positions', () => {
+    expect(build([]).topHoldings()).toEqual([]);
+  });
+});
