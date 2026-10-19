@@ -27,6 +27,12 @@ public enum MeasureFailure
     /// <summary>Fewer than two valuations, or a window that does not move forward in time.</summary>
     InsufficientData,
 
+    /// <summary>
+    /// A statistic over a series that is too short to carry it: volatility and downside deviation need two monthly
+    /// returns, the three-year figure 36 (GIPS 4.A.1.j). The figure shows "not enough history", never a number.
+    /// </summary>
+    NotEnoughHistory,
+
     /// <summary>Two figures compared over different windows.</summary>
     WindowMismatch,
 
