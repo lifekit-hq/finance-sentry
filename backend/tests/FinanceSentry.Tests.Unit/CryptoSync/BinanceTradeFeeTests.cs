@@ -1,4 +1,6 @@
+using System.Net;
 using System.Web;
+using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 using FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
@@ -82,12 +84,26 @@ public class BinanceTradeFeeTests
     [Fact]
     public async Task CommissionInAnAssetWithNoPrice_IsKeptButUnvalued()
     {
-        // No klines stub: the call answers 404, which leaves the fee unvalued rather than priced at today's rate.
+        _handler.RespondWithStatus("/api/v3/klines", _ => (HttpStatusCode.BadRequest, "{\"code\":-1121,\"msg\":\"Invalid symbol.\"}"));
+
         var trade = await SingleTradeAsync(Row(1, "2000.00", "1.0", "0.005", "BNB"));
 
         trade.Fee.Should().Be(0.005m);
         trade.FeeAsset.Should().Be("BNB");
         trade.FeeUsd.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task TransientPriceFailure_PropagatesInsteadOfStoringTheFeeUnvalued(HttpStatusCode status)
+    {
+        _handler.Respond("/api/v3/myTrades", Row(1, "2000.00", "1.0", "0.005", "BNB"));
+        _handler.Respond("/api/v3/klines", "{}", status);
+
+        var act = () => CreateSut().GetTradesAsync(ApiKey, ApiSecret, "ETH", cursor: null, Walk);
+
+        await act.Should().ThrowAsync<BinanceException>();
     }
 
     [Fact]

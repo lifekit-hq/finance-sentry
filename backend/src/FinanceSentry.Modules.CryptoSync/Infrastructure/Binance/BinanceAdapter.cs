@@ -224,7 +224,8 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     /// <summary>
     /// A fill's commission in USD at the fill's own time: a stablecoin at par, the traded asset at the fill's price, any
     /// other asset (typically BNB) at its one-minute candle open from <c>klines</c>. Null when that asset has no
-    /// USDT pair or the call fails, so the fee stays unvalued instead of being priced at today's rate.
+    /// USDT pair (HTTP 400, invalid symbol), so the fee stays unvalued instead of being priced at today's rate; any other
+    /// failure (rate limit, 5xx) propagates so the walk retries it rather than storing the fee unvalued for good.
     /// </summary>
     private async Task<decimal?> FeeUsdAsync(
         decimal fee,
@@ -252,7 +253,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             {
                 unitPrice = await _httpClient.GetMinuteOpenPriceAsync($"{feeAsset}USDT", key.Item2 * 60_000, ct);
             }
-            catch (BinanceException ex)
+            catch (BinanceException ex) when (ex.VenueStatusCode == (int)HttpStatusCode.BadRequest)
             {
                 _logger.LogDebug(ex, "Binance price for fee asset {Asset} unavailable; the commission stays unvalued.", feeAsset);
                 unitPrice = null;
