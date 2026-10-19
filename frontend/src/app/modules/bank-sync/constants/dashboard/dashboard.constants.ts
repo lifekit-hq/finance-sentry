@@ -81,10 +81,10 @@ export const MIN_PROJECTION_MONTHS = 3;
 export const NET_WORTH_SERIES_ROUTES: ReadonlyMap<string, AppRoute> = new Map([
   ['Banking', AppRoute.AccountsList],
   ['Cash', AppRoute.AccountsList],
-  ['Brokerage', AppRoute.AccountsInvestments],
-  ['Brokerage invested', AppRoute.AccountsInvestments],
-  ['Crypto', AppRoute.AccountsInvestments],
-  ['Crypto invested', AppRoute.AccountsInvestments],
+  ['Brokerage', AppRoute.Accounts],
+  ['Brokerage invested', AppRoute.Accounts],
+  ['Crypto', AppRoute.Accounts],
+  ['Crypto invested', AppRoute.Accounts],
 ]);
 
 /** The transactions `type` each income-vs-spending series drills into. */

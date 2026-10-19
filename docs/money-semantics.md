@@ -71,8 +71,8 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   reader boundary with the current FX rate (§3), like bank balances; a fiat code with no rate is
   valued 1:1 and logged. It counts toward the venue's value and net worth, and in
   `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
-  position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Holdings page
-  groups it in the **Cash** slice (with broker cash, below) with no unit price
+  position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Accounts accordions
+  group it in the **Cash** row (with broker cash, below) with no unit price
   (`holdings.computed.ts`).
 - **Cost basis — Binance** is reconstructed from the full fill history
   (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
@@ -134,8 +134,10 @@ broker account (then that code wins; a code `CurrencyConverter` has no rate for,
 falls back to UAH). Each row keeps that currency and its amount as reported (`BrokerageHolding.Currency` /
 `NativeValue`, never converted) next to `UsdValue`, which is converted once, at ingest (§3).
 `GET /brokerage/holdings` returns both as `currency` / `nativeValue` (null `nativeValue` = USD-only row,
-e.g. IBKR); the Holdings page shows such a row's price and value in its own currency with the USD figure
-muted beneath. The wealth summary's brokerage account rows carry the same pair as `nativeCurrency` /
+e.g. IBKR); an Accounts accordion row shows such a row's price and value in its own currency with the USD figure
+muted beneath. The feed-backed rows (P&L, day change) replace the summary's rows only while the profile's base
+currency is USD: the feed is USD-only and the accordion header is in the base currency, so any other base keeps
+the summary rows (`positionValue` / `balanceInBaseCurrency`) and the rows add up to the header. The wealth summary's brokerage account rows carry the same pair as `nativeCurrency` /
 `nativeValue` (the accounts list shows them in that currency with the base equivalent muted) and MCP
 `get_account_summary` reports such a row in its own currency. Totals, weights and the donut still sum
 `UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next daily sync rewrites
@@ -188,8 +190,8 @@ brokerage total forward, are corrected once by a migration (§8, *Inzhur history
 - **Net worth** — the rows are ordinary brokerage holdings, so they enter the brokerage total
   (§8) with no Inzhur-specific path.
 
-**Holdings page slices.** `GET /brokerage/holdings` tags each position with `assetClass`, the
-`AssetClassNormalizer` bucket of its `InstrumentType`. The Holdings page donut, allocation rows
+**Holdings slices.** `GET /brokerage/holdings` tags each position with `assetClass`, the
+`AssetClassNormalizer` bucket of its `InstrumentType`. The Home Investments card's donut, allocation rows
 and weights slice **Cash, Bonds, Real estate, Equities, Crypto**: broker `CASH` rows (IBKR
 `<CCY> Cash`, Inzhur `UAH Cash`) and venue fiat share the Cash slice; Inzhur `BOND` and `REIT`
 rows are Bonds and Real estate; other classes (commodities, unclassified) stay with Equities;
@@ -356,15 +358,15 @@ already inside the institution total). Monobank cards and pockets are all return
 gathers them under one collapsed `N hidden · $X` row at the end of the institution (`HiddenCount` and signed
 `HiddenTotal`, formatted by `MoneyUtils.format` in the base currency), closed by default and remembered per device.
 The three preferences are edited in Settings → Preferences, saved with the profile; the threshold must be above 0 and
-at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts and Investments
-apply them.
+at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts applies
+them.
 
-`/crypto/holdings` and `/brokerage/holdings` (the Investments page) annotate each position with `HiddenReason` the
+`/crypto/holdings` and `/brokerage/holdings` (the Accounts accordions and the Home Investments card) annotate each position with `HiddenReason` the
 same way, through the same `Classify` (`AssetVisibility.ClassifyPosition` wraps it). Their DTOs are in USD, so the
 base-currency threshold is converted once to USD at the handler (`AssetVisibility.ResolveInUsdAsync`, shared with
 `/wealth/summary`). A position with a quantity but no price is unpriced (value unknown) and a short or negative one
 is never `small`, so neither is hidden. `TotalUsdValue`, the page total and every portfolio weight sum **all**
-positions: the Investments page closes each asset-class group with a collapsed "N hidden · $X" row and groups by the
+positions: an Accounts accordion closes its hidden positions behind a collapsed "N hidden · $X" row and splits by the
 API's `hiddenReason` without deciding anything itself. Group totals and weights still include the hidden rows.
 
 ## 3. Currency conversion
@@ -1028,7 +1030,7 @@ are closed periods.
   already-deactivated account reads as a removal - because credentials record no deactivation time;
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
   `CreatedAt` is re-stamped).
-- **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Investments tab's
+- **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Home Investments card's
   "Contributed vs growth" section; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
   the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
@@ -1061,7 +1063,7 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Investments tab's "Crypto: contributed vs
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Home Investments card's "Crypto: contributed vs
   growth" card, the same component as the brokerage one; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
@@ -1310,7 +1312,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the Investments tab reads for its "growth of 10,000" card (finance-framework P2): the longest period
+  which the Home Investments card reads for its "growth of 10,000" card (finance-framework P2): the longest period
   with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
   10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
   to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply
@@ -1323,7 +1325,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   (`bookTwrFrom` to `bookTwrTo`, the last bar on or before each, M9), so `delta` and the `outperform` /
   `underperform` verdict compare like with like. The brief labels it "Book TWR". The fictional example from
   before the fix: 10,000 grows to 11,000, a 10,000 deposit makes it 21,000, it ends at 19,800 - the old figure
-  read +98%, this one reads +3.7%. The money-weighted split of the same sleeve is on the Investments tab (§8).
+  read +98%, this one reads +3.7%. The money-weighted split of the same sleeve is on the Home Investments card (§8).
 - **Cash-inclusive scope.** The TWR runs on `net_worth_snapshots.brokerage_total` (IBKR + Inzhur, idle
   broker cash included), not on `brokerage_invested`. A purchase from idle cash moves value inside the scope,
   so it is not a gain, and a deposit is a flow at the scope's edge, so it can be taken out. This deviates from

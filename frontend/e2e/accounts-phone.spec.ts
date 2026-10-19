@@ -233,29 +233,22 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(groups.nth(2)).toHaveJSProperty('open', false);
     });
 
-    test('opens a broker in place with value-first positions and a link to Investments', async ({
-      page,
-    }) => {
+    test('opens a broker in place with value-first positions and no link out', async ({page}) => {
       await openAccounts(page);
 
       const broker = page.locator('cmn-disclosure-row').nth(1);
       await toggle(broker, 'Interactive Brokers');
 
-      const row = broker.getByTestId('position-row');
+      const row = broker.getByTestId('position-row').first();
       await expect(row).toBeVisible();
-      await expect(row.getByTestId('position-ticker')).toHaveText('GOOGL');
-      await expect(row.getByTestId('position-quantity')).toHaveText('40 shares');
-      await expect(row.getByTestId('position-value')).toHaveText('$6,800.00');
+      await expect(row.getByTestId('position-ticker')).toHaveText('MSFT');
+      await expect(row.getByTestId('position-quantity')).toHaveText('5');
+      await expect(row.getByTestId('position-value')).toHaveText('$21,000.00');
       await expect(
         broker.getByRole('button', {name: 'Actions for Interactive Brokers'})
       ).toBeVisible();
 
-      await broker
-        .getByTestId('institution-investments-link')
-        .getByText('Open in Investments')
-        .click();
-
-      await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
+      await expect(broker.getByTestId('institution-investments-link')).toHaveCount(0);
     });
 
     test('gives every actions menu a 44px hit target without growing the row', async ({page}) => {

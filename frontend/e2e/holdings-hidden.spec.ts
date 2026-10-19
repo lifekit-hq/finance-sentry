@@ -1,4 +1,4 @@
-import {expect, type Page, test} from '@playwright/test';
+import {expect, type Locator, type Page, test} from '@playwright/test';
 
 import {API, BROKERAGE_HOLDINGS, CRYPTO_HOLDINGS, mockApis} from './support/dossier-mocks';
 
@@ -41,21 +41,58 @@ const CRYPTO = {
   ],
 };
 
-async function open(page: Page): Promise<void> {
+const SUMMARY = {
+  totalNetWorth: 68_500.62,
+  baseCurrency: 'USD',
+  appliedFilters: {category: null, provider: null},
+  categories: [
+    {
+      category: 'crypto',
+      totalInBaseCurrency: 30_000.62,
+      institutionCount: 1,
+      institutions: [
+        {
+          institutionId: 'binance-1',
+          provider: 'binance',
+          name: 'Binance',
+          category: 'crypto',
+          totalInBaseCurrency: 30_000.62,
+          syncStatus: 'synced',
+          lastSyncTimestamp: '2026-09-01T10:00:00Z',
+          lastSuccessfulSyncTimestamp: '2026-09-01T10:00:00Z',
+          hiddenCount: 2,
+          hiddenTotal: 0.62,
+          accounts: [],
+          cards: null,
+        },
+      ],
+    },
+  ],
+};
+
+async function open(page: Page): Promise<Locator> {
   await mockApis(page);
+  await page.route(`${API}/wealth/summary`, route =>
+    route.fulfill({contentType: 'application/json', body: JSON.stringify(SUMMARY)})
+  );
+  await page.route(`${API}/wealth/manual-holdings`, route =>
+    route.fulfill({contentType: 'application/json', body: '[]'})
+  );
   await page.route(`${API}/crypto/holdings`, route =>
     route.fulfill({contentType: 'application/json', body: JSON.stringify(CRYPTO)})
   );
   await page.route(`${API}/brokerage/holdings`, route =>
     route.fulfill({contentType: 'application/json', body: JSON.stringify(BROKERAGE_HOLDINGS)})
   );
-  await page.goto('/accounts/investments');
-  await expect(page.getByTestId('holdings-hidden')).toBeVisible();
+  await page.goto('/accounts/list?provider=binance');
+  const hidden = page.getByTestId('hidden-rows');
+  await expect(hidden).toBeVisible();
+  return hidden;
 }
 
 async function shot(page: Page, name: string): Promise<void> {
   if (SHOTS_DIR) {
-    await page.getByTestId('holdings-hidden').scrollIntoViewIfNeeded();
+    await page.getByTestId('hidden-rows').scrollIntoViewIfNeeded();
     await page.waitForTimeout(SCROLL_SETTLE_MS);
     await page.mouse.move(0, 0);
     await page.screenshot({path: `${SHOTS_DIR}/${name}.png`});
@@ -69,15 +106,14 @@ for (const [label, viewport] of [
   test.describe(`hidden positions at ${label}`, () => {
     test.use({viewport, hasTouch: label === '390', isMobile: label === '390'});
 
-    test('closes a group with a collapsed row, opens in place and keeps totals whole', async ({
+    test('closes a group with a collapsed row, opens in place and keeps the row stable', async ({
       page,
     }) => {
-      await open(page);
-      const hidden = page.getByTestId('holdings-hidden');
+      const hidden = await open(page);
       const details = hidden.locator('details');
+      await expect(page.getByTestId('position-ticker').first()).toHaveText('BTC');
       await expect(details).toHaveJSProperty('open', false);
       await expect(hidden).toContainText('2 hidden · $0.62');
-      await expect(page.getByTestId('holdings-total-value')).toContainText('$68,500.62');
       await shot(page, `holdings-hidden-collapsed-${label}`);
 
       const summary = hidden.locator('summary');
@@ -91,8 +127,8 @@ for (const [label, viewport] of [
       const before = await offset();
       await summary.click();
       await expect(details).toHaveJSProperty('open', true);
-      await expect(hidden.getByTestId('holdings-hidden-rows')).toContainText('SHIB');
-      await expect(hidden.getByTestId('holdings-hidden-rows')).toContainText('DOGE');
+      await expect(hidden.getByTestId('hidden-rows-list')).toContainText('SHIB');
+      await expect(hidden.getByTestId('hidden-rows-list')).toContainText('DOGE');
       expect(await offset()).toBe(before);
       await shot(page, `holdings-hidden-expanded-${label}`);
     });

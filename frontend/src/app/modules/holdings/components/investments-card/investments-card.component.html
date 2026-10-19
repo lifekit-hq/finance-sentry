@@ -6,7 +6,7 @@
       (retry)="store.loadPositions()"
       retryable
     >
-      <div skeleton class="h-[40rem] space-y-cmn-4" data-testid="investments-card-skeleton">
+      <div skeleton class="h-[80rem] space-y-cmn-4" data-testid="investments-card-skeleton">
         <cmn-skeleton height="1.5rem" width="45%" />
         <div class="flex items-center gap-cmn-4">
           <div class="flex-1 space-y-cmn-2">
@@ -74,6 +74,8 @@
       </div>
 
       <fns-brokerage-growth />
+      <fns-growth-of-ten-thousand />
+      <fns-brokerage-growth sleeve="crypto" />
 
       @if (store.topHoldings().length > 0) {
         <section

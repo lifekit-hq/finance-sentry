@@ -339,10 +339,10 @@ describe('DashboardComponent chart click-through', () => {
     it.each([
       ['Banking', '/accounts/list'],
       ['Cash', '/accounts/list'],
-      ['Brokerage', '/accounts/investments'],
-      ['Brokerage invested', '/accounts/investments'],
-      ['Crypto', '/accounts/investments'],
-      ['Crypto invested', '/accounts/investments'],
+      ['Brokerage', '/accounts'],
+      ['Brokerage invested', '/accounts'],
+      ['Crypto', '/accounts'],
+      ['Crypto invested', '/accounts'],
     ])('opens the accounts page behind the %s band', (label, url) => {
       const {fixture} = render();
       const navigateByUrl = vi

@@ -467,7 +467,9 @@ describe('AssetDossierComponent', () => {
   it('links the position provider to the investment accounts list', () => {
     fixture.detectChanges();
 
-    expect(byTestId('position-provider-link')?.getAttribute('href')).toBe('/accounts/investments');
+    expect(byTestId('position-provider-link')?.getAttribute('href')).toBe(
+      '/accounts?provider=ibkr'
+    );
   });
 
   it('links an analyst action to its source only when one exists', () => {

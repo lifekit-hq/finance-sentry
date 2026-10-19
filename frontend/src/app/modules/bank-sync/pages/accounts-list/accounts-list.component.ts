@@ -4,10 +4,12 @@ import {
   Component,
   computed,
   inject,
+  Injector,
   OnInit,
   ViewContainerRef,
 } from '@angular/core';
-import {ActivatedRoute, Router, RouterLink} from '@angular/router';
+import {toObservable} from '@angular/core/rxjs-interop';
+import {ActivatedRoute, Router} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
   AlertComponent,
@@ -26,10 +28,15 @@ import {
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
-import {take} from 'rxjs';
+import {filter, map, pairwise, take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {DisclosureToggleDirective} from '../../../../shared/directives/disclosure-toggle.directive';
+import {ScrollIntoViewDirective} from '../../../../shared/directives/scroll-into-view.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {
   type AccountBalanceItem,
@@ -45,6 +52,8 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
+import {type PositionRow} from '../../../holdings/store/holdings.computed';
+import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {ManualHoldingDialogComponent} from '../../components/manual-holding-dialog/manual-holding-dialog.component';
@@ -83,6 +92,8 @@ import {
 
 const SKELETON_ROWS = 3;
 const SKELETON_SECTIONS = 2;
+/** The holdings feed values every position in USD. */
+const FEED_CURRENCY = 'USD';
 
 @Component({
   selector: 'fns-accounts-list',
@@ -107,15 +118,17 @@ const SKELETON_SECTIONS = 2;
     NgTemplateOutlet,
     PositionQuantityPipe,
     PositionValuePipe,
-    RouterLink,
+    ScrollIntoViewDirective,
     SkeletonComponent,
     SyncStatusLabelPipe,
     SyncStatusVariantPipe,
   ],
   templateUrl: './accounts-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [HoldingsStore],
 })
 export class AccountsListComponent implements OnInit {
+  private readonly injector = inject(Injector);
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly connectStore = inject(ConnectStore);
@@ -124,7 +137,20 @@ export class AccountsListComponent implements OnInit {
   private readonly connectivity = inject(ConnectivityService);
   private readonly toast = inject(ToastService);
 
+  /** Providers listed by exactly one institution: only those can take their positions from the holdings feed. */
+  private readonly singleInstitutionProviders = computed(() => {
+    const counts = new Map<string, number>();
+    for (const section of this.store.categorySections()) {
+      for (const institution of section.summary.institutions) {
+        counts.set(institution.provider, (counts.get(institution.provider) ?? 0) + 1);
+      }
+    }
+    return new Set([...counts].filter(([, count]) => count === 1).map(([provider]) => provider));
+  });
   public readonly store = inject(AccountsStore);
+  public readonly holdings = inject(HoldingsStore);
+  /** The `?provider=` a link named: that institution's accordion opens and scrolls into view. */
+  public readonly deepLinkProvider = this.route.snapshot.queryParamMap.get('provider');
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
   public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
   public readonly attentionInstitutions = computed(() =>
@@ -142,7 +168,8 @@ export class AccountsListComponent implements OnInit {
       lastSyncedAt: this.store.lastSyncedAt(),
     })
   );
-  public readonly investmentsRoute = AppRoute.AccountsInvestments;
+  public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
+  public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
   public readonly closedAccountsKey = CLOSED_ACCOUNTS_KEY;
   public readonly manualHoldingMenu = MANUAL_HOLDING_MENU;
   /** Closed unless this device opened it: the section is a record, not something to read on every visit. */
@@ -155,6 +182,17 @@ export class AccountsListComponent implements OnInit {
     const connected = params.get('connected');
     const connectError = params.get('connectError');
     const reconnect = params.get('reconnect');
+
+    this.store.openProvider(this.deepLinkProvider);
+    // A summary reload (connect, reconnect, a manual-holding edit, Retry) reloads the positions feed too, so an
+    // institution's header total and its feed-backed rows stay in step.
+    this.holdings.loadPositions(
+      toObservable(this.store.lastSyncedAt, {injector: this.injector}).pipe(
+        pairwise(),
+        filter(([previous]) => previous !== null),
+        map(() => undefined)
+      )
+    );
 
     if (connected === 'truelayer') {
       this.toast.show('Bank connected. Syncing your accounts now.', 'success');
@@ -169,6 +207,21 @@ export class AccountsListComponent implements OnInit {
       this.clearConnectQueryParams();
       this.reconnect({provider: reconnect});
     }
+  }
+
+  /**
+   * The holdings feed's rows for a broker or exchange, with P&L and today's move; null while the feed has
+   * nothing for it (not loaded, failed, shared by several institutions, or a base currency other than USD, which
+   * the USD feed cannot add up to), when the summary's rows stand in.
+   */
+  public holdingRows(institution: Institution): Nullable<PositionRow[]> {
+    if (
+      this.store.baseCurrency() !== FEED_CURRENCY ||
+      !this.singleInstitutionProviders().has(institution.provider)
+    ) {
+      return null;
+    }
+    return this.holdings.positionsByProvider()[institution.provider] ?? null;
   }
 
   public connectAccount(): void {

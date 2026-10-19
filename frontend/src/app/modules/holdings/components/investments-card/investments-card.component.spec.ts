@@ -6,10 +6,17 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {type AllocationBreakdownRow, type PositionRow} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 import {BrokerageGrowthComponent} from '../brokerage-growth/brokerage-growth.component';
+import {GrowthOfTenThousandComponent} from '../growth-of-ten-thousand/growth-of-ten-thousand.component';
 import {InvestmentsCardComponent} from './investments-card.component';
 
 @Component({selector: 'fns-brokerage-growth', template: '<span data-testid="growth-stub"></span>'})
 class BrokerageGrowthStubComponent {}
+
+@Component({
+  selector: 'fns-growth-of-ten-thousand',
+  template: '<span data-testid="ten-thousand-stub"></span>',
+})
+class GrowthOfTenThousandStubComponent {}
 
 function row(
   symbol: string,
@@ -21,6 +28,7 @@ function row(
     symbol,
     provider,
     providerLabel: provider,
+    assetClass: 'equity',
     quantity: 1,
     currentPrice: currentValue,
     currentValue,
@@ -65,8 +73,8 @@ describe('InvestmentsCardComponent', () => {
     };
     await TestBed.configureTestingModule({imports: [InvestmentsCardComponent]})
       .overrideComponent(InvestmentsCardComponent, {
-        remove: {imports: [BrokerageGrowthComponent]},
-        add: {imports: [BrokerageGrowthStubComponent]},
+        remove: {imports: [BrokerageGrowthComponent, GrowthOfTenThousandComponent]},
+        add: {imports: [BrokerageGrowthStubComponent, GrowthOfTenThousandStubComponent]},
       })
       .overrideComponent(InvestmentsCardComponent, {
         set: {providers: [{provide: HoldingsStore, useValue: store}]},
@@ -99,8 +107,11 @@ describe('InvestmentsCardComponent', () => {
     expect(rows).toContain('$8,210');
   });
 
-  it('shows the brokerage growth section', () => {
-    expect(byId(render(), 'growth-stub')).not.toBeNull();
+  it('shows the brokerage and crypto growth sections and the growth of 10,000', () => {
+    const el = render();
+
+    expect(el.querySelectorAll('[data-testid="growth-stub"]')).toHaveLength(2);
+    expect(byId(el, 'ten-thousand-stub')).not.toBeNull();
   });
 
   it('lists the top holdings, each linking to its dossier', () => {
@@ -117,7 +128,7 @@ describe('InvestmentsCardComponent', () => {
     (store['isLoading'] as ReturnType<typeof signal<boolean>>).set(true);
     const el = render();
 
-    expect(byId(el, 'investments-card-skeleton')?.className).toContain('h-[40rem]');
+    expect(byId(el, 'investments-card-skeleton')?.className).toContain('h-[80rem]');
     expect(byId(el, 'investments-card-total')).toBeNull();
   });
 

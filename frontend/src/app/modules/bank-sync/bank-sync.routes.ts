@@ -1,13 +1,15 @@
-import {type Routes} from '@angular/router';
+import {inject} from '@angular/core';
+import {Router, type Routes} from '@angular/router';
 import type {PageChromeData} from '@lifekit-hq/ui';
 
 import {RouteTitleUtils} from '../../core/title/route-title.utils';
 import {ACCOUNTS_CONNECT_ACTION} from '../../shared/constants/page-actions/page-actions.constants';
 import {TAB_PRELOAD_DATA} from '../../shared/constants/tab-preload/tab-preload.constants';
+import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {BankSyncRoute} from './enums/bank-sync-route/bank-sync-route.enum';
 import {provideConnectStrategies} from './strategies/provide-connect-strategies';
 
-// Both tabs of the accounts page share one title and the Connect action; the shell handles it.
+// The accounts page carries one title and the Connect action; the shell handles it.
 const ACCOUNTS_TITLE = RouteTitleUtils.of('Accounts');
 const ACCOUNTS_CHROME = {
   actions: [{id: ACCOUNTS_CONNECT_ACTION, label: 'Connect account', icon: 'Plus'}],
@@ -37,14 +39,13 @@ export const BANK_SYNC_ROUTES: Routes = [
             ...ACCOUNTS_TITLE,
             data: {...ACCOUNTS_CHROME, ...TAB_PRELOAD_DATA},
           },
+          // The retired Investments tab: its positions live in the Accounts accordions. The redirect
+          // carries the query, so a `?provider=` link still opens that institution's accordion.
           {
             path: BankSyncRoute.Investments,
-            loadComponent: () =>
-              import('../holdings/pages/holdings/holdings.component').then(
-                m => m.InvestmentsComponent
-              ),
-            ...ACCOUNTS_TITLE,
-            data: ACCOUNTS_CHROME,
+            pathMatch: 'full',
+            redirectTo: ({queryParams}) =>
+              inject(Router).createUrlTree([AppRoute.Accounts], {queryParams}),
           },
         ],
       },

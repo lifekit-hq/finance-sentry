@@ -90,7 +90,7 @@ test.describe('Connect Revolut X', () => {
     await fillKeyPair(page);
     await page.getByRole('button', {name: 'Connect Revolut X'}).click();
 
-    await expect(page).toHaveURL(/\/accounts\/investments/);
+    await expect(page).toHaveURL(/\/accounts\/list/);
     expect(connectRequest?.method()).toBe('POST');
     expect(connectRequest?.postDataJSON()).toEqual({
       apiKey: 'revx-api-key',

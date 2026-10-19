@@ -126,7 +126,7 @@ export class AssetDossierComponent {
 
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
-  public readonly accountsRoute = AppRoute.AccountsInvestments;
+  public readonly accountsRoute = AppRoute.Accounts;
   public readonly decisionsRoute = AppRoute.LedgerDecisions;
   public readonly decisionRecordedTitle = DECISION_RECORDED_TITLE;
   public readonly dossierStatus = computed<AsyncStateStatus>(() => {

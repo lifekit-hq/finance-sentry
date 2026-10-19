@@ -71,7 +71,7 @@ async function pasteSession(page: Page, value = PASTED): Promise<void> {
 }
 
 test.describe('Connect Inzhur', () => {
-  test('a pasted session connects and lands on investments', async ({page}) => {
+  test('a pasted session connects and lands on accounts', async ({page}) => {
     await mockApis(page);
     let sessionRequest: Request | undefined;
     await page.route(`${API}/brokerage/inzhur/session`, route => {
@@ -84,7 +84,7 @@ test.describe('Connect Inzhur', () => {
     await expect(page.getByText(/without signing out/)).toBeVisible();
     await pasteSession(page, ` ${PASTED} `);
 
-    await expect(page).toHaveURL(/\/accounts\/investments/);
+    await expect(page).toHaveURL(/\/accounts\/list/);
     expect(sessionRequest?.method()).toBe('POST');
     expect(sessionRequest?.postDataJSON()).toEqual({refreshToken: PASTED});
   });

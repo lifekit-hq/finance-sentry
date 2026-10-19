@@ -134,7 +134,7 @@ export const CRYPTO_HOLDINGS_FULL = {
   totalUsdValue: 3200,
 };
 
-/** The investments tab's contributions-vs-growth split, from the day the value history starts. */
+/** The Home investments card's contributions-vs-growth split, from the day the value history starts. */
 export const BROKERAGE_GROWTH = {
   seriesStart: '2026-06-30',
   from: '2026-06-30',
@@ -206,8 +206,8 @@ export const BOOK_PERFORMANCE = {
 };
 
 /**
- * The accounts page and the investments tab read the wealth summary and both holdings feeds;
- * the investments tab also reads both growth splits and the book against SPY. */
+ * The accounts page and the Home investments card read the wealth summary and both holdings feeds;
+ * the card also reads both growth splits and the book against SPY. */
 export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/summary', WEALTH_SUMMARY_FULL);
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);
