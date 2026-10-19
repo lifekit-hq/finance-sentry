@@ -126,6 +126,8 @@
 
       @if (!store.providerFilter()) {
         <fns-brokerage-growth />
+        <fns-growth-of-ten-thousand />
+        <fns-brokerage-growth sleeve="crypto" />
       }
 
       @for (group of store.positionsByAssetClass(); track group.assetClass) {

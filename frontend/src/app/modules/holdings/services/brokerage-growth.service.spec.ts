@@ -31,11 +31,17 @@ describe('BrokerageGrowthService', () => {
 
   it('reads the brokerage split from the wealth endpoint', () => {
     let result: unknown = null;
-    service.getGrowth().subscribe(growth => (result = growth));
+    service.getGrowth('brokerage').subscribe(growth => (result = growth));
 
     const body: Partial<BrokerageGrowth> = {seriesStart: '2026-07-01', growth: 110};
     http.expectOne(`${BASE}/wealth/brokerage/growth`).flush(body);
 
     expect(result).toEqual(body);
+  });
+
+  it('reads the crypto split from its own sleeve endpoint', () => {
+    service.getGrowth('crypto').subscribe();
+
+    http.expectOne(`${BASE}/wealth/crypto/growth`).flush({});
   });
 });

@@ -31,6 +31,7 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {BrokerageGrowthComponent} from '../../components/brokerage-growth/brokerage-growth.component';
+import {GrowthOfTenThousandComponent} from '../../components/growth-of-ten-thousand/growth-of-ten-thousand.component';
 import {type AssetClass, type PositionRow} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 
@@ -42,6 +43,7 @@ const SKELETON_ROWS = 4;
     AssetLogoPipe,
     AsyncStateComponent,
     BrokerageGrowthComponent,
+    GrowthOfTenThousandComponent,
     CardComponent,
     CmnCellDirective,
     CmnColumnComponent,

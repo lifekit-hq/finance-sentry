@@ -8,6 +8,18 @@ export class PercentUtils {
   }
 
   /**
+   * Percentage points with their sign, to `digits` places: 4.21 → "+4.2%", -3 → "-3.0%". A figure that
+   * rounds to zero reads "0.0%", never "-0.0%" (finance-framework D2).
+   */
+  public static signed(points: number, digits: number): string {
+    const fixed = points.toFixed(digits);
+    if (Number(fixed) === 0) {
+      return `${(0).toFixed(digits)}%`;
+    }
+    return `${points > 0 ? '+' : ''}${fixed}%`;
+  }
+
+  /**
    * The fraction behind a typed percent, or null when the text is not a number or falls outside
    * `[minPercent, maxPercent]` — the caller keeps its previous value rather than saving nonsense.
    */

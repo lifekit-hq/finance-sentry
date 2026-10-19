@@ -9,7 +9,9 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {BrokerageGrowthComponent} from '../../components/brokerage-growth/brokerage-growth.component';
+import {GrowthOfTenThousandComponent} from '../../components/growth-of-ten-thousand/growth-of-ten-thousand.component';
 import {type Position} from '../../models/position/position.model';
+import {BookPerformanceStore} from '../../store/book-performance/book-performance.store';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {type AllocationBreakdownRow, type PositionAssetGroup} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
@@ -151,6 +153,16 @@ describe('InvestmentsComponent — positions view', () => {
             {
               provide: BrokerageGrowthStore,
               useValue: {status: signal('success'), hasHistory: signal(false)},
+            },
+          ],
+        },
+      })
+      .overrideComponent(GrowthOfTenThousandComponent, {
+        set: {
+          providers: [
+            {
+              provide: BookPerformanceStore,
+              useValue: {status: signal('success'), growth: signal(null)},
             },
           ],
         },

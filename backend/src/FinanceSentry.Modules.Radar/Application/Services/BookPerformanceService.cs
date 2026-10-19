@@ -128,7 +128,8 @@ public sealed class BookPerformanceService(
             BookHeadline(window, since, today, splitWithheld, flows),
             book?.Twr.From,
             book?.Twr.To,
-            book?.Reasons);
+            book?.Reasons,
+            book?.Quality);
     }
 
     // M3 over the cash-inclusive brokerage totals inside [since, today], with link days bridged. Null when the
@@ -180,7 +181,10 @@ public sealed class BookPerformanceService(
             reasons.Add(new HeadlineReason(HeadlineReasonCode.UnknownFlow));
         }
 
-        return new BookTwrWindow(twr, reasons);
+        var quality = reasons.Select(r => HeadlineQualityMapper.QualityOf(r.Code))
+            .DefaultIfEmpty(HeadlineQuality.Complete)
+            .Max();
+        return new BookTwrWindow(twr, reasons, quality);
     }
 
     // SPY's adjusted close at the book's own opening and closing dates (the last bar on or before each, so a
@@ -310,7 +314,8 @@ public sealed class BookPerformanceService(
 
     private sealed record SplitDay(DateOnly Date, decimal InvestedUsd, HeadlineSignals? Signals);
 
-    private readonly record struct BookTwrWindow(TimeWeightedResult Twr, IReadOnlyList<HeadlineReason> Reasons);
+    private readonly record struct BookTwrWindow(
+        TimeWeightedResult Twr, IReadOnlyList<HeadlineReason> Reasons, HeadlineQuality Quality);
 
     private static int AllowedEdgeGapDays(int periodDays) =>
         Math.Clamp(

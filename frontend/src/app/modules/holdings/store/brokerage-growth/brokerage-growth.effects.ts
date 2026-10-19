@@ -3,10 +3,14 @@ import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {pipe, switchMap, tap} from 'rxjs';
 
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
-import {type BrokerageGrowth} from '../../models/brokerage-growth/brokerage-growth.model';
+import {
+  type BrokerageGrowth,
+  type GrowthSleeve,
+} from '../../models/brokerage-growth/brokerage-growth.model';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 
 interface StoreMethods {
+  sleeve: GrowthSleeve;
   setLoading(): void;
   setSuccess(): void;
   setError(errorCode: Nullable<string>): void;
@@ -20,7 +24,7 @@ export function brokerageGrowthEffects(store: StoreMethods) {
     pipe(
       tap(() => store.setLoading()),
       switchMap(() =>
-        service.getGrowth().pipe(
+        service.getGrowth(store.sleeve).pipe(
           tap(growth => {
             store.setGrowth(growth);
             store.setSuccess();

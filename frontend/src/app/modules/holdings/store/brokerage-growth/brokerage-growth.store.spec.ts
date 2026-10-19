@@ -76,6 +76,25 @@ describe('BrokerageGrowthStore', () => {
     expect(store.showsNewlyLinked()).toBe(false);
   });
 
+  it('reads the brokerage sleeve when no host names one', () => {
+    const store = create(split());
+
+    expect(store.sleeve).toBe('brokerage');
+    expect(getGrowth).toHaveBeenCalledWith('brokerage');
+  });
+
+  it('sets the time-weighted return against the money-weighted one', () => {
+    const store = create(split({timeWeightedReturn: 0, moneyWeightedReturn: 0.0525}));
+
+    expect(store.timingGap()).toEqual({investments: '0.0%', money: '+5.3%', points: '5.3'});
+  });
+
+  it('leaves the timing gap out while the time-weighted return is not measured', () => {
+    const store = create(split({timeWeightedReturn: null}));
+
+    expect(store.timingGap()).toBeNull();
+  });
+
   it('signs a loss without a plus', () => {
     const store = create(split({headline: {...split().headline, percent: -3.25}}));
 
