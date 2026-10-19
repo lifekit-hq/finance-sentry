@@ -31,8 +31,12 @@
 #
 # The dotnet steps (one shell string so restore state survives) run: directly
 # when `dotnet` is on the PATH (a CI-like runner), otherwise inside the
-# mcr.microsoft.com/dotnet/sdk:10.0 image with the repo mounted and host
-# networking. The container is capped with --memory 2g; --memory-swap is left
+# mcr.microsoft.com/dotnet/sdk:10.0 image with the repo mounted, on Docker's
+# default bridge network, never --network host: the container's 127.0.0.1 stays its own
+# loopback, so a test's deliberately fake connection string cannot reach a service listening on
+# the box's. Nothing in the run needs the host network (no Docker socket is mounted, so
+# container-backed tests skip themselves, and NuGet restore only needs outbound access).
+# The container is capped with --memory 2g; --memory-swap is left
 # unset so Docker's default applies (swap equal to the memory limit), meaning a
 # runaway run slows down on swap instead of getting the host's other processes
 # OOM-killed. NuGet packages persist in the named volume nm-nuget-cache
@@ -94,7 +98,7 @@ commands:
         img=mcr.microsoft.com/dotnet/sdk:10.0
         # A fresh named volume is root-owned; hand it to the caller once (cheap, idempotent).
         docker run --rm -u 0 -v nm-nuget-cache:/nuget "$img" chown "$(id -u):$(id -g)" /nuget
-        sh scripts/nm-heavy-slot.sh docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)" \
+        sh scripts/nm-heavy-slot.sh docker run --rm --memory 2g -u "$(id -u):$(id -g)" \
           -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1 -e DOTNET_gcServer=0 \
           -e NUGET_PACKAGES=/nuget -v nm-nuget-cache:/nuget \
           -v "$PWD":/src -w /src "$img" sh -c "$dn"

@@ -1,7 +1,9 @@
 # Backend build + full test suite in a memory-capped SDK container:
 #   docker compose -f docker/docker-compose.test.yml run --rm backend-tests
 # (scripts/test-backend.sh wraps this). Build parallelism comes from backend/Directory.Build.rsp,
-# so no -m flags are needed. No Docker socket is passed in: container-backed tests skip themselves
+# so no -m flags are needed. The service stays on the compose default network, not host networking,
+# so the container's 127.0.0.1 is its own loopback and a test's fake connection string cannot reach a
+# service on the box. No Docker socket is passed in: container-backed tests skip themselves
 # (run them on the host, or in CI, where a daemon is reachable). mem_limit matches the production host's per-build-container limit.
 services:
   backend-tests:
@@ -18,7 +20,6 @@ services:
     volumes:
       - ..:/src
       - fs-backend-tests-nuget:/nuget
-    network_mode: host
     command:
       - sh
       - -c
