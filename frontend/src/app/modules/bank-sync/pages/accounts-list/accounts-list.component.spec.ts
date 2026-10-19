@@ -10,6 +10,8 @@ import {
   type Institution,
   type NetWorthBreakdownRow,
 } from '../../../../shared/models/wealth/wealth.model';
+import {type PositionRow} from '../../../holdings/store/holdings.computed';
+import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {
   type AccountNote,
   type ClosedAccountRow,
@@ -48,6 +50,8 @@ function setupFixture(
     closed?: ClosedAccountRow[];
     notes?: Record<string, AccountNote>;
     manual?: ManualHoldingRow[];
+    positions?: Record<string, PositionRow[]>;
+    openProvider?: (provider: Nullable<string>) => void;
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -68,6 +72,7 @@ function setupFixture(
     disconnectAccount: vi.fn(),
     institutionOpen: signal(state.open ?? {}),
     setInstitutionOpen: state.setInstitutionOpen ?? vi.fn(),
+    openProvider: state.openProvider ?? vi.fn(),
     totalNetWorth: signal(state.totalNetWorth ?? 0),
     netWorthHeadline: signal(state.headline ?? null),
     isNetWorthUnavailable: signal(state.headline?.quality === 'UNAVAILABLE'),
@@ -96,6 +101,13 @@ function setupFixture(
       {provide: ActivatedRoute, useValue: {snapshot: {queryParamMap: new Map()}}},
       ...(extraProviders as never[]),
     ],
+  });
+  TestBed.overrideComponent(AccountsListComponent, {
+    set: {
+      providers: [
+        {provide: HoldingsStore, useValue: {positionsByProvider: signal(state.positions ?? {})}},
+      ],
+    },
   });
   const fixture = TestBed.createComponent(AccountsListComponent);
   fixture.detectChanges();
@@ -364,12 +376,72 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
     expect(navigate).toHaveBeenCalledWith(['/assets', 'GOOGL']);
   });
 
-  it('ends the list with a link to Investments filtered to the provider', () => {
-    const link = brokerage().querySelector<HTMLAnchorElement>(
-      '[data-testid="institution-investments-link"]'
-    );
+  it('ends the list with no link out: the accordion is the inventory', () => {
+    expect(brokerage().querySelector('[data-testid="institution-investments-link"]')).toBeNull();
+  });
 
-    expect(link?.getAttribute('href')).toBe('/accounts/investments?provider=ibkr');
+  describe('from the holdings feed', () => {
+    const row = (overrides: Partial<PositionRow>): PositionRow => ({
+      symbol: 'MSFT',
+      provider: 'ibkr',
+      providerLabel: 'Interactive Brokers',
+      assetClass: 'equity',
+      quantity: 3,
+      currentPrice: 400,
+      currentValue: 1200,
+      pnlPercent: 12.5,
+      pnlUsd: 133.33,
+      dayChangePct: -1.25,
+      dayChangeUsd: -15,
+      hiddenReason: null,
+      weightPercent: 50,
+      ...overrides,
+    });
+
+    const withFeed = (positions: PositionRow[]): HTMLElement =>
+      brokerage({open: {'ibkr:ibkr-1': true}, positions: {ibkr: positions}});
+
+    it('shows P&L and the day change on a position row', () => {
+      const element = withFeed([row({})]);
+
+      const rows = element.querySelectorAll('[data-testid="position-row"]');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.querySelector('[data-testid="position-ticker"]')?.textContent).toBe('MSFT');
+      expect(rows[0]?.querySelector('[data-testid="position-value"]')?.textContent).toBe(
+        '$1,200.00'
+      );
+      expect(rows[0]?.querySelector('[data-testid="position-pnl"]')?.textContent).toContain(
+        '12.50%'
+      );
+      expect(rows[0]?.querySelector('[data-testid="position-day-change"]')?.textContent).toContain(
+        '-1.25%'
+      );
+    });
+
+    it('leaves P&L and day change out when the feed has none', () => {
+      const element = withFeed([row({pnlPercent: null, pnlUsd: null, dayChangePct: null})]);
+
+      expect(element.querySelector('[data-testid="position-pnl"]')).toBeNull();
+      expect(element.querySelector('[data-testid="position-day-change"]')).toBeNull();
+    });
+
+    it('lists cash as a Cash row and tucks hidden rows away', () => {
+      const element = withFeed([
+        row({symbol: 'USD', assetClass: 'cash'}),
+        row({symbol: 'DUST', hiddenReason: 'small'}),
+      ]);
+
+      expect(element.querySelectorAll('[data-testid="cash-row"]')).toHaveLength(1);
+      expect(
+        element.querySelectorAll('[data-testid="hidden-rows"] [data-testid="position-row"]')
+      ).toHaveLength(0);
+    });
+
+    it('falls back to the summary rows when the feed has nothing for the provider', () => {
+      const element = brokerage({open: {'ibkr:ibkr-1': true}, positions: {binance: [row({})]}});
+
+      expect(element.querySelectorAll('[data-testid="position-row"]')).toHaveLength(2);
+    });
   });
 
   it('leaves the actions menu on the row', () => {
@@ -1057,5 +1129,35 @@ describe('AccountsListComponent values entered by hand', () => {
     fixture.componentInstance.onManualHoldingAction(steam, 'remove');
 
     expect(store['removeManualHolding']).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountsListComponent ?provider= deep link', () => {
+  const route = (provider: string) => ({
+    provide: ActivatedRoute,
+    useValue: {snapshot: {queryParamMap: new Map([['provider', provider]])}},
+  });
+
+  it('asks the store to open that provider and scrolls its accordion into view', () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const openProvider = vi.fn();
+
+    const fixture = setupFixture({provider: 'ibkr', category: 'brokerage'}, [route('ibkr')], {
+      openProvider,
+    });
+    fixture.detectChanges();
+
+    expect(openProvider).toHaveBeenCalledWith('ibkr');
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('scrolls nothing when no provider is named', () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+
+    setupFixture({provider: 'ibkr', category: 'brokerage'});
+
+    expect(scroll).not.toHaveBeenCalled();
   });
 });

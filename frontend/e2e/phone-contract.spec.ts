@@ -48,7 +48,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(page.getByTestId('dossier-back')).toHaveCount(0);
 
       await page.getByRole('button', {name: 'Back'}).click();
-      await expect(page).toHaveURL(/\/accounts\/investments/);
+      await expect(page).toHaveURL(/\/accounts\/list/);
       await expectNoHorizontalScroll(page);
     });
 

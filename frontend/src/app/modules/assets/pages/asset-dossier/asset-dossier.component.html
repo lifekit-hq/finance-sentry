@@ -213,6 +213,7 @@
             <p class="mt-cmn-3 text-cmn-xs text-text-secondary">
               Held at
               <a
+                [queryParams]="{provider: position.provider}"
                 [routerLink]="accountsRoute"
                 class="hover:underline"
                 data-testid="position-provider-link"

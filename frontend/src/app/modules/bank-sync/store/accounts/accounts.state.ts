@@ -20,6 +20,8 @@ export interface AccountsState {
    * group absent here follows its category's default (`AccountsDisclosureUtils.defaultOpen`).
    */
   institutionOpen: Record<string, boolean>;
+  /** Provider a `?provider=` link named: its institutions open once the summary lists them, then it clears. */
+  focusProvider: Nullable<string>;
 }
 
 export const initialAccountsState: AccountsState = {
@@ -29,4 +31,5 @@ export const initialAccountsState: AccountsState = {
   lastSyncedAt: null,
   disconnectVersion: 0,
   institutionOpen: {},
+  focusProvider: null,
 };

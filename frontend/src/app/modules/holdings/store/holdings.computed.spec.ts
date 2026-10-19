@@ -27,8 +27,7 @@ function build(
   positions: Position[],
   dayChangePctByTicker: Record<string, number> = {},
   status: AsyncStatus = 'idle',
-  headline: Nullable<Headline> = null,
-  provider: Nullable<string> = null
+  headline: Nullable<Headline> = null
 ) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
@@ -36,7 +35,6 @@ function build(
       headline: signal(headline),
       status: signal<AsyncStatus>(status),
       dayChangePctByTicker: signal(dayChangePctByTicker),
-      provider: signal(provider),
     })
   );
 }
@@ -287,74 +285,59 @@ describe('holdingsComputed', () => {
   });
 });
 
-describe('holdingsComputed provider filter', () => {
+describe('holdingsComputed positionsByProvider', () => {
   const ibkr = position({
     symbol: 'AAPL',
     provider: 'ibkr',
     assetClass: 'equity',
     currentValue: 300,
   });
+  const ibkrBig = position({
+    symbol: 'MSFT',
+    provider: 'ibkr',
+    assetClass: 'equity',
+    currentValue: 900,
+  });
+  const ibkrHidden = position({
+    symbol: 'DUST',
+    provider: 'ibkr',
+    assetClass: 'equity',
+    currentValue: 1,
+    hiddenReason: 'small',
+  });
   const binance = position({symbol: 'ETH', provider: 'binance', currentValue: 100});
 
-  it('keeps every position when no provider is selected', () => {
+  it('groups every position under its provider, largest first, hidden rows included', () => {
+    const c = build([ibkr, binance, ibkrHidden, ibkrBig]);
+
+    expect(Object.keys(c.positionsByProvider()).sort()).toEqual(['binance', 'ibkr']);
+    expect(c.positionsByProvider()['ibkr'].map(r => r.symbol)).toEqual(['MSFT', 'AAPL', 'DUST']);
+    expect(c.positionsByProvider()['ibkr'][2].hiddenReason).toBe('small');
+  });
+
+  it('keeps weights against the whole book, not the provider', () => {
     const c = build([ibkr, binance]);
 
-    expect(c.positions()).toHaveLength(2);
-    expect(c.providerFilterLabel()).toBeNull();
-    expect(c.totalPositionsValue()).toBe(400);
+    expect(c.positionsByProvider()['ibkr'][0].weightPercent).toBe(75);
   });
 
-  it('narrows positions, total, groups and weights to the selected provider', () => {
-    const c = build([ibkr, binance], {}, 'success', null, 'ibkr');
-
-    expect(c.positions().map(p => p.symbol)).toEqual(['AAPL']);
-    expect(c.totalPositionsValue()).toBe(300);
-    expect(c.positionsByAssetClass().map(g => g.assetClass)).toEqual(['equity']);
-    expect(c.positionsByAssetClass()[0].rows[0].weightPercent).toBe(100);
-    expect(c.providerFilterLabel()).toBe('Interactive Brokers');
-    expect(c.isFilteredEmpty()).toBe(false);
+  it('has no entry for a provider with no positions', () => {
+    expect(build([ibkr]).positionsByProvider()['binance']).toBeUndefined();
   });
 
-  it('reports a filter that matches nothing without reading as an empty book', () => {
-    const c = build([ibkr], {}, 'success', null, 'binance');
+  it('reads a failed feed as an unavailable total, never an empty book', () => {
+    const c = build([ibkr], {}, 'success', {
+      amount: 300,
+      percent: null,
+      method: 'VALUE',
+      scope: 'umbrella',
+      window: {to: '2026-10-15'},
+      quality: 'DEGRADED',
+      reasons: [{code: 'STALE_SOURCE', source: 'crypto'}],
+      currency: 'USD',
+    });
 
-    expect(c.positions()).toHaveLength(0);
-    expect(c.isFilteredEmpty()).toBe(true);
     expect(c.isEmpty()).toBe(false);
-  });
-
-  const staleFeed = (source: string): Headline => ({
-    amount: 300,
-    percent: null,
-    method: 'VALUE',
-    scope: 'umbrella',
-    window: {to: '2026-10-15'},
-    quality: 'DEGRADED',
-    reasons: [{code: 'STALE_SOURCE', source}],
-    currency: 'USD',
-  });
-
-  it('flags the filtered provider when its feed failed, never an empty provider', () => {
-    const c = build([ibkr], {}, 'success', staleFeed('crypto'), 'binance');
-
-    expect(c.isProviderFeedFailed()).toBe(true);
-    expect(c.isFilteredEmpty()).toBe(false);
-    expect(c.isTotalUnavailable()).toBe(true);
-  });
-
-  it('maps a broker provider to the brokerage feed', () => {
-    const c = build([binance], {}, 'success', staleFeed('brokerage'), 'ibkr');
-
-    expect(c.isProviderFeedFailed()).toBe(true);
-    expect(c.isFilteredEmpty()).toBe(false);
-  });
-
-  it('keeps the filtered figure when only the other feed failed', () => {
-    const c = build([ibkr], {}, 'success', staleFeed('crypto'), 'ibkr');
-
-    expect(c.isProviderFeedFailed()).toBe(false);
-    expect(c.isTotalUnavailable()).toBe(false);
-    expect(c.totalPositionsValue()).toBe(300);
   });
 });
 

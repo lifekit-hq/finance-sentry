@@ -1,6 +1,7 @@
 import {signalState} from '@ngrx/signals';
 import {beforeEach, describe, expect, it} from 'vitest';
 
+import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';
 import {
   ACCOUNTS_COLLAPSED_STORAGE_KEY,
   ACCOUNTS_OPEN_STORAGE_KEY,
@@ -55,5 +56,55 @@ describe('accountsMethods institution open state', () => {
     methods.setInstitutionOpen('a', true);
 
     expect(state.institutionOpen()).toEqual({a: true});
+  });
+});
+
+describe('accountsMethods provider deep link', () => {
+  const summary: WealthSummaryResponse = {
+    categories: [
+      {
+        category: 'brokerage',
+        institutions: [
+          {provider: 'ibkr', institutionId: 'ibkr-1'},
+          {provider: 'inzhur', institutionId: 'inz-1'},
+        ],
+      },
+    ],
+  } as unknown as WealthSummaryResponse;
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('opens the provider institutions once the summary lists them, keeping the other choices', () => {
+    const {state, methods} = setup();
+    methods.setInstitutionOpen('truelayer:aib', false);
+
+    methods.openProvider('ibkr');
+    expect(state.focusProvider()).toBe('ibkr');
+    methods.setSummary(summary);
+
+    expect(state.institutionOpen()).toEqual({'truelayer:aib': false, 'ibkr:ibkr-1': true});
+    expect(state.focusProvider()).toBeNull();
+    expect(localStorage.getItem(ACCOUNTS_OPEN_STORAGE_KEY)).toContain('"ibkr:ibkr-1":true');
+  });
+
+  it('opens at once when the summary is already there', () => {
+    const {state, methods} = setup();
+    methods.setSummary(summary);
+
+    methods.openProvider('inzhur');
+
+    expect(state.institutionOpen()).toEqual({'inzhur:inz-1': true});
+  });
+
+  it('does nothing for a provider the summary does not list', () => {
+    const {state, methods} = setup();
+    methods.setSummary(summary);
+
+    methods.openProvider('binance');
+
+    expect(state.institutionOpen()).toEqual({});
+    expect(state.focusProvider()).toBeNull();
   });
 });

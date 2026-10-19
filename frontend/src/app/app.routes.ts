@@ -107,7 +107,8 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: AppRoute.Investments.slice(1),
-        redirectTo: AppRoute.AccountsInvestments.slice(1),
+        redirectTo: ({queryParams}) =>
+          inject(Router).createUrlTree([AppRoute.Accounts], {queryParams}),
         pathMatch: 'full',
       },
       {
@@ -203,7 +204,7 @@ export const APP_ROUTES: Routes = [
             m => m.AssetDossierComponent
           ),
         // The title is the symbol; the path names it, so the title resolves from the param.
-        data: {parent: AppRoute.AccountsInvestments} satisfies PageChromeData,
+        data: {parent: AppRoute.Accounts} satisfies PageChromeData,
         ...RouteTitleUtils.of(
           (route: ActivatedRouteSnapshot) =>
             route.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM)?.toUpperCase() ?? 'Asset'

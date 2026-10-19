@@ -35,12 +35,6 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
   {id: AppRoute.AccountsList, label: 'Accounts', icon: 'Building2', group: 'Pages'},
   {id: AppRoute.Transactions, label: 'Transactions', icon: 'ArrowLeftRight', group: 'Pages'},
-  {
-    id: AppRoute.AccountsInvestments,
-    label: 'Investments',
-    icon: 'ChartNoAxesColumn',
-    group: 'Pages',
-  },
   {id: AppRoute.Budgets, label: 'Budgets', icon: 'Zap', group: 'Pages'},
   {id: AppRoute.Subscriptions, label: 'Subscriptions', icon: 'RefreshCw', group: 'Pages'},
   {id: AppRoute.Alerts, label: 'Alerts', icon: 'Bell', group: 'Pages'},

@@ -15,12 +15,11 @@ test.describe('Asset Dossier', () => {
   });
 
   test('click holding symbol navigates to dossier page', async ({page}) => {
-    await page.goto('/accounts/investments');
-    // Wait for positions to load and AAPL to appear
-    await expect(page.getByText('AAPL').first()).toBeVisible();
-
-    // The whole row is the click target (cmn-data-table rowsActionable)
-    await page.getByText('AAPL').first().click();
+    await page.goto('/accounts/list');
+    const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
+    await broker.locator('summary').click();
+    // The whole position row is the click target
+    await broker.getByTestId('position-row').filter({hasText: 'AAPL'}).click();
 
     // Should land on the dossier URL
     await expect(page).toHaveURL(/\/assets\/AAPL/);
@@ -140,27 +139,27 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByText('Apple reports record services revenue in Q3')).toBeVisible();
   });
 
-  test('the top bar back chevron returns to investments', async ({page}) => {
+  test('the top bar back chevron returns to accounts', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
 
     await page.getByRole('button', {name: 'Back'}).click();
 
-    await expect(page).toHaveURL(/\/accounts\/investments/);
+    await expect(page).toHaveURL(/\/accounts/);
   });
 
-  test('accounts list brokerage row opens in place and links to investments for its provider', async ({
+  test("the dossier's provider link opens that institution's accordion on Accounts", async ({
     page,
   }) => {
-    await page.goto('/accounts/list');
+    await page.goto('/assets/AAPL');
+
+    await page.getByTestId('position-provider-link').click();
+
+    await expect(page).toHaveURL(/\/accounts\/list\?provider=ibkr/);
     const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
-    await broker.locator('summary').click();
-    const link = broker.getByTestId('institution-investments-link');
-    await expect(link).toBeVisible();
-
-    await link.click();
-
-    await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
+    await expect(broker.locator('details').first()).toHaveJSProperty('open', true);
+    await expect(broker.getByTestId('position-row').first()).toBeVisible();
+    await expect(broker.getByTestId('institution-investments-link')).toHaveCount(0);
   });
 
   test('accounts list position row opens the asset dossier', async ({page}) => {

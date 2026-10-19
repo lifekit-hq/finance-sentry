@@ -103,7 +103,7 @@ test.describe('Connect Interactive Brokers (Flex)', () => {
     }
 
     await page.getByRole('button', {name: /Save & connect/}).click();
-    await expect(page).toHaveURL(/\/accounts\/investments/);
+    await expect(page).toHaveURL(/\/accounts\/list/);
     expect(connectBody).toEqual({token: '123456', queryId: '987654'});
   });
 

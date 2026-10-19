@@ -15,7 +15,7 @@ import {AccountsShellComponent} from './accounts-shell.component';
 })
 class StubPageComponent {}
 
-describe('AccountsShellComponent tabs', () => {
+describe('AccountsShellComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
@@ -26,25 +26,20 @@ describe('AccountsShellComponent tabs', () => {
           {
             path: 'accounts',
             component: AccountsShellComponent,
-            children: [
-              {path: 'list', component: StubPageComponent},
-              {path: 'investments', component: StubPageComponent},
-            ],
+            children: [{path: 'list', component: StubPageComponent}],
           },
         ]),
       ],
     });
   });
 
-  it('marks only the active tab with aria-current=page', async () => {
+  it('renders the routed page with no tab bar: Accounts is the one inventory', async () => {
     const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/accounts/investments');
+    await harness.navigateByUrl('/accounts/list');
     harness.detectChanges();
 
-    const nav = harness.routeNativeElement?.querySelector('nav');
-    expect(nav?.getAttribute('aria-label')).toBe('Accounts view');
-    const tabs = Array.from<HTMLElement>(nav?.querySelectorAll('a') ?? []);
-    expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['Inventory', 'Investments']);
-    expect(tabs.map(tab => tab.getAttribute('aria-current'))).toEqual([null, 'page']);
+    const element = harness.routeNativeElement;
+    expect(element?.querySelector('nav')).toBeNull();
+    expect(element?.querySelector('fns-stub-page')).not.toBeNull();
   });
 });

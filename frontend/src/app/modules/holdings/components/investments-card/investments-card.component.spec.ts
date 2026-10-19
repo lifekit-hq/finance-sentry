@@ -21,6 +21,7 @@ function row(
     symbol,
     provider,
     providerLabel: provider,
+    assetClass: 'equity',
     quantity: 1,
     currentPrice: currentValue,
     currentValue,

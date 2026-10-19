@@ -7,13 +7,10 @@ export interface HoldingsState {
   headline: Nullable<Headline>;
   /** Day change % per ticker (upper-cased). A missing key means no quote; never cleared on refresh. */
   dayChangePctByTicker: Record<string, number>;
-  /** Provider slug the list is narrowed to (`?provider=`); null shows every provider. */
-  provider: Nullable<string>;
 }
 
 export const initialHoldingsState: HoldingsState = {
   positions: [],
   headline: null,
   dayChangePctByTicker: {},
-  provider: null,
 };

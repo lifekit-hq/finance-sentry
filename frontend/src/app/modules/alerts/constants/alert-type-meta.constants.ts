@@ -40,7 +40,7 @@ export const ALERT_TYPE_META_REGISTRY = {
   ['PolicyViolation']: {
     icon: 'ShieldAlert',
     label: 'policy violation',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['Opportunity']: {
     icon: 'Lightbulb',
@@ -66,7 +66,7 @@ export const ALERT_TYPE_META_REGISTRY = {
   ['PerformanceBrief']: {
     icon: 'ChartLine',
     label: 'performance brief',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['CashShortfall']: {
     icon: 'Wallet',
@@ -96,12 +96,12 @@ export const ALERT_TYPE_META_REGISTRY = {
   ['RebalanceProposal']: {
     icon: 'Scale',
     label: 'rebalance',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['CashSweepProposal']: {
     icon: 'PiggyBank',
     label: 'cash sweep',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['EarningsAhead']: {
     icon: 'CalendarClock',
@@ -151,17 +151,17 @@ export const ALERT_TYPE_META_REGISTRY = {
   ['PolicyReview']: {
     icon: 'ClipboardCheck',
     label: 'policy review',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['PolicyReviewMissed']: {
     icon: 'ClipboardX',
     label: 'review missed',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
   ['RelativeUnderperformance']: {
     icon: 'TrendingDown',
     label: 'underperformance',
-    destination: AppRoute.AccountsInvestments,
+    destination: AppRoute.Accounts,
   },
 } satisfies Record<AlertType, AlertTypeMeta>;
 

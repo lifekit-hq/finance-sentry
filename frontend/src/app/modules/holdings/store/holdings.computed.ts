@@ -8,8 +8,6 @@ import {
   CRYPTO_COLOUR,
   EQUITY_COLOUR,
 } from '../../../shared/constants/chart-colour/chart-colour.constants';
-import {STALE_SOURCE_CODE} from '../../../shared/constants/headline/headline.constants';
-import {PROVIDER_CATALOG} from '../../../shared/constants/providers/providers.constants';
 import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {type HiddenReason} from '../../../shared/models/wealth/wealth.model';
@@ -24,7 +22,6 @@ interface StateSignals {
   headline: Signal<Nullable<Headline>>;
   status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
-  provider: Signal<Nullable<string>>;
 }
 
 const WEIGHT_TO_PERCENT = 100;
@@ -32,16 +29,13 @@ const WEIGHT_TO_PERCENT = 100;
 /** How many positions the Home Investments card lists. */
 export const TOP_HOLDINGS_COUNT = 5;
 
-// The headline names a failed read by feed ('brokerage' | 'crypto'), not by provider.
-const CRYPTO_FEED = 'crypto';
-const BROKERAGE_FEED = 'brokerage';
-
 export type AssetClass = PositionAssetClass;
 
 export interface PositionRow {
   symbol: string;
   provider: string;
   providerLabel: string;
+  assetClass: AssetClass;
   quantity: number;
   currentPrice: Nullable<number>;
   currentValue: number;
@@ -70,11 +64,6 @@ export interface PositionAssetGroup {
   hiddenTotal: number;
   /** The whole class: visible and hidden rows. */
   totalValue: number;
-}
-
-export interface ProviderOption {
-  slug: string;
-  label: string;
 }
 
 export interface AllocationBreakdownRow {
@@ -112,35 +101,20 @@ export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
 };
 
 export function holdingsComputed(store: StateSignals) {
-  // The provider filter narrows everything the page shows - total, weights, groups and donut.
-  const visiblePositions = computed((): Position[] => {
-    const provider = store.provider();
-    return provider ? store.positions().filter(p => p.provider === provider) : store.positions();
-  });
-  const isProviderFeedFailed = computed(() => {
-    const provider = store.provider();
-    const institutionType = PROVIDER_CATALOG.find(p => p.slug === provider)?.institutionType;
-    if (!institutionType) {
-      return false;
-    }
-    const feed = institutionType === 'crypto' ? CRYPTO_FEED : BROKERAGE_FEED;
-    return (store.headline()?.reasons ?? []).some(
-      r => r.code === STALE_SOURCE_CODE && r.source === feed
-    );
-  });
   const totalPositionsValue = computed(() =>
-    visiblePositions().reduce((sum, p) => sum + p.currentValue, 0)
+    store.positions().reduce((sum, p) => sum + p.currentValue, 0)
   );
   // Everything but the cash asset class (broker cash, venue fiat): the book's `investedUsd`
   // (money-semantics §8), so Home's card and its hero sub-line state one figure.
   const investedPositionsValue = computed(() =>
-    visiblePositions()
+    store
+      .positions()
       .filter(p => p.assetClass !== 'cash')
       .reduce((sum, p) => sum + p.currentValue, 0)
   );
 
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
-    const positions = visiblePositions();
+    const positions = store.positions();
     const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0);
     const dayChanges = store.dayChangePctByTicker();
     const groups = new Map<AssetClass, PositionRow[]>();
@@ -154,6 +128,7 @@ export function holdingsComputed(store: StateSignals) {
         symbol: p.symbol,
         provider: p.provider,
         providerLabel: ProviderUtils.label(p.provider),
+        assetClass,
         quantity: p.quantity,
         currentPrice: p.currentPrice,
         currentValue: p.currentValue,
@@ -190,35 +165,32 @@ export function holdingsComputed(store: StateSignals) {
   });
 
   return {
-    positions: visiblePositions,
-    providerFilter: computed(() => store.provider()),
-    providerFilterLabel: computed(() => {
-      const provider = store.provider();
-      return provider ? ProviderUtils.label(provider) : null;
-    }),
-    // A filter with no matching rows is its own state, never the "connect an account" empty page.
-    isFilteredEmpty: computed(
-      () =>
-        store.provider() !== null &&
-        visiblePositions().length === 0 &&
-        store.positions().length > 0 &&
-        !isProviderFeedFailed()
-    ),
-    // The filtered provider's feed failed to load: its empty list is not an empty provider.
-    isProviderFeedFailed,
+    positions: store.positions,
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
     investedPositionsValue,
     // The total's record: its badge, and N/A (never 0) when every feed failed.
     totalHeadline: computed((): Nullable<Headline> => store.headline()),
-    isTotalUnavailable: computed(
-      () => isProviderFeedFailed() || HeadlineUtils.isUnavailable(store.headline())
-    ),
+    isTotalUnavailable: computed(() => HeadlineUtils.isUnavailable(store.headline())),
     // A failed feed is never read as an empty book: the total card keeps its N/A and badge.
     isEmpty: computed(
       () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null
     ),
     positionsByAssetClass,
+    // Every position of one provider, largest first, hidden rows included (they carry `hiddenReason`):
+    // the Accounts accordion of that institution lists these.
+    positionsByProvider: computed((): Record<string, PositionRow[]> => {
+      const byProvider: Record<string, PositionRow[]> = {};
+      for (const group of positionsByAssetClass()) {
+        for (const row of [...group.rows, ...group.hiddenRows]) {
+          (byProvider[row.provider] ??= []).push(row);
+        }
+      }
+      for (const rows of Object.values(byProvider)) {
+        rows.sort((a, b) => b.currentValue - a.currentValue);
+      }
+      return byProvider;
+    }),
     // Largest positions across every venue, for the Home card: cash balances have no dossier and
     // hidden rows are tucked away, so neither is listed (both still count in the weights).
     topHoldings: computed((): PositionRow[] =>
