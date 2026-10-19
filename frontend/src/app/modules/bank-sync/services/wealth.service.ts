@@ -4,6 +4,12 @@ import {type Observable} from 'rxjs';
 
 import {type WealthSummaryResponse} from '../../../shared/models/wealth/wealth.model';
 import {type FireProjection} from '../models/fire/fire.model';
+import {
+  type ManualHolding,
+  type ManualHoldingInput,
+} from '../models/manual-holding/manual-holding.model';
+
+const MANUAL_HOLDINGS_PATH = 'manual-holdings';
 
 @Injectable({providedIn: 'root'})
 export class WealthService extends ApiService {
@@ -17,5 +23,21 @@ export class WealthService extends ApiService {
 
   public getFireProjection(): Observable<FireProjection> {
     return this.get<FireProjection>('fire');
+  }
+
+  public getManualHoldings(): Observable<ManualHolding[]> {
+    return this.get<ManualHolding[]>(MANUAL_HOLDINGS_PATH);
+  }
+
+  public createManualHolding(input: ManualHoldingInput): Observable<ManualHolding> {
+    return this.post<ManualHolding>(MANUAL_HOLDINGS_PATH, input);
+  }
+
+  public updateManualHolding(id: string, input: ManualHoldingInput): Observable<ManualHolding> {
+    return this.put<ManualHolding>(`${MANUAL_HOLDINGS_PATH}/${id}`, input);
+  }
+
+  public deleteManualHolding(id: string): Observable<void> {
+    return this.delete<void>(`${MANUAL_HOLDINGS_PATH}/${id}`);
   }
 }

@@ -5,6 +5,10 @@ import {catchError, EMPTY, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
 
 import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {
+  type ManualHolding,
+  type ManualHoldingInput,
+} from '../../models/manual-holding/manual-holding.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {BinanceService} from '../../services/binance.service';
 import {IBKRService} from '../../services/ibkr.service';
@@ -18,6 +22,7 @@ interface EffectsStore {
   setError: (errorCode: Nullable<string>) => void;
   setSummary: (summary: WealthSummaryResponse) => void;
   setAllAccounts: (accounts: BankAccount[]) => void;
+  setManualHoldings: (holdings: ManualHolding[]) => void;
   bumpDisconnectVersion: () => void;
 }
 
@@ -37,11 +42,15 @@ export function accountsEffects(store: EffectsStore) {
           wealthService.getSummary(),
           // The closed section and the row notes are extras: a failed list leaves what was there, never the page.
           bankSyncService.getAccounts().pipe(catchError(() => of(null))),
+          wealthService.getManualHoldings().pipe(catchError(() => of(null))),
         ]).pipe(
-          tap(([summary, accounts]) => {
+          tap(([summary, accounts, manualHoldings]) => {
             store.setSummary(summary);
             if (accounts) {
               store.setAllAccounts(accounts.accounts);
+            }
+            if (manualHoldings) {
+              store.setManualHoldings(manualHoldings);
             }
             store.setSuccess();
           }),
@@ -59,6 +68,38 @@ export function accountsEffects(store: EffectsStore) {
     pipe(
       switchMap(accountId =>
         bankSyncService.reopenAccount(accountId).pipe(
+          tap(() => load()),
+          catchError((err: unknown) => {
+            store.setError(extractErrorCode(err));
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
+  // The reload brings the new value into the total, the breakdown and the section together.
+  const saveManualHolding = rxMethod<{id: Nullable<string>; input: ManualHoldingInput}>(
+    pipe(
+      switchMap(({id, input}) =>
+        (id
+          ? wealthService.updateManualHolding(id, input)
+          : wealthService.createManualHolding(input)
+        ).pipe(
+          tap(() => load()),
+          catchError((err: unknown) => {
+            store.setError(extractErrorCode(err));
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
+  const removeManualHolding = rxMethod<string>(
+    pipe(
+      switchMap(id =>
+        wealthService.deleteManualHolding(id).pipe(
           tap(() => load()),
           catchError((err: unknown) => {
             store.setError(extractErrorCode(err));
@@ -191,6 +232,8 @@ export function accountsEffects(store: EffectsStore) {
   return {
     load,
     reopenAccount,
+    saveManualHolding,
+    removeManualHolding,
     disconnectMonobank,
     disconnectAccount,
     disconnectInstitution,

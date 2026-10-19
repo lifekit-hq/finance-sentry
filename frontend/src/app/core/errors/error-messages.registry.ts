@@ -76,6 +76,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   EVENTS_KINDS_INVALID: 'One of the requested event kinds is not recognised.',
   MACRO_STATUS_INVALID: 'Unknown macro event status. Use scheduled or released.',
   BUDGET_NOT_FOUND: 'Budget not found.',
+  MANUAL_HOLDING_NOT_FOUND: 'That value is no longer there. Refresh to see your current list.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'Invalid budget category.',
   BUDGET_INVALID_LIMIT: 'Budget limit must be greater than zero.',

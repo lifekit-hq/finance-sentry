@@ -1,5 +1,6 @@
 import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {type ManualHolding} from '../../models/manual-holding/manual-holding.model';
 
 export interface AccountsState {
   summary: Nullable<WealthSummaryResponse>;
@@ -8,6 +9,8 @@ export interface AccountsState {
    * the "Closed accounts" section and the notes on live rows (card expiry, replaced card) read from here.
    */
   allAccounts: BankAccount[];
+  /** Values the person entered by hand (`GET /wealth/manual-holdings`); the summary carries their total, not the fields an edit needs. */
+  manualHoldings: ManualHolding[];
   /** Epoch ms of the last successful summary load; drives the offline "last synced" notice. */
   lastSyncedAt: Nullable<number>;
   /** Bumped after every successful disconnect so sibling stores (e.g. HoldingsStore) can react. */
@@ -22,6 +25,7 @@ export interface AccountsState {
 export const initialAccountsState: AccountsState = {
   summary: null,
   allAccounts: [],
+  manualHoldings: [],
   lastSyncedAt: null,
   disconnectVersion: 0,
   institutionOpen: {},

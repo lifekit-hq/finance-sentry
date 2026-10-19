@@ -5,15 +5,17 @@ import {
   type CategorySummary,
   type WealthSummaryResponse,
 } from '../../../../shared/models/wealth/wealth.model';
+import {type ManualHolding} from '../../models/manual-holding/manual-holding.model';
 import {accountsComputed} from './accounts.computed';
 
 function category(name: CategorySummary['category']): CategorySummary {
   return {category: name, totalInBaseCurrency: 100, institutionCount: 1, institutions: []};
 }
 
-function computedFor(categories: CategorySummary[]) {
+function computedFor(categories: CategorySummary[], manualHoldings: ManualHolding[] = []) {
   return accountsComputed({
     allAccounts: signal([]),
+    manualHoldings: signal(manualHoldings),
     summary: signal({
       totalNetWorth: 0,
       baseCurrency: 'USD',
@@ -75,5 +77,31 @@ describe('accountsComputed net-worth breakdown', () => {
     const segments = withTotals(-93.23, 9278.96, 6489.6).netWorthSegments();
 
     expect(segments.map(s => s.label)).toEqual(['Brokerage', 'Crypto']);
+  });
+});
+
+describe('accountsComputed values entered by hand', () => {
+  const steam: ManualHolding = {
+    id: 'manual-1',
+    label: 'Steam wallet',
+    amount: 40,
+    currency: 'USD',
+    asOf: '2026-10-05',
+    convertibility: 'InEconomy',
+    reliability: 'L3Estimated',
+    updatedAt: '2026-10-05T10:00:00Z',
+  };
+
+  it('words a row by where it spends and the day it was true on', () => {
+    const [row] = computedFor([], [steam]).manualRows();
+
+    expect(row.sublabel).toBe('Spendable only inside its platform · Mon 5 Oct');
+  });
+
+  it('reads the section total from the summary in the base currency', () => {
+    const c = computedFor([{...category('other'), totalInBaseCurrency: 37.5}], [steam]);
+
+    expect(c.manualTotal()).toBe(37.5);
+    expect(computedFor([]).manualTotal()).toBe(0);
   });
 });

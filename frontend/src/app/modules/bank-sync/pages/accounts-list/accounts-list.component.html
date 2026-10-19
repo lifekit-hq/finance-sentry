@@ -85,6 +85,9 @@
       <cmn-button (clicked)="connectAccount()" cta variant="primary"
         >Connect Your First Account</cmn-button
       >
+      <cmn-button (clicked)="openManualHolding()" cta variant="secondary"
+        >Add a value by hand</cmn-button
+      >
     </cmn-empty-state>
 
     <cmn-button (clicked)="store.load()" error-action variant="secondary" size="sm"
@@ -203,6 +206,64 @@
         }
       </cmn-list-section>
     }
+
+    <!-- Values with no feed (a Steam wallet): in total net worth, never in cash unless spendable anywhere. -->
+    <!-- Rows are positioned so they stay above the shell's page-overflow spacer, which otherwise takes their taps near the page end. -->
+    <cmn-list-section class="mb-cmn-8" data-testid="manual-holdings" heading="Entered by hand">
+      @if (store.manualRows().length > 0) {
+        <span
+          class="shrink-0 font-medium tabular-nums"
+          cmnListSectionAside
+          data-testid="manual-subtotal"
+          >{{ store.manualTotal() | money: store.baseCurrency() }}</span
+        >
+      }
+      <ul>
+        @for (row of store.manualRows(); track row.id) {
+          <li
+            class="relative flex items-center border-t border-border-default pr-cmn-2 transition-colors first:border-t-0 hover:bg-surface-card"
+            data-testid="manual-holding-row"
+          >
+            <button
+              (click)="openManualHolding(row)"
+              class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
+              type="button"
+            >
+              <span class="min-w-0">
+                <span class="block truncate text-cmn-sm text-text-primary">{{ row.label }}</span>
+                <span class="block text-cmn-xs text-text-secondary">{{ row.sublabel }}</span>
+              </span>
+              <span
+                class="shrink-0 text-cmn-sm tabular-nums text-text-primary"
+                data-testid="manual-holding-value"
+                >{{ row.amount | money: row.currency }}</span
+              >
+            </button>
+            <cmn-menu
+              [items]="manualHoldingMenu"
+              [ariaLabel]="'Actions for ' + row.label"
+              (itemSelect)="onManualHoldingAction(row, $event.id)"
+            >
+              <cmn-icon name="Ellipsis" />
+            </cmn-menu>
+          </li>
+        }
+        <li
+          [class.border-t]="store.manualRows().length > 0"
+          class="relative border-border-default transition-colors hover:bg-surface-card"
+        >
+          <button
+            (click)="openManualHolding()"
+            class="flex min-h-[2.75rem] w-full items-center gap-cmn-2 px-cmn-4 py-cmn-3 text-left text-cmn-sm font-medium text-text-primary"
+            data-testid="add-manual-holding"
+            type="button"
+          >
+            <cmn-icon name="Plus" />
+            Add a value by hand
+          </button>
+        </li>
+      </ul>
+    </cmn-list-section>
   </cmn-async-state>
 
   @if (store.closedAccounts().length > 0) {

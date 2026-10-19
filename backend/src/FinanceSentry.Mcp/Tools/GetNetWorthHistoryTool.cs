@@ -58,15 +58,19 @@ public sealed class GetNetWorthHistoryTool(
                 s.CryptoInvested,
                 HeadlineFactory.Value(
                     s.TotalNetWorth, HeadlineScope.Umbrella, s.SnapshotDate,
-                    HeadlineSignals.FromSnapshot(null, s.IsApproximate, s.FxReasons) with { StaleSources = StaleSources(s) }),
+                    HeadlineSignals.FromSnapshot(null, s.IsApproximate, s.FxReasons) with
+                    {
+                        StaleSources = SourcesWith(s, SourceReasons.StaleSource),
+                        EstimatedSources = SourcesWith(s, SourceReasons.EstimatedValue),
+                    }),
                 s.Sources,
                 s.OtherInvested))
             .ToList();
     }
 
-    // Stale state comes from the per-source reasons the history query resolved for the day, not the column.
-    private static IReadOnlyList<string> StaleSources(NetWorthSnapshotDto snapshot)
-        => [.. (snapshot.Sources ?? []).Where(s => s.Reasons.Contains(SourceReasons.StaleSource)).Select(s => s.SourceId)];
+    // Stale and estimated state come from the per-source reasons the history query resolved for the day, not the column.
+    private static IReadOnlyList<string> SourcesWith(NetWorthSnapshotDto snapshot, string reason)
+        => [.. (snapshot.Sources ?? []).Where(s => s.Reasons.Contains(reason)).Select(s => s.SourceId)];
 }
 
 public sealed record NetWorthHistoryEntry(

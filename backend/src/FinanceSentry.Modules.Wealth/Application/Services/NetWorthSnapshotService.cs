@@ -118,7 +118,8 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
     /// <summary>
     /// A source's row, as the source read this run. A failed read has no figures (null, never zero) and is
     /// UNAVAILABLE + STALE_SOURCE, the way <see cref="BookFigures"/> reports it; a read that succeeded takes its FX
-    /// reasons (ESTIMATED for today's/seed rate, DEGRADED for a 1:1 conversion), and a sleeve this snapshot carried
+    /// reasons (ESTIMATED for today's/seed rate, DEGRADED for a 1:1 conversion), ESTIMATED + ESTIMATED_VALUE for an
+    /// estimated (L3) value, and a sleeve this snapshot carried
     /// forward is at best DEGRADED + STALE_SOURCE. The snapshot's own column then holds the carried figure.
     /// </summary>
     private static NetWorthSnapshotSource ToRow(BookSourceReading figure, List<string> staleSleeves)
@@ -134,6 +135,11 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
                 FxStatus.TodayRate or FxStatus.SeedTable => SourceHealth.Estimated,
                 _ => SourceHealth.Complete,
             };
+            if (reading.Reliability == Reliability.L3Estimated && reading.TotalValueUsd != 0m)
+            {
+                health = SourceHealth.Estimated > health ? SourceHealth.Estimated : health;
+                reasons.Add(SourceReasons.EstimatedValue);
+            }
             if (staleSleeves.Contains(figure.SourceId))
             {
                 health = SourceHealth.Degraded > health ? SourceHealth.Degraded : health;

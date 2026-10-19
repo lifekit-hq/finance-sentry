@@ -22,6 +22,60 @@ namespace FinanceSentry.Modules.Wealth.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.ManualHolding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<string>("Convertibility")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("convertibility");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("label");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_manual_holdings_user");
+
+                    b.ToTable("manual_holdings", (string)null);
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshot", b =>
                 {
                     b.Property<Guid>("Id")

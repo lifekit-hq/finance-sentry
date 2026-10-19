@@ -16,6 +16,8 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
 
     public DbSet<NetWorthSnapshotSource> NetWorthSnapshotSources { get; set; } = null!;
 
+    public DbSet<ManualHolding> ManualHoldings { get; set; } = null!;
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
@@ -76,5 +78,20 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         source.HasQueryFilter(
             OwnerQueryFilter.Name,
             x => NetWorthSnapshots.Any(s => s.Id == x.SnapshotId && s.UserId == CurrentUserId));
+
+        // Values the person enters by hand (framework §5.5). Amount is in the row's own Currency; convertibility is
+        // stored by name (the enum convention). Reliability is always L3, so it is not a column.
+        var manual = modelBuilder.Entity<ManualHolding>();
+        manual.ToTable("manual_holdings");
+        manual.HasKey(x => x.Id);
+        manual.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+        manual.Property(x => x.Label).HasColumnName("label").IsRequired().HasMaxLength(ManualHoldingLimits.LabelMaxLength);
+        manual.Property(x => x.Amount).HasColumnName("amount");
+        manual.Property(x => x.Currency).HasColumnName("currency").IsRequired().HasMaxLength(3);
+        manual.Property(x => x.AsOf).HasColumnName("as_of");
+        manual.Property(x => x.Convertibility).HasColumnName("convertibility").IsRequired().HasMaxLength(16);
+        manual.Property(x => x.CreatedAt).HasColumnName("created_at");
+        manual.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        manual.HasIndex(x => x.UserId).HasDatabaseName("idx_manual_holdings_user");
     }
 }

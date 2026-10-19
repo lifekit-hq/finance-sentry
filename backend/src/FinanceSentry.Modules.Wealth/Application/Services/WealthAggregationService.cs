@@ -6,6 +6,7 @@ using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
+using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FinanceSentry.Modules.Wealth.Domain.Services;
 using Microsoft.Extensions.Options;
 
@@ -18,7 +19,8 @@ public class WealthAggregationService(
     IEnumerable<IConnectionHealthReader>? healthReaders = null,
     IOptionsMonitor<ConnectionHealthOptions>? healthOptions = null,
     IUserAssetVisibilityReader? visibilityReader = null,
-    IUserBaseCurrencyReader? baseCurrencyReader = null) : IWealthAggregationService
+    IUserBaseCurrencyReader? baseCurrencyReader = null,
+    IManualHoldingRepository? manualHoldings = null) : IWealthAggregationService
 {
     private static readonly HashSet<string> AllowedCategories =
         new(StringComparer.OrdinalIgnoreCase) { "banking", "crypto", "brokerage", "other" };
@@ -26,6 +28,8 @@ public class WealthAggregationService(
     // Banking feeds sync roughly daily (not tick-by-tick like crypto/brokerage prices), so a
     // longer window before we call a bank account "stale". Matches the net-worth snapshot job.
     private static readonly TimeSpan BankingStaleThreshold = TimeSpan.FromHours(36);
+
+    private const string ManualInstitutionName = "Entered by hand";
 
     // A Dormant account is not ranked: it is quiet beside its working siblings (WorstSyncStatus).
     private static readonly IReadOnlyDictionary<string, int> SyncStatusPriority =
@@ -167,6 +171,36 @@ public class WealthAggregationService(
             }
         }
 
+        // Values entered by hand (a Steam wallet) are one "other" institution. They count in the total like any
+        // other row and make it ESTIMATED; they carry no sync, so they never set the as-of or read as stale.
+        if (manualHoldings is not null && (category is null || category == "other")
+            && (provider is null || string.Equals(provider, WealthSourceIds.Manual, StringComparison.OrdinalIgnoreCase)))
+        {
+            var entries = await manualHoldings.ListAsync(userId, ct);
+            if (entries.Count > 0)
+            {
+                var accounts = entries.Select(h =>
+                {
+                    var usd = CurrencyConverter.Convert(h.Amount, h.Currency);
+                    fx = fx.Worst(usd.Status);
+                    return Mark(new AccountBalanceDto(
+                        h.Id, h.Label, WealthSourceIds.Manual, string.Empty, WealthSourceIds.Manual, "other",
+                        h.Currency, h.Amount, usd.Amount, "synced", null), prefs);
+                }).ToList();
+                var institution = new InstitutionDto(
+                    InstitutionId: userId,
+                    Provider: WealthSourceIds.Manual,
+                    Name: ManualInstitutionName,
+                    Category: "other",
+                    TotalInBaseCurrency: accounts.Sum(a => a.BalanceInBaseCurrency ?? 0m),
+                    SyncStatus: "synced",
+                    LastSyncTimestamp: null,
+                    LastSuccessfulSyncTimestamp: null,
+                    Accounts: accounts);
+                grouped.Add(new CategorySummaryDto("other", institution.TotalInBaseCurrency, 1, [institution]));
+            }
+        }
+
         var total = grouped.Sum(c => c.TotalInBaseCurrency);
         return new WealthSummaryResponse(
             total, "USD", grouped,
@@ -175,7 +209,8 @@ public class WealthAggregationService(
     }
 
     // Institutions that are not current (stale, failed, needing re-auth) make the total degraded, each named
-    // as its own source. The oldest successful sync behind the total is its as-of.
+    // as its own source; a non-zero hand-entered value makes it estimated. The oldest successful sync behind the
+    // total is its as-of.
     private static Headline BuildHeadline(
         decimal totalUsd, IReadOnlyList<CategorySummaryDto> categories, FxStatus fx, string? category, string? provider)
     {
@@ -186,6 +221,9 @@ public class WealthAggregationService(
                 .Where(i => NotCurrentStatuses.Contains(i.SyncStatus))
                 .Select(i => i.Provider)
                 .Distinct(StringComparer.OrdinalIgnoreCase)],
+            EstimatedSources = [.. institutions
+                .Where(i => i.Provider == WealthSourceIds.Manual && i.TotalInBaseCurrency != 0m)
+                .Select(i => i.Provider)],
             Fx = fx,
         };
         DateTimeOffset? asOf = institutions.Min(i => i.LastSuccessfulSyncTimestamp) is { } oldest

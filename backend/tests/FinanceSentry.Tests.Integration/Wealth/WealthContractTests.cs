@@ -252,11 +252,12 @@ public class WealthApiFactory : WebApplicationFactory<Program>
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
     }
 
-    public HttpClient CreateAuthenticatedClient()
+    public HttpClient CreateAuthenticatedClient(Guid? userId = null)
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        TestUsers.EnsureExists(Services, TestUserId);
-        client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(TestUserId)}");
+        var id = userId ?? TestUserId;
+        TestUsers.EnsureExists(Services, id);
+        client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(id)}");
         return client;
     }
 

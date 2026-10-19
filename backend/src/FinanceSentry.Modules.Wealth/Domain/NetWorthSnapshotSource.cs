@@ -11,7 +11,7 @@ public enum SourceHealth
     /// <summary>Read this run with live or published rates; nothing to caveat.</summary>
     Complete,
 
-    /// <summary>Read this run, but a conversion used today's or a seed-table rate (<c>FX_TODAY_RATE</c>).</summary>
+    /// <summary>Read this run, but a conversion used today's or a seed-table rate (<c>FX_TODAY_RATE</c>), or a value is an estimate (<c>ESTIMATED_VALUE</c>).</summary>
     Estimated,
 
     /// <summary>Read this run but unreliable (a 1:1 conversion), or not trusted this run so the snapshot carried the sleeve forward.</summary>
@@ -26,6 +26,9 @@ public static class SourceReasons
 {
     /// <summary>The source failed to read, or the snapshot carried its sleeve forward from an earlier day.</summary>
     public const string StaleSource = "STALE_SOURCE";
+
+    /// <summary>The source read an estimated value (reliability L3: one the person entered), not a quoted price.</summary>
+    public const string EstimatedValue = "ESTIMATED_VALUE";
 }
 
 /// <summary>
@@ -56,6 +59,6 @@ public sealed class NetWorthSnapshotSource
 
     public SourceHealth Health { get; init; }
 
-    /// <summary>Typed reason codes (<c>FX_TODAY_RATE</c>, <c>FX_UNKNOWN_1TO1</c>, <c>STALE_SOURCE</c>); empty = none.</summary>
+    /// <summary>Typed reason codes (<c>FX_TODAY_RATE</c>, <c>FX_UNKNOWN_1TO1</c>, <c>STALE_SOURCE</c>, <c>ESTIMATED_VALUE</c>); empty = none.</summary>
     public string[] Reasons { get; init; } = [];
 }

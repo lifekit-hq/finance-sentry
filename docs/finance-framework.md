@@ -33,12 +33,12 @@ rule or shape agreed but not implemented), **missing**.
 | C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Today's two projections use two sets (gap G7). |
 | C2(a) | **Contributions vs growth for IBKR and Inzhur now, showing both MWR and TWR** (2026-10-15): "Contributed / Growth" with a Modified Dietz return on the Investments tab, and Book vs SPY as a time-weighted return. MWR only was declined. | M2 and M4 on the brokerage sleeve (§3.4); M3 and M9 on Book vs SPY (G1 closed). Internal moves are not flows; dividends and interest count as growth unless withdrawn. |
 | C9 | **Per-holding checks first**, each threshold cited from a public source. No portfolio-level score. | Presentation pattern P7; the per-holding screen of #824. |
+| C6 | **Steam is not linked; the person enters it by hand** (2026-10-18): no wallet, inventory or API integration. The entry is valued at what they would receive after fees, L3, IN_ECONOMY. | The manual source (§5.4, §5.5): counted in total net worth, outside cash and liquid net worth, and the total ESTIMATED (`ESTIMATED_VALUE`). Bank-side Steam charges stay spending; the entry joins as a newly linked line (§3.2 rule 3), so nothing is counted twice. |
 
 ### Open
 
 | Id | Question | State |
 |---|---|---|
-| C6 | **Steam: whether and how to link.** | **Undecided.** Research comes first (report §5.5, the F1 list); no linking decision is made. The treatment in §5.5 below is the *valuation* rule for when it is decided, not a commitment to link. |
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
 | C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. (b) started: S2a reads the venue fiat legs and Revolut X transfers, S2b Binance's coin deposits and withdrawals and matches transfers between the venues, S2c the earn, airdrop and dust events (G6). |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
@@ -53,8 +53,8 @@ rule or shape agreed but not implemented), **missing**.
  Layer 2: economies, one adapter each (section 5)
  ┌────────────┬────────────┬────────────┬────────────┬──────────────┬──────────┐
  │ Banks      │ Brokerage  │ Crypto     │ Funds      │ Marketplaces │ Manual   │
- │ Monobank   │ IBKR       │ Binance    │ Inzhur     │ Steam (C6)   │ entries  │
- │ TrueLayer  │            │ Revolut X  │            │              │          │
+ │ Monobank   │ IBKR       │ Binance    │ Inzhur     │ (not linked, │ entries  │
+ │ TrueLayer  │            │ Revolut X  │            │ C6)          │ (Steam)  │
  └─────┬──────┴─────┬──────┴─────┬──────┴─────┬──────┴──────┬───────┴────┬─────┘
        └────────────┴──── one SourceSnapshot per source per day ──────────┘
             positions · cash · liabilities · dated flows · prices · capabilities
@@ -375,6 +375,7 @@ them:
 | `HasStaleSleeves` on FIRE | DEGRADED + `STALE_SOURCE` |
 | "Book N/A" | UNAVAILABLE + `NO_SPLIT` (the period has snapshot days but no measured cash/invested split to form the window) or `SHORT_HISTORY` (no measurable window otherwise) |
 | A measure's failure (`MeasureFailure`) on a change | the amount stands, the percent is null: `ZERO_BASE`, `NEGATIVE_BASE`, `SCOPE_CHANGED`, `SHORT_HISTORY` (a missing end: UNAVAILABLE), `NOT_MEASURABLE` |
+| A source whose reading is an estimate (reliability L3: a value entered by hand) | ESTIMATED + `ESTIMATED_VALUE <source>` on the total and on the split line its value sits in (live, C6) |
 | (new) | `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`, `NON_CASH_INCLUDED`, `PRICE_CARRIED_FORWARD`, `RESIDUAL_ABOVE_TOLERANCE` |
 
 Every row above except FIRE is mapped in `HeadlineQualityMapper` (tests: `HeadlineQualityMapperTests`).
@@ -583,14 +584,21 @@ For every position, apply five steps in order:
 | Inzhur | Fund | units (`InzhurHoldingsMapper`) | deposits land in the same table, read by `BrokerageFlowReader` | L2 (published unit price) | CASH or LOCKED, **not verified** (redemption terms) | wrap; check redemption terms |
 | Binance, Revolut X | CryptoVenue | balances, venue fiat | fiat legs, coin deposits and withdrawals, Revolut X transfers, earn and staking rewards, airdrops, dust service charge (`CryptoFlowReader`, S2a/S2b/S2c) | L1 for liquid pairs | CASH; LOCKED for lock-up products | trade fees and on-chain yield stay in the market remainder |
 | Self-custody wallets | ChainWallet | — | — | — | — | not built; needs research |
-| Steam | Marketplace | wallet + inventory | wallet top-ups, market sales: unverified | L1–L3 per item | IN_ECONOMY; LOCKED under a trade hold | **undecided (C6)** |
-| Manual (property, pensions, private holdings) | Manual | value the person enters | entered by the person | L3 | as declared | not built; only if wanted |
+| Steam | Marketplace | wallet + inventory | wallet top-ups, market sales: unverified | L1–L3 per item | IN_ECONOMY; LOCKED under a trade hold | **not linked (C6)**: entered by hand through the manual source |
+| Manual (a Steam wallet; property, pensions, private holdings) | Manual | value the person enters, in its currency, as of a date | none | L3 | as declared: CASH, IN_ECONOMY or LOCKED | built (`ManualWealthSource`, source id `manual`; money-semantics §8 "Values entered by hand") |
 
-### 5.5 Steam: the valuation rule, and what is undecided
+### 5.5 Steam: entered by hand, and the rule if it is ever linked
 
-**Linking Steam is undecided (C6): research comes first.** What follows is the valuation treatment that
-applies *if and when* it is linked, so the rule exists before the decision. The verified facts, the quotes
-and the list of what is not yet verified are in report §5.5 and §12.4; none of it is a commitment.
+**Decided (C6, 2026-10-18): Steam is not linked.** The person enters it through the manual source: one value,
+what they would receive after the marketplace's fees (step 2 of 5.3, applied by the person), L3, IN_ECONOMY.
+It counts in total net worth, stays outside cash and liquid net worth, and makes the total ESTIMATED with
+`ESTIMATED_VALUE manual`. Bank-side Steam charges stay spending at the bank layer (nothing is reclassified),
+and the entered value joins the umbrella as a newly linked line on the day it is added (§3.2 rule 3: the
+history change across that day withholds its percentage with `SCOPE_CHANGED`), so a top-up is never counted
+as both spending and growth. Editing the value later is a revaluation (§3.3), not a flow.
+
+The table below is the valuation treatment that would apply if Steam were ever linked; the verified facts,
+the quotes and the list of what is not yet verified are in report §5.5 and §12.4.
 
 | Holding | Value | Reliability | Convertibility |
 |---|---|---|---|
@@ -598,7 +606,7 @@ and the list of what is not yet verified are in report §5.5 and §12.4; none of
 | Market items | exit price (5.3 step 2), on the marketplace's own market | L1 with recent sales; L2 thin or similar; L3 otherwise | IN_ECONOMY; LOCKED under a trade hold |
 
 - **Totals.** Included in total net worth, excluded from liquid net worth.
-- **Classification is the question that matters most.** Today a card payment to a marketplace is spending at
+- **Classification is the question that matters most** if it is ever linked. Today a card payment to a marketplace is spending at
   the bank layer. Once the marketplace is linked, a wallet top-up is an *internal* transfer at the umbrella
   scope and an item purchase is an asset purchase, while a game purchase stays spending. Linking would
   therefore change "monthly outflow" for anyone who buys items.

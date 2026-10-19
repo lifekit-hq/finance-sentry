@@ -170,4 +170,5 @@ export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);
   await mockGet(page, 'crypto/holdings', CRYPTO_HOLDINGS_FULL);
   await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
+  await mockGet(page, 'wealth/manual-holdings', []);
 }

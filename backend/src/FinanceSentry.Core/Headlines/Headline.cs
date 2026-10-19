@@ -204,4 +204,8 @@ public enum HeadlineReasonCode
     /// <summary>No position in the scope has a known cost basis, so a gain against cost cannot be measured.</summary>
     [JsonStringEnumMemberName("NO_COST_BASIS")]
     NoCostBasis,
+
+    /// <summary>A value in the figure is an estimate, not a quoted price (reliability L3: one the person entered); <see cref="HeadlineReason.Source"/> names its source.</summary>
+    [JsonStringEnumMemberName("ESTIMATED_VALUE")]
+    EstimatedValue,
 }
