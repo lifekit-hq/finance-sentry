@@ -49,6 +49,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -106,6 +107,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             fire.Object,
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -164,6 +166,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             projection.Object,
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -202,6 +205,60 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.ProjectedNetWorth.Should().Be(new ProjectionRange(1080m, 1296m, 1512m));
     }
 
+    private static async Task<MonthlyIncomeLensResponse> GetIncomeLens(string? profileCurrency)
+    {
+        var lens = new Mock<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>();
+        lens.Setup(h => h.Handle(It.IsAny<GetMonthlyIncomeLensQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonthlyIncomeLensResponse(
+                MonthlyIncomeLensStatus.Shown, NetWorth: 54_000m, SafeWithdrawalRate: 0.04m, MonthlyIncome: 108m,
+                HasStaleSleeves: false));
+        var reader = new Mock<IUserBaseCurrencyReader>();
+        reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
+
+        var controller = new WealthController(
+            Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            lens.Object,
+            reader.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", UserId.ToString())], "test")),
+                },
+            },
+        };
+
+        var ok = (OkObjectResult)await controller.GetMonthlyIncomeLens(CancellationToken.None);
+        return (MonthlyIncomeLensResponse)ok.Value!;
+    }
+
+    [Fact]
+    public async Task IncomeLens_EuroBase_ConvertsBothAmounts_NotTheRate()
+    {
+        var result = await GetIncomeLens("EUR");
+
+        result.BaseCurrency.Should().Be("EUR");
+        result.NetWorth.Should().Be(50_000m);
+        result.MonthlyIncome.Should().Be(100m);
+        result.SafeWithdrawalRate.Should().Be(0.04m);
+    }
+
+    [Theory]
+    [InlineData("USD")]
+    [InlineData(null)]
+    public async Task IncomeLens_UsdOrUnsetBase_LeavesAmountsUntouched(string? profile)
+    {
+        var result = await GetIncomeLens(profile);
+
+        result.BaseCurrency.Should().Be("USD");
+        result.MonthlyIncome.Should().Be(108m);
+    }
+
     private static async Task<SleeveGrowthResponse> GetGrowth(string? profileCurrency)
     {
         var from = new DateOnly(2026, 7, 1);
@@ -221,6 +278,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
             growth.Object,
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext

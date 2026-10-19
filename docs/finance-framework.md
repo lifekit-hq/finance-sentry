@@ -244,7 +244,7 @@ waterfall (3.7) shows it on Home.
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
 | M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates); per decision, the Ledger scoreboard (`get_ledger_scoreboard`, a 30-day price excess per proposal or pick, money-semantics §10) |
-| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration; range spread from FCA COBS 13 Annex 2 | a month-by-month simulation at each return | engine: `Projection` (twelve-month figure and FIRE, one assumption set, both as a range; G7 closed). The P5 lens is not built |
+| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration; range spread from FCA COBS 13 Annex 2 | a month-by-month simulation at each return | engine: `Projection` (twelve-month figure and FIRE, one assumption set, both as a range; G7 closed); the P5 lens (`IncomeLens`) reads the same set |
 
 Choices the engine fixes once, so they stop being re-decided:
 
@@ -465,7 +465,7 @@ marked. R7 builds them in the order P3, P8, P2, P4, P5; P5 waits on M10 and C8.
 | P2 | Growth of 10,000 | What 10,000 invested at the start would be worth now, book vs benchmark | M3, M9. **Done (R7)**: Home Investments card, the longest Book vs SPY window measured for both, in USD; end values only, no line yet |
 | P3 | Contributions vs growth | "You put in X; it grew by Y" | M2. **Done (R7)**: Home Investments card, a card per sleeve (brokerage, crypto) |
 | P4 | Bridge waterfall | Start → savings → investment return → FX → linked → end | M5. **Done (R7)**: Home card under the net-worth hero, over the hero's range in the base currency; the unexplained residual is always its own row, and above tolerance the card says so in place (DEGRADED, `RESIDUAL_ABOVE_TOLERANCE`); bars drawn in the app until `@lifekit-hq/ui` has a waterfall chart |
-| P5 | Monthly-income lens | A large total also shown as the monthly income it could pay | M10, C8 |
+| P5 | Monthly-income lens | A large total also shown as the monthly income it could pay | M10, C8. **Done (R7)**: Home hero, under the twelve-month figure: "As income: about $X a month", the net worth at the shared safe withdrawal rate ÷ 12 (`IncomeLens`, `GET /wealth/income-lens`), its assumption in words; one figure, as the withdrawal rate is single-valued; hidden with no positive net worth |
 | P6 | 1 / 5 / 10-year table | Average annual total return per standard window, book vs benchmark | M3, long history |
 | P7 | Checklist score | A few yes/no checks per holding, drawn as a shape; ideas only, thresholds cited (C9) | cited thresholds; fits #824 |
 | P8 | Timing gap | "Your investments returned A; your money earned B; the difference is timing" | M3, M4. **Done (R7)**: under each growth split, when both returns are measured |
@@ -996,7 +996,7 @@ classifies them. No IBKR deposits or withdrawals arrive, because the Flex query 
 **G7. Two projections use two different assumptions.** *Closed (M10, 2026-10-19): the twelve-month figure moved from the
 browser to `GET /wealth/projection`, and it and the FIRE projection both run on `Projection` with one
 `ProjectionAssumptions` set, each shown as a range with its assumptions in words (C8). Left: neither carries a
-headline record yet (§3.6), and the P5 monthly-income lens is not built. The history below is kept as the
+headline record yet (§3.6). The P5 monthly-income lens is built on the same set (R7). The history below is kept as the
 record.*
 The 12-month tile was median monthly savings × 12 with no market return; the FIRE projection compounded a 5%
 real return to a 4%-withdrawal target. Each stated its basis, but nothing shared one assumptions contract

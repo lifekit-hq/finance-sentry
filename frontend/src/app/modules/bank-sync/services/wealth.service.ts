@@ -4,6 +4,7 @@ import {type Observable} from 'rxjs';
 
 import {type WealthSummaryResponse} from '../../../shared/models/wealth/wealth.model';
 import {type FireProjection} from '../models/fire/fire.model';
+import {type MonthlyIncomeLens} from '../models/income-lens/income-lens.model';
 import {
   type ManualHolding,
   type ManualHoldingInput,
@@ -28,6 +29,10 @@ export class WealthService extends ApiService {
 
   public getNetWorthProjection(): Observable<NetWorthProjection> {
     return this.get<NetWorthProjection>('projection');
+  }
+
+  public getMonthlyIncomeLens(): Observable<MonthlyIncomeLens> {
+    return this.get<MonthlyIncomeLens>('income-lens');
   }
 
   public getManualHoldings(): Observable<ManualHolding[]> {

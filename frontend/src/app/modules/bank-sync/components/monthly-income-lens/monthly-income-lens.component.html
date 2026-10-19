@@ -1,0 +1,22 @@
+<!--
+  A lump sum reads larger than the income it buys, so the total is also shown as a monthly
+  amount. The lens does not change with the history range, so it holds no fixed slot: it appears
+  once loaded and renders nothing with no positive net worth (NoNetWorth) or on a failed load.
+-->
+@if (store.visible()) {
+  <p class="text-cmn-xs leading-4 text-text-secondary" data-testid="monthly-income-lens">
+    As income: about
+    <span class="font-medium text-text-primary">{{ store.monthlyIncome() }} a month</span>
+  </p>
+  <p
+    class="mt-cmn-1 text-cmn-xs leading-4 text-text-secondary"
+    data-testid="monthly-income-lens-assumptions"
+  >
+    {{ store.assumptions() }}
+    @if (store.hasStaleSleeves()) {
+      <span data-testid="monthly-income-lens-stale"
+        >Some account data is stale, so this is an estimate.</span
+      >
+    }
+  </p>
+}
