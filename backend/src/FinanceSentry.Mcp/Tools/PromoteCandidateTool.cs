@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -12,6 +14,7 @@ public sealed class PromoteCandidateTool(
     ICommandHandler<PromoteCandidateCommand, PromoteCandidateResult> handler,
     IIdentityResolver identity)
 {
+    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "promote_candidate")]
     [Description("Promotes an active candidate into a monitored InvestmentThesis. Always runs the 022 risk gate (check_risk_rules) first: if the proposed position is Refused, no thesis is created and the verdict (named rule + max compliant size) is returned — unless overrideRisk is true, which records the override as a signal. Set paper=true for a tracking-only promotion that will never draw down real cash: the gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real (non-paper) promotions keep today's full rule set. Invalidation triggers default to the deterministic prefill from the candidate's fundamentals; pass triggers to override. Returns the thesis id (when created) and the gate verdict.")]
     public async Task<PromoteCandidateResult?> ExecuteAsync(

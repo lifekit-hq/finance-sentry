@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -13,6 +15,7 @@ public sealed class SaveIpsTool(
     ICommandHandler<SaveIpsCommand, IpsDto> handler,
     IIdentityResolver identity)
 {
+    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "save_ips")]
     [Description("Creates a new version of the user's Investment Policy Statement (the written strategy). Each save supersedes the prior version and retains history — amend, don't overwrite. Co-author this from the onboarding interview: only pass values the user has actually confirmed, never invented ones. rebalancingRule defaults to the industry-standard 5/25 rule (rebalance at 5 absolute points or 25% relative drift, annual cadence, new contributions directed to underweight sleeves first) when omitted.")]
     public async Task<IpsDto?> ExecuteAsync(

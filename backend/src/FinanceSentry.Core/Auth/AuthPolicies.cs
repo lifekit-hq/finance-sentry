@@ -18,6 +18,13 @@ public static class AuthPolicies
     /// </summary>
     public const string RequireMcpAccess = "RequireMcpAccess";
 
+    /// <summary>
+    /// The gate on MCP tools that create, change or delete Research data, registered by the MCP host only and not
+    /// one-to-one with a permission: a personal token (the owner's own session) passes, a service token (a headless
+    /// agent such as Ledger) never does. An agent proposes; the change lands on the owner's word.
+    /// </summary>
+    public const string RequireMcpPersonalToken = "RequireMcpPersonalToken";
+
     /// <summary>Operations access (<see cref="Permissions.OpsAdmin"/>); the name predates permissions.</summary>
     public const string RequireOwner = "RequireOwner";
 

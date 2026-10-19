@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -13,6 +15,7 @@ public sealed class SaveThesisTool(
     ICommandHandler<SaveThesisCommand, ThesisDto> handler,
     IIdentityResolver identity)
 {
+    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "save_thesis")]
     [Description("Creates or updates an investment thesis. Pass id=null to create; pass an existing id to update. At least one invalidationTrigger is expected for thesis-break detection to work. Provide entryPrice so that price_drawdown triggers are anchored to your entry, not the asset's historical peak.")]
     public async Task<ThesisDto?> ExecuteAsync(

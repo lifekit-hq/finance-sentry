@@ -32,7 +32,8 @@ public sealed class ToolAttributeContractTests
 
     /// <summary>
     /// Policy coverage for tools: the MCP endpoint is gated by the MCP access policy for every tool, so no tool may opt out
-    /// with [AllowAnonymous], and any tool-level [Authorize] must name a registered permission policy.
+    /// with [AllowAnonymous], and any tool-level [Authorize] must name a registered permission policy or the MCP host's
+    /// personal-token gate.
     /// </summary>
     [Fact]
     public void NoTool_OptsOutOfAuthorization_AndEveryToolPolicyIsKnown()
@@ -45,7 +46,9 @@ public sealed class ToolAttributeContractTests
             .Select(m => m.Name)
             .Should().BeEmpty();
         members.SelectMany(m => m.GetCustomAttributes<AuthorizeAttribute>())
-            .Where(a => a.Policy is not null && !AuthPolicies.PermissionByPolicy.ContainsKey(a.Policy))
+            .Where(a => a.Policy is not null
+                && a.Policy != AuthPolicies.RequireMcpPersonalToken
+                && !AuthPolicies.PermissionByPolicy.ContainsKey(a.Policy))
             .Select(a => a.Policy)
             .Should().BeEmpty();
     }
