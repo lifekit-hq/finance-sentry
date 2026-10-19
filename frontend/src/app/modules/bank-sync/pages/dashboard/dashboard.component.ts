@@ -35,6 +35,7 @@ import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.p
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {InvestmentsCardComponent} from '../../../holdings/components/investments-card/investments-card.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {
   CASH_FLOW_SERIES_TYPES,
@@ -78,6 +79,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     FireTileComponent,
     HeadlineBadgeComponent,
     IconComponent,
+    InvestmentsCardComponent,
     MerchantCategoryPipe,
     MoneyPipe,
     RouterLink,
@@ -242,36 +244,6 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 }
               </div>
               <!--
-                The invested book's change (brokerage + crypto positions, cash excluded) over the
-                days that have a split. A change in value, deposits included, not a return. Empty
-                below two split days, so a range reaching before the backfill shows nothing here.
-              -->
-              <div class="h-4 leading-4" data-testid="net-worth-invested-change-slot">
-                @if (!store.isFirstLoad() && !store.isHistoryFirstLoad()) {
-                  @if (store.investedChangeFormatted()) {
-                    <p
-                      [class]="investedChangeClass()"
-                      class="font-label text-cmn-xs font-medium leading-4"
-                      data-testid="net-worth-invested-change"
-                    >
-                      <span class="font-normal text-text-secondary">Invested change</span>
-                      {{ store.investedChangeFormatted() }}
-                      @if (store.investedChangePercentFormatted()) {
-                        ({{ store.investedChangePercentFormatted() }})
-                      }
-                      <span class="font-normal text-text-secondary"
-                        >·
-                        {{
-                          store.investedChangeSinceFormatted() ??
-                            store.scrubDateFormatted() ??
-                            rangeLabel()
-                        }}</span
-                      >
-                    </p>
-                  }
-                }
-              </div>
-              <!--
                 Projected from contributions, never from the net-worth line: most of the book is
                 market-marked, so a trend fitted to that line would forecast the market and call
                 it a savings forecast. Empty below three complete months (hasProjection()).
@@ -340,6 +312,8 @@ const HISTORY_RANGES: ChipRowOption[] = [
               />
             </div>
           </cmn-card>
+
+          <fns-investments-card />
 
           <!--
             Computed on read from the same honest monthly flow as the savings rate, with both
@@ -512,9 +486,6 @@ export class DashboardComponent {
   );
   public readonly changeClass = computed(() =>
     this.paceClass(this.store.netWorthChangeDirection())
-  );
-  public readonly investedChangeClass = computed(() =>
-    this.paceClass(this.store.investedChangeDirection())
   );
   // The three window figures read as one card. Savings opens the audit view, which
   // shows every money bucket at once.

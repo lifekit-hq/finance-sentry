@@ -115,8 +115,10 @@ function setup() {
     },
     retryButton: (): HTMLElement | null =>
       el.querySelector('[data-testid="net-worth-history-error"] cmn-button button'),
+    // The Investments card loads its own positions, outside the range request this spec exercises.
     shimmering: (): number =>
-      el.querySelectorAll('.cmn-skeleton-sweep:not(.after\\:hidden)').length,
+      el.querySelectorAll('.cmn-skeleton-sweep:not(.after\\:hidden):not(fns-investments-card *)')
+        .length,
     placeholders: (): number => el.querySelectorAll('.cmn-skeleton-sweep.after\\:hidden').length,
   };
 }

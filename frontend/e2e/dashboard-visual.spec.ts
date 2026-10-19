@@ -1,5 +1,6 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {mockAccounts} from './support/accounts-mocks';
 import {API, AUTH_RESPONSE} from './support/dossier-mocks';
 import {versionMasks} from './support/visual-baseline';
 
@@ -70,7 +71,7 @@ const json = (body: unknown) => ({
 // Enough snapshots for the hero chart, so the baseline shows the figure, chart and range control as one card.
 // The first two days predate the cash / invested split (drawn as the "No split" band); the last two
 // carry it, with cash as the remainder, so the baseline shows the stacked Cash / invested chart and the
-// invested change beside the net-worth change.
+// hero without an invested-change line (that figure lives in the Investments card).
 const HISTORY = [
   ['2026-07-15', 41_000, 5_000, 1_000, null],
   ['2026-08-15', 42_500, 5_500, 1_200, null],
@@ -96,8 +97,10 @@ async function openDashboard(page: Page): Promise<void> {
   );
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
+  await mockAccounts(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
+  await expect(page.getByTestId('investments-card-total')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.clock.runFor(CHART_SETTLE_MS);

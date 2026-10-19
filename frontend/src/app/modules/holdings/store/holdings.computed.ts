@@ -29,6 +29,9 @@ interface StateSignals {
 
 const WEIGHT_TO_PERCENT = 100;
 
+/** How many positions the Home Investments card lists. */
+export const TOP_HOLDINGS_COUNT = 5;
+
 // The headline names a failed read by feed ('brokerage' | 'crypto'), not by provider.
 const CRYPTO_FEED = 'crypto';
 const BROKERAGE_FEED = 'brokerage';
@@ -208,6 +211,15 @@ export function holdingsComputed(store: StateSignals) {
       () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null
     ),
     positionsByAssetClass,
+    // Largest positions across every venue, for the Home card: cash balances have no dossier and
+    // hidden rows are tucked away, so neither is listed (both still count in the weights).
+    topHoldings: computed((): PositionRow[] =>
+      positionsByAssetClass()
+        .filter(group => group.assetClass !== 'cash')
+        .flatMap(group => group.rows)
+        .sort((a, b) => b.currentValue - a.currentValue)
+        .slice(0, TOP_HOLDINGS_COUNT)
+    ),
     allocationSegments: computed((): DonutSegment[] =>
       positionsByAssetClass().map(group => ({
         label: group.label,

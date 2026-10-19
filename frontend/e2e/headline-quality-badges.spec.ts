@@ -1,5 +1,6 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {mockAccounts} from './support/accounts-mocks';
 import {API, AUTH_RESPONSE, mockApis as mockHoldingsApis} from './support/dossier-mocks';
 
 // A headline figure that is not COMPLETE carries a badge; one tap opens the reason sheet.
@@ -47,6 +48,8 @@ async function mockApis(page: Page, netWorthHeadline: unknown): Promise<void> {
     route.fulfill(json({...DASHBOARD, netWorthHeadline}))
   );
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
+  // The Home Investments card reads the holdings feeds and growth split on its own.
+  await mockAccounts(page);
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: [], hasHistory: false}))
