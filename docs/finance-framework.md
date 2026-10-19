@@ -76,7 +76,7 @@ rule or shape agreed but not implemented), **missing**.
 
 This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1, a
 per-source row written beside every snapshot, R8 PR 2, and read back by history, the dashboard, MCP and FIRE,
-R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the
+R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6, M8 and M9 (3.4); the
 headline record (3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The stored
 total is the sum of every registered source's resolved figure; the three sleeve columns are frozen by
 R8 PR 4: kept for history, never extended (5.6).
