@@ -1427,7 +1427,8 @@ the savings path and the starting net worth (decision C8; gap G7 closed). Comput
   reads the FIRE handler directly and stays USD.
 - `HasStaleSleeves` is true on both when any of the latest snapshot's sources is stale (`STALE_SOURCE` on
   its per-source rows, or `StaleSleeves` on a snapshot taken before them, §8). Neither projection carries
-  a headline record yet (finance-framework §3.6).
+  a headline record yet (finance-framework §3.6). Both tiles show a warning notice while it is set (the
+  twelve-month line only while it shows a figure).
 
 ### Twelve-month projection (dashboard hero)
 

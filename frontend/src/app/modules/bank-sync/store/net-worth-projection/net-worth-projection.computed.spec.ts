@@ -17,11 +17,26 @@ describe('netWorthProjectionComputed', () => {
     expect(computeds.range()).toBe('');
     expect(computeds.assumptions()).toBe('');
     expect(computeds.horizonMonths()).toBe(0);
+    expect(computeds.hasStaleSleeves()).toBe(false);
   });
 
   it('is hidden below the complete-month minimum', () => {
     expect(
       build(netWorthProjection({status: 'InsufficientHistory', projectedNetWorth: null})).visible()
+    ).toBe(false);
+  });
+
+  it('flags stale sleeves only while the projection is visible', () => {
+    expect(build(netWorthProjection({hasStaleSleeves: true})).hasStaleSleeves()).toBe(true);
+    expect(build(netWorthProjection()).hasStaleSleeves()).toBe(false);
+    expect(
+      build(
+        netWorthProjection({
+          status: 'InsufficientHistory',
+          projectedNetWorth: null,
+          hasStaleSleeves: true,
+        })
+      ).hasStaleSleeves()
     ).toBe(false);
   });
 

@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {SkeletonComponent} from '@lifekit-hq/ui';
+import {AlertComponent, SkeletonComponent} from '@lifekit-hq/ui';
 
 import {NetWorthProjectionStore} from '../../store/net-worth-projection/net-worth-projection.store';
 
@@ -9,7 +9,7 @@ import {NetWorthProjectionStore} from '../../store/net-worth-projection/net-wort
  */
 @Component({
   selector: 'fns-net-worth-projection',
-  imports: [SkeletonComponent],
+  imports: [AlertComponent, SkeletonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block'},
   providers: [NetWorthProjectionStore],

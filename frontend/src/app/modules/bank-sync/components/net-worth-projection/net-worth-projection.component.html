@@ -22,4 +22,10 @@
   >
     {{ store.assumptions() }}
   </p>
+  @if (store.hasStaleSleeves()) {
+    <cmn-alert class="mt-cmn-1 block" variant="warning" data-testid="net-worth-projection-stale"
+      >Some account data is stale — carried forward from the last successful sync, so this
+      projection is an estimate.</cmn-alert
+    >
+  }
 }

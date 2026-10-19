@@ -44,6 +44,18 @@ describe('NetWorthProjectionComponent', () => {
     expect(el.querySelector('[data-testid="net-worth-projection"]')).toBeNull();
   });
 
+  it('shows the stale-data notice when a source is stale', () => {
+    const el = render(netWorthProjection({hasStaleSleeves: true}));
+    expect(el.querySelector('[data-testid="net-worth-projection-stale"]')?.textContent).toContain(
+      'projection is an estimate'
+    );
+  });
+
+  it('omits the stale-data notice when no source is stale', () => {
+    const el = render(netWorthProjection());
+    expect(el.querySelector('[data-testid="net-worth-projection-stale"]')).toBeNull();
+  });
+
   it('renders nothing below the complete-month minimum', () => {
     const el = render(netWorthProjection({status: 'InsufficientHistory', projectedNetWorth: null}));
     expect(el.querySelector('[data-testid="net-worth-projection"]')).toBeNull();
