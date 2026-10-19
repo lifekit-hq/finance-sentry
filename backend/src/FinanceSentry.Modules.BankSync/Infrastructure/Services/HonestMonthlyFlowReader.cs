@@ -1,21 +1,31 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Services;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Read-port adapter: exposes <see cref="GetMoneyFlowStatisticsQuery"/> to other modules
 /// (Wealth) without them referencing BankSync directly. Collapses the per-currency and
 /// synthetic counterparty rows into one USD total per month, matching the way the dashboard's
-/// own monthly-savings computation aggregates <see cref="MonthlyFlow"/> rows.
+/// own monthly-savings computation aggregates <see cref="MonthlyFlow"/> rows. The day-window
+/// net reads the flow breakdown the dashboard's windowed tiles are explained by, leaving out an account's
+/// transactions dated before it was linked and after it was removed: that balance reaches (or leaves) a
+/// net-worth bridge through its newly linked (or unlinked) line, not through savings.
 /// </summary>
 public class HonestMonthlyFlowReader(
-    IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> handler)
+    IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> handler,
+    IFlowBreakdownService breakdown,
+    BankSyncDbContext db)
     : IHonestMonthlyFlowReader
 {
     private readonly IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> _handler = handler;
+    private readonly IFlowBreakdownService _breakdown = breakdown;
+    private readonly BankSyncDbContext _db = db;
 
     public async Task<IReadOnlyList<HonestMonthlyFlow>> GetMonthlyFlowAsync(
         Guid userId, int months, CancellationToken ct = default)
@@ -27,5 +37,38 @@ public class HonestMonthlyFlowReader(
             .Select(g => new HonestMonthlyFlow(g.Key, g.Sum(f => f.OutflowUsd), g.Sum(f => f.NetUsd)))
             .OrderBy(f => f.Month)
             .ToList();
+    }
+
+    public async Task<decimal> GetWindowNetAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        if (to < from)
+            return 0m;
+
+        // The breakdown classifies over whole months back from today; reach back to the window's first month.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var months = Math.Max(1, ((today.Year - from.Year) * 12) + today.Month - from.Month);
+        var range = await _breakdown.GetRangeBreakdownAsync(userId, from, to, months, ct);
+
+        // The active-account filter must go too: a removed account is an inactive row, so its removal day would never be seen.
+        var lifetimes = (await _db.BankAccounts
+                .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.AccountActiveFilterName])
+                .Where(a => a.UserId == userId)
+                .Select(a => new { a.Id, a.CreatedAt, a.IsActive, a.UpdatedAt })
+                .ToListAsync(ct))
+            .ToDictionary(
+                a => a.Id,
+                a => (Linked: DateOnly.FromDateTime(a.CreatedAt),
+                    Removed: !a.IsActive && a.UpdatedAt is { } removedAt ? DateOnly.FromDateTime(removedAt) : DateOnly.MaxValue));
+        var items = range.Items.Where(i =>
+        {
+            if (!lifetimes.TryGetValue(i.AccountId, out var lifetime))
+                return true;
+
+            var day = DateOnly.FromDateTime(i.Date);
+            return day >= lifetime.Linked && day <= lifetime.Removed;
+        }).ToList();
+
+        return items.Where(i => i.Bucket == FlowBuckets.Income).Sum(i => i.AmountUsd)
+            - items.Where(i => i.Bucket == FlowBuckets.Spending).Sum(i => i.AmountUsd);
     }
 }

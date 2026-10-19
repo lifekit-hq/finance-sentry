@@ -55,6 +55,9 @@ public static class HeadlineQualityMapper
         foreach (var source in signals.EstimatedSources.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
             reasons.Add(new HeadlineReason(HeadlineReasonCode.EstimatedValue, source));
 
+        if (signals.ResidualAboveTolerance)
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.ResidualAboveTolerance));
+
         if (percentFailure is { } failure)
             reasons.Add(new HeadlineReason(ReasonFor(failure)));
 
@@ -67,21 +70,34 @@ public static class HeadlineQualityMapper
     /// </summary>
     public static Headline WithFx(Headline headline, FxStatus status)
     {
-        var carried = headline.Reasons.Any(r => r.Code == HeadlineReasonCode.FxUnknown1To1) ? FxStatus.Unknown1To1
-            : headline.Reasons.Any(r => r.Code == HeadlineReasonCode.FxTodayRate) ? FxStatus.TodayRate
+        var carried = new HeadlineAssessment(headline.Quality, headline.Reasons);
+        var assessment = WithFx(carried, headline.Amount is not null, status);
+        return ReferenceEquals(assessment, carried)
+            ? headline
+            : headline with { Quality = assessment.Quality, Reasons = assessment.Reasons };
+    }
+
+    /// <summary>
+    /// <paramref name="assessment"/> with one more conversion applied, for a figure that is not a single
+    /// <see cref="Headline"/> (the net-worth bridge's lines): unchanged when <paramref name="status"/> is no worse
+    /// than the FX reason it carried.
+    /// </summary>
+    public static HeadlineAssessment WithFx(HeadlineAssessment assessment, bool amountAvailable, FxStatus status)
+    {
+        var carried = assessment.Reasons.Any(r => r.Code == HeadlineReasonCode.FxUnknown1To1) ? FxStatus.Unknown1To1
+            : assessment.Reasons.Any(r => r.Code == HeadlineReasonCode.FxTodayRate) ? FxStatus.TodayRate
             : FxStatus.Exact;
         var worst = carried.Worst(status);
         if (worst == carried)
-            return headline;
+            return assessment;
 
-        var reasons = headline.Reasons
+        var reasons = assessment.Reasons
             .Where(r => r.Code is not (HeadlineReasonCode.FxTodayRate or HeadlineReasonCode.FxUnknown1To1))
             .ToList();
         if (ReasonFor(worst) is { } fxReason)
             reasons.Add(new HeadlineReason(fxReason));
 
-        var assessment = Build(reasons, headline.Amount is not null);
-        return headline with { Quality = assessment.Quality, Reasons = assessment.Reasons };
+        return Build(reasons, amountAvailable);
     }
 
     /// <summary>A position-returns coverage (<c>complete</c> / <c>partial</c> / <c>unavailable</c>) as a basis status.</summary>

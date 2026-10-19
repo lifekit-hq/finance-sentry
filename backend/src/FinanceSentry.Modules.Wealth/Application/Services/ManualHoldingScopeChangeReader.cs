@@ -10,6 +10,8 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// </summary>
 public sealed class ManualHoldingScopeChangeReader(IManualHoldingRepository holdings) : IAccountScopeChangeReader
 {
+    public string WealthSourceId => WealthSourceIds.Manual;
+
     public async Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(
         Guid userId, DateTime sinceUtc, CancellationToken ct = default)
     {

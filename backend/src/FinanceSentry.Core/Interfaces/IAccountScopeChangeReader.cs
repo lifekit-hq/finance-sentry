@@ -7,6 +7,9 @@ namespace FinanceSentry.Core.Interfaces;
 /// </summary>
 public interface IAccountScopeChangeReader
 {
+    /// <summary>The net-worth part its changes move (a <see cref="WealthSourceIds"/> value), so a bridge can tell which series a link touched.</summary>
+    string WealthSourceId { get; }
+
     Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(Guid userId, DateTime sinceUtc, CancellationToken ct = default);
 }
 

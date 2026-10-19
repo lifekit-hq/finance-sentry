@@ -258,4 +258,74 @@ public class GetSleeveGrowthQueryHandlerTests
         result.Growth.Should().Be(0m);
         result.Headline.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, "binance"));
     }
+
+    private Task<SleeveGrowthResponse> Handle(string sleeve, DateOnly? from, DateOnly? to)
+        => new GetSleeveGrowthQueryHandler(_history.Object, _flows.Object, _snapshots.Object, _cryptoFlows.Object)
+            .Handle(new GetSleeveGrowthQuery(UserId, sleeve, from, to), CancellationToken.None);
+
+    private void SetupWindowedBrokerage(params DailyBrokerageValue[] values)
+    {
+        _history.Setup(h => h.GetDailyAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, DateOnly from, DateOnly to, CancellationToken _) =>
+                [.. values.Where(v => v.Date >= from && v.Date <= to)]);
+        _flows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SleeveFlowReading([IbkrRecorded], []));
+    }
+
+    [Fact]
+    public async Task BrokerageSleeve_WithAWindow_SplitsOnlyTheClosesInsideIt()
+    {
+        SetupWindowedBrokerage(Value(0, 1000m), Value(5, 1150m), Value(10, 1210m), Value(15, 1300m));
+
+        var result = await Handle(WealthSourceIds.Brokerage, Day(5), Day(10));
+
+        result.From.Should().Be(Day(5));
+        result.To.Should().Be(Day(10));
+        result.StartValue.Should().Be(1150m);
+        result.EndValue.Should().Be(1210m);
+        result.Growth.Should().Be(60m);
+        result.SeriesStart.Should().Be(Day(5), "the series starts at the window's first valued close");
+    }
+
+    [Fact]
+    public async Task CryptoSleeve_WithAWindow_SplitsOnlyTheClosesInsideIt()
+    {
+        var closes = new[] { CryptoClose(0, 1000m), CryptoClose(5, 1150m), CryptoClose(10, 1210m), CryptoClose(15, 1300m) };
+        SetupCrypto(closes, [new FlowSourceCoverage("revolut_x", Day(-30), true)]);
+        _snapshots.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, DateOnly? from, DateOnly? to, CancellationToken _) =>
+                [.. closes.Where(c => c.SnapshotDate >= from && c.SnapshotDate <= to)]);
+
+        var result = await Handle(WealthSourceIds.Crypto, Day(5), Day(10));
+
+        result.StartValue.Should().Be(1150m);
+        result.EndValue.Should().Be(1210m);
+        result.Growth.Should().Be(60m);
+    }
+
+    [Fact]
+    public async Task AWindowHoldingNoCloses_IsUnavailable_AndNamesTheWindowItWasAskedFor()
+    {
+        SetupWindowedBrokerage(Value(0, 1000m), Value(5, 1150m));
+
+        var result = await Handle(WealthSourceIds.Brokerage, Day(11), Day(14));
+
+        result.SeriesStart.Should().BeNull();
+        result.Growth.Should().BeNull();
+        result.Headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        result.Headline.Window.Should().Be(new HeadlineWindow(Day(14), Day(14)));
+    }
+
+    [Fact]
+    public async Task AWindowHoldingOneClose_IsUnavailable_FromThatClosesDay()
+    {
+        SetupWindowedBrokerage(Value(0, 1000m), Value(12, 1150m));
+
+        var result = await Handle(WealthSourceIds.Brokerage, Day(11), Day(14));
+
+        result.SeriesStart.Should().Be(Day(12));
+        result.Growth.Should().BeNull();
+        result.Headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        result.Headline.Window.Should().Be(new HeadlineWindow(Day(12), Day(14)));
+    }
 }

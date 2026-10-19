@@ -346,5 +346,85 @@ public class HeadlineQualityMapperTests
         headline.Basis.Should().Be(HeadlineBasis.AverageCapital);
         headline.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
     }
-}
 
+    [Fact]
+    public void WithFx_OnAnAssessment_AddsTheWorseConversionReason_AndKeepsTheRest()
+    {
+        var stale = HeadlineQualityMapper.Assess(HeadlineSignals.FromSnapshot("crypto", false, FxStatus.Exact), amountAvailable: true);
+
+        var result = HeadlineQualityMapper.WithFx(stale, amountAvailable: true, FxStatus.TodayRate);
+
+        result.Quality.Should().Be(HeadlineQuality.Degraded);
+        result.Reasons.Should().BeEquivalentTo(
+        [
+            new HeadlineReason(HeadlineReasonCode.StaleSource, "crypto"),
+            new HeadlineReason(HeadlineReasonCode.FxTodayRate),
+        ]);
+    }
+
+    [Fact]
+    public void WithFx_OnAnAssessment_ReplacesALessSevereConversionReason()
+    {
+        var today = HeadlineQualityMapper.Assess(new HeadlineSignals { Fx = FxStatus.TodayRate }, amountAvailable: true);
+
+        var result = HeadlineQualityMapper.WithFx(today, amountAvailable: true, FxStatus.Unknown1To1);
+
+        result.Quality.Should().Be(HeadlineQuality.Degraded);
+        result.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.FxUnknown1To1));
+    }
+
+    [Theory]
+    [InlineData(FxStatus.Exact)]
+    [InlineData(FxStatus.NearestPublished)]
+    [InlineData(FxStatus.TodayRate)]
+    public void WithFx_OnAnAssessment_IsUnchangedWhenTheStatusIsNoWorseThanTheOneCarried(FxStatus status)
+    {
+        var carried = HeadlineQualityMapper.Assess(new HeadlineSignals { Fx = FxStatus.TodayRate }, amountAvailable: true);
+
+        HeadlineQualityMapper.WithFx(carried, amountAvailable: true, status).Should().BeSameAs(carried);
+    }
+
+    [Fact]
+    public void WithFx_OnAnAssessmentWithNoAmount_StaysUnavailable()
+    {
+        var missing = HeadlineQualityMapper.Assess(HeadlineSignals.None, amountAvailable: false, MeasureFailure.InsufficientData);
+
+        var result = HeadlineQualityMapper.WithFx(missing, amountAvailable: false, FxStatus.TodayRate);
+
+        result.Quality.Should().Be(HeadlineQuality.Unavailable);
+        result.Reasons.Select(r => r.Code).Should().Contain(HeadlineReasonCode.ShortHistory)
+            .And.Contain(HeadlineReasonCode.FxTodayRate);
+    }
+
+    [Fact]
+    public void WithFx_OnAHeadline_AppliesTheSameConversionToItsQualityAndReasons()
+    {
+        var headline = HeadlineFactory.Value(1000m, HeadlineScope.Umbrella, Today, HeadlineSignals.None);
+
+        var result = HeadlineQualityMapper.WithFx(headline, FxStatus.Unknown1To1);
+
+        result.Quality.Should().Be(HeadlineQuality.Degraded);
+        result.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.FxUnknown1To1));
+        result.Amount.Should().Be(1000m);
+        result.Scope.Should().Be(headline.Scope);
+    }
+
+    [Fact]
+    public void WithFx_OnAHeadline_IsTheSameHeadlineWhenTheConversionIsNoWorse()
+    {
+        var headline = HeadlineFactory.Value(1000m, HeadlineScope.Umbrella, Today, new HeadlineSignals { Fx = FxStatus.TodayRate });
+
+        HeadlineQualityMapper.WithFx(headline, FxStatus.Exact).Should().BeSameAs(headline);
+    }
+
+    [Fact]
+    public void WithFx_OnAHeadlineWithNoAmount_StaysUnavailable()
+    {
+        var headline = HeadlineFactory.Value(null, HeadlineScope.Umbrella, Today, HeadlineSignals.None);
+
+        var result = HeadlineQualityMapper.WithFx(headline, FxStatus.TodayRate);
+
+        result.Quality.Should().Be(HeadlineQuality.Unavailable);
+        result.Amount.Should().BeNull();
+    }
+}

@@ -1163,6 +1163,56 @@ are closed periods.
   own earliest synced transaction, so an account connected partway through the gap
   contributes only from that date onward.
 
+### Net-worth bridge (M5, `GET /net-worth/bridge`)
+
+`GetNetWorthBridgeQuery` splits End − Start between the first and last `NetWorthSnapshot` dated
+`from`..`to` (both optional) into the framework's lines (finance-framework §3.3) and hands them to the
+`NetWorthBridge` engine, which forms the investment return and the residual. Every line is USD until the
+controller applies the base currency. Where each line comes from:
+
+- **Savings**: the honest net of §5 (`IHonestMonthlyFlowReader.GetWindowNetAsync`: the flow breakdown's
+  income less spending, counterparty and transfer corrected) over the days after the opening close through the
+  closing one. The breakdown's invested bucket (bank money sent to a broker) is not savings: it reaches the
+  sleeve as a contribution and the two meet in the residual, netting to zero for a transfer between two parts in
+  scope. Each account counts from its link day (`BankAccount.CreatedAt`) to its removal day (`UpdatedAt` of an
+  inactive row): a transaction dated before the link is imported history whose balance reaches the bridge as
+  newly linked, and one dated after the removal belongs to a balance that left as unlinked, so neither is savings.
+  An account the breakdown cannot place keeps all its transactions.
+- **Investment return**: each sleeve's own growth split (`GetSleeveGrowthQuery`, brokerage and crypto, over the
+  same window): market = growth − income + fees + taxes, so the engine's market + income − fees − taxes is that
+  growth again. A sleeve whose flows are unknown contributes nothing (its whole change stays in the residual) and
+  marks the bridge `UNKNOWN_FLOW <source>`; its `UNMATCHED_TRANSFER` reasons carry through. Rate moves inside a
+  sleeve stay in its market line.
+- **FX translation**: each active non-USD bank account's balance, walked back from today through its settled
+  transactions (a day's close holds that day's transactions, as the history reconstruction walks it), translated
+  over each stretch between two banking closes as the balance at the stretch's end × (its end rate − its start
+  rate), at published rates (`PublishedRateLookup`). A `credit` account's translation enters negated (§2). A
+  stretch a link bridged (below), and every stretch before the account was linked (`BankAccount.CreatedAt`), is
+  left out; a stretch with no published rate at either end leaves its move in the residual.
+- **Revaluation**: the change of the part of the snapshot outside the banking, brokerage and crypto columns (the
+  manual values).
+- **Newly linked / unlinked**: a link or removal day (`IAccountScopeChangeReader`, each reader naming the part it
+  moves) bridged on the banking or manual series by `ScopeLinks`: the stretch across it is the linked value, that
+  stretch's own savings and rate moves included, positive into newly linked, negative into unlinked; a part that
+  held nothing at the opening brings its first value in as newly linked, and a part a removal left empty takes its
+  last value out. The sleeves' own `newlyLinked` adds the same way, and so does a sleeve's first (or last) value
+  when a brokerage or exchange link, not a deposit, filled (or emptied) it inside the window.
+- **Residual**: End − Start − all of the above, always returned. It holds what no line reads: an account removed
+  inside the window (it is no longer read, so its moves before the removal), cash spent from or paid into a source
+  the breakdown does not cover, a snapshot day whose rate differs from the published one, and the brokerage-bound
+  transfers above when only one side is in scope. Above 0.2% of the start value it sets `residualAboveTolerance`
+  and the bridge is DEGRADED (`RESIDUAL_ABOVE_TOLERANCE`).
+
+Quality and reasons merge the two end snapshots' own (stale, estimated, FX), `SCOPE_CHANGED` when any link
+touched the window, the sleeves' `UNKNOWN_FLOW` / `UNMATCHED_TRANSFER` and the residual flag. Fewer than two
+snapshots return every amount null, UNAVAILABLE with `SHORT_HISTORY`.
+
+**Base currency** (`NetWorthBridgeController`): the start converts at the opening date's published rate and the
+end at the closing date's, as the history rows do (§3); every line between them converts at the closing rate,
+and the FX line also carries the start's re-statement, start × (closing factor − opening factor), so the lines
+still sum to the converted End − Start. A date with no published rate takes today's (`FX_TODAY_RATE`). The
+tolerance flag stays the USD one.
+
 ## 5b. Book drawdown (risk re-measurement, #700)
 
 The risk layer enforces the owner's recorded maximum drawdown (IPS `MaxDrawdownTolerancePct`, whole

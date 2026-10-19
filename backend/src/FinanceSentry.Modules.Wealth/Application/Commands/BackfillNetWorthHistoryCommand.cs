@@ -90,7 +90,7 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
             while (day > floor)
             {
                 var ownEffect = byAccountDay.TryGetValue((account.AccountId, day), out var dayTransactions)
-                    ? dayTransactions.Sum(t => SignedNativeEffect(account.AccountType, t))
+                    ? dayTransactions.Sum(t => AccountBalanceMath.NativeEffect(account.AccountType, t.TransactionType, t.Amount))
                     : 0m;
 
                 balance -= ownEffect;
@@ -147,16 +147,4 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
         return new BackfillNetWorthHistoryResult(inserted, anchor.SnapshotDate, earliestBackfilled);
     }
 
-    /// <summary>
-    /// The transaction's effect on the account's own stored balance field — not the
-    /// net-worth sign, which <see cref="AccountBalanceMath.SignedForNetTotal"/> applies
-    /// separately at the aggregation boundary. For checking/savings a credit grows the
-    /// balance; for a credit (liability) account a debit grows the amount owed instead.
-    /// </summary>
-    private static decimal SignedNativeEffect(string? accountType, BankingTransactionSummary transaction)
-    {
-        var isCredit = string.Equals(transaction.TransactionType, "credit", StringComparison.OrdinalIgnoreCase);
-        var growsBalance = AccountBalanceMath.IsLiability(accountType) ? !isCredit : isCredit;
-        return growsBalance ? transaction.Amount : -transaction.Amount;
-    }
 }

@@ -224,10 +224,12 @@ End − Start =   savings              external inflows − external outflows at
 ```
 
 A residual above 0.2% of the start value makes the bridge DEGRADED (reason `RESIDUAL_ABOVE_TOLERANCE`).
-**Status: engine built, not wired.** `NetWorthBridge` (3.4) computes these lines and the tolerance flag
-from the window's classified flows plus the per-position market, FX, revaluation and linking lines;
-`NetWorthBridge.Translate` splits a holding's move into its local part and its FX part. No figure shows a
-bridge yet.
+**Status: wired, no figure shows it yet.** `GetNetWorthBridgeQuery` (Wealth) gathers the lines over the first
+and last snapshot of a window and hands them to the `NetWorthBridge` engine (3.4), which forms the investment
+return, the residual and the tolerance flag; `GET /api/v1/net-worth/bridge?from=&to=` (`NetWorthBridgeController`,
+beside `/net-worth/history`) serves it in the person's base currency with the quality and reasons every headline
+carries. Where each line comes from, and what still lands in the residual, is money-semantics §8 (*Net-worth bridge*). The P4
+waterfall (3.7) is what will show it.
 
 ### 3.4 The ten measures
 
@@ -237,7 +239,7 @@ bridge yet.
 | M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetSleeveGrowthQuery`, flows from `BrokerageFlowReader`); the crypto sleeve's (flows from `CryptoFlowReader`: venue fiat legs, Binance coin deposits and withdrawals and Revolut X transfers, S2a/S2b; earn and staking rewards, airdrops as income and the dust service charge as a fee, S2c; withheld per venue while its walk is behind, G6) |
 | M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | Book vs SPY's `bookTwr` (brokerage sleeve, cash-inclusive, `BookPerformanceService`); `timeWeightedReturn` on both growth splits (`GetSleeveGrowthQuery`, the P8 timing gap) |
 | M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | Modified Dietz on both sleeves' "Contributed vs growth"; XIRR (ported from ExcelFinancialFunctions) not wired |
-| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
+| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | `GET /net-worth/bridge` (`GetNetWorthBridgeQuery` over `NetWorthBridge`); no figure shows it until P4 |
 | M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
@@ -398,8 +400,9 @@ A live total's stale source is a sleeve whose read failed (`BookFigures.StaleSou
 freshness window, or an institution whose sync status is stale, failed or needs re-authorisation. The
 `(new)` codes have their quality fixed (ESTIMATED for `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`,
 `PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`). `UNKNOWN_FLOW` is raised by
-the brokerage and crypto growth headlines and Book vs SPY's TWR (C2(a)), `UNMATCHED_TRANSFER` by the crypto growth
-headline (S2b); the others wait on the source registry (R8).
+the brokerage and crypto growth headlines, Book vs SPY's TWR (C2(a)) and the net-worth bridge, `UNMATCHED_TRANSFER`
+by the crypto growth headline (S2b) and the bridge that carries it, `RESIDUAL_ABOVE_TOLERANCE` by the net-worth bridge
+(M5, 3.3); the others wait on the source registry (R8).
 
 **Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
 the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
@@ -439,8 +442,8 @@ The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection car
 ### 3.7 Presentation patterns
 
 A big number becomes meaning through a small set of patterns. Each needs its measure first; the ones built are
-marked. R7 builds them in the order P3, P8, P2, P4, P5: P4 waits on the full bridge (M5 is in the engine, not
-wired) and P5 on M10 and C8.
+marked. R7 builds them in the order P3, P8, P2, P4, P5: P4's bridge is wired (M5, 3.3: `GET /net-worth/bridge`)
+and waits only on its waterfall; P5 waits on M10 and C8.
 
 | Id | Pattern | What the person sees | Needs |
 |---|---|---|---|

@@ -45,8 +45,14 @@ public record SleeveGrowthResponse(
     string Currency = "USD",
     decimal? TimeWeightedReturn = null);
 
-/// <summary>The growth split for <paramref name="Sleeve"/>: <see cref="WealthSourceIds.Brokerage"/> or <see cref="WealthSourceIds.Crypto"/>.</summary>
-public record GetSleeveGrowthQuery(Guid UserId, string Sleeve = WealthSourceIds.Brokerage) : IQuery<SleeveGrowthResponse>;
+/// <summary>
+/// The growth split for <paramref name="Sleeve"/>: <see cref="WealthSourceIds.Brokerage"/> or <see cref="WealthSourceIds.Crypto"/>.
+/// <paramref name="From"/> / <paramref name="To"/> narrow the closes it runs over (the net-worth bridge's window);
+/// left out, it runs over the whole series to today.
+/// </summary>
+public record GetSleeveGrowthQuery(
+    Guid UserId, string Sleeve = WealthSourceIds.Brokerage, DateOnly? From = null, DateOnly? To = null)
+    : IQuery<SleeveGrowthResponse>;
 
 public class GetSleeveGrowthQueryHandler(
     IBrokerageValueHistoryReader history,
@@ -59,12 +65,13 @@ public class GetSleeveGrowthQueryHandler(
 
     public async Task<SleeveGrowthResponse> Handle(GetSleeveGrowthQuery query, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var to = query.To ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = query.From ?? DateOnly.MinValue;
         var (held, flows) = query.Sleeve switch
         {
-            WealthSourceIds.Brokerage => (await BrokerageDailyAsync(query.UserId, today, cancellationToken),
+            WealthSourceIds.Brokerage => (await BrokerageDailyAsync(query.UserId, from, to, cancellationToken),
                 await flowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
-            WealthSourceIds.Crypto => (await CryptoDailyAsync(query.UserId, today, cancellationToken),
+            WealthSourceIds.Crypto => (await CryptoDailyAsync(query.UserId, from, to, cancellationToken),
                 await cryptoFlowReader.ReadAsync(query.UserId, DateOnly.MinValue, cancellationToken)),
             _ => throw new ArgumentOutOfRangeException(nameof(query), query.Sleeve, "No growth split for this sleeve."),
         };
@@ -83,10 +90,10 @@ public class GetSleeveGrowthQueryHandler(
         {
             var missing = HeadlineFactory.Growth(
                 null, MeasuredRate.Fails(MeasureFailure.InsufficientData), scope,
-                seriesStart ?? today, today, HeadlineSignals.None);
+                seriesStart ?? to, to, HeadlineSignals.None);
             return new SleeveGrowthResponse(
                 seriesStart, null, null, null, null, null, null, null, null, null, null, null,
-                flows.SourcesWithoutFlows(today), missing);
+                flows.SourcesWithoutFlows(to), missing);
         }
 
         var unknown = flows.SourcesWithoutFlows(closing.Date);
@@ -134,14 +141,14 @@ public class GetSleeveGrowthQueryHandler(
                 : null);
     }
 
-    private async Task<IReadOnlyList<SleeveDay>> BrokerageDailyAsync(Guid userId, DateOnly today, CancellationToken ct)
-        => [.. (await history.GetDailyAsync(userId, DateOnly.MinValue, today, ct))
+    private async Task<IReadOnlyList<SleeveDay>> BrokerageDailyAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct)
+        => [.. (await history.GetDailyAsync(userId, from, to, ct))
             .Select(d => new SleeveDay(d.Date, d.BrokerageTotalUsd, d.Signals ?? HeadlineSignals.None))];
 
     // Read like BrokerageValueHistoryReader: only the crypto source's own STALE_SOURCE reaches the sleeve's signals.
-    private async Task<IReadOnlyList<SleeveDay>> CryptoDailyAsync(Guid userId, DateOnly today, CancellationToken ct)
+    private async Task<IReadOnlyList<SleeveDay>> CryptoDailyAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct)
     {
-        var raw = await snapshots.GetByUserIdUnscopedAsync(userId, DateOnly.MinValue, today, ct);
+        var raw = await snapshots.GetByUserIdUnscopedAsync(userId, from, to, ct);
         var withSources = SnapshotSources.OfEach(
             raw, await snapshots.GetSourcesUnscopedAsync(userId, [.. raw.Select(s => s.Id)], ct));
         return [.. withSources.Select(x => new SleeveDay(

@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 public class BrokerageScopeChangeReader(BrokerageSyncDbContext db) : IAccountScopeChangeReader
 {
+    public string WealthSourceId => WealthSourceIds.Brokerage;
+
     // CreatedAt is re-stamped when a deactivated credential is relinked, so a relink counts as newly linked.
     // A credential records no deactivation time: removal is detected for bank accounts only
     // (BankAccountScopeChangeReader), and per-source rows (R8) resolve it for the rest.

@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 public class ExchangeScopeChangeReader(CryptoSyncDbContext db) : IAccountScopeChangeReader
 {
+    public string WealthSourceId => WealthSourceIds.Crypto;
+
     // CreatedAt is re-stamped on reactivation, so a relinked exchange counts as newly linked.
     // Removal is approximated for bank accounts only until per-source rows exist (R8).
     public async Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(
