@@ -294,6 +294,21 @@ public class RiskStatisticsTests
     }
 
     [Fact]
+    public void ThirtySixReturnsSpanningThirtyEightMonths_ThreeYearFigureIsNotEnoughHistory()
+    {
+        var values = MonthEnds(FixtureB.Concat([0.01m, 0.01m, 0.01m]).ToArray());
+        values.RemoveAll(p => p.Date == Day(2023, 5, 31));
+        values.Add(Close(Day(2023, 5, 10), 1000m));
+
+        var result = RiskStatistics.Measure(values.OrderBy(p => p.Date).ToList(), []);
+
+        result.MonthlyReturns.Should().HaveCount(37);
+        result.Volatility.Value.Should().NotBeNull();
+        result.ThreeYearVolatility.Value.Should().BeNull();
+        result.ThreeYearVolatility.Failure.Should().Be(MeasureFailure.NotEnoughHistory);
+    }
+
+    [Fact]
     public void WeekendMonthEnd_StillEndsItsMonth()
     {
         // 31 Mar 2023 is a Friday; 30 Jun 2023 a Friday; 31 Jul 2022 a Sunday, so Friday 29 Jul ends July.

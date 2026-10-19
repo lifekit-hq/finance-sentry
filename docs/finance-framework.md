@@ -272,12 +272,16 @@ also fixes:
   the chain (rule 4), never chained as a return.
 - **M8 (`RiskStatistics`)** is our own implementation of the empyrical definitions, with empyrical-reloaded
   0.7.0 as the offline oracle for its golden fixtures (nothing of it, or of LEAN's `Statistics.cs`, is in the
-  repo). The observations are time-weighted returns between consecutive calendar month-ends (the first, partial
-  month gives none; a return is taken only between two closes that are the month's last calendar day or the last weekday before a weekend month-end, so a mid-month close is a stub that breaks the chain and the returns beside it are left out; a month with no valuation fails `MissingValue` rather than being bridged into a two-month
-  return). Volatility is the sample standard deviation (n − 1) × √12; downside deviation is √(mean of
+  repo). The observations are the time-weighted returns of each calendar month that opens and closes on a
+  month-end close (the first, partial month gives none; a month-end close is the month's last calendar day or the
+  last weekday before a weekend month-end, so a mid-month close is a stub and the returns beside it are left out,
+  which can leave gaps in the series; a gap of a month with no valuation at all fails `MissingValue` rather than
+  being bridged into a two-month return). Volatility is the sample standard deviation (n − 1) × √12; downside deviation is √(mean of
   min(r, 0)² over *all* observations) × √12 at a target of 0, so up-months count as zero shortfall instead of
-  leaving the denominator; fewer than two returns fails `NotEnoughHistory`. The three-year volatility is the last 36
-  monthly returns and fails `NotEnoughHistory` below 36 (GIPS 4.A.1.j): the surface shows "not enough history",
+  leaving the denominator; fewer than two returns fails `NotEnoughHistory`. Whole-history volatility and downside deviation use every
+  valid return. The three-year volatility is over the 36 calendar months ending at the last valid month-end and
+  fails `NotEnoughHistory` if any of those 36 monthly returns is missing or excluded, so 36 returns spread over a
+  longer span never qualify (GIPS 4.A.1.j): the surface shows "not enough history",
   never a number. Max drawdown is the deepest fall of the chained time-weighted sub-period index (every valued
   close, so a dip inside a month shows), as a positive fraction; the index opens at 1, so a fall in the first
   step counts. `GrowthIndex` holds that chaining and `BookDrawdownCalculator` uses it for its current drawdown.

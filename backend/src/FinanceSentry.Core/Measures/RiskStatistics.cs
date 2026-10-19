@@ -2,14 +2,16 @@ namespace FinanceSentry.Core.Measures;
 
 /// <summary>
 /// M8 over the window from the first to the last valued close. <paramref name="MonthlyReturns"/> are the
-/// time-weighted returns between consecutive calendar month-ends. Every rate is a fraction and is either a
+/// time-weighted returns of each calendar month that opens and closes on a month-end close; a month without both
+/// is absent, so the list can have gaps. Every rate is a fraction and is either a
 /// number or the typed reason there is none; a series that is too short carries
 /// <see cref="MeasureFailure.NotEnoughHistory"/>, never a zero. <paramref name="MissingValueDays"/> and
 /// <paramref name="UnexplainedDays"/> are those of the whole-window time-weighted chain (M3): a figure with
 /// any of them is degraded (reason <c>UNKNOWN_FLOW</c> for the latter), never guessed.
 /// </summary>
 /// <param name="Volatility">Standard deviation (n − 1) of the monthly returns × √12, over all of them.</param>
-/// <param name="ThreeYearVolatility">The same over the last 36 monthly returns; needs at least 36.</param>
+/// <param name="ThreeYearVolatility">The same over the 36 calendar months ending at the last monthly return; if
+/// any of those 36 months has no return it is <see cref="MeasureFailure.NotEnoughHistory"/>.</param>
 /// <param name="DownsideDeviation">√(mean of min(r, 0)² over all observations) × √12, target 0.</param>
 /// <param name="MaxDrawdown">The deepest fall of the flow-neutral index from a prior high, as a positive fraction.</param>
 public sealed record RiskResult(
@@ -83,15 +85,24 @@ public static class RiskStatistics
             whole.To,
             months,
             Annualised(returns, StandardDeviation),
-            returns.Count < ThreeYearMonths
-                ? MeasuredRate.Fails(MeasureFailure.NotEnoughHistory)
-                : Annualised(returns.TakeLast(ThreeYearMonths).ToList(), StandardDeviation),
+            ThreeYearVolatility(months),
             Annualised(returns, DownsideRootMeanSquare),
             GrowthIndex.Drawdown(whole.Periods.Select(p => p.Return)) is { } drawdown
                 ? MeasuredRate.Of(drawdown.Max)
                 : MeasuredRate.Fails(MeasureFailure.InsufficientData),
             whole.MissingValueDays,
             whole.UnexplainedDays);
+    }
+
+    private static MeasuredRate ThreeYearVolatility(IReadOnlyList<SubPeriodReturn> months)
+    {
+        if (months.Count < ThreeYearMonths)
+            return MeasuredRate.Fails(MeasureFailure.NotEnoughHistory);
+
+        var last = months.TakeLast(ThreeYearMonths).ToList();
+        return MonthIndex(last[^1].To) - MonthIndex(last[0].To) == ThreeYearMonths - 1
+            ? Annualised(last.Select(m => m.Return).ToList(), StandardDeviation)
+            : MeasuredRate.Fails(MeasureFailure.NotEnoughHistory);
     }
 
     // A close ends its month when only weekend days follow it there; a holiday gap cannot be verified, so a
