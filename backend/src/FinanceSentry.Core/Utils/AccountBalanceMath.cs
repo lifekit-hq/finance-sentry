@@ -16,4 +16,17 @@ public static class AccountBalanceMath
 
     public static decimal SignedForNetTotal(string? accountType, decimal amount)
         => IsLiability(accountType) ? -amount : amount;
+
+    /// <summary>
+    /// A transaction's effect on the account's own stored balance field — not the
+    /// net-worth sign, which <see cref="SignedForNetTotal"/> applies separately at the
+    /// aggregation boundary. For checking/savings a credit grows the balance; for a credit
+    /// (liability) account a debit grows the amount owed instead.
+    /// </summary>
+    public static decimal NativeEffect(string? accountType, string transactionType, decimal amount)
+    {
+        var isCredit = string.Equals(transactionType, "credit", StringComparison.OrdinalIgnoreCase);
+        var growsBalance = IsLiability(accountType) ? !isCredit : isCredit;
+        return growsBalance ? amount : -amount;
+    }
 }

@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 public class BankAccountScopeChangeReader(BankSyncDbContext db) : IAccountScopeChangeReader
 {
+    public string WealthSourceId => WealthSourceIds.Banking;
+
     public async Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(
         Guid userId, DateTime sinceUtc, CancellationToken ct = default)
     {

@@ -9,13 +9,17 @@ namespace FinanceSentry.Core.Measures;
 /// the window. <paramref name="VanishedDays"/> are closes that read zero after a valued close with no recorded
 /// withdrawal: a failed read stores zero, so they are dropped as missing valuations rather than read as a total
 /// loss, and a figure with any of them is an estimate (reason <c>UNKNOWN_FLOW</c>, rule 4).
+/// <paramref name="LinkedInUsd"/> and <paramref name="LinkedOutUsd"/> are <paramref name="NewlyLinkedUsd"/> split by
+/// sign, both positive: the stretches whose value rose and those whose value fell (M5's newly linked and unlinked lines).
 /// </summary>
 public sealed record LinkBridge(
     IReadOnlyList<ValuePoint> Values,
     IReadOnlyList<ClassifiedFlow> Flows,
     decimal NewlyLinkedUsd,
     IReadOnlyList<DateOnly> Links,
-    IReadOnlyList<DateOnly> VanishedDays)
+    IReadOnlyList<DateOnly> VanishedDays,
+    decimal LinkedInUsd,
+    decimal LinkedOutUsd)
 {
     /// <summary>Whether a link touched the window (reason <c>SCOPE_CHANGED</c>, informative: the measures bridged it).</summary>
     public bool ScopeChanged => Links.Count > 0;
@@ -52,7 +56,8 @@ public static class ScopeLinks
         var (points, vanished) = WithoutVanishedCloses(
             [.. values.OrderBy(v => v.Date).SkipWhile(v => v.ValueUsd is null or 0m)], allFlows);
         var links = new List<DateOnly>();
-        var newlyLinked = 0m;
+        var linkedIn = 0m;
+        var linkedOut = 0m;
 
         foreach (var link in linkDays.Distinct().Order())
         {
@@ -82,12 +87,15 @@ public static class ScopeLinks
             if (linked == 0m)
                 continue;
 
-            newlyLinked += linked;
+            if (linked > 0m)
+                linkedIn += linked;
+            else
+                linkedOut -= linked;
             allFlows.Add(new ClassifiedFlow(
                 after.Date, linked > 0m ? FlowClass.ExternalInflow : FlowClass.ExternalOutflow, Math.Abs(linked)));
         }
 
-        return new LinkBridge(points, allFlows, newlyLinked, links, vanished);
+        return new LinkBridge(points, allFlows, linkedIn - linkedOut, links, vanished, linkedIn, linkedOut);
     }
 
     // A close of zero after a valued one is a real emptying only when a withdrawal was recorded in between.

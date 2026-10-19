@@ -47,6 +47,12 @@ public sealed record HeadlineSignals
     /// </summary>
     public IReadOnlyList<string> EstimatedSources { get; init; } = [];
 
+    /// <summary>
+    /// The net-worth bridge's unexplained residual exceeds its tolerance (M5, finance-framework §3.3): the lines
+    /// do not account for the change, so the bridge is DEGRADED (<c>RESIDUAL_ABOVE_TOLERANCE</c>).
+    /// </summary>
+    public bool ResidualAboveTolerance { get; init; }
+
     /// <summary>Both figures' signals: the start and the end of a window.</summary>
     public HeadlineSignals Merge(HeadlineSignals other) => new()
     {
@@ -59,6 +65,7 @@ public sealed record HeadlineSignals
         ScopeChanged = ScopeChanged || other.ScopeChanged,
         UnmatchedTransferSources = [.. UnmatchedTransferSources.Concat(other.UnmatchedTransferSources).Distinct(StringComparer.OrdinalIgnoreCase)],
         EstimatedSources = [.. EstimatedSources.Concat(other.EstimatedSources).Distinct(StringComparer.OrdinalIgnoreCase)],
+        ResidualAboveTolerance = ResidualAboveTolerance || other.ResidualAboveTolerance,
     };
 
     /// <summary>

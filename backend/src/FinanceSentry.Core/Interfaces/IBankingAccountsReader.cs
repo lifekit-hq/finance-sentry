@@ -31,13 +31,15 @@ public interface IBankingAccountsReader
     Task<IReadOnlyList<AccountBalanceSnapshot>> GetActiveAccountSnapshotsAsync(Guid userId, CancellationToken ct = default);
 }
 
+/// <param name="LinkedAtUtc">When the account was linked, so a reader over past days can leave it out before then; null when unknown.</param>
 public record AccountBalanceSnapshot(
     Guid AccountId,
     string BankName,
     string AccountType,
     string AccountNumberLast4,
     string Currency,
-    decimal? CurrentBalance)
+    decimal? CurrentBalance,
+    DateTime? LinkedAtUtc = null)
 {
     public string DisplayName => $"{BankName} ···{AccountNumberLast4}";
 }

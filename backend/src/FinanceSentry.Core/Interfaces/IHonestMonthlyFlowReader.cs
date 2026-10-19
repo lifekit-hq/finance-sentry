@@ -14,6 +14,13 @@ public interface IHonestMonthlyFlowReader
     /// </summary>
     Task<IReadOnlyList<HonestMonthlyFlow>> GetMonthlyFlowAsync(
         Guid userId, int months, CancellationToken ct = default);
+
+    /// <summary>
+    /// The same honest net (inflow less outflow, counterparty and transfer corrected, USD) over the UTC days
+    /// <paramref name="from"/> through <paramref name="to"/>, both inclusive: the savings line of the net-worth
+    /// bridge (M5) for a window that is not a whole month.
+    /// </summary>
+    Task<decimal> GetWindowNetAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default);
 }
 
 /// <summary>One calendar month's honest outflow and net savings, USD, "yyyy-MM" keyed.</summary>
