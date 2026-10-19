@@ -1080,7 +1080,7 @@ are closed periods.
     (return). A buy paid from Binance's own fiat balance (`Cash Balance`) moves nothing across the sleeve's
     edge, so only its fee counts. An earn reward, a staking reward and an airdrop are income (return, in the
     asset received), never money put in; a dust conversion moves nothing and counts only its BNB service charge as
-    a fee. Spot trades, Convert, Earn subscribe and redeem and Revolut X `stake` and `un_stake` are internal and
+    a fee. Spot trades (their principal; a Binance commission books as a fee, below), Convert, Earn subscribe and redeem and Revolut X `stake` and `un_stake` are internal and
     record nothing. An income or fee leg the venue could not price drops out of the split without marking the
     flows unknown. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
     EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. The other side's account type is kept raw
