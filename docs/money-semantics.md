@@ -901,6 +901,21 @@ are closed periods.
   single point is UNAVAILABLE with `SHORT_HISTORY`, never a zero change) carry the same record. A Dormant
   account is a quiet state and never marks the headline (connection-health S5; finance-framework "What the person
   is told"). The untyped fields are unchanged.
+- **Values entered by hand** (`wealth.manual_holdings`, `GET/POST /wealth/manual-holdings`,
+  `PUT/DELETE /wealth/manual-holdings/{id}`; the "Entered by hand" section of Accounts; finance-framework C6):
+  wealth no provider reads, such as a Steam wallet. Each entry is a label, an amount in its own currency (what
+  the person would receive after fees, not what they paid), an as-of date and a convertibility (`Cash`,
+  `InEconomy`, `Locked`); reliability is always L3. `ManualWealthSource` (source id `manual`, kind `Manual`)
+  converts each entry once with `CurrencyConverter.Convert`, keeping the worst `FxStatus`. A `Cash` entry is
+  cash; any other is an "Other" position, so a Steam wallet (`InEconomy`) counts in total net worth and in
+  invested, never in cash or the liquid figure built on it. A non-zero reading makes the total and the split
+  line it sits in ESTIMATED with `ESTIMATED_VALUE manual`, and its per-source snapshot row ESTIMATED. The
+  wealth summary lists the entries as an "other" category. Bank-side charges to the platform stay spending
+  (§5); an entry joins the history as a scope change (`linked`, on its creation day: the change across that
+  day keeps its amount and withholds the percent with `SCOPE_CHANGED`), and a later edit is a revaluation
+  of the same entry. The app's form records the as-of date as the day of the save. A deleted entry is
+  soft-deleted (`RemovedAt`): current reads exclude it, and it leaves the history as a `removed` scope change
+  on its removal day (`ManualHoldingScopeChangeReader`), so the drop is not reported as a decline.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point

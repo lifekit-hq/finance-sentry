@@ -52,6 +52,9 @@ public static class HeadlineQualityMapper
         foreach (var source in signals.UnmatchedTransferSources.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
             reasons.Add(new HeadlineReason(HeadlineReasonCode.UnmatchedTransfer, source));
 
+        foreach (var source in signals.EstimatedSources.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.EstimatedValue, source));
+
         if (percentFailure is { } failure)
             reasons.Add(new HeadlineReason(ReasonFor(failure)));
 
@@ -130,6 +133,7 @@ public static class HeadlineQualityMapper
         HeadlineReasonCode.PriceCarriedForward => HeadlineQuality.Estimated,
         HeadlineReasonCode.NonCashIncluded => HeadlineQuality.Degraded,
         HeadlineReasonCode.ResidualAboveTolerance => HeadlineQuality.Degraded,
+        HeadlineReasonCode.EstimatedValue => HeadlineQuality.Estimated,
         _ => HeadlineQuality.Complete,
     };
 

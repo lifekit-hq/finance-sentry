@@ -174,6 +174,9 @@ public class DashboardQueryService(
                     .Select(g => g.Key.ToLowerInvariant())],
             });
         var splitSignals = split is null ? signals with { NoSplit = true } : signals;
+        // An estimated source marks only the split line its value sits in: an in-economy entry is invested, not cash.
+        var cashSignals = book is null ? splitSignals : splitSignals with { EstimatedSources = HeadlineSignals.EstimatedIn(book, r => r.CashUsd) };
+        var investedSignals = book is null ? splitSignals : splitSignals with { EstimatedSources = HeadlineSignals.EstimatedIn(book, r => r.InvestedValueUsd) };
         DateTime?[] inputTimes = [.. cryptoHoldings.Select(h => (DateTime?)h.SyncedAt), .. brokerageHoldings.Select(h => (DateTime?)h.SyncedAt), lastSync?.CompletedAt];
         DateTimeOffset? asOf = inputTimes.Min() is { } oldest ? new DateTimeOffset(DateTime.SpecifyKind(oldest, DateTimeKind.Utc)) : null;
         var today = DateOnly.FromDateTime(now);
@@ -190,8 +193,8 @@ public class DashboardQueryService(
             CashUsd: split?.CashUsd,
             InvestedUsd: split?.InvestedValueUsd,
             NetWorthHeadline: HeadlineFactory.Value(totalUsd, HeadlineScope.Umbrella, today, signals, asOf),
-            CashHeadline: HeadlineFactory.Value(split?.CashUsd, HeadlineScope.CashSleeve, today, splitSignals, asOf),
-            InvestedHeadline: HeadlineFactory.Value(split?.InvestedValueUsd, HeadlineScope.InvestedSleeve, today, splitSignals, asOf));
+            CashHeadline: HeadlineFactory.Value(split?.CashUsd, HeadlineScope.CashSleeve, today, cashSignals, asOf),
+            InvestedHeadline: HeadlineFactory.Value(split?.InvestedValueUsd, HeadlineScope.InvestedSleeve, today, investedSignals, asOf));
     }
 
     // Midnight UTC of the requested day — the dashboard anchors every date in UTC — held

@@ -16,12 +16,18 @@ import {
   type WealthSummaryResponse,
 } from '../../../../shared/models/wealth/wealth.model';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
+import {DateUtils} from '../../../../shared/utils/date.utils';
 import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
+import {CONVERTIBILITY_LABEL} from '../../constants/manual-holding/manual-holding.constants';
 import {
   type AccountNote,
   type ClosedAccountRow,
 } from '../../models/account-lifecycle/account-lifecycle.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {
+  type ManualHolding,
+  type ManualHoldingRow,
+} from '../../models/manual-holding/manual-holding.model';
 import {AccountLifecycleUtils} from '../../utils/account-lifecycle.utils';
 
 const PERCENT = 100;
@@ -29,6 +35,7 @@ const PERCENT = 100;
 interface StateSignals {
   summary: Signal<Nullable<WealthSummaryResponse>>;
   allAccounts: Signal<BankAccount[]>;
+  manualHoldings: Signal<ManualHolding[]>;
   status: Signal<'idle' | 'loading' | 'success' | 'error'>;
 }
 
@@ -70,6 +77,18 @@ export function accountsComputed(store: StateSignals) {
     // Retired accounts for the "Closed accounts" section, newest closure first.
     closedAccounts: computed((): ClosedAccountRow[] =>
       AccountLifecycleUtils.closedRows(store.allAccounts())
+    ),
+    // The "Entered by hand" rows: how freely each value spends, and the day it was true on.
+    manualRows: computed((): ManualHoldingRow[] =>
+      store.manualHoldings().map(holding => ({
+        ...holding,
+        sublabel: `${CONVERTIBILITY_LABEL.get(holding.convertibility) ?? holding.convertibility} · ${DateUtils.recentDayLabel(holding.asOf)}`,
+      }))
+    ),
+    // The summary's "other" category is the entered values, already in the base currency.
+    manualTotal: computed(
+      (): number =>
+        store.summary()?.categories.find(c => c.category === 'other')?.totalInBaseCurrency ?? 0
     ),
     // The quiet lines under a live row (card expiry, replaced card), by account id; accounts with neither are absent.
     accountNotes: computed((): Record<string, AccountNote> => {

@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Services;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Domain.Ports;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
@@ -12,6 +13,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using FinanceSentry.Infrastructure.Persistence;
 
 public static class WealthModule
@@ -63,6 +65,11 @@ public static class WealthModule
         services.AddScoped<IUserDataEraser, WealthUserDataEraser>();
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
+        services.AddScoped<IManualHoldingRepository, ManualHoldingRepository>();
+        // Values entered by hand join the book after the three sleeves (AddBookFigures is idempotent), so they read last.
+        services.AddBookFigures();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IWealthSource, ManualWealthSource>());
+        services.AddScoped<IAccountScopeChangeReader, ManualHoldingScopeChangeReader>();
         // #673: published read port - the Integration adapter reaches the snapshots only through it.
         services.AddScoped<IBrokerageValueHistoryReader, BrokerageValueHistoryReader>();
         services.AddScoped<INetWorthSnapshotService, NetWorthSnapshotService>();

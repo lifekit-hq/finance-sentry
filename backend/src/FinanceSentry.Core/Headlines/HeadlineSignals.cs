@@ -41,6 +41,12 @@ public sealed record HeadlineSignals
     /// </summary>
     public IReadOnlyList<string> UnmatchedTransferSources { get; init; } = [];
 
+    /// <summary>
+    /// Sources whose value in the figure is an estimate rather than a quoted price (reliability L3, framework §5.3
+    /// step 3): the figure is ESTIMATED (<c>ESTIMATED_VALUE</c> per source).
+    /// </summary>
+    public IReadOnlyList<string> EstimatedSources { get; init; } = [];
+
     /// <summary>Both figures' signals: the start and the end of a window.</summary>
     public HeadlineSignals Merge(HeadlineSignals other) => new()
     {
@@ -52,6 +58,7 @@ public sealed record HeadlineSignals
         UnknownFlowSources = [.. UnknownFlowSources.Concat(other.UnknownFlowSources).Distinct(StringComparer.OrdinalIgnoreCase)],
         ScopeChanged = ScopeChanged || other.ScopeChanged,
         UnmatchedTransferSources = [.. UnmatchedTransferSources.Concat(other.UnmatchedTransferSources).Distinct(StringComparer.OrdinalIgnoreCase)],
+        EstimatedSources = [.. EstimatedSources.Concat(other.EstimatedSources).Distinct(StringComparer.OrdinalIgnoreCase)],
     };
 
     /// <summary>
@@ -80,12 +87,25 @@ public sealed record HeadlineSignals
             : FxStatus.Exact,
     };
 
-    /// <summary>The canonical book figures' flags: the sources that failed to read and the worst conversion.</summary>
+    /// <summary>
+    /// The canonical book figures' flags: the sources that failed to read, the worst conversion, and the sources
+    /// that read an estimated (L3) value into the total.
+    /// </summary>
     public static HeadlineSignals FromBook(BookFigures book) => new()
     {
         StaleSources = book.StaleSources,
         Fx = book.FxStatus,
+        EstimatedSources = EstimatedIn(book, r => r.TotalValueUsd),
     };
+
+    /// <summary>
+    /// The book's sources that read an estimated (L3) value into the part of their reading <paramref name="part"/>
+    /// selects (the total, the cash, the invested value): a figure without that part is not an estimate.
+    /// </summary>
+    public static IReadOnlyList<string> EstimatedIn(BookFigures book, Func<WealthSourceReading, decimal> part) =>
+        [.. book.Sources
+            .Where(s => s.Reading is { Reliability: Reliability.L3Estimated } r && part(r) != 0m)
+            .Select(s => s.SourceId)];
 
     private static IReadOnlyList<string> SplitSources(string? csv) =>
         string.IsNullOrWhiteSpace(csv)

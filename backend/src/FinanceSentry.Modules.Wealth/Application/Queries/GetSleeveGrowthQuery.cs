@@ -141,6 +141,7 @@ public class GetSleeveGrowthQueryHandler(
             x.Sources.Signals(x.Snapshot) with
             {
                 StaleSources = x.Sources.IsStale(WealthSourceIds.Crypto) ? [WealthSourceIds.Crypto] : [],
+                EstimatedSources = [],
             }))];
     }
 

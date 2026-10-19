@@ -182,6 +182,24 @@ public class NetWorthSnapshotSourceRowTests
     }
 
     [Fact]
+    public async Task Service_MarksAnEstimatedSourceWithValue_AsEstimated_AndAnEmptyOneAsComplete()
+    {
+        var (repo, rows) = Repo();
+        var manual = new WealthSourceReading(0m,
+            [new BookFigurePosition("Steam wallet", "other", 1m, null, 40m, "manual")], FxStatus.Exact, Reliability.L3Estimated);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, Data(
+            new("manual", EconomyKind.Manual, manual),
+            new("manual-empty", EconomyKind.Manual, new WealthSourceReading(0m, [], FxStatus.Exact, Reliability.L3Estimated))));
+
+        var written = rows()!;
+        written[0].Health.Should().Be(SourceHealth.Estimated);
+        written[0].Reasons.Should().Equal(SourceReasons.EstimatedValue);
+        written[1].Health.Should().Be(SourceHealth.Complete, "a source with nothing in it estimates nothing");
+        written[1].Reasons.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Service_WritesAFailedSourceAsUnavailable_WithNullFiguresAndAStaleReason()
     {
         var (repo, rows) = Repo(new NetWorthSnapshot { BankingTotal = 100m, CryptoTotal = 45m });

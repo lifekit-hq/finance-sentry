@@ -27,7 +27,7 @@ public record NetWorthSnapshotDto(
 /// One source's part of a history row (framework §5.6): <c>Total</c> is the figure the row counted for it (a
 /// carried-forward sleeve's carried figure; null only for a source outside the three sleeves whose read failed),
 /// <c>Health</c> COMPLETE / ESTIMATED / DEGRADED / UNAVAILABLE and <c>Reasons</c> its typed codes
-/// (<c>STALE_SOURCE</c>, <c>FX_TODAY_RATE</c>, <c>FX_UNKNOWN_1TO1</c>). A row taken before per-source rows were
+/// (<c>STALE_SOURCE</c>, <c>FX_TODAY_RATE</c>, <c>FX_UNKNOWN_1TO1</c>, <c>ESTIMATED_VALUE</c>). A row taken before per-source rows were
 /// stored lists the three sleeves from its columns, with <c>STALE_SOURCE</c> on the ones it carried forward.
 /// </summary>
 public record NetWorthSourceDto(

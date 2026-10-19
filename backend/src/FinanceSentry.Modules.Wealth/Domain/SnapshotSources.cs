@@ -20,6 +20,9 @@ public sealed record SnapshotSourceFigure(
 {
     /// <summary>The source failed to read, or the snapshot carried it forward from an earlier day.</summary>
     public bool IsStale => Reasons.Contains(SourceReasons.StaleSource);
+
+    /// <summary>The source's figure is an estimate (reliability L3), not a quoted price.</summary>
+    public bool IsEstimated => Reasons.Contains(SourceReasons.EstimatedValue);
 }
 
 /// <summary>
@@ -71,11 +74,16 @@ public sealed class SnapshotSources
     public bool IsStale(string sourceId) => Sources.Any(s => s.SourceId == sourceId && s.IsStale);
 
     /// <summary>
-    /// The snapshot's headline signals: <c>STALE_SOURCE</c> per stale source here, and the snapshot's own
-    /// reconstruction flag and recorded conversion status (the rule <see cref="HeadlineSignals.FromSnapshot(string?, bool, FxStatus?)"/> applies).
+    /// The snapshot's headline signals: <c>STALE_SOURCE</c> per stale source here, <c>ESTIMATED_VALUE</c> per estimated
+    /// one, and the snapshot's own reconstruction flag and recorded conversion status (the rule
+    /// <see cref="HeadlineSignals.FromSnapshot(string?, bool, FxStatus?)"/> applies).
     /// </summary>
     public HeadlineSignals Signals(NetWorthSnapshot snapshot)
-        => HeadlineSignals.FromSnapshot(null, snapshot.IsApproximate, snapshot.FxStatus) with { StaleSources = StaleSources };
+        => HeadlineSignals.FromSnapshot(null, snapshot.IsApproximate, snapshot.FxStatus) with
+        {
+            StaleSources = StaleSources,
+            EstimatedSources = [.. Sources.Where(s => s.IsEstimated).Select(s => s.SourceId)],
+        };
 
     /// <summary>
     /// The snapshot's sources from its per-source <paramref name="rows"/> (null or empty for a snapshot taken

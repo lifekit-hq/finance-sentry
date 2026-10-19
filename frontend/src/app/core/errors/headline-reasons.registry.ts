@@ -28,6 +28,8 @@ export const HEADLINE_REASON_MESSAGES: ErrorMessagesMap = {
   PRICE_CARRIED_FORWARD: 'A price from an earlier day is used where today’s is missing.',
   RESIDUAL_ABOVE_TOLERANCE:
     'The change in net worth is not fully explained by known movements and price changes.',
+  ESTIMATED_VALUE:
+    'Part of this total is a value you entered by hand, not one read from a provider.',
   NO_COST_BASIS:
     'None of these holdings has a known purchase cost, so a gain against cost cannot be measured.',
 };

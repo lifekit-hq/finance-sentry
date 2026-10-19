@@ -77,12 +77,13 @@ CONTRIBUTIONS_VS_GROWTH, TWR, MWR_XIRR, MODIFIED_DIETZ, GAIN_VS_COST, HPR), `bas
 
 ## Decided and open calls (finance-framework §1)
 
-Decided: C3, C4, C5, C7(i), C8, C9.
-Open: C6, C1, C2, C7(ii).
+Decided: C3, C4, C5, C7(i), C8, C9, C6.
+Open: C1, C2, C7(ii).
 
 C3: the book headline is cash-inclusive brokerage, benchmark SPY. C8: one disclosed projection assumption
-set, shown as a range. C9: per-holding checks, each threshold cited, no portfolio-level score. An open call
-is the captain's: present the trade-off, never settle it.
+set, shown as a range. C9: per-holding checks, each threshold cited, no portfolio-level score. C6: Steam is
+entered by hand (L3, in-economy), never linked. An open call is the captain's: present the trade-off, never
+settle it.
 
 ## Where each number comes from
 

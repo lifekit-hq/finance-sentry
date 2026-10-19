@@ -14,6 +14,7 @@ import {
   type AccountNote,
   type ClosedAccountRow,
 } from '../../models/account-lifecycle/account-lifecycle.model';
+import {type ManualHoldingRow} from '../../models/manual-holding/manual-holding.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsListComponent} from './accounts-list.component';
@@ -46,6 +47,7 @@ function setupFixture(
     setInstitutionOpen?: (key: string, isOpen: boolean) => void;
     closed?: ClosedAccountRow[];
     notes?: Record<string, AccountNote>;
+    manual?: ManualHoldingRow[];
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -58,6 +60,10 @@ function setupFixture(
     load: state.load ?? vi.fn(),
     closedAccounts: signal(state.closed ?? []),
     accountNotes: signal(state.notes ?? {}),
+    manualRows: signal(state.manual ?? []),
+    manualTotal: signal((state.manual ?? []).reduce((sum, row) => sum + row.amount, 0)),
+    saveManualHolding: vi.fn(),
+    removeManualHolding: vi.fn(),
     reopenAccount: vi.fn(),
     disconnectAccount: vi.fn(),
     institutionOpen: signal(state.open ?? {}),
@@ -951,5 +957,105 @@ describe('AccountsListComponent lifecycle notes on live rows', () => {
     expect(element.querySelector('[data-testid="account-row"]')).not.toBeNull();
     expect(element.querySelector('[data-testid="account-expiry-note"]')).toBeNull();
     expect(element.querySelector('[data-testid="account-replacement-note"]')).toBeNull();
+  });
+});
+
+describe('AccountsListComponent values entered by hand', () => {
+  const steam: ManualHoldingRow = {
+    id: 'manual-1',
+    label: 'Steam wallet',
+    amount: 40,
+    currency: 'USD',
+    asOf: '2026-10-18',
+    convertibility: 'InEconomy',
+    reliability: 'L3Estimated',
+    updatedAt: '2026-10-18T10:00:00Z',
+    sublabel: 'Spendable only inside its platform · Today',
+  };
+  const input = {
+    label: 'Steam wallet',
+    amount: 35,
+    currency: 'USD',
+    asOf: '2026-10-19',
+    convertibility: 'InEconomy',
+  };
+
+  function setupManual(closedWith: unknown, manual: ManualHoldingRow[] = [steam]) {
+    const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(closedWith)})};
+    const fixture = setupFixture(
+      {syncStatus: 'synced'},
+      [{provide: CmnDialogService, useValue: dialog}],
+      {manual}
+    );
+    const store = TestBed.inject(AccountsStore) as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
+    return {fixture, element: fixture.nativeElement as HTMLElement, dialog, store};
+  }
+
+  it('lists each entry with how freely it spends and its value, under the section subtotal', () => {
+    const {element} = setupManual(undefined);
+    const row = element.querySelector('[data-testid="manual-holding-row"]') ?? element;
+
+    expect(row.textContent).toContain('Steam wallet');
+    expect(row.textContent).toContain('Spendable only inside its platform');
+    expect(row.querySelector('[data-testid="manual-holding-value"]')?.textContent).toContain(
+      '$40.00'
+    );
+    expect(element.querySelector('[data-testid="manual-subtotal"]')?.textContent).toContain(
+      '$40.00'
+    );
+  });
+
+  it('offers an add row even with nothing entered, without a subtotal', () => {
+    const {element} = setupManual(undefined, []);
+
+    expect(element.querySelector('[data-testid="add-manual-holding"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="manual-subtotal"]')).toBeNull();
+  });
+
+  it('adds what the form closes with', () => {
+    const {element, store} = setupManual(input, []);
+
+    (element.querySelector('[data-testid="add-manual-holding"]') as HTMLElement).click();
+
+    expect(store['saveManualHolding']).toHaveBeenCalledWith({id: null, input});
+  });
+
+  it('edits the tapped entry under its id', () => {
+    const {fixture, store, dialog} = setupManual(input);
+
+    fixture.componentInstance.onManualHoldingAction(steam, 'edit');
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({data: {holding: steam}})
+    );
+    expect(store['saveManualHolding']).toHaveBeenCalledWith({id: 'manual-1', input});
+  });
+
+  it('saves nothing when the form is cancelled', () => {
+    const {fixture, store} = setupManual(undefined);
+
+    fixture.componentInstance.openManualHolding(steam);
+
+    expect(store['saveManualHolding']).not.toHaveBeenCalled();
+  });
+
+  it('removes only after the person confirms', () => {
+    const {fixture, store} = setupManual(true);
+
+    fixture.componentInstance.onManualHoldingAction(steam, 'remove');
+
+    expect(store['removeManualHolding']).toHaveBeenCalledWith('manual-1');
+  });
+
+  it('keeps the entry when the removal is cancelled', () => {
+    const {fixture, store} = setupManual(false);
+
+    fixture.componentInstance.onManualHoldingAction(steam, 'remove');
+
+    expect(store['removeManualHolding']).not.toHaveBeenCalled();
   });
 });

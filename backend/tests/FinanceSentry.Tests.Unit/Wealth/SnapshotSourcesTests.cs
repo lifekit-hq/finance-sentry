@@ -159,6 +159,22 @@ public class SnapshotSourcesTests
     }
 
     [Fact]
+    public void AnEstimatedSource_MakesTheSnapshotEstimated_NamingIt()
+    {
+        var snapshot = Snapshot(1_000m, 0m, 0m);
+        var rows = new[]
+        {
+            Row(snapshot, "banking", EconomyKind.Bank, 1_000m),
+            Row(snapshot, "manual", EconomyKind.Manual, 40m, SourceHealth.Estimated, SourceReasons.EstimatedValue),
+        };
+
+        var assessment = HeadlineQualityMapper.Assess(SnapshotSources.Of(snapshot, rows).Signals(snapshot), true);
+
+        assessment.Quality.Should().Be(HeadlineQuality.Estimated);
+        assessment.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.EstimatedValue, "manual"));
+    }
+
+    [Fact]
     public void OfEach_PairsEverySnapshotWithItsOwnRows_InOrder()
     {
         var old = Snapshot(900m, 0m, 0m, staleSleeves: "banking");

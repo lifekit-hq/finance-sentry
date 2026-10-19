@@ -1,8 +1,12 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Wealth;
 
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Application.Services;
+using FinanceSentry.Modules.Wealth.Domain;
+using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -504,5 +508,57 @@ public class WealthAggregationServiceTests
         result.Categories.Should().HaveCount(2);
         result.Categories.First(c => c.Category == "banking").TotalDebits.Should().Be(100m);
         result.Categories.First(c => c.Category == "crypto").TotalDebits.Should().Be(50m);
+    }
+
+    private static WealthAggregationService BuildServiceWithManual(params ManualHolding[] holdings)
+    {
+        var accounts = new Mock<IBankingAccountsReader>();
+        accounts.Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([MakeAccount("monobank", "USD", 1_000m)]);
+        var manual = new Mock<IManualHoldingRepository>();
+        manual.Setup(r => r.ListAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(holdings);
+        return new WealthAggregationService(accounts.Object, Mock.Of<IBankingTransactionReader>(), manualHoldings: manual.Object);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_HandEnteredValues_AreOneOtherInstitution_CountedInTheTotal_AndMakeItEstimated()
+    {
+        var steam = ManualHolding.Create(UserId, "Steam wallet", 40m, "USD", DateOnly.FromDateTime(DateTime.UtcNow), Convertibility.InEconomy);
+        var svc = BuildServiceWithManual(steam);
+
+        var result = await svc.GetWealthSummaryAsync(UserId, null, null);
+
+        result.TotalNetWorth.Should().Be(1_040m);
+        var other = result.Categories.Single(c => c.Category == "other");
+        var institution = other.Institutions.Single();
+        institution.Provider.Should().Be("manual");
+        institution.LastSuccessfulSyncTimestamp.Should().BeNull("a hand-entered value has no sync to date the total by");
+        institution.Accounts.Single().Should().Match<AccountBalanceDto>(a =>
+            a.AccountId == steam.Id && a.BankName == "Steam wallet" && a.BalanceInBaseCurrency == 40m);
+        result.Headline!.Quality.Should().Be(HeadlineQuality.Estimated);
+        result.Headline.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.EstimatedValue, "manual"));
+    }
+
+    [Theory]
+    [InlineData("banking", null)]
+    [InlineData(null, "monobank")]
+    public async Task GetWealthSummary_AFilterOutsideTheManualSource_LeavesHandEnteredValuesOut(string? category, string? provider)
+    {
+        var svc = BuildServiceWithManual(
+            ManualHolding.Create(UserId, "Steam wallet", 40m, "USD", DateOnly.FromDateTime(DateTime.UtcNow), Convertibility.InEconomy));
+
+        var result = await svc.GetWealthSummaryAsync(UserId, category, provider);
+
+        result.Categories.Should().NotContain(c => c.Category == "other");
+        result.TotalNetWorth.Should().Be(1_000m);
+        result.Headline!.Reasons.Should().NotContain(r => r.Code == HeadlineReasonCode.EstimatedValue);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_NoHandEnteredValues_AddsNoOtherCategory()
+    {
+        var result = await BuildServiceWithManual().GetWealthSummaryAsync(UserId, null, null);
+
+        result.Categories.Should().NotContain(c => c.Category == "other");
     }
 }

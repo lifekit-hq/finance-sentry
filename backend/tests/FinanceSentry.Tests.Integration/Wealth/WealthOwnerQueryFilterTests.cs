@@ -16,8 +16,8 @@ using Xunit;
 /// <summary>
 /// The Owner query filter on <see cref="WealthDbContext"/>: a context acting for one person sees only that
 /// person's net-worth snapshots, a context with no person in scope sees none, and the snapshot job, the startup
-/// catch-up and the cross-module brokerage history reader (which run with no person in scope) opt out explicitly,
-/// so they still see the user they name. Real Postgres, matching the other filter suites.
+/// catch-up, the cross-module brokerage history reader and the manual wealth source (which run with no person in
+/// scope) opt out explicitly, so they still see the user they name. Real Postgres, matching the other filter suites.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
@@ -82,7 +82,7 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         // Every entity type, not only those with a UserId: a source row has none and is filtered through its snapshot.
         var perUser = ctx.Model.GetEntityTypes().ToList();
 
-        perUser.Should().HaveCount(2);
+        perUser.Should().HaveCount(3);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -159,6 +159,42 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         (await unscoped.GetSourcesUnscopedAsync(_userA, both)).Select(r => r.Total).Should().Equal(
             [1_000m], "the unscoped read keeps its own user predicate");
         (await unscoped.GetSourcesUnscopedAsync(_userA, [])).Should().BeEmpty();
+    }
+
+    [DockerRequiredFact]
+    public async Task Manual_holdings_follow_the_acting_person_and_the_wealth_source_reads_the_named_user_with_no_person()
+    {
+        await using (var seed = CreateContext())
+        {
+            var removed = ManualHolding.Create(_userA, "Old wallet", 500m, "USD", Today, Convertibility.InEconomy);
+            removed.Remove();
+            seed.ManualHoldings.AddRange(
+                ManualHolding.Create(_userA, "Steam wallet", 40m, "USD", Today, Convertibility.InEconomy),
+                ManualHolding.Create(_userB, "Steam wallet", 90m, "USD", Today, Convertibility.InEconomy),
+                removed);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ManualHoldingRepository(asA);
+            (await repo.ListAsync(_userA)).Select(h => h.Amount).Should().Equal(40m);
+            (await repo.ListAsync(_userB)).Should().BeEmpty("naming another person does not lift the owner scope");
+            var other = (await CreateContext().ManualHoldings.IgnoreQueryFilters().FirstAsync(h => h.UserId == _userB)).Id;
+            (await repo.GetAsync(_userB, other)).Should().BeNull();
+        }
+
+        await using var asNoOne = CreateContext();
+        var unscoped = new ManualHoldingRepository(asNoOne);
+        (await unscoped.ListAsync(_userA)).Should().BeEmpty("no person in scope matches no row");
+        var reading = await new ManualWealthSource(unscoped).ReadAsync(_userA);
+        reading.TotalValueUsd.Should().Be(40m, "the snapshot job reads the named user's entries with no person in scope");
+        reading.Reliability.Should().Be(Reliability.L3Estimated);
+
+        var changes = await new ManualHoldingScopeChangeReader(unscoped).GetChangesSinceAsync(_userA, DateTime.UtcNow.AddDays(-1));
+        changes.Select(c => c.Kind).Should().BeEquivalentTo(
+            [AccountScopeChangeKinds.Linked, AccountScopeChangeKinds.Linked, AccountScopeChangeKinds.Removed],
+            "a removed entry is skipped by every read of current holdings and dated by the scope-change reader");
     }
 
     [DockerRequiredFact]

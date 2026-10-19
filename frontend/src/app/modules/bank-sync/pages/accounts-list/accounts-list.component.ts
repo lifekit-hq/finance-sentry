@@ -15,6 +15,7 @@ import {
   ButtonComponent,
   CardComponent,
   CmnDialogService,
+  ConfirmDialogComponent,
   DisclosureRowComponent,
   EmptyStateComponent,
   IconComponent,
@@ -42,13 +43,25 @@ import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pi
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
+import {ManualHoldingDialogComponent} from '../../components/manual-holding-dialog/manual-holding-dialog.component';
 import {RemoveClosedAccountDialogComponent} from '../../components/remove-closed-account-dialog/remove-closed-account-dialog.component';
 import {CLOSED_ACCOUNTS_KEY} from '../../constants/accounts-disclosure/accounts-disclosure.constants';
+import {
+  MANUAL_HOLDING_MENU,
+  MENU_ACTION_EDIT,
+  MENU_ACTION_REMOVE_MANUAL,
+} from '../../constants/manual-holding/manual-holding.constants';
 import {type ClosedAccountRow} from '../../models/account-lifecycle/account-lifecycle.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {
+  type ManualHolding,
+  type ManualHoldingDialogData,
+  type ManualHoldingInput,
+} from '../../models/manual-holding/manual-holding.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
 import {PositionQuantityPipe} from '../../pipes/position-quantity.pipe';
 import {PositionValuePipe} from '../../pipes/position-value.pipe';
@@ -131,6 +144,7 @@ export class AccountsListComponent implements OnInit {
   );
   public readonly investmentsRoute = AppRoute.AccountsInvestments;
   public readonly closedAccountsKey = CLOSED_ACCOUNTS_KEY;
+  public readonly manualHoldingMenu = MANUAL_HOLDING_MENU;
   /** Closed unless this device opened it: the section is a record, not something to read on every visit. */
   public readonly closedOpen = computed(
     () => this.store.institutionOpen()[CLOSED_ACCOUNTS_KEY] ?? false
@@ -360,6 +374,58 @@ export class AccountsListComponent implements OnInit {
       .subscribe(confirmed => {
         if (confirmed === true) {
           this.store.disconnectAccount(row.accountId);
+        }
+      });
+  }
+
+  /** Adds a value by hand, or edits `holding`; the reload brings it into every total. */
+  public openManualHolding(holding: Nullable<ManualHolding> = null): void {
+    const data: ManualHoldingDialogData = {holding};
+    this.dialog
+      .open<ManualHoldingInput>(ManualHoldingDialogComponent, {
+        title: holding ? `Edit ${holding.label}` : 'Add a value by hand',
+        size: 'sm',
+        viewContainerRef: this.viewContainerRef,
+        data,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(input => {
+        if (input) {
+          this.store.saveManualHolding({id: holding?.id ?? null, input});
+        }
+      });
+  }
+
+  public onManualHoldingAction(holding: ManualHolding, action: string): void {
+    if (action === MENU_ACTION_EDIT) {
+      this.openManualHolding(holding);
+    } else if (action === MENU_ACTION_REMOVE_MANUAL) {
+      this.removeManualHolding(holding);
+    }
+  }
+
+  public removeManualHolding(holding: ManualHolding): void {
+    const title = `Remove ${holding.label}?`;
+    this.dialog
+      .open<boolean>(ConfirmDialogComponent, {
+        data: {
+          title,
+          message: 'It leaves your total net worth. Your linked accounts are not affected.',
+          confirmLabel: 'Remove',
+          cancelLabel: 'Cancel',
+          confirmVariant: 'destructive',
+        },
+        title: DialogUtils.phoneTitle(title),
+        size: 'sm',
+        phone: 'action-sheet',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (confirmed === true) {
+          this.store.removeManualHolding(holding.id);
         }
       });
   }

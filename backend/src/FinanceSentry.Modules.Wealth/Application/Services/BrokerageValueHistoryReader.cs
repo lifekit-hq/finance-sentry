@@ -15,14 +15,15 @@ public sealed class BrokerageValueHistoryReader(INetWorthSnapshotRepository snap
         var raw = await snapshots.GetByUserIdUnscopedAsync(userId, from, to, ct);
         var withSources = SnapshotSources.OfEach(
             raw, await snapshots.GetSourcesUnscopedAsync(userId, [.. raw.Select(s => s.Id)], ct));
-        // Another source failing or carried forward does not touch the brokerage figure, so only the brokerage
-        // source's own STALE_SOURCE reaches its signals.
+        // Another source failing, carried forward or estimated does not touch the brokerage figure, so only the
+        // brokerage source's own STALE_SOURCE reaches its signals.
         return withSources
             .Select(x => new DailyBrokerageValue(
                 x.Snapshot.SnapshotDate, x.Snapshot.BrokerageTotal, x.Snapshot.BrokerageInvested,
                 x.Sources.Signals(x.Snapshot) with
                 {
                     StaleSources = x.Sources.IsStale(BrokerageSleeve) ? [BrokerageSleeve] : [],
+                    EstimatedSources = [],
                 }))
             .ToList();
     }

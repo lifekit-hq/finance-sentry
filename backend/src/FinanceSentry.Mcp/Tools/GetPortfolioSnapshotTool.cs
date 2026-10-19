@@ -38,13 +38,16 @@ public sealed class GetPortfolioSnapshotTool(
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var signals = HeadlineSignals.FromBook(book);
+        // An estimated source marks only the lines its value sits in: an in-economy entry is invested, not cash.
+        var investedSignals = signals with { EstimatedSources = HeadlineSignals.EstimatedIn(book, r => r.InvestedValueUsd) };
         var headlines = new PortfolioHeadlines(
             TotalValue: HeadlineFactory.Value(book.TotalValueUsd, HeadlineScope.Umbrella, today, signals),
-            InvestedValue: HeadlineFactory.Value(book.InvestedValueUsd, HeadlineScope.InvestedSleeve, today, signals),
-            Cash: HeadlineFactory.Value(book.CashUsd, HeadlineScope.CashSleeve, today, signals),
+            InvestedValue: HeadlineFactory.Value(book.InvestedValueUsd, HeadlineScope.InvestedSleeve, today, investedSignals),
+            Cash: HeadlineFactory.Value(book.CashUsd, HeadlineScope.CashSleeve, today,
+                signals with { EstimatedSources = HeadlineSignals.EstimatedIn(book, r => r.CashUsd) }),
             UnrealizedPnl: HeadlineFactory.GainVsCost(
                 [.. book.Positions.Select(p => new CostedValue(p.UsdValue, p.CostBasisUsd))],
-                HeadlineScope.InvestedSleeve, today, signals));
+                HeadlineScope.InvestedSleeve, today, investedSignals));
 
         return new PortfolioSnapshot(
             Positions: positions,
