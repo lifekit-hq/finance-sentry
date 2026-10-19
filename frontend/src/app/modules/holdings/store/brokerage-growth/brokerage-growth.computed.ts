@@ -1,13 +1,16 @@
 import {computed, type Signal} from '@angular/core';
 
+import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {ProviderUtils} from '../../../../shared/utils/provider.utils';
 import {
   IBKR_PROVIDER,
-  MWR_PERCENT_DIGITS,
+  PERCENT_POINTS,
+  RETURN_PERCENT_DIGITS,
 } from '../../constants/brokerage-growth/brokerage-growth.constants';
 import {
   type BrokerageGrowth,
   type BrokerageGrowthView,
+  type GrowthTimingGap,
 } from '../../models/brokerage-growth/brokerage-growth.model';
 
 interface StateSignals {
@@ -37,7 +40,20 @@ export function brokerageGrowthComputed(store: StateSignals) {
       if (percent == null) {
         return null;
       }
-      return `${percent > 0 ? '+' : ''}${percent.toFixed(MWR_PERCENT_DIGITS)}%`;
+      return PercentUtils.signed(percent, RETURN_PERCENT_DIGITS);
+    }),
+    /** P8: the time-weighted return against the money-weighted one; null unless both are measured. */
+    timingGap: computed<Nullable<GrowthTimingGap>>(() => {
+      const twr = store.growth()?.timeWeightedReturn;
+      const mwr = store.growth()?.moneyWeightedReturn;
+      if (twr == null || mwr == null) {
+        return null;
+      }
+      return {
+        investments: PercentUtils.signed(twr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
+        money: PercentUtils.signed(mwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
+        points: (Math.abs(twr - mwr) * PERCENT_POINTS).toFixed(RETURN_PERCENT_DIGITS),
+      };
     }),
     showsNewlyLinked: computed(() => {
       const linked = store.growth()?.newlyLinked;

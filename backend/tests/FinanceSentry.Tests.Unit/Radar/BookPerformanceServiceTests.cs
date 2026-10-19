@@ -725,6 +725,7 @@ public sealed class BookPerformanceServiceTests
         period.BookTwrFrom.Should().Be(since);
         period.BookTwrTo.Should().Be(today);
         period.BookTwrReasons.Should().BeEmpty();
+        period.BookTwrQuality.Should().Be(HeadlineQuality.Complete);
     }
 
     [Fact]
@@ -739,6 +740,7 @@ public sealed class BookPerformanceServiceTests
 
         period.BookTwr.Should().Be(0.03m);
         period.BookTwrReasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"));
+        period.BookTwrQuality.Should().Be(HeadlineQuality.Estimated, "its deposits would read as return");
     }
 
     [Fact]

@@ -44,6 +44,7 @@ public class BrokerageGrowthContractTests(WealthApiFactory factory) : IClassFixt
         body.NewlyLinked.Should().Be(0m);
         body.Growth.Should().Be(110m);
         body.MoneyWeightedReturn.Should().Be(0.1m);
+        body.TimeWeightedReturn.Should().Be(0.1m);
         body.SourcesWithoutFlows.Should().BeEmpty();
         body.Currency.Should().Be("USD");
         body.Headline.Amount.Should().Be(110m);
@@ -85,4 +86,4 @@ public record BrokerageGrowthHeadlineShape(decimal? Amount, decimal? Percent, st
 public record BrokerageGrowthShape(
     string? SeriesStart, string? From, string? To, decimal? StartValue, decimal? EndValue, decimal? Contributed,
     decimal? NewlyLinked, decimal? Growth, decimal? MoneyWeightedReturn, List<string> SourcesWithoutFlows,
-    BrokerageGrowthHeadlineShape Headline, string Currency);
+    BrokerageGrowthHeadlineShape Headline, string Currency, decimal? TimeWeightedReturn);

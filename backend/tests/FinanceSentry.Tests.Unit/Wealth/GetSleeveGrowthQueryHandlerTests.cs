@@ -85,6 +85,7 @@ public class GetSleeveGrowthQueryHandlerTests
         result.Taxes.Should().Be(3m);
         // The day-one deposit is invested for the whole window: 110 / (1000 + 100).
         result.MoneyWeightedReturn.Should().Be(0.1m);
+        result.TimeWeightedReturn.Should().Be(0.1m, "the deposit landed before any market move, so timing cost nothing");
         result.SourcesWithoutFlows.Should().BeEmpty();
         result.Headline.Amount.Should().Be(110m);
         result.Headline.Percent.Should().Be(10m);
@@ -105,10 +106,24 @@ public class GetSleeveGrowthQueryHandlerTests
         result.Contributed.Should().BeNull();
         result.Growth.Should().BeNull();
         result.MoneyWeightedReturn.Should().BeNull();
+        result.TimeWeightedReturn.Should().BeNull();
         result.SourcesWithoutFlows.Should().Equal("ibkr");
         result.Headline.Amount.Should().BeNull();
         result.Headline.Quality.Should().Be(HeadlineQuality.Unavailable);
         result.Headline.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"));
+    }
+
+    [Fact]
+    public async Task SeparatesTheInvestmentsReturn_FromTheMoneysReturn_ByTheTimingOfTheDeposit()
+    {
+        // The market halves, then 1000 goes in on day 6 and the market doubles: the investments broke even,
+        // the money - mostly invested for the rise - gained.
+        Setup([Value(0, 1000m), Value(5, 500m), Value(10, 3000m)], [IbkrRecorded], Flow(6, FlowClass.ExternalInflow, 1000m));
+
+        var result = await Handle();
+
+        result.TimeWeightedReturn.Should().Be(0m);
+        result.MoneyWeightedReturn.Should().BePositive();
     }
 
     [Fact]

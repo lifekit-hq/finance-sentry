@@ -1,12 +1,18 @@
-import {signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
+import {of} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {GROWTH_SLEEVE_COPY} from '../../constants/brokerage-growth/brokerage-growth.constants';
 import {
   type BrokerageGrowth,
   type BrokerageGrowthView,
+  type GrowthSleeve,
+  type GrowthSleeveCopy,
+  type GrowthTimingGap,
 } from '../../models/brokerage-growth/brokerage-growth.model';
+import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {BrokerageGrowthComponent} from './brokerage-growth.component';
 
@@ -37,8 +43,18 @@ const GROWTH: BrokerageGrowth = {
   currency: 'USD',
 };
 
+@Component({
+  imports: [BrokerageGrowthComponent],
+  template: '<fns-brokerage-growth sleeve="crypto" />',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class CryptoHostComponent {}
+
 describe('BrokerageGrowthComponent', () => {
   let store: {
+    sleeve: GrowthSleeve;
+    copy: GrowthSleeveCopy;
+    timingGap: ReturnType<typeof signal<Nullable<GrowthTimingGap>>>;
     status: ReturnType<typeof signal<AsyncStatus>>;
     errorMessage: ReturnType<typeof signal<string>>;
     growth: ReturnType<typeof signal<Nullable<BrokerageGrowth>>>;
@@ -62,6 +78,9 @@ describe('BrokerageGrowthComponent', () => {
 
   beforeEach(async () => {
     store = {
+      sleeve: 'brokerage',
+      copy: GROWTH_SLEEVE_COPY.brokerage,
+      timingGap: signal<Nullable<GrowthTimingGap>>(null),
       status: signal<AsyncStatus>('success'),
       errorMessage: signal(''),
       growth: signal<Nullable<BrokerageGrowth>>(GROWTH),
@@ -140,6 +159,41 @@ describe('BrokerageGrowthComponent', () => {
 
     const el = render();
 
+    expect(el.querySelector('[data-testid="brokerage-growth"]')).toBeNull();
+  });
+
+  it('says the timing gap between the investments and the money', () => {
+    store.timingGap.set({investments: '0.0%', money: '+5.3%', points: '5.3'});
+
+    const el = render();
+
+    expect(text(el, 'brokerage-growth-timing-gap')).toBe(
+      'Your investments returned 0.0% (time-weighted); your money earned +5.3% (money-weighted). ' +
+        'The difference, 5.3 points, is the timing of your deposits and withdrawals.'
+    );
+  });
+
+  it('leaves the timing gap out when it is not measured', () => {
+    const el = render();
+
+    expect(el.querySelector('[data-testid="brokerage-growth-timing-gap"]')).toBeNull();
+  });
+
+  it('reads the crypto sleeve when its host says so', () => {
+    const getGrowth = vi
+      .fn()
+      .mockReturnValue(of({...GROWTH, headline: {...GROWTH.headline, scope: 'sleeve:crypto'}}));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [CryptoHostComponent],
+      providers: [{provide: BrokerageGrowthService, useValue: {getGrowth}}],
+    });
+    const fixture = TestBed.createComponent(CryptoHostComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(getGrowth).toHaveBeenCalledWith('crypto');
+    expect(text(el, 'crypto-growth-since')).toContain('Binance and Revolut X since 30 Jun 2026');
     expect(el.querySelector('[data-testid="brokerage-growth"]')).toBeNull();
   });
 });

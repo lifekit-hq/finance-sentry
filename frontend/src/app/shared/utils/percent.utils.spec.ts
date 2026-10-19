@@ -20,6 +20,20 @@ describe('PercentUtils.fromFraction', () => {
   });
 });
 
+describe('PercentUtils.signed', () => {
+  it('marks a gain with a plus', () => {
+    expect(PercentUtils.signed(4.21, 1)).toBe('+4.2%');
+  });
+
+  it('keeps the minus on a loss', () => {
+    expect(PercentUtils.signed(-3, 1)).toBe('-3.0%');
+  });
+
+  it('reads a figure that rounds to zero as an unsigned zero', () => {
+    expect(PercentUtils.signed(-0.04, 1)).toBe('0.0%');
+  });
+});
+
 describe('PercentUtils.toFraction', () => {
   it('converts a typed percent to a fraction', () => {
     expect(PercentUtils.toFraction('4', 0.5, 10)).toBe(0.04);

@@ -1052,7 +1052,11 @@ are closed periods.
     stretch §10 bridges; neither paid in nor earned). `income`, `fees` and `taxes` break the growth down; the
     remainder is market movement. `moneyWeightedReturn` is Modified Dietz over the window (a deposit counts
     from the start of its day; not annualised), carried in the headline record (`MODIFIED_DIETZ`, scope
-    `sleeve:brokerage`, percent in percentage points).
+    `sleeve:brokerage`, percent in percentage points). `timeWeightedReturn` is the time-weighted return over
+    the same closes and flows (finance-framework M3, the Book vs SPY method), null while the split is withheld
+    or while value moved with no recorded flow. With both, the card adds the timing gap (finance-framework P8):
+    "your investments returned TWR; your money earned MWR; the difference is the timing of your deposits and
+    withdrawals". Both are rates, so the difference is unaffected by the base-currency conversion.
   - **No contributions recorded yet.** While a linked provider has never reported a deposit or withdrawal
     (`sourcesWithoutFlows`; IBKR until the Flex Query includes *Deposits & Withdrawals* and the backfill runs),
     every one of its deposits would read as growth, so the split is withheld: `contributed`, `growth` and the
@@ -1061,7 +1065,8 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Investments tab's "Crypto: contributed vs
+  growth" card, the same component as the brokerage one; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).
@@ -1296,6 +1301,13 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   only Ledger-as-proposed's gross mean, to one decimal.
 
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
+
+- **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
+  which the Investments tab reads for its "growth of 10,000" card (finance-framework P2): the longest period
+  with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
+  10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
+  to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply
+  (`HeadlineQualityMapper`), so the card's badge reads the same reasons the brief's "(est.)" does.
 
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the

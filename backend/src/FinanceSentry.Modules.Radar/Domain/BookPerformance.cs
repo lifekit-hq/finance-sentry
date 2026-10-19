@@ -21,7 +21,8 @@ public enum BookPerformancePeriod
 /// <c>Since</c> and there is no <c>Delta</c>. <c>BookTwrReasons</c> qualify the TWR: <c>UNKNOWN_FLOW</c> names a
 /// provider that has never reported a deposit or withdrawal (its deposits would read as return, so the figure is
 /// an estimate), <c>SCOPE_CHANGED</c> says a link was bridged, and the end rows' stale, reconstructed and FX flags
-/// carry over. Null fields indicate insufficient price or value history for the period.
+/// carry over, and <c>BookTwrQuality</c> is the worst quality they imply (finance-framework §3.6), so the TWR wears
+/// its badge. Null fields indicate insufficient price or value history for the period.
 /// <para>
 /// <c>HoldingsBasedReturn</c> is the flow-neutral companion: the book's price return from revaluing each
 /// capture's quantities at the next capture's prices and chaining, so deposits and purchases from idle cash
@@ -52,7 +53,8 @@ public sealed record PeriodTwr(
     Headline? Book = null,
     DateOnly? BookTwrFrom = null,
     DateOnly? BookTwrTo = null,
-    IReadOnlyList<HeadlineReason>? BookTwrReasons = null);
+    IReadOnlyList<HeadlineReason>? BookTwrReasons = null,
+    HeadlineQuality? BookTwrQuality = null);
 
 /// <summary>
 /// Book-vs-SPY time-weighted scoreboard across the four standard lookback windows.
