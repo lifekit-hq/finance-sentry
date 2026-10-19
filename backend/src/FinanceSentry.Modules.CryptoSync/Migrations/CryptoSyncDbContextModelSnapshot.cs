@@ -195,6 +195,18 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<decimal?>("Fee")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)");
+
+                    b.Property<string>("FeeAsset")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("FeeUsd")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
+
                     b.Property<bool>("IsBuyer")
                         .HasColumnType("boolean");
 

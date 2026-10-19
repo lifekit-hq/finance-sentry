@@ -127,4 +127,25 @@ public sealed class CostBasisCalculatorTests
         result.CostBasisUsd.Should().Be(0m);
         result.TradeCount.Should().Be(2);
     }
+
+    [Fact]
+    public void Compute_FeeOnABuy_IsPartOfTheLotsCost()
+    {
+        var buy = Buy(qty: 1m, price: 2_000m, id: 1) with { Fee = 0.005m, FeeAsset = "BNB", FeeUsd = 3m };
+
+        var result = _sut.Compute([buy]);
+
+        result.CostBasisUsd.Should().Be(2_003m);
+        result.AverageBuyPriceUsd.Should().Be(2_003m);
+    }
+
+    [Fact]
+    public void Compute_FeeOnASell_ReducesRealizedPnl()
+    {
+        var sell = Sell(qty: 1m, price: 2_500m, id: 2) with { FeeUsd = 4m };
+
+        var result = _sut.Compute([Buy(qty: 1m, price: 2_000m, id: 1), sell]);
+
+        result.RealizedPnlUsd.Should().Be(496m);
+    }
 }

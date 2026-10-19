@@ -337,4 +337,25 @@ public class CryptoFlowReaderTests
         external.Flows.Select(f => (f.Flow.Class, f.Flow.AmountUsd, f.UnmatchedTransfer)).Should().Equal(
             (FlowClass.ExternalOutflow, 60000m, true), (FlowClass.Fee, 6m, false));
     }
+
+    [Fact]
+    public async Task Fixture14_ATradeFeeBooksAsAFeeAtItsValue_NotAsMarketMoves()
+    {
+        await using var db = NewDb();
+        db.ExchangeCredentials.Add(Link(CryptoExchangeProvider.Binance));
+        var trade = new CryptoTrade("1", "ETH", "USDT", 1m, 2_000m, 2_000m, true, Apr9, Fee: 0.005m, FeeAsset: "BNB", FeeUsd: 3m);
+        var unvalued = trade with { TradeId = "2", FeeUsd = null };
+        var history = trade with { TradeId = "3", Timestamp = Linked.AddHours(2) };
+        db.CryptoTrades.AddRange(
+            CryptoTradeRecord.Create(UserId, CryptoExchangeProvider.Binance, trade),
+            CryptoTradeRecord.Create(UserId, CryptoExchangeProvider.Binance, unvalued),
+            CryptoTradeRecord.Create(UserId, CryptoExchangeProvider.Binance, history),
+            CryptoTradeRecord.Create(Guid.NewGuid(), CryptoExchangeProvider.Binance, trade with { TradeId = "4" }));
+        await db.SaveChangesAsync();
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Select(f => (f.Source, f.Flow.Class, f.Flow.AmountUsd, f.Fx)).Should().Equal(
+            (CryptoExchangeProvider.Binance, FlowClass.Fee, 3m, FxStatus.Exact));
+    }
 }

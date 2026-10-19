@@ -91,7 +91,7 @@ public sealed class ForwardCostBasisLedger
             if (fill.IsBuyer)
             {
                 tracked += fill.Quantity;
-                cost += fill.QuoteQuantityUsd;
+                cost += fill.QuoteQuantityUsd + (fill.FeeUsd ?? 0m);
                 continue;
             }
 
@@ -106,7 +106,7 @@ public sealed class ForwardCostBasisLedger
             if (untracked <= QuantityEpsilon)
             {
                 var average = cost / tracked;
-                realized += (fill.PriceUsd - average) * sold;
+                realized += ((fill.PriceUsd - average) * sold) - (fill.FeeUsd ?? 0m);
                 cost -= average * sold;
                 tracked -= sold;
             }

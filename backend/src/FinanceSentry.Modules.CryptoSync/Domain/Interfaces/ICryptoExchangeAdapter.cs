@@ -107,6 +107,12 @@ public sealed record CryptoTradePage(
     string? NextCursor,
     bool IsComplete = true);
 
+/// <param name="Fee">The commission the venue charged, in <paramref name="FeeAsset"/>; null when it reported none.</param>
+/// <param name="FeeAsset">The asset the commission was paid in (often BNB on Binance), not necessarily the pair's.</param>
+/// <param name="FeeUsd">
+/// <paramref name="Fee"/> in USD at the fill's own time; null when no price for <paramref name="FeeAsset"/> could be had,
+/// so the fee is unvalued rather than guessed.
+/// </param>
 public sealed record CryptoTrade(
     string TradeId,
     string Asset,
@@ -115,7 +121,10 @@ public sealed record CryptoTrade(
     decimal PriceUsd,
     decimal QuoteQuantityUsd,
     bool IsBuyer,
-    DateTime Timestamp);
+    DateTime Timestamp,
+    decimal? Fee = null,
+    string? FeeAsset = null,
+    decimal? FeeUsd = null);
 
 public sealed record CryptoFlowWalk(DateTime From, DateTime AsOf, int Lane = 0);
 

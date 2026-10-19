@@ -52,6 +52,8 @@ public sealed class BinanceHoldingsAggregator
     }
 
     /// <summary>Last price per symbol (<c>BTCUSDT</c> → price).</summary>
+    public static bool IsStablecoin(string asset) => Stablecoins.Contains(asset);
+
     public static Dictionary<string, decimal> PriceMap(IReadOnlyList<BinancePriceTicker> prices) =>
         prices.ToDictionary(
             p => p.Symbol,

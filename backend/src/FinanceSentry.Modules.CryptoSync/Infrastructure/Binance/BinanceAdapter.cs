@@ -35,6 +35,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     // every lane has read it; a walk further behind catches up over the next runs.
     private const long FlowWindowMs = 24L * 60 * 60 * 1000;
     private const int FlowLanes = 4;
+    private const long DayMs = 24L * 60 * 60 * 1000;
     private const int FlowPageRows = 500;
     private const int MaxFlowPages = 20;
     private const int FiatIn = 0;
@@ -160,12 +161,16 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
         var nextFromIds = BinanceTradeCursor.Parse(cursor, QuoteCandidates);
         var allTrades = new List<CryptoTrade>();
+        var feePrices = new Dictionary<(string Asset, long Day), decimal?>();
+        var stopped = false;
 
         foreach (var quote in QuoteCandidates)
         {
+            if (stopped) break;
+
             var symbol = $"{asset.ToUpperInvariant()}{quote}";
             var fromId = nextFromIds.GetValueOrDefault(quote);
-            for (var page = 0; page < maxPages; page++)
+            for (var page = 0; page < maxPages && !stopped; page++)
             {
                 IReadOnlyList<BinanceTradeRow> rows;
                 try
@@ -179,24 +184,51 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
                 }
 
                 // fromId is inclusive, so a row below it was already counted by an earlier run.
-                var fresh = rows.Where(r => r.Id >= fromId).ToList();
+                var fresh = rows.Where(r => r.Id >= fromId).OrderBy(r => r.Id).ToList();
+                long? lastConsumedId = null;
                 foreach (var r in fresh)
                 {
+                    var price = decimal.Parse(r.Price, CultureInfo.InvariantCulture);
+                    var fee = ParseAmount(r.Commission);
+                    var feeAsset = string.IsNullOrWhiteSpace(r.CommissionAsset) ? null : r.CommissionAsset.Trim().ToUpperInvariant();
+                    var hasFee = fee is > 0m && feeAsset is not null;
+                    decimal? feeUsd = null;
+                    if (hasFee)
+                    {
+                        try
+                        {
+                            feeUsd = await FeeUsdAsync(fee!.Value, feeAsset!, asset, price, r.TimeMs, feePrices, ct);
+                        }
+                        catch (BinanceException ex)
+                        {
+                            _logger.LogWarning(
+                                ex,
+                                "Binance price for fee asset {Asset} failed on {Symbol} fill {TradeId}; the walk stops here and resumes from this fill next sync.",
+                                feeAsset, symbol, r.Id);
+                            stopped = true;
+                            break;
+                        }
+                    }
+
                     allTrades.Add(new CryptoTrade(
                         TradeId: r.Id.ToString(CultureInfo.InvariantCulture),
                         Asset: asset.ToUpperInvariant(),
                         QuoteAsset: quote,
                         Quantity: decimal.Parse(r.Quantity, CultureInfo.InvariantCulture),
-                        PriceUsd: decimal.Parse(r.Price, CultureInfo.InvariantCulture),
+                        PriceUsd: price,
                         QuoteQuantityUsd: decimal.Parse(r.QuoteQuantity, CultureInfo.InvariantCulture),
                         IsBuyer: r.IsBuyer,
-                        Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(r.TimeMs).UtcDateTime));
+                        Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(r.TimeMs).UtcDateTime,
+                        Fee: hasFee ? fee : null,
+                        FeeAsset: hasFee ? feeAsset : null,
+                        FeeUsd: feeUsd));
+                    lastConsumedId = r.Id;
                 }
 
-                if (fresh.Count > 0)
+                if (lastConsumedId is { } lastId)
                 {
-                    // Ids are per symbol: the next run resumes this pair just past its last fill.
-                    fromId = fresh.Max(r => r.Id) + 1;
+                    // Ids are per symbol: the next run resumes this pair just past its last valued fill.
+                    fromId = lastId + 1;
                     nextFromIds[quote] = fromId;
                 }
 
@@ -210,7 +242,51 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             .ThenBy(t => long.Parse(t.TradeId, CultureInfo.InvariantCulture))
             .ToList();
 
-        return new CryptoTradePage(trades, BinanceTradeCursor.Format(nextFromIds));
+        return new CryptoTradePage(trades, BinanceTradeCursor.Format(nextFromIds), IsComplete: !stopped);
+    }
+
+    /// <summary>
+    /// A fill's commission in USD at the fill's own time: a stablecoin at par, the traded asset at the fill's price, any
+    /// other asset (typically BNB) at the close of its daily <c>klines</c> candle for the fill's UTC date. Null when that asset has no
+    /// USDT pair (HTTP 400, invalid symbol), so the fee stays unvalued instead of being priced at today's rate; any other
+    /// failure (rate limit, 5xx) propagates so the walk retries it rather than storing the fee unvalued for good.
+    /// </summary>
+    private async Task<decimal?> FeeUsdAsync(
+        decimal fee,
+        string feeAsset,
+        string tradedAsset,
+        decimal fillPriceUsd,
+        long timeMs,
+        Dictionary<(string Asset, long Day), decimal?> cache,
+        CancellationToken ct)
+    {
+        if (BinanceHoldingsAggregator.IsStablecoin(feeAsset))
+        {
+            return fee;
+        }
+
+        if (string.Equals(feeAsset, tradedAsset, StringComparison.OrdinalIgnoreCase))
+        {
+            return fee * fillPriceUsd;
+        }
+
+        var key = (feeAsset, timeMs / DayMs);
+        if (!cache.TryGetValue(key, out var unitPrice))
+        {
+            try
+            {
+                unitPrice = await _httpClient.GetDailyClosePriceAsync($"{feeAsset}USDT", key.Item2 * DayMs, ct);
+            }
+            catch (BinanceException ex) when (ex.VenueStatusCode == (int)HttpStatusCode.BadRequest)
+            {
+                _logger.LogDebug(ex, "Binance price for fee asset {Asset} unavailable; the commission stays unvalued.", feeAsset);
+                unitPrice = null;
+            }
+
+            cache[key] = unitPrice;
+        }
+
+        return unitPrice is { } p ? fee * p : null;
     }
 
     /// <summary>

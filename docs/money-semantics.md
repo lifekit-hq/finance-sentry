@@ -1095,11 +1095,21 @@ are closed periods.
     (return). A buy paid from Binance's own fiat balance (`Cash Balance`) moves nothing across the sleeve's
     edge, so only its fee counts. An earn reward, a staking reward and an airdrop are income (return, in the
     asset received), never money put in; a dust conversion moves nothing and counts only its BNB service charge as
-    a fee. Spot trades, Convert, Earn subscribe and redeem and Revolut X `stake` and `un_stake` are internal and
+    a fee. Spot trades (their principal; a Binance commission books as a fee, below), Convert, Earn subscribe and redeem and Revolut X `stake` and `un_stake` are internal and
     record nothing. An income or fee leg the venue could not price drops out of the split without marking the
     flows unknown. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
     EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. The other side's account type is kept raw
     (`CounterpartyRef`); the sleeve reads both `revolut` and `external_*` as external.
+  - **Binance spot trade commission.** A fill's `commission` / `commissionAsset` (`/api/v3/myTrades`) is kept on the
+    stored trade (`Fee`, `FeeAsset`, `FeeUsd`) and books as a fee (return) on the fill's day, never as market
+    moves. `FeeUsd` is valued when the fill is synced: a stablecoin at par, the traded asset at the fill's price,
+    any other asset (typically BNB) at the close of its daily `klines` candle for the fill's UTC date (one price call
+    per asset and day). A fee on a pair Binance does not list (HTTP 400) stays unvalued and books nothing (it stays
+    in the market remainder). A price call that fails transiently (429, 5xx) stops the trade walk at that fill: the
+    fills before it are stored and the cursor resumes from it on the next sync. Fills stored before this release carry no
+    fee and are not backfilled. Cost basis includes it: a buy's `FeeUsd` joins the lot's cost, a sell's reduces
+    realized P&L. Fixture 14: 0.005 BNB at 600 = a 3.00 fee. Revolut X trade fees are not read (they need
+    `/orders/{id}`, a read not made today) and stay in the market remainder.
   - **Transfers between venues** (`CryptoTransferMatcher`, at read time). A coin one venue sent and another
     received is a move inside the sleeve, not money in or out: the pair books no flow, only its cost as a fee
     on the send's day (what left the sender, its own fee included, less what arrived). A pair matches on the

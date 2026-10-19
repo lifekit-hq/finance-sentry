@@ -43,7 +43,8 @@ public sealed class CostBasisCalculator
 
             if (trade.IsBuyer)
             {
-                runningCostUsd += trade.QuoteQuantityUsd;
+                // The commission is part of what the lot cost.
+                runningCostUsd += trade.QuoteQuantityUsd + (trade.FeeUsd ?? 0m);
                 runningQty += trade.Quantity;
             }
             else
@@ -52,6 +53,9 @@ public sealed class CostBasisCalculator
                 {
                     continue;
                 }
+
+                // The commission on a sale is a cost of realizing it.
+                realizedPnl -= trade.FeeUsd ?? 0m;
 
                 var avg = runningCostUsd / runningQty;
                 var sellQty = Math.Min(trade.Quantity, runningQty);

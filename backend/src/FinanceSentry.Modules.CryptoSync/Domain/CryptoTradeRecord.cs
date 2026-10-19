@@ -21,6 +21,13 @@ public sealed class CryptoTradeRecord : IUserOwned
     public decimal PriceUsd { get; private set; }
     public decimal QuoteQuantityUsd { get; private set; }
     public bool IsBuyer { get; private set; }
+
+    /// <summary>The commission the venue charged, in <see cref="FeeAsset"/>. Null on rows synced before fees were kept (never backfilled).</summary>
+    public decimal? Fee { get; private set; }
+    public string? FeeAsset { get; private set; }
+
+    /// <summary><see cref="Fee"/> in USD at the fill's own time; null when unvalued.</summary>
+    public decimal? FeeUsd { get; private set; }
     public DateTime Timestamp { get; private set; }
     public DateTime RecordedAt { get; private set; }
 
@@ -43,6 +50,9 @@ public sealed class CryptoTradeRecord : IUserOwned
             PriceUsd = trade.PriceUsd,
             QuoteQuantityUsd = trade.QuoteQuantityUsd,
             IsBuyer = trade.IsBuyer,
+            Fee = trade.Fee,
+            FeeAsset = trade.FeeAsset,
+            FeeUsd = trade.FeeUsd,
             Timestamp = trade.Timestamp,
             RecordedAt = DateTime.UtcNow,
         };
