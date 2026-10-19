@@ -457,7 +457,8 @@ The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection car
 ### 3.7 Presentation patterns
 
 A big number becomes meaning through a small set of patterns. Each needs its measure first; the ones built are
-marked. R7 builds them in the order P3, P8, P2, P4, P5; P5 waits on M10 and C8.
+marked. R7 builds them in the order P3, P8, P2, P4, P5, each after its measure: P4 once the bridge was wired
+(M5), P5 once M10 and C8 had landed. All five are built.
 
 | Id | Pattern | What the person sees | Needs |
 |---|---|---|---|
