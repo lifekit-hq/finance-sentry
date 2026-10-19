@@ -30,7 +30,7 @@ rule or shape agreed but not implemented), **missing**.
 | C4 | **Compute in USD; show returns in the person's base currency**, using dated rates for flows and values. | Currency of M3–M5. Flows convert at the flow date's rate, positions at the valuation date's rate (§3.2 rule 5). |
 | C5 | The net-worth headline is the **total**, with "of which liquid" beneath. No toggle. | §5.3 totals; presentation pattern P10. |
 | C7(i) | **Designs only** from AGPL/GPL projects; **code only** from permissively licensed ones, with attribution. | What may be ported. AGPL/GPL code is never copied; AGPL designs are paraphrased. |
-| C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Today's two projections use two sets (gap G7). |
+| C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Built (G7 closed): `ProjectionAssumptions` is the one set, its real return a ±3-point range (2% / 5% / 8% on the default 5%, the FCA's COBS 13 spread) with the 4% withdrawal rate; the twelve-month figure and the FIRE projection both use it and state it in words. |
 | C2(a) | **Contributions vs growth for IBKR and Inzhur now, showing both MWR and TWR** (2026-10-15): "Contributed / Growth" with a Modified Dietz return on the Home Investments card, and Book vs SPY as a time-weighted return. MWR only was declined. | M2 and M4 on the brokerage sleeve (§3.4); M3 and M9 on Book vs SPY (G1 closed). Internal moves are not flows; dividends and interest count as growth unless withdrawn. |
 | C9 | **Per-holding checks first**, each threshold cited from a public source. No portfolio-level score. | Presentation pattern P7; the per-holding screen of #824. |
 | C6 | **Steam is not linked; the person enters it by hand** (2026-10-18): no wallet, inventory or API integration. The entry is valued at what they would receive after fees, L3, IN_ECONOMY. | The manual source (§5.4, §5.5): counted in total net worth, outside cash and liquid net worth, and the total ESTIMATED (`ESTIMATED_VALUE`). Bank-side Steam charges stay spending; the entry joins as a newly linked line (§3.2 rule 3), so nothing is counted twice. |
@@ -102,9 +102,9 @@ Three rules keep the layers apart:
 | 4 | Book vs SPY (weekly brief, MCP `get_book_performance`, `GET /radar/book-performance` behind the Home Investments card's growth of 10,000) | `BookPerformanceService` | Since C2(a): daily-chained TWR on the cash-inclusive brokerage total with the brokers' deposits and withdrawals taken out and provider links bridged (`ScopeLinks`); SPY's adjusted-close return over the same dates, `delta` = the difference. The `book` headline stays the change in invested value. Beside it, since R1(b), the flow-neutral **holdings-based return** (`holdingsBasedReturn`) against SPY's price return (`spyPriceReturn`, close) | null when history misses the edge tolerance; `bookTwrReasons` (`UNKNOWN_FLOW` while a provider has no deposits on record, `SCOPE_CHANGED` on a link) and `bookTwrQuality`, the worst quality they imply; the holdings-based figure carries a typed reason instead of a number | M3, M9; `book` is M1 | none (G1 closed) |
 | 5 | Book drawdown | `BookDrawdownCalculator` | Flow-neutral chained index from holdings snapshots, with split detection | null under two captures | M8 | none: the pattern to reuse |
 | 6 | Position returns | `PositionReturnCalculator` | Average-cost walk: unrealized, realized, dividends net of withholding, currency effect | `Coverage` = complete / partial / unavailable | M6 | the vocabulary is local (G5) |
-| 7 | 12-month projection tile | `dashboard.computed.ts` | Median monthly savings × 12, no market return | hidden under three complete months | M10 | G7 |
+| 7 | 12-month projection (dashboard hero, `GET /wealth/projection`) | `GetNetWorthProjectionQuery` on `Projection`; money-semantics §11 | Latest net worth plus the median monthly savings, compounded twelve months at the shared real return, as a low / central / high range | `InsufficientHistory` (hidden under three complete months); `HasStaleSleeves` | M10 | none (G7 closed) |
 | 4b | Contributed vs growth (Home Investments card, `GET /wealth/brokerage/growth` and `GET /wealth/crypto/growth`, one card each) | `GetSleeveGrowthQuery` | growth = end − start − newly linked − net deposits on the sleeve total since the value series starts (brokerage: cash-inclusive; crypto: the venues' `crypto_total`); Modified Dietz on the same window, and beside it `timeWeightedReturn` (M3 over the same closes and flows; null while the split is withheld or value moved with no recorded flow) | UNAVAILABLE with `UNKNOWN_FLOW` while a provider has no deposits on record or a venue's walk is behind; `SCOPE_CHANGED` on a link; `UNMATCHED_TRANSFER` (crypto) for a transfer leg no other venue's leg matched | M2, M3, M4 | IBKR flows wait on C1; crypto earn, dust, airdrops and fees wait on S2c |
-| 8 | FIRE projection | `FireCalculator`; money-semantics §11 | Target = 12 × median outflow ÷ withdrawal rate (default 4%); 5% real return, compounding | `HasStaleSleeves`, `InsufficientHistory` | M10 | G7 |
+| 8 | FIRE projection | `GetFireProjectionQuery` on `Projection`; money-semantics §11 | Target = 12 × median outflow ÷ withdrawal rate (default 4%); months to it at the shared real return range (default 2% / 5% / 8%), compounding | `HasStaleSleeves`, `InsufficientHistory` | M10 | none (G7 closed); no headline record yet (§3.6) |
 | 9 | Historical FX | `CachingHistoricalExchangeRateService` | `ConvertToUsdAsync` returns a `ConvertResult`: the published rate for the date (`EXACT`), the closest earlier published day (`NEAREST_PUBLISHED`), else today's rate (`TODAY_RATE`, or `SEED_TABLE` / `UNKNOWN_1TO1` when today's rate is itself the seed or absent) | `FxStatus` on the result (R4); the log line stays | valuation step 5 | G2 (closed for the live total) |
 
 Two things already right and kept:
@@ -242,7 +242,7 @@ bridge yet.
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
 | M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates); per decision, the Ledger scoreboard (`get_ledger_scoreboard`, a 30-day price excess per proposal or pick, money-semantics §10) |
-| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration | — | tile + FIRE, two assumption sets (G7) |
+| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration; range spread from FCA COBS 13 Annex 2 | a month-by-month simulation at each return | engine: `Projection` (twelve-month figure and FIRE, one assumption set, both as a range; G7 closed). The P5 lens is not built |
 
 Choices the engine fixes once, so they stop being re-decided:
 
@@ -299,6 +299,20 @@ assertion, never from running the engine. The headline record (3.6) takes M1's a
 for the figures that are changes (net-worth history's window change, the `book` headline of `get_book_performance`);
 the gain-vs-cost headlines describe the unrealized P&L the readers already sum (value minus cost of the
 positions whose cost is known), not M6's event walk, which no reader feeds yet.
+
+**M10 (`Projection`)** is the one projection engine (C8). `ProjectionAssumptions` holds the real annual return
+and the safe withdrawal rate (per person, default 5% and 4%); its `RealAnnualReturns` is the range: the return
+± `ReturnSpread` (3 points), the low bound floored at 0% and never above the central one. The cited US
+standards fix how a projection is disclosed, not its bounds; the three-point spread is the UK FCA's lower /
+intermediate / higher projection rates (COBS 13 Annex 2: 2%, 5%, 8%), which the 5% default reproduces. The
+withdrawal rate stays a single value. `SavingsPathOf` takes the median net of the complete months (none under
+three), `ValueAfter` compounds net worth plus that saving for n months at each return, and
+`FinancialIndependence` solves the months to annual spend ÷ withdrawal rate at each return. Each figure is a
+`ProjectionRange` (low ≤ central ≤ high whichever scenario lands on which end). `ProjectionInputsReader` reads
+both consumers' inputs (assumptions, latest snapshot, complete months, stale sources), so they cannot drift.
+Each projection shows its range and its assumptions in words next to it, ending "Hypothetical, not a
+guarantee." `ProjectionTests` checks the range ordering, the zero-return, short-history and negative-net-worth
+guards, and both figures against a month-by-month simulation.
 
 ### 3.5 Worked example (fictional numbers)
 
@@ -401,7 +415,8 @@ freshness window, or an institution whose sync status is stale, failed or needs 
 the brokerage and crypto growth headlines and Book vs SPY's TWR (C2(a)), `UNMATCHED_TRANSFER` by the crypto growth
 headline (S2b); the others wait on the source registry (R8).
 
-**Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
+**Not yet carrying the record** (R6's remaining work): the two projections (the twelve-month figure and FIRE)
+and their `HasStaleSleeves`;
 the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
 recommendation or per flow rather than a book total or return (`get_benchmark_track_record`,
 `get_thesis_performance`, `get_track_record`, `get_ledger_scoreboard`, postmortems, `get_cashflow_report`, budgets, the family
@@ -976,10 +991,14 @@ IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"` a
 classifies them. No IBKR deposits or withdrawals arrive, because the Flex query does not include that type
 (C1). Crypto venues store their fiat legs and Revolut X's transfers (`crypto_sync."CryptoFlowEvents"`); Binance's coin deposits and withdrawals are read too (S2b), so a crypto scope computes M2 and M4; its earn, dust and airdrop events are read too (S2c).
 
-**G7. Two projections use two different assumptions.**
-The 12-month tile is median monthly savings × 12 with no market return; the FIRE projection compounds a 5%
-real return to a 4%-withdrawal target. Each states its basis, but nothing shares one assumptions contract
-and neither shows a range (C8).
+**G7. Two projections use two different assumptions.** *Closed (M10, 2026-10-19): the twelve-month figure moved from the
+browser to `GET /wealth/projection`, and it and the FIRE projection both run on `Projection` with one
+`ProjectionAssumptions` set, each shown as a range with its assumptions in words (C8). Left: neither carries a
+headline record yet (§3.6), and the P5 monthly-income lens is not built. The history below is kept as the
+record.*
+The 12-month tile was median monthly savings × 12 with no market return; the FIRE projection compounded a 5%
+real return to a 4%-withdrawal target. Each stated its basis, but nothing shared one assumptions contract
+and neither showed a range (C8).
 
 **G8. Resilience: the contract is only partly built** (§5.7).
 No early re-checks for a once-a-day source after a failure (the next attempt is the next daily run); a

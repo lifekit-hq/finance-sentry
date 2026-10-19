@@ -1,7 +1,9 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Measures;
 using FinanceSentry.Modules.Wealth.Application.Queries;
+using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FluentAssertions;
@@ -19,7 +21,7 @@ public class GetFireProjectionQueryHandlerTests
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetFireProjectionQueryHandler CreateHandler() =>
-        new(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock);
+        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock), _clock);
 
     private static NetWorthSnapshot Snapshot(decimal totalNetWorth, string? staleSleeves = null) => new()
     {
@@ -168,6 +170,48 @@ public class GetFireProjectionQueryHandlerTests
 
         result.SafeWithdrawalRate.Should().Be(0.04m);
         result.RealAnnualReturn.Should().Be(0.05m);
+    }
+
+    [Fact]
+    public async Task Handle_Projected_CarriesTheReturnRangeAndADateRange_HighReturnSoonest()
+    {
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Snapshot(100_000m));
+        _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));
+        _assumptions.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FireAssumptions(0.04m, 0.05m));
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        result.RealAnnualReturnRange.Should().Be(new ProjectionRange(0.02m, 0.05m, 0.08m));
+        result.CompleteMonths.Should().Be(3);
+        result.Target.Should().Be(900_000m);
+        var months = result.MonthsToFireRange!.Value;
+        months.Central.Should().Be(result.MonthsToFire!.Value);
+        months.Low.Should().BeLessThan(months.Central);
+        months.Central.Should().BeLessThan(months.High);
+        result.EarliestDate.Should().BeBefore(result.ProjectedDate!.Value);
+        result.ProjectedDate.Should().BeBefore(result.LatestDate!.Value);
+    }
+
+    [Fact]
+    public async Task Handle_NotSaving_HasNoMonthsOrDates_ButStillStatesTheReturnRange()
+    {
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Snapshot(100_000m));
+        _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: -200m));
+        _assumptions.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FireAssumptions(0.04m, 0.05m));
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        result.Status.Should().Be(FireProjectionStatus.NotSaving);
+        result.MonthsToFireRange.Should().BeNull();
+        result.EarliestDate.Should().BeNull();
+        result.LatestDate.Should().BeNull();
+        result.RealAnnualReturnRange.Should().Be(new ProjectionRange(0.02m, 0.05m, 0.08m));
     }
 
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider

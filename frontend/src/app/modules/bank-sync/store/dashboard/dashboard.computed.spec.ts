@@ -12,7 +12,7 @@ import {
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {dashboardComputed} from './dashboard.computed';
-import {build, type Fixture, projectionFor, snapshot} from './dashboard.computed.fixtures';
+import {build, dashboardFor, type Fixture, snapshot} from './dashboard.computed.fixtures';
 
 // Frozen mid-month so "the current month" is genuinely partial.
 const NOW = new Date('2026-08-12T00:00:00.000Z');
@@ -43,17 +43,6 @@ function computedForWindow(
     dashboardComputed(build({monthlyFlow, windowFlow}, range))
   );
 }
-
-/**
- * Three closed months netting −200, +1000 and +5000, plus a partial August. The +5000 stands
- * in for the June 2026 duplicate-salary artifact: median 1000, mean 1933.
- */
-const SKEWED_MONTHS: MonthlyFlow[] = [
-  flow('2026-05', 1000, 1200),
-  flow('2026-06', 5000, 4000),
-  flow('2026-07', 6000, 1000),
-  flow('2026-08', 400, 300),
-];
 
 /** Three closed months at a steady 4000 in / 2000 out, plus a partial August. */
 function steadyHistory(augustInflow: number, augustOutflow: number): MonthlyFlow[] {
@@ -90,7 +79,7 @@ describe('dashboardComputed', () => {
     });
 
     it('formats the headline and hero totals in the base currency the API names', () => {
-      const c = projectionFor(euroFixture);
+      const c = dashboardFor(euroFixture);
 
       expect(c.windowSpendingFormatted()).toBe('€3,100.00');
       expect(c.windowInflowFormatted()).toBe('€3,000.00');
@@ -99,7 +88,7 @@ describe('dashboardComputed', () => {
     });
 
     it('stays in dollars when the API names no base currency', () => {
-      const c = projectionFor({...euroFixture, baseCurrency: undefined});
+      const c = dashboardFor({...euroFixture, baseCurrency: undefined});
 
       expect(c.windowSpendingFormatted()).toBe('$3,100.00');
       expect(c.baseCurrency()).toBe('USD');
@@ -244,98 +233,19 @@ describe('dashboardComputed', () => {
     });
   });
 
-  describe('twelve-month projection from savings contributions', () => {
-    it('projects from the MEDIAN month, so one artifact month cannot drag the number', () => {
-      // Nets are −200 / +1000 / +5000. Median 1000 → +12,000 over the horizon.
-      // A mean (1933) would have produced $33,200 off the same months.
-      const c = projectionFor({monthlyFlow: SKEWED_MONTHS, totalNetWorthUsd: 10_000});
-
-      expect(c.projectedNetWorthFormatted()).toBe('$22,000');
-    });
-
-    it('averages the two middle months when the sample is even', () => {
-      const c = projectionFor({
-        monthlyFlow: [
-          flow('2026-04', 1000, 900), // +100
-          flow('2026-05', 1000, 700), // +300
-          flow('2026-06', 1000, 500), // +500
-          flow('2026-07', 1000, 100), // +900
-        ],
-        totalNetWorthUsd: 0,
-      });
-
-      // Middle two are 300 and 500 → 400/mo → 4,800 over twelve months.
-      expect(c.projectedNetWorthFormatted()).toBe('$4,800');
-    });
-
-    it('renders nothing below three complete months', () => {
-      const c = projectionFor({
-        monthlyFlow: [
-          flow('2026-06', 4000, 2000),
-          flow('2026-07', 4000, 2000),
-          flow('2026-08', 1, 1),
-        ],
-      });
-
-      expect(c.hasProjection()).toBe(false);
-    });
-
-    it('turns on at exactly three complete months and names the sample size', () => {
-      const c = projectionFor({monthlyFlow: SKEWED_MONTHS});
-
-      expect(c.hasProjection()).toBe(true);
-      expect(c.projectionBasisLabel()).toBe('Median saved per month, based on 3 complete months');
-    });
-
-    it('keeps the in-progress month out of the baseline', () => {
-      // August is wildly negative; if it leaked into the sample the median would move.
-      const withWildAugust = projectionFor({
-        monthlyFlow: [...SKEWED_MONTHS.slice(0, 3), flow('2026-08', 0, 90_000)],
-        totalNetWorthUsd: 10_000,
-      });
-
-      expect(withWildAugust.projectedNetWorthFormatted()).toBe('$22,000');
-      expect(withWildAugust.projectionBasisLabel()).toContain('3 complete months');
-    });
-
-    it('projects a shrinking net worth when the typical month is negative', () => {
-      const c = projectionFor({
-        monthlyFlow: [
-          flow('2026-05', 1000, 1200),
-          flow('2026-06', 1000, 1300),
-          flow('2026-07', 1000, 1100),
-        ],
-        totalNetWorthUsd: 10_000,
-      });
-
-      expect(c.projectedNetWorthFormatted()).toBe('$7,600');
-    });
-
-    it('assumes no market return, even with market-marked sleeves present', () => {
-      const c = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        netWorthHistory: [snapshot(100_000, 8000, 2000)],
-      });
-
-      // Contributions only: 10,000 + 12,000, with no return on the 10,000 market-marked sleeves.
-      expect(c.projectedNetWorthFormatted()).toBe('$22,000');
-    });
-  });
-
   describe('net worth hero', () => {
     function history(first: number, last: number): NetWorthSnapshotDto[] {
       return [snapshot(first, 0, 0), snapshot(last, 0, 0)];
     }
 
     it('formats the headline symbol-first with cents', () => {
-      const c = projectionFor({monthlyFlow: [], totalNetWorthUsd: 18_981.48});
+      const c = dashboardFor({monthlyFlow: [], totalNetWorthUsd: 18_981.48});
 
       expect(c.totalBalanceFormatted()).toBe('$18,981.48');
     });
 
     it('states the window change in whole dollars and percent', () => {
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: history(10_000, 10_320)});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: history(10_000, 10_320)});
 
       expect(c.netWorthChangeFormatted()).toBe('+$320');
       expect(c.netWorthChangePercentFormatted()).toBe('+3.2%');
@@ -343,7 +253,7 @@ describe('dashboardComputed', () => {
     });
 
     it('signs a decline', () => {
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: history(10_000, 9_500)});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: history(10_000, 9_500)});
 
       expect(c.netWorthChangeFormatted()).toBe('-$500');
       expect(c.netWorthChangePercentFormatted()).toBe('-5.0%');
@@ -359,7 +269,7 @@ describe('dashboardComputed', () => {
       }
 
       it('keeps the amount, drops the percentage and names the linked account', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: dated(10_000, 14_000),
           scopeChanges: [{source: 'monobank', kind: 'linked', at: '2026-07-20'}],
@@ -371,12 +281,12 @@ describe('dashboardComputed', () => {
       });
 
       it('names removed accounts, and both when both happened', () => {
-        const removed = projectionFor({
+        const removed = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: dated(10_000, 6_000),
           scopeChanges: [{source: 'monobank', kind: 'removed', at: '2026-07-10'}],
         });
-        const both = projectionFor({
+        const both = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: dated(10_000, 6_000),
           scopeChanges: [
@@ -390,7 +300,7 @@ describe('dashboardComputed', () => {
       });
 
       it('keeps the percentage when the link predates the window', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: dated(10_000, 10_320),
           scopeChanges: [{source: 'monobank', kind: 'linked', at: '2026-06-15'}],
@@ -401,7 +311,7 @@ describe('dashboardComputed', () => {
       });
 
       it('ignores a link after the scrubbed day', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: dated(10_000, 14_000),
           scrubIndex: 0,
@@ -414,7 +324,7 @@ describe('dashboardComputed', () => {
 
     describe('invested / cash sub-line', () => {
       it('reads invested then cash in whole dollars, leaving the headline as is', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 10_000.5,
           cashUsd: 700.4,
@@ -426,13 +336,13 @@ describe('dashboardComputed', () => {
       });
 
       it('shows negative cash, as card debt nets against it', () => {
-        const c = projectionFor({monthlyFlow: [], cashUsd: -1_200, investedUsd: 5_000});
+        const c = dashboardFor({monthlyFlow: [], cashUsd: -1_200, investedUsd: 5_000});
 
         expect(c.bookSplitFormatted()).toBe('invested $5,000 · cash -$1,200');
       });
 
       it('follows the base currency', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           baseCurrency: 'EUR',
           cashUsd: 500,
@@ -443,14 +353,14 @@ describe('dashboardComputed', () => {
       });
 
       it('is empty when the book split is unknown', () => {
-        expect(projectionFor({monthlyFlow: []}).bookSplitFormatted()).toBeNull();
+        expect(dashboardFor({monthlyFlow: []}).bookSplitFormatted()).toBeNull();
         expect(
-          projectionFor({monthlyFlow: [], cashUsd: null, investedUsd: null}).bookSplitFormatted()
+          dashboardFor({monthlyFlow: [], cashUsd: null, investedUsd: null}).bookSplitFormatted()
         ).toBeNull();
       });
 
       it('is empty while scrubbing, as the split is live only', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           cashUsd: 700,
           investedUsd: 9_300,
@@ -466,7 +376,7 @@ describe('dashboardComputed', () => {
       const points = [snapshot(10_000, 0, 0), snapshot(12_000, 0, 0), snapshot(11_000, 0, 0)];
 
       it('shows the scrubbed point and its change since the window start', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 11_000,
           netWorthHistory: points,
@@ -480,7 +390,7 @@ describe('dashboardComputed', () => {
       });
 
       it('colours the delta by the scrubbed point, not the window end', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           netWorthHistory: [snapshot(10_000, 0, 0), snapshot(8_000, 0, 0), snapshot(11_000, 0, 0)],
           scrubIndex: 1,
@@ -490,7 +400,7 @@ describe('dashboardComputed', () => {
       });
 
       it('rests on the live figure when nothing is scrubbed', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 11_000,
           netWorthHistory: points,
@@ -502,7 +412,7 @@ describe('dashboardComputed', () => {
       });
 
       it('reads the charted total on a day a sleeve feed went missing', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 40_000,
           netWorthHistory: [snapshot(40_000, 5_000, 0), snapshot(40_000, 0, 0)],
@@ -515,7 +425,7 @@ describe('dashboardComputed', () => {
       });
 
       it('keeps a negative sleeve in the scrubbed total and its delta', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 8_000,
           netWorthHistory: [snapshot(1_000, 10_000, 0), snapshot(-2_000, 10_000, 0)],
@@ -528,7 +438,7 @@ describe('dashboardComputed', () => {
       });
 
       it('ignores an index past the drawn history', () => {
-        const c = projectionFor({
+        const c = dashboardFor({
           monthlyFlow: [],
           totalNetWorthUsd: 11_000,
           netWorthHistory: points,
@@ -541,7 +451,7 @@ describe('dashboardComputed', () => {
     });
 
     it('shows nothing until two snapshots exist', () => {
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: [snapshot(10_000, 0, 0)]});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: [snapshot(10_000, 0, 0)]});
 
       expect(c.netWorthChangeFormatted()).toBe('');
       expect(c.netWorthChangePercentFormatted()).toBe('');
@@ -559,7 +469,7 @@ describe('dashboardComputed', () => {
     }
 
     it('draws every category while each can keep its own colour', () => {
-      const c = projectionFor({monthlyFlow: [], topCategories: categories(8)});
+      const c = dashboardFor({monthlyFlow: [], topCategories: categories(8)});
 
       expect(c.categoryChartData().map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94, 93]);
     });
@@ -571,7 +481,7 @@ describe('dashboardComputed', () => {
         percentOfTotal: 0,
       });
       const colourOf = (cats: CategoryStat[], category: string): unknown =>
-        projectionFor({monthlyFlow: [], topCategories: cats})
+        dashboardFor({monthlyFlow: [], topCategories: cats})
           .categoryChartData()
           .find((_, i) => cats[i].category === category)?.color;
 
@@ -583,7 +493,7 @@ describe('dashboardComputed', () => {
     });
 
     it('folds the tail past seven into one slate slice', () => {
-      const c = projectionFor({monthlyFlow: [], topCategories: categories(10)});
+      const c = dashboardFor({monthlyFlow: [], topCategories: categories(10)});
       const segments = c.categoryChartData();
 
       expect(segments).toHaveLength(8);

@@ -16,6 +16,11 @@ function fire(overrides: Partial<FireProjection> = {}): FireProjection {
     monthsToFire: 150.2,
     hasStaleSleeves: false,
     baseCurrency: 'USD',
+    realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+    monthsToFireRange: {low: 120.4, central: 150.2, high: 196.8},
+    earliestDate: '2038-11-26',
+    latestDate: '2042-10-26',
+    completeMonths: 6,
     ...overrides,
   };
 }
@@ -72,6 +77,12 @@ describe('FireTileUtils.headline', () => {
     expect(FireTileUtils.headline(fire())).toBe('Financial independence around Mar 2041');
   });
 
+  it('says the date is unavailable when a projection carries none', () => {
+    expect(FireTileUtils.headline(fire({projectedDate: null}))).toBe(
+      'Financial independence date unavailable'
+    );
+  });
+
   it('states that the target is reached', () => {
     expect(FireTileUtils.headline(fire({status: 'AlreadyReached', projectedDate: null}))).toBe(
       'You have reached your financial independence target'
@@ -90,8 +101,21 @@ describe('FireTileUtils.headline', () => {
 });
 
 describe('FireTileUtils.runway', () => {
-  it('gives the time to go while a date exists', () => {
+  it('gives the time to go and the dates across the return range', () => {
     expect(FireTileUtils.runway(fire({monthsToFire: 150.2}))).toBe(
+      'About 12 years 7 months from now: between Nov 2038 and Oct 2042 at a 2% to 8% return'
+    );
+  });
+
+  it('gives only the time to go when the range dates are missing', () => {
+    expect(FireTileUtils.runway(fire({earliestDate: null, latestDate: null}))).toBe(
+      'About 12 years 7 months from now'
+    );
+    expect(FireTileUtils.runway(fire({latestDate: null}))).toBe('About 12 years 7 months from now');
+  });
+
+  it('gives only the time to go when the range collapses to one month', () => {
+    expect(FireTileUtils.runway(fire({earliestDate: '2041-03-01', latestDate: '2041-03-26'}))).toBe(
       'About 12 years 7 months from now'
     );
   });
@@ -110,7 +134,9 @@ describe('FireTileUtils.assumptions', () => {
     expect(text).toContain('5% real (after-inflation) annual return');
     expect(text).toContain('$250,000.00 net worth');
     expect(text).toContain('$2,000.00 a month');
-    expect(text).toContain('compounded monthly');
+    expect(text).toContain('your median over 6 complete months');
+    expect(text).toContain('compounded monthly; the date range uses 2% to 8%');
+    expect(text).toContain('Hypothetical, not a guarantee.');
   });
 
   it('formats every amount in the base currency, never as dollars', () => {

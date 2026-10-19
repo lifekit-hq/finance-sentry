@@ -81,7 +81,7 @@ export function build(
   };
 }
 
-export function projectionFor(fixture: Fixture) {
+export function dashboardFor(fixture: Fixture) {
   return TestBed.runInInjectionContext(() => dashboardComputed(build(fixture)));
 }
 

@@ -7,7 +7,7 @@ import {beforeEach, describe, expect, it} from 'vitest';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {type NetWorthSnapshotDto} from '../../models/dashboard/dashboard.model';
 import {SPLIT_COLOUR} from './dashboard.computed';
-import {projectionFor, snapshot} from './dashboard.computed.fixtures';
+import {dashboardFor, snapshot} from './dashboard.computed.fixtures';
 
 describe('dashboardComputed cash / invested split', () => {
   beforeEach(() => {
@@ -75,7 +75,7 @@ describe('dashboardComputed cash / invested split', () => {
 
   describe('area chart series', () => {
     it('keeps the sleeve stack when no day has a split', () => {
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [snapshot(1_000, 2_000, 300), snapshot(1_100, 2_100, 310)],
       });
@@ -89,7 +89,7 @@ describe('dashboardComputed cash / invested split', () => {
         {...withSources(noSplitDay('2026-07-01', 1_000, 2_000, 300), 700), totalNetWorth: 4_000},
         {...withSources(noSplitDay('2026-07-02', 1_100, 2_100, 310), 700), totalNetWorth: 4_210},
       ];
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: history});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: history});
       const series = c.netWorthAreaSeries();
 
       expect(series.map(s => s.label)).toEqual(['Banking', 'Brokerage', 'Crypto', 'Other sources']);
@@ -104,7 +104,7 @@ describe('dashboardComputed cash / invested split', () => {
         ...withSources(noSplitDay('2026-07-01', 100, 200, 50)),
         totalNetWorth: 350.01,
       };
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: [rounded]});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: [rounded]});
 
       expect(c.netWorthAreaSeries().map(s => s.label)).toEqual(['Banking', 'Brokerage', 'Crypto']);
     });
@@ -114,7 +114,7 @@ describe('dashboardComputed cash / invested split', () => {
         splitDayWithFund('2026-08-01', 4_000, 700),
         splitDayWithFund('2026-08-02', 4_100, 800),
       ];
-      const c = projectionFor({monthlyFlow: [], netWorthHistory: history});
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: history});
       const series = c.netWorthAreaSeries();
 
       expect(series.map(s => s.label)).toEqual([
@@ -134,7 +134,7 @@ describe('dashboardComputed cash / invested split', () => {
         ...withSources(noSplitDay('2026-07-01', 3_000, 5_000, 500), 700),
         totalNetWorth: 9_200,
       };
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [unsplit, splitDay('2026-08-01', 4_000, 5_000, 1_000)],
       });
@@ -147,7 +147,7 @@ describe('dashboardComputed cash / invested split', () => {
         ...withSources(noSplitDay('2026-07-01', 3_000, 5_000, 500), 700),
         totalNetWorth: 9_200,
       };
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [unsplit, splitDayWithFund('2026-08-01', 4_000, 700)],
       });
@@ -161,7 +161,7 @@ describe('dashboardComputed cash / invested split', () => {
     });
 
     it('stacks cash, brokerage invested and crypto invested when every day has a split', () => {
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [
           splitDay('2026-08-01', 4_000, 5_000, 1_000),
@@ -182,7 +182,7 @@ describe('dashboardComputed cash / invested split', () => {
         splitDay('2026-08-01', -500, 8_000, 2_000),
         splitDay('2026-08-02', 300, 8_100, 2_000),
       ];
-      const series = projectionFor({
+      const series = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: history,
       }).netWorthAreaSeries();
@@ -193,7 +193,7 @@ describe('dashboardComputed cash / invested split', () => {
     });
 
     it('draws a day with no split as one "No split" band, keeping the stack top at the total', () => {
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [
           noSplitDay('2026-07-01', 3_000, 5_000, 500),
@@ -218,7 +218,7 @@ describe('dashboardComputed cash / invested split', () => {
 
     it('treats a partly null split as no split', () => {
       const partial = {...splitDay('2026-07-01', 4_000, 5_000, 1_000), cryptoInvested: null};
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [partial, splitDay('2026-08-01', 4_000, 5_000, 1_000)],
       });
@@ -227,7 +227,7 @@ describe('dashboardComputed cash / invested split', () => {
     });
 
     it('still carries a missing sleeve forward on the no-split span', () => {
-      const c = projectionFor({
+      const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [
           noSplitDay('2026-07-01', 3_000, 5_000, 500),
