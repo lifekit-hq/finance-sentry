@@ -4,9 +4,11 @@ import {
   Component,
   computed,
   inject,
+  Injector,
   OnInit,
   ViewContainerRef,
 } from '@angular/core';
+import {toObservable} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
@@ -26,7 +28,7 @@ import {
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
-import {take} from 'rxjs';
+import {filter, map, pairwise, take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {
@@ -90,6 +92,8 @@ import {
 
 const SKELETON_ROWS = 3;
 const SKELETON_SECTIONS = 2;
+/** The holdings feed values every position in USD. */
+const FEED_CURRENCY = 'USD';
 
 @Component({
   selector: 'fns-accounts-list',
@@ -124,6 +128,7 @@ const SKELETON_SECTIONS = 2;
   providers: [HoldingsStore],
 })
 export class AccountsListComponent implements OnInit {
+  private readonly injector = inject(Injector);
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly connectStore = inject(ConnectStore);
@@ -179,6 +184,15 @@ export class AccountsListComponent implements OnInit {
     const reconnect = params.get('reconnect');
 
     this.store.openProvider(this.deepLinkProvider);
+    // A summary reload (connect, reconnect, a manual-holding edit, Retry) reloads the positions feed too, so an
+    // institution's header total and its feed-backed rows stay in step.
+    this.holdings.loadPositions(
+      toObservable(this.store.lastSyncedAt, {injector: this.injector}).pipe(
+        pairwise(),
+        filter(([previous]) => previous !== null),
+        map(() => undefined)
+      )
+    );
 
     if (connected === 'truelayer') {
       this.toast.show('Bank connected. Syncing your accounts now.', 'success');
@@ -197,10 +211,14 @@ export class AccountsListComponent implements OnInit {
 
   /**
    * The holdings feed's rows for a broker or exchange, with P&L and today's move; null while the feed has
-   * nothing for it (not loaded, failed, or shared by several institutions), when the summary's rows stand in.
+   * nothing for it (not loaded, failed, shared by several institutions, or a base currency other than USD, which
+   * the USD feed cannot add up to), when the summary's rows stand in.
    */
   public holdingRows(institution: Institution): Nullable<PositionRow[]> {
-    if (!this.singleInstitutionProviders().has(institution.provider)) {
+    if (
+      this.store.baseCurrency() !== FEED_CURRENCY ||
+      !this.singleInstitutionProviders().has(institution.provider)
+    ) {
       return null;
     }
     return this.holdings.positionsByProvider()[institution.provider] ?? null;

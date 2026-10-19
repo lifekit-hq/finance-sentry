@@ -135,7 +135,9 @@ falls back to UAH). Each row keeps that currency and its amount as reported (`Br
 `NativeValue`, never converted) next to `UsdValue`, which is converted once, at ingest (§3).
 `GET /brokerage/holdings` returns both as `currency` / `nativeValue` (null `nativeValue` = USD-only row,
 e.g. IBKR); an Accounts accordion row shows such a row's price and value in its own currency with the USD figure
-muted beneath. The wealth summary's brokerage account rows carry the same pair as `nativeCurrency` /
+muted beneath. The feed-backed rows (P&L, day change) replace the summary's rows only while the profile's base
+currency is USD: the feed is USD-only and the accordion header is in the base currency, so any other base keeps
+the summary rows (`positionValue` / `balanceInBaseCurrency`) and the rows add up to the header. The wealth summary's brokerage account rows carry the same pair as `nativeCurrency` /
 `nativeValue` (the accounts list shows them in that currency with the base equivalent muted) and MCP
 `get_account_summary` reports such a row in its own currency. Totals, weights and the donut still sum
 `UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next daily sync rewrites

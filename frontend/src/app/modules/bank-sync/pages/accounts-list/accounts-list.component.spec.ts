@@ -52,6 +52,7 @@ function setupFixture(
     manual?: ManualHoldingRow[];
     positions?: Record<string, PositionRow[]>;
     openProvider?: (provider: Nullable<string>) => void;
+    baseCurrency?: string;
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -77,7 +78,7 @@ function setupFixture(
     netWorthHeadline: signal(state.headline ?? null),
     isNetWorthUnavailable: signal(state.headline?.quality === 'UNAVAILABLE'),
     netWorthBreakdown: signal(state.breakdown ?? []),
-    baseCurrency: signal('USD'),
+    baseCurrency: signal(state.baseCurrency ?? 'USD'),
     categorySections: signal([
       {
         category: institution.category,
@@ -105,7 +106,13 @@ function setupFixture(
   TestBed.overrideComponent(AccountsListComponent, {
     set: {
       providers: [
-        {provide: HoldingsStore, useValue: {positionsByProvider: signal(state.positions ?? {})}},
+        {
+          provide: HoldingsStore,
+          useValue: {
+            positionsByProvider: signal(state.positions ?? {}),
+            loadPositions: vi.fn(),
+          },
+        },
       ],
     },
   });
@@ -435,6 +442,17 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       expect(
         element.querySelectorAll('[data-testid="hidden-rows"] [data-testid="position-row"]')
       ).toHaveLength(0);
+    });
+
+    it('keeps the summary rows when the base currency is not USD, so rows add up to the header', () => {
+      const element = brokerage({
+        open: {'ibkr:ibkr-1': true},
+        positions: {ibkr: [row({})]},
+        baseCurrency: 'EUR',
+      });
+
+      expect(element.querySelectorAll('[data-testid="position-row"]')).toHaveLength(2);
+      expect(element.querySelector('[data-testid="position-pnl"]')).toBeNull();
     });
 
     it('falls back to the summary rows when the feed has nothing for the provider', () => {
