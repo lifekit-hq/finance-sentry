@@ -22,7 +22,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 73 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 75 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -48,6 +48,8 @@ The current runtime surface contains 73 tools. The canonical list is the `Agreed
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
 | `get_pending_companion_events` | Read | Events | `limit?`, `includeHeldForDigest?`, `heldOverrideReason?` | Undelivered companion events (`id`, `kind`, `subject`, `severity`, `summary`, `referenceId`, `disposition`, `occurredAt`) plus `appUrl`: an absolute link to the app page the event is about, built from `Companion:PublicBaseUrl` (deploys bind `FRONTEND_BASE_URL`) and the event's `appPath` (#466). Additive: the key is absent, never null or relative, when the event has no target page or no base URL is configured |
 | `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified` | Records the reader's judgement on a fired companion event, alert-sourced or not (e.g. `AnalystAction`); an acknowledged event with no verdict reads as silence; `recorded=false` for a foreign, unknown event or a blank verdict |
+| `record_ledger_correction` | Write | Companion | `agentSaid`, `whatWasWrong`, `ownerCorrection`, `correctedAt?` | Ledger's correction log: one row each time the owner says Ledger was wrong (what it said, what was wrong, the correction, when). Reviewed by a human into the persona and tests, never read back automatically; `recorded=false` for a blank or over-long field (2000 / 1000 / 2000 chars) or a future `correctedAt` |
+| `list_ledger_corrections` | Read | Companion | `month?` (`yyyy-MM`, UTC; default current), `limit?` (default 50, max 200) | One month of the correction log, newest first, with that month's `count` and `byMonth` counts for every month with corrections; null for an unparseable month. The monthly correction rate is this count over the owner's messages to Ledger (`scripts/ledger-corrections-month.sh`) |
 | `get_daily_event_outcomes` | Read | Events | `date?` | Accountability view for one UTC day: every companion event that fired, of any kind, with fired/judged/sent/withheld counts and the per-item outcome; unlike `get_event_calendar` it is not limited to the five alert-backed event types |
 | `get_news_for_ticker` | Read | Research | `ticker`, `since?`, `limit` | Recent ticker-specific news |
 | `get_quotes` | Read | Research | `tickers` | Current quotes for one or more tickers, including requested/resolved ticker identity and market-session freshness metadata |

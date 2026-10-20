@@ -17,7 +17,7 @@ public sealed class PersonaComposerTests
         "A2A envelope",
         "reply_expected",
         "openclaw-openclaw-gateway",
-        "ledger-lit-digest",
+        "silence_window_days",
         "Kit routes tasks",
     ];
 

@@ -95,6 +95,8 @@ public static class CompanionModule
         services.AddSingleton<IProblemReportRelay, SshProblemReportRelay>();
         services.AddScoped<ProblemReportForwardJob>();
 
+        services.AddScoped<ILedgerCorrectionRepository, LedgerCorrectionRepository>();
+
         services.AddScoped<CompanionPushJob>();
         services.AddScoped<CompanionCaptureJob>();
         services.AddScoped<CompanionDispatchJob>();

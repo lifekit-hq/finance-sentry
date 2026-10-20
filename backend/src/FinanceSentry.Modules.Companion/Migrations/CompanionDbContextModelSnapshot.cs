@@ -163,6 +163,45 @@ namespace FinanceSentry.Modules.Companion.Migrations
                     b.ToTable("companion_notification_settings", "companion");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Companion.Domain.LedgerCorrection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AgentSaid")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OwnerCorrection")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WhatWasWrong")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CorrectedAt");
+
+                    b.ToTable("ledger_corrections", "companion");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Companion.Domain.ProblemReport", b =>
                 {
                     b.Property<long>("Id")

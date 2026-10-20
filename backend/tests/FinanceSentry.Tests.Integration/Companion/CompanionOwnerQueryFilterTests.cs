@@ -110,7 +110,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(5);
+        perUser.Should().HaveCount(6);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -159,6 +159,38 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         await using var asNoOne = CreateContext();
         (await asNoOne.ProblemReports.AnyAsync()).Should().BeFalse("no person in scope matches no row");
     }
+
+    [DockerRequiredFact]
+    public async Task Ledger_corrections_are_scoped_to_their_owner_and_invisible_with_no_person_in_scope()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await SeedAsync(NewCorrection(_userA, now), NewCorrection(_userB, now));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new LedgerCorrectionRepository(asA);
+            (await asA.LedgerCorrections.Select(c => c.UserId).ToListAsync()).Should().Equal(_userA);
+            (await repo.ListAsync(_userB, now.AddDays(-1), now.AddDays(1), 50)).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+            (await repo.ListCorrectedAtAsync(_userB)).Should().BeEmpty();
+            (await repo.ListAsync(_userA, now.AddDays(-1), now.AddDays(1), 50)).Should().HaveCount(1);
+        }
+
+        await using (var asB = CreateContext(_userB))
+            (await asB.LedgerCorrections.AnyAsync(c => c.UserId == _userA)).Should().BeFalse();
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.LedgerCorrections.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    private static LedgerCorrection NewCorrection(Guid userId, DateTimeOffset correctedAt) => new()
+    {
+        UserId = userId,
+        AgentSaid = "CPI prints on the 12th.",
+        WhatWasWrong = "Wrong release date.",
+        OwnerCorrection = "CPI is on the 15th this month.",
+        CorrectedAt = correctedAt,
+    };
 
     [DockerRequiredFact]
     public async Task The_problem_report_forwarder_reads_and_updates_across_users_with_no_person_in_scope()
