@@ -49,6 +49,12 @@ public static class AuthModule
         services.AddScoped<AccountPurgeJob>();
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
+        // Both seed keys are optional; whatever is set must be a well-formed address.
+        services.AddOptions<AuthSeedOptions>()
+            .BindConfiguration(AuthSeedOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddAuthDataProtection(config);
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>

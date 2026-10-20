@@ -56,7 +56,7 @@ public sealed class LocalMcpSessionTests
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Mcp:CredentialFile"] = credentialFile })
             .Build();
-        var store = new LocalMcpCredentialStore(config);
+        var store = new LocalMcpCredentialStore(Options.Create(new McpOptions { CredentialFile = credentialFile }));
         store.Save(new StoredMcpCredentials(
             "http://localhost:5001/api/v1",
             "http://localhost:4200",

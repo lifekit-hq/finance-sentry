@@ -5,7 +5,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Infrastructure.Links;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -29,7 +30,7 @@ public sealed class FamilyClearingStatementJobTests
 
     private FamilyClearingStatementJob Job() =>
         new(_users.Object, _statementQuery.Object, _alerts.Object,
-            new ConfigurationBuilder().Build(), NullLogger<FamilyClearingStatementJob>.Instance);
+            Options.Create(new CompanionLinksOptions()), NullLogger<FamilyClearingStatementJob>.Instance);
 
     private void ActiveUsers(params Guid[] userIds) =>
         _users

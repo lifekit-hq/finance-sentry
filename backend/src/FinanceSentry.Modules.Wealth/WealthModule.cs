@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Links;
 using FinanceSentry.Infrastructure.Persistence;
 
 public static class WealthModule
@@ -80,6 +81,7 @@ public static class WealthModule
         services.AddScoped<ProjectionInputsReader>();
 
         services.AddScoped<NetWorthSnapshotJob>();
+        services.AddCompanionLinks();
         services.AddScoped<FireBriefJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();

@@ -6,7 +6,8 @@ using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using Hangfire;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Infrastructure.Links;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -22,7 +23,7 @@ public sealed class BookPerformanceBriefJob(
     ITrackRecordSource trackRecord,
     ILedgerScoreboardSource ledgerScoreboard,
     IAlertGeneratorService alerts,
-    IConfiguration configuration,
+    IOptions<CompanionLinksOptions> companionLinks,
     ILogger<BookPerformanceBriefJob> logger)
 {
     private static readonly IReadOnlyList<BookPerformancePeriod> DefaultPeriods =
@@ -36,7 +37,7 @@ public sealed class BookPerformanceBriefJob(
     private static readonly TimeSpan SignalLookback = TimeSpan.FromDays(30);
 
     /// <summary>Public origin the brief's bullets link onto (<c>Companion:PublicBaseUrl</c>); empty = no links.</summary>
-    private string? AppBaseUrl => configuration["Companion:PublicBaseUrl"];
+    private string? AppBaseUrl => companionLinks.Value.PublicBaseUrl;
 
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)

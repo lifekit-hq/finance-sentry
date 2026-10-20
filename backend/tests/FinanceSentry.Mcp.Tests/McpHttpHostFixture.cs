@@ -66,7 +66,7 @@ public sealed class McpHttpHostFixture : IAsyncLifetime
         await RoleSeeder.SeedAsync(
             scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(),
             scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
-            _app.Configuration,
+            new AuthSeedOptions(),
             NullLogger.Instance);
     }
 

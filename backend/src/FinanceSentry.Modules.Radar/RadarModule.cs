@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Links;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Http;
 
@@ -93,6 +94,7 @@ public static class RadarModule
         services.AddScoped<IMarketStructureReader, MarketStructureReader>();
 
         services.AddScoped<IBookPerformanceService, BookPerformanceService>();
+        services.AddCompanionLinks();
         services.AddScoped<BookPerformanceBriefJob>();
         services.AddScoped<RadarIngestionJob>();
         services.AddScoped<RadarComputeJob>();

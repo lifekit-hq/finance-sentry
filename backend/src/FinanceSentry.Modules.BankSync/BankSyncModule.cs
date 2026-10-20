@@ -20,6 +20,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Http;
+using FinanceSentry.Infrastructure.Links;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -161,10 +162,13 @@ public static class BankSyncModule
         services.AddScoped<IMonobankCredentialRepository, MonobankCredentialRepository>();
         services.AddScoped<ITrueLayerConnectionRepository, TrueLayerConnectionRepository>();
 
-        var deduplicationKey = config["Deduplication:MasterKeyBase64"]
-            ?? throw new InvalidOperationException("Deduplication:MasterKeyBase64 is required.");
+        // Required: existing transaction hashes are only comparable under the same key, so a host without it must not start.
+        services.AddOptions<DeduplicationOptions>()
+            .BindConfiguration(DeduplicationOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddSingleton<ITransactionDeduplicationService>(
-            _ => new TransactionDeduplicationService(deduplicationKey));
+            sp => new TransactionDeduplicationService(sp.GetRequiredService<IOptions<DeduplicationOptions>>().Value.MasterKeyBase64));
 
         services.AddSingleton<ICategoryResolver, CategoryResolver>();
         // Stateless over the singleton resolver — the per-user installment plans are a call
@@ -253,8 +257,10 @@ public static class BankSyncModule
         services.AddScoped<DuplicateChargeDetectionJob>();
         services.AddScoped<CategorySpikeDetectionJob>();
         services.AddScoped<FxSpreadDetectionJob>();
+        services.AddCompanionLinks();
         services.AddScoped<FamilyClearingStatementJob>();
 
+        services.AddOptions<FeatureFlagOptions>().BindConfiguration(FeatureFlagOptions.SectionName);
         services.AddSingleton<IFeatureFlagService, FeatureFlagService>();
         services.AddScoped<EFQueryLoggerInterceptor>();
 

@@ -10,7 +10,6 @@ using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -133,11 +132,9 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
         Guid? seeded;
         using (var scope = factory.Services.CreateScope())
         {
-            var config = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?> { [SmokeAccountSeeder.EmailConfigKey] = "ext-smoke@test.com" })
-                .Build();
+            var options = new AuthSeedOptions { SmokeAccount = new SmokeAccountOptions { Email = "ext-smoke@test.com" } };
             seeded = await SmokeAccountSeeder.SeedAsync(
-                scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(), config, NullLogger.Instance);
+                scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(), options, NullLogger.Instance);
         }
 
         var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-smoke", "ext-smoke@test.com", true));
