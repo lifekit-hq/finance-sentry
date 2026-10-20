@@ -95,6 +95,7 @@ public static class RetentionPolicyRegistry
 
         Keep(Companion, "companion_capture_state", "Capture watermark; tiny."),
         Keep(Companion, "companion_notification_settings", "User settings."),
+        Keep(Companion, "ledger_corrections", "Owner's corrections of Ledger; reviewed into its persona and tests, and the monthly correction rate is counted from them."),
         Keep(Companion, "push_subscriptions", "User device state; the sender prunes dead endpoints itself."),
 
         Keep(Radar, "radar_universe_members", "Universe config."),

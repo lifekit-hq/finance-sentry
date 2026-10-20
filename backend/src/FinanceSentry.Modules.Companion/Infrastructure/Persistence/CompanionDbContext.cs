@@ -22,6 +22,8 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
 
     public DbSet<ProblemReport> ProblemReports => Set<ProblemReport>();
 
+    public DbSet<LedgerCorrection> LedgerCorrections => Set<LedgerCorrection>();
+
     protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -94,6 +96,17 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.Property(x => x.Client).HasMaxLength((2 * ProblemReportLimits.ClientPartMaxLength) + 1);
             e.Property(x => x.CorrelationId).HasMaxLength(64);
             e.Property(x => x.LastError).HasMaxLength(300);
+        });
+
+        modelBuilder.Entity<LedgerCorrection>(e =>
+        {
+            e.ToTable("ledger_corrections");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.UserId, x.CorrectedAt });
+            e.Property(x => x.AgentSaid).HasMaxLength(LedgerCorrectionLimits.AgentSaidMaxLength);
+            e.Property(x => x.WhatWasWrong).HasMaxLength(LedgerCorrectionLimits.WhatWasWrongMaxLength);
+            e.Property(x => x.OwnerCorrection).HasMaxLength(LedgerCorrectionLimits.OwnerCorrectionMaxLength);
         });
 
         modelBuilder.Entity<CompanionCaptureState>(e =>

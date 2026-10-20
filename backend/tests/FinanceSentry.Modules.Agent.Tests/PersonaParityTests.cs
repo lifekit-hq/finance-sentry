@@ -1,10 +1,13 @@
 namespace FinanceSentry.Modules.Agent.Tests;
 
+using System.Reflection;
+using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.Agent.Application.Services;
 using FinanceSentry.Modules.Agent.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.Server;
 using Xunit;
 
 /// <summary>
@@ -88,5 +91,16 @@ public sealed class PersonaParityTests
     {
         // The MCP resource FinanceFrameworkPrimerResource serves; the primer is the only big-picture source.
         OpenClawPrompt().Should().Contain("""MCP.financeSentry.resources.read({uri:"finance-framework://primer"})""");
+    }
+
+    [Fact]
+    public void OpenClaw_RecordsCorrectionsThroughTheCorrectionLogTool()
+    {
+        // The persona names the Code Mode callable of the MCP tool that keeps the correction log.
+        var toolName = typeof(RecordLedgerCorrectionTool).GetMethod(nameof(RecordLedgerCorrectionTool.ExecuteAsync))!
+            .GetCustomAttribute<McpServerToolAttribute>()!.Name;
+        toolName.Should().Be("record_ledger_correction");
+
+        OpenClawPrompt().Should().Contain("MCP.financeSentry.recordLedgerCorrection");
     }
 }

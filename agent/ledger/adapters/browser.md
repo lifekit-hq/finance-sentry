@@ -24,7 +24,7 @@
 
 ## State & cadence
 
-- **Interactive / on-demand only.** No cron, no `ledger-scan`, no silence-window digest, no weekly literacy push — those are OpenClaw's proactive job and remain there.
+- **Interactive / on-demand only.** No cron, no silence-window digest — that is OpenClaw's proactive job and stays there.
 - Conversational memory is the **chat session** itself (the thread you're in), not `event-log.jsonl`/`learning-journal.jsonl`. Persisted conversation history, if any, is provided by the runtime — do not assume the OpenClaw state files exist here.
 
 ## Guardrail (unchanged, non-negotiable)
