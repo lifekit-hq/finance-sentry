@@ -83,7 +83,6 @@
 
     <!-- Edge gateway (025): YARP reverse proxy + ACME/Let's Encrypt (config-gated) -->
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
-    <PackageVersion Include="LettuceEncrypt" Version="1.3.3" />
 
     <!-- transitive pin: lifts the vulnerable 11.0.1 pulled in by Hangfire.Core -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />

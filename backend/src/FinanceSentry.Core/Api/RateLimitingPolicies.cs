@@ -12,6 +12,13 @@ public static class RateLimitingPolicies
     /// <summary>10 requests/min for anonymous users (per resolved client address).</summary>
     public const string Anonymous = "anonymous";
 
+    /// <summary>
+    /// 60 requests/min for the anonymous session bootstrap reads (<c>GET /auth/me</c>, <c>/auth/methods</c>,
+    /// <c>/auth/oidc/start</c>), per resolved client address, on a budget of their own so they never spend the
+    /// credential endpoints' <see cref="Anonymous"/> one.
+    /// </summary>
+    public const string AuthSession = "auth-session";
+
     /// <summary>Exempt from all rate limiting (health checks).</summary>
     public const string Exempt = "exempt";
 

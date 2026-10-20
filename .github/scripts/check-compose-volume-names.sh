@@ -28,7 +28,7 @@ if cfg["name"] != "finance-sentry":
 
 volumes = cfg.get("volumes") or {}
 if not volumes:
-    errors.append("no named volumes rendered; postgres_data, api_logs and gateway_keys are expected")
+    errors.append("no named volumes rendered; postgres_data and api_logs are expected")
 for key, volume in sorted(volumes.items()):
     if volume.get("external"):
         continue

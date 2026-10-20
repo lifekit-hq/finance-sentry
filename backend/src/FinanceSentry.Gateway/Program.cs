@@ -32,14 +32,14 @@ builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
     .WriteTo.Console(new RenderedCompactJsonFormatter()));
 
 // -----------------------------------------------------------------------------------------------
-// Edge gateway (feature 025) — single YARP reverse-proxy front door for frontend + API + MCP.
+// Edge gateway (feature 025) — YARP reverse proxy for frontend + API behind the box edge (Traefik).
 // Routing/clusters/health-checks are declarative in appsettings*.json (FR-002); only cross-cutting
-// middleware (forwarded headers, rate limiting, TLS, metrics) is wired here.
+// middleware (forwarded headers, rate limiting, metrics) is wired here. TLS is terminated in front
+// of the gateway (Tailscale Serve / the edge), so it serves plain HTTP.
 // -----------------------------------------------------------------------------------------------
 
 const int DefaultAuthPermitPerMinute = 10;
 const int DefaultAuthSessionPermitPerMinute = 60;
-const int HstsMaxAgeDays = 365;
 const int TooManyRequestsStatusCode = StatusCodes.Status429TooManyRequests;
 
 // Exports (data download) must stream through un-truncated (spec edge case): drop the body-size cap.
@@ -122,43 +122,13 @@ builder.Services.AddOpenTelemetry()
         }
     });
 
-// US2 / FR-003: TLS termination via ACME (Let's Encrypt) — enabled ONLY when a public domain is
-// configured AND the ToS is accepted. Empty/absent config (dev, or Tailscale-terminated prod) skips
-// this entirely and the gateway serves plain HTTP. This is the config toggle described in research.md.
-var acmeDomains = builder.Configuration.GetSection("LettuceEncrypt:DomainNames").Get<string[]>() ?? [];
-var acmeAccepted = builder.Configuration.GetValue("LettuceEncrypt:AcceptTermsOfService", false);
-var tlsEnabled = acmeDomains.Length > 0 && acmeAccepted;
-if (tlsEnabled)
-{
-    builder.Services.AddLettuceEncrypt();
-}
-
-// HSTS (outside Development): browsers that reached the gateway over HTTPS refuse plain HTTP to this host
-// for the max-age. UseHsts only sends it on HTTPS requests (after UseForwardedHeaders, a request the
-// trusted TLS terminator marked X-Forwarded-Proto: https counts) and never for localhost.
-builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(HstsMaxAgeDays));
-
 var app = builder.Build();
 
 // Order matters: security headers first (registered before anything can end the response, so every
-// response carries them), forwarded headers next (so the rate-limiter partition, HSTS and proxied
+// response carries them), forwarded headers next (so the rate-limiter partition and proxied
 // X-Forwarded-* see the real client and scheme), then rate limiting, then the proxy.
 app.UseGatewaySecurityHeaders(app.Configuration);
 app.UseForwardedHeaders();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
-
-if (tlsEnabled)
-{
-    app.UseHttpsRedirection();
-}
-
-// Routing runs here, explicitly, so the public-listener scope below sees the matched endpoint.
-app.UseRouting();
-app.UseGatewayPublicListener(app.Configuration);
 
 app.UseRateLimiter();
 

@@ -119,6 +119,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.AddPolicy(RateLimitingPolicies.Authenticated, RateLimitPartitions.Authenticated);
     options.AddPolicy(RateLimitingPolicies.Anonymous, RateLimitPartitions.Anonymous);
+    options.AddPolicy(RateLimitingPolicies.AuthSession, RateLimitPartitions.AuthSession);
     options.AddPolicy(RateLimitingPolicies.Exempt, RateLimitPartitions.Exempt);
     options.AddPolicy(RateLimitingPolicies.ProblemReport, RateLimitPartitions.ProblemReport);
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
