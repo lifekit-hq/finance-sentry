@@ -14,9 +14,14 @@ using Xunit;
 public class RateLimitPolicyTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
     private const int AnonymousPermitPerMinute = 3;
+    private const int AuthSessionPermitPerMinute = 7;
     private const int HealthProbeBurst = 25;
-    private const string MethodsPath = "/api/v1/auth/methods";
+    private const int PastTheCredentialDefault = 20;
+    private const string RefreshPath = "/api/v1/auth/refresh";
     private const string HealthPath = "/api/v1/health";
+
+    private static readonly string[] SessionPaths =
+        ["/api/v1/auth/me", "/api/v1/auth/methods", "/api/v1/auth/oidc/start"];
 
     [Fact]
     public async Task AnonymousAuthEndpoint_AboveItsPermit_Returns429()
@@ -28,11 +33,45 @@ public class RateLimitPolicyTests(AuthApiFactory factory) : IClassFixture<AuthAp
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i <= AnonymousPermitPerMinute; i++)
         {
-            statuses.Add((await client.GetAsync(MethodsPath)).StatusCode);
+            statuses.Add((await client.PostAsync(RefreshPath, content: null)).StatusCode);
         }
 
         statuses.Take(AnonymousPermitPerMinute).Should().NotContain(HttpStatusCode.TooManyRequests);
         statuses.Last().Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task SessionEndpoints_ShareTheirOwnHigherBudget_NotTheCredentialOne()
+    {
+        await using var scoped = factory.WithWebHostBuilder(builder => builder
+            .UseSetting(RateLimitPartitions.AnonymousPermitKey, AnonymousPermitPerMinute.ToString())
+            .UseSetting(RateLimitPartitions.AuthSessionPermitKey, AuthSessionPermitPerMinute.ToString()));
+        using var client = scoped.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i <= AuthSessionPermitPerMinute; i++)
+        {
+            statuses.Add((await client.GetAsync(SessionPaths[i % SessionPaths.Length])).StatusCode);
+        }
+
+        // Past the 3/min credential permit, still admitted: the session reads are on the 7/min budget.
+        statuses.Take(AuthSessionPermitPerMinute).Should().NotContain(HttpStatusCode.TooManyRequests);
+        statuses.Last().Should().Be(HttpStatusCode.TooManyRequests);
+
+        // And they never spent the credential budget.
+        (await client.PostAsync(RefreshPath, content: null)).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task SessionEndpoints_AtTheDefaultPermit_AdmitMoreThanTheCredentialDefault()
+    {
+        using var client = factory.CreateClient();
+
+        // The credential default is 10/min; the session default is 60/min.
+        for (var i = 0; i < PastTheCredentialDefault; i++)
+        {
+            (await client.GetAsync(SessionPaths[1])).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        }
     }
 
     [Fact]

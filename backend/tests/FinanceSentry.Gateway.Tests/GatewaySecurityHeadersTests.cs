@@ -8,8 +8,8 @@ using Xunit;
 /// Every gateway response carries the security headers from <c>Gateway:SecurityHeaders</c> (its own
 /// endpoints, proxied responses and rejections).
 /// </summary>
-public sealed class GatewaySecurityHeadersTests(GatewayPublicListenerTests.PublicListenerFactory factory)
-    : IClassFixture<GatewayPublicListenerTests.PublicListenerFactory>
+public sealed class GatewaySecurityHeadersTests(GatewayEndpointContractTests.GatewayFactory factory)
+    : IClassFixture<GatewayEndpointContractTests.GatewayFactory>
 {
     private static readonly string[] RequiredHeaders =
     [
@@ -55,15 +55,13 @@ public sealed class GatewaySecurityHeadersTests(GatewayPublicListenerTests.Publi
             .ToArray();
 
     [Theory]
-    [InlineData("/gateway/health", null)]           // the gateway's own endpoint
-    [InlineData("/metrics", null)]
-    [InlineData("/api/v1/accounts", null)]          // proxied (upstream unreachable in the test)
-    [InlineData("/dashboard", null)]
-    [InlineData("/dashboard", GatewayPublicListenerTests.PublicPort)]
-    [InlineData("/hangfire", GatewayPublicListenerTests.PublicPort)]  // refused on the public listener
-    public async Task EveryResponse_CarriesTheSecurityHeaders(string path, int? localPort)
+    [InlineData("/gateway/health")]           // the gateway's own endpoint
+    [InlineData("/metrics")]
+    [InlineData("/api/v1/accounts")]          // proxied (upstream unreachable in the test)
+    [InlineData("/dashboard")]
+    public async Task EveryResponse_CarriesTheSecurityHeaders(string path)
     {
-        var response = await GatewayPublicListenerTests.SendAsync(factory, path, localPort);
+        var response = await factory.CreateClient().GetAsync(path);
 
         foreach (var header in RequiredHeaders)
             Assert.True(response.Headers.Contains(header), $"{path} lacks {header} ({(int)response.StatusCode}).");

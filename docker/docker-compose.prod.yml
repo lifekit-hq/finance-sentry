@@ -296,9 +296,8 @@ services:
   # loopback:8080 on :4200 and :5001 (both URLs kept working, now path-routed by YARP); the
   # frontend/api host ports are closed. Rollback: re-add the ports: blocks and repoint serve.
   #
-  # TLS: default is Tailscale-terminated — the gateway serves plain HTTP on loopback:8080 and
-  # `tailscale serve` fronts it. To switch to public-domain ACME instead, set the LettuceEncrypt env
-  # below (DomainNames + EmailAddress + AcceptTermsOfService=true) and uncomment the 80/443 ports.
+  # TLS is Tailscale-terminated: the gateway serves plain HTTP on loopback:8080 and `tailscale serve`
+  # fronts it.
   gateway:
     build:
       context: ..
@@ -309,7 +308,7 @@ services:
     restart: unless-stopped
     mem_limit: 192m         # 1.3 budget: 7-day peak 89 MiB
     pids_limit: 100
-    cap_drop: [ALL]         # ACME mode's 80/443 still bind: Docker allows unprivileged ports from 0 in a container
+    cap_drop: [ALL]         # plain HTTP on 8080 only, no privileged port to bind
     security_opt: ["no-new-privileges:true"]
     read_only: true
     tmpfs:
@@ -326,14 +325,8 @@ services:
       lifekit.contract.service: finance-sentry-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # 8080 serves the full surface (app, API, Hangfire, MCP, health, metrics) as before;
-      # 8081 is the public listener, which serves only the app and /api/** (Gateway:PublicListener).
-      ASPNETCORE_URLS: http://+:8080;http://+:8081
-      Gateway__PublicListener__Port: "8081"
-      # Public-domain ACME (leave empty for Tailscale-terminated mode):
-      LettuceEncrypt__DomainNames__0: ${GATEWAY_DOMAIN:-}
-      LettuceEncrypt__EmailAddress: ${GATEWAY_ACME_EMAIL:-}
-      LettuceEncrypt__AcceptTermsOfService: ${GATEWAY_ACME_ACCEPT_TOS:-false}
+      # 8080 serves the app and API, health and metrics. TLS is terminated in front (Tailscale Serve).
+      ASPNETCORE_URLS: http://+:8080
       # Trace spine (spec 023 amendment, 2026-09-13): OTLP/HTTP exporter, reachable over `lifekit-shared`
       # below (same network api's Loki/OTLP traffic already crosses).
       Observability__Otlp__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://otel-collector:4318}
@@ -344,13 +337,6 @@ services:
       ForwardedHeaders__KnownProxies__0: ${EDGE_BRIDGE_IP:?set EDGE_BRIDGE_IP to the edge network bridge address}
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
-      # Public listener, loopback only: for the edge proxy to pick up.
-      - "127.0.0.1:${GATEWAY_PUBLIC_PORT:-8081}:8081"
-      # ACME cutover: uncomment to publish the public TLS ports (requires GATEWAY_DOMAIN + DNS).
-      # - "80:80"
-      # - "443:443"
-    volumes:
-      - gateway_keys:/home/app/.aspnet/DataProtection-Keys
     depends_on:
       api:
         condition: service_started
@@ -423,8 +409,6 @@ volumes:
     name: docker_postgres_data
   api_logs:
     name: docker_api_logs
-  gateway_keys:   # data-protection key cache for the non-root gateway (025) — only used when TLS/ACME is enabled
-    name: docker_gateway_keys
 
 networks:
   finance-sentry:

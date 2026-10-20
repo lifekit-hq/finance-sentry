@@ -48,6 +48,7 @@ public class AuthController(
     private bool SecureCookies => env.IsProduction();
 
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicies.AuthSession)]
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
@@ -70,6 +71,7 @@ public class AuthController(
 
     /// <summary>Which sign-in methods this deployment offers, so the login page shows only those.</summary>
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicies.AuthSession)]
     [HttpGet("methods")]
     public IActionResult Methods() => Ok(new SignInMethodsResponse(
         Oidc: oidcOptions.Value.IsConfigured));
@@ -77,6 +79,7 @@ public class AuthController(
     // Sends the browser to the org identity provider. The provider returns to the OIDC handler's callback
     // (OidcLoginOptions.CallbackPath), which signs into Identity's external cookie and lands on OidcCallback.
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicies.AuthSession)]
     [HttpGet("oidc/start")]
     public IActionResult OidcStart([FromQuery] string? returnUrl = null)
     {

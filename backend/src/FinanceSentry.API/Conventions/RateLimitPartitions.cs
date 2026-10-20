@@ -16,6 +16,8 @@ public static class RateLimitPartitions
     private const int DefaultAnonymousPermitPerMinute = 10;
     public const string AuthenticatedPermitKey = "RateLimiting:Authenticated:PermitPerMinute";
     public const string AnonymousPermitKey = "RateLimiting:Anonymous:PermitPerMinute";
+    private const int DefaultAuthSessionPermitPerMinute = 60;
+    public const string AuthSessionPermitKey = "RateLimiting:AuthSession:PermitPerMinute";
     private const int ProblemReportPermitPerHour = 5;
     private const int ProblemReportSegments = 12;
     private const string UnknownClient = "unknown";
@@ -29,6 +31,14 @@ public static class RateLimitPartitions
 
     public static RateLimitPartition<string> Anonymous(HttpContext context)
         => FixedWindow($"ip:{ClientAddress(context)}", Permit(context, AnonymousPermitKey, DefaultAnonymousPermitPerMinute));
+
+    /// <summary>
+    /// The session bootstrap reads (<c>/auth/me</c>, <c>/auth/methods</c>, <c>/auth/oidc/start</c>): every page load
+    /// and silent refresh makes them, so they get a higher budget than the credential endpoints, kept in its own
+    /// partition so the two budgets never draw on each other.
+    /// </summary>
+    public static RateLimitPartition<string> AuthSession(HttpContext context)
+        => FixedWindow($"session-ip:{ClientAddress(context)}", Permit(context, AuthSessionPermitKey, DefaultAuthSessionPermitPerMinute));
 
     /// <summary>Problem reports: a sliding hour per signed-in person (per address if somehow anonymous).</summary>
     public static RateLimitPartition<string> ProblemReport(HttpContext context)

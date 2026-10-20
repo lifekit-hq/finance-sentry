@@ -43,7 +43,7 @@ public sealed class GatewayEndpointContractTests : IClassFixture<GatewayEndpoint
         var clusters = body.RootElement.GetProperty("clusters").EnumerateArray()
             .Select(c => c.GetProperty("id").GetString())
             .ToList();
-        Assert.Equal(["api", "frontend", "mcp"], clusters);
+        Assert.Equal(["api", "frontend"], clusters);
     }
 
     [Fact]
