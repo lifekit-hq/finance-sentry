@@ -308,7 +308,7 @@ services:
     restart: unless-stopped
     mem_limit: 192m         # 1.3 budget: 7-day peak 89 MiB
     pids_limit: 100
-    cap_drop: [ALL]         # ACME mode's 80/443 still bind: Docker allows unprivileged ports from 0 in a container
+    cap_drop: [ALL]         # plain HTTP on 8080 only, no privileged port to bind
     security_opt: ["no-new-privileges:true"]
     read_only: true
     tmpfs:

@@ -5,7 +5,7 @@ namespace FinanceSentry.Gateway;
 /// its own endpoints, proxied ones and rejections alike. The set is declarative in
 /// <c>Gateway:SecurityHeaders</c> (header name → value) and is kept in step by hand with the frontend container's
 /// <c>docker/nginx.security-headers.conf</c>; the gateway's value replaces any copy the upstream sent, so
-/// a response never carries two policies. HSTS stays with <c>UseHsts</c> (HTTPS-only by design).
+/// a response never carries two policies. HSTS is not set here: the gateway serves plain HTTP and TLS ends in front of it.
 /// </summary>
 public static class GatewaySecurityHeaders
 {
