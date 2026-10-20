@@ -88,7 +88,7 @@ public static class AgentModule
     private static void RegisterMcpToolSurface(IServiceCollection services)
     {
         services.AddHttpContextAccessor();
-        services.AddSingleton<LocalMcpCredentialStore>();
+        services.AddLocalMcpCredentialStore();
         services.AddMcpOAuthTokenClient();
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();

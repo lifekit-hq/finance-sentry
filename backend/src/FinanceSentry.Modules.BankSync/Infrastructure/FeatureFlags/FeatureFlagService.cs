@@ -1,9 +1,9 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.FeatureFlags;
 
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 /// <summary>
-/// Simple feature flag service backed by IConfiguration (appsettings / env vars).
+/// Simple feature flag service backed by the bound <see cref="FeatureFlagOptions"/> section (appsettings / env vars).
 /// Keys are read from "FeatureFlags:{KEY}" — e.g. "FeatureFlags:BANK_SYNC_ENABLED=true".
 /// Supports gradual rollout by user ID hash when a percentage value (0-100) is configured.
 /// </summary>
@@ -19,13 +19,27 @@ public interface IFeatureFlagService
     bool IsEnabledForUser(string flagKey, Guid userId);
 }
 
-public class FeatureFlagService(IConfiguration config) : IFeatureFlagService
+/// <summary>
+/// The <c>FeatureFlags</c> configuration section: flag key → raw value ("true"/"false" or a 0-100 percentage).
+/// Keys are case-insensitive, as configuration keys are. Optional — an unset flag is off.
+/// </summary>
+public sealed class FeatureFlagOptions : Dictionary<string, string?>
 {
-    private readonly IConfiguration _config = config;
+    public const string SectionName = "FeatureFlags";
+
+    public FeatureFlagOptions()
+        : base(StringComparer.OrdinalIgnoreCase)
+    {
+    }
+}
+
+public class FeatureFlagService(IOptionsMonitor<FeatureFlagOptions> flags) : IFeatureFlagService
+{
+    private string? Lookup(string flagKey) => flags.CurrentValue.GetValueOrDefault(flagKey);
 
     public bool IsEnabled(string flagKey)
     {
-        var value = _config[$"FeatureFlags:{flagKey}"];
+        var value = Lookup(flagKey);
         if (value is null) return false;
 
         // Boolean flag: "true" / "false"
@@ -41,7 +55,7 @@ public class FeatureFlagService(IConfiguration config) : IFeatureFlagService
 
     public bool IsEnabledForUser(string flagKey, Guid userId)
     {
-        var value = _config[$"FeatureFlags:{flagKey}"];
+        var value = Lookup(flagKey);
         if (value is null) return false;
 
         if (bool.TryParse(value, out var boolVal))

@@ -5,7 +5,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using Hangfire;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Infrastructure.Links;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -20,11 +21,11 @@ public sealed class FireBriefJob(
     IBankingTotalsReader bankingTotals,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> projectionQuery,
     IAlertGeneratorService alerts,
-    IConfiguration configuration,
+    IOptions<CompanionLinksOptions> companionLinks,
     ILogger<FireBriefJob> logger)
 {
     /// <summary>Public origin the brief's bullets link onto (<c>Companion:PublicBaseUrl</c>); empty = no links.</summary>
-    private string? AppBaseUrl => configuration["Companion:PublicBaseUrl"];
+    private string? AppBaseUrl => companionLinks.Value.PublicBaseUrl;
 
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)

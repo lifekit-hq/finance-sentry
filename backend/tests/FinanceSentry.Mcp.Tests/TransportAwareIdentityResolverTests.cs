@@ -63,7 +63,7 @@ public sealed class TransportAwareIdentityResolverTests
             })
             .Build();
 
-        var store = new LocalMcpCredentialStore(config);
+        var store = new LocalMcpCredentialStore(Options.Create(new McpOptions { CredentialFile = credentialFile }));
         store.Save(new StoredMcpCredentials(
             "http://localhost:5001/api/v1",
             "http://localhost:4200",

@@ -9,7 +9,6 @@ using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -207,13 +206,11 @@ public sealed class RoleSeederTests : IAsyncDisposable
     private async Task SeedAsync(string? ownerEmail)
     {
         using var scope = _services.CreateScope();
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { [RoleSeeder.OwnerEmailConfigKey] = ownerEmail })
-            .Build();
+        var options = new AuthSeedOptions { OwnerEmail = ownerEmail };
         await RoleSeeder.SeedAsync(
             scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(),
             scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
-            config,
+            options,
             NullLogger.Instance);
     }
 

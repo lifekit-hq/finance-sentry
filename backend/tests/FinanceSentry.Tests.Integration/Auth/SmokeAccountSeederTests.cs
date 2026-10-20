@@ -8,7 +8,6 @@ using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -133,16 +132,11 @@ public sealed class SmokeAccountSeederTests : IAsyncDisposable
     private async Task<Guid?> SeedAsync(string? email)
     {
         using var scope = _services.CreateScope();
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [SmokeAccountSeeder.EmailConfigKey] = email,
-            })
-            .Build();
+        var options = new AuthSeedOptions { SmokeAccount = new SmokeAccountOptions { Email = email } };
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         await RoleSeeder.SeedAsync(
-            scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(), users, config, NullLogger.Instance);
-        return await SmokeAccountSeeder.SeedAsync(users, config, NullLogger.Instance);
+            scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(), users, options, NullLogger.Instance);
+        return await SmokeAccountSeeder.SeedAsync(users, options, NullLogger.Instance);
     }
 
     private async Task<ApplicationUser?> FindAsync(string email)

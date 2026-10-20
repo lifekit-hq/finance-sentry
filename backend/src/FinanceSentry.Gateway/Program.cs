@@ -14,8 +14,6 @@ using Yarp.ReverseProxy;
 var builder = WebApplication.CreateBuilder(args);
 
 const string GatewayServiceName = "finance-sentry-gateway";
-const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
-const string DefaultOtlpEndpoint = "http://otel-collector:4318";
 const string OtlpTracesPath = "/v1/traces";
 const string MetricsPath = "/metrics";
 
@@ -97,7 +95,7 @@ builder.Services.AddRateLimiter(options =>
 // forwards it; no extra code needed) so api's span joins the same trace. /metrics scrapes are not
 // traced. Endpoint shape matches api's Observability:Otlp:Endpoint: unset falls back to the
 // in-network collector default, an explicit empty value disables the exporter (dev).
-var gatewayOtlpEndpoint = builder.Configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
+var gatewayOtlpEndpoint = GatewayObservabilityOptions.From(builder.Configuration).Otlp.Endpoint;
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(GatewayServiceName))
     .WithMetrics(metrics => metrics

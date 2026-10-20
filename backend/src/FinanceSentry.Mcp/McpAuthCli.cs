@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Net;
 using FinanceSentry.Mcp.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Mcp;
 
@@ -16,7 +18,9 @@ internal static class McpAuthCli
 
         var command = args[1].ToLowerInvariant();
         var logger = loggerFactory.CreateLogger("FinanceSentry.Mcp.AuthCli");
-        var store = new LocalMcpCredentialStore(configuration);
+        var options = configuration.GetSection(McpOptions.SectionName).Get<McpOptions>() ?? new McpOptions();
+        Validator.ValidateObject(options, new ValidationContext(options), validateAllProperties: true);
+        var store = new LocalMcpCredentialStore(Options.Create(options));
         await using var services = new ServiceCollection()
             .AddSingleton(loggerFactory)
             .AddLogging()
@@ -26,7 +30,7 @@ internal static class McpAuthCli
 
         return command switch
         {
-            "login" => await RunLoginAsync(args.Skip(2).ToArray(), configuration, store, tokenClient, logger),
+            "login" => await RunLoginAsync(args.Skip(2).ToArray(), options, store, tokenClient, logger),
             "logout" => await RunLogoutAsync(store, tokenClient, logger),
             "status" => RunStatus(store),
             _ => 2
@@ -35,16 +39,16 @@ internal static class McpAuthCli
 
     private static async Task<int> RunLoginAsync(
         string[] args,
-        IConfiguration configuration,
+        McpOptions options,
         LocalMcpCredentialStore store,
         McpOAuthTokenClient tokenClient,
         ILogger logger)
     {
         var apiBaseUrl = GetOption(args, "--api-base")
-            ?? configuration["Mcp:ApiBaseUrl"]
+            ?? options.ApiBaseUrl
             ?? "http://localhost:5001/api/v1";
         var frontendBaseUrl = GetOption(args, "--frontend-base")
-            ?? configuration["Mcp:FrontendBaseUrl"]
+            ?? options.FrontendBaseUrl
             ?? "http://localhost:4200";
 
         using var listener = StartListener(out var redirectUri);

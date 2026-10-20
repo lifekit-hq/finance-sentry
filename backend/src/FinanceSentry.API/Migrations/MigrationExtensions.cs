@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 public static class MigrationExtensions
@@ -83,7 +84,7 @@ public static class MigrationExtensions
             RoleSeeder.SeedAsync(
                 sp.GetRequiredService<RoleManager<IdentityRole>>(),
                 sp.GetRequiredService<UserManager<ApplicationUser>>(),
-                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<IOptions<AuthSeedOptions>>().Value,
                 logger).GetAwaiter().GetResult();
         }
         catch (Exception ex)
@@ -103,7 +104,7 @@ public static class MigrationExtensions
         {
             var userId = SmokeAccountSeeder.SeedAsync(
                 sp.GetRequiredService<UserManager<ApplicationUser>>(),
-                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<IOptions<AuthSeedOptions>>().Value,
                 logger).GetAwaiter().GetResult();
             if (userId is { } id && SmokeDataSeeder.Seed(sp.GetRequiredService<BankSyncDbContext>(), id, DateTime.UtcNow))
                 logger.LogInformation("Seeded fake bank data for the smoke account {UserId}.", id);

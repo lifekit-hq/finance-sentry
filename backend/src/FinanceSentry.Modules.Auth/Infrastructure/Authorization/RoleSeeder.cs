@@ -6,7 +6,6 @@ using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.People;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -30,13 +29,13 @@ public static class RoleSeeder
     public static async Task SeedAsync(
         RoleManager<IdentityRole> roles,
         UserManager<ApplicationUser> users,
-        IConfiguration config,
+        AuthSeedOptions options,
         ILogger logger)
     {
         foreach (var roleName in AuthRoles.All)
             await ConvergeRoleAsync(roles, roleName, Permissions.ByRole[roleName], logger);
 
-        await SeedOwnerAsync(users, config[OwnerEmailConfigKey], logger);
+        await SeedOwnerAsync(users, options.OwnerEmail, logger);
         await SeedMembersAsync(users, logger);
     }
 

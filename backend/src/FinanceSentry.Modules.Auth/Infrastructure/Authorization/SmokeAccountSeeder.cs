@@ -5,7 +5,6 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.People;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -32,9 +31,9 @@ public static class SmokeAccountSeeder
     /// Ensures the smoke account and returns its user id, or null when the seed is not configured or the
     /// configured email belongs to an account the seed may not manage.
     /// </summary>
-    public static async Task<Guid?> SeedAsync(UserManager<ApplicationUser> users, IConfiguration config, ILogger logger)
+    public static async Task<Guid?> SeedAsync(UserManager<ApplicationUser> users, AuthSeedOptions options, ILogger logger)
     {
-        var email = config[EmailConfigKey]?.Trim();
+        var email = options.SmokeAccount.Email?.Trim();
         if (string.IsNullOrEmpty(email))
             return null;
 

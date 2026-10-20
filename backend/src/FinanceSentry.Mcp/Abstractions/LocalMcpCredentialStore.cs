@@ -1,16 +1,16 @@
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Mcp.Abstractions;
 
-public sealed class LocalMcpCredentialStore(IConfiguration configuration)
+public sealed class LocalMcpCredentialStore(IOptions<McpOptions> options)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
-    public string FilePath => configuration["Mcp:CredentialFile"]
+    public string FilePath => options.Value.CredentialFile
         ?? Environment.GetEnvironmentVariable("FINANCE_SENTRY_MCP_AUTH_FILE")
         ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

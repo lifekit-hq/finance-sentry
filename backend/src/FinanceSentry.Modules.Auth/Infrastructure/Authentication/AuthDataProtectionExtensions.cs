@@ -1,6 +1,5 @@
 namespace FinanceSentry.Modules.Auth.Infrastructure.Authentication;
 
-using System.Security.Cryptography.X509Certificates;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +16,7 @@ public static class AuthDataProtectionExtensions
     public const string ApplicationName = "FinanceSentry";
 
     /// <summary>Configuration key: base64 of a PKCS#12 (no password) whose RSA key wraps the key ring at rest.</summary>
-    public const string CertificateConfigKey = "DataProtection:CertificatePfxBase64";
+    public const string CertificateConfigKey = $"{DataProtectionCertificateOptions.SectionName}:{nameof(DataProtectionCertificateOptions.CertificatePfxBase64)}";
 
     public static IServiceCollection AddAuthDataProtection(this IServiceCollection services, IConfiguration config)
     {
@@ -27,12 +26,12 @@ public static class AuthDataProtectionExtensions
 
         // Production sets the certificate (docker-compose.prod.yml requires it), so the keys sit encrypted in the
         // database. Without one the platform stores them unprotected and says so in the log; local runs and tests.
-        var pfx = config[CertificateConfigKey];
-        if (!string.IsNullOrWhiteSpace(pfx))
+        // Optional: when set it must be the base64 of a loadable PKCS#12, or loading it here stops startup. The key
+        // ring is wired here, before the container exists, so the value is read from the section directly.
+        var certificate = config.GetSection(DataProtectionCertificateOptions.SectionName).Get<DataProtectionCertificateOptions>();
+        if (certificate?.TryLoad() is { } cert)
         {
-            // Ephemeral: the container filesystem is read-only, so the key must not be written to a user store.
-            dataProtection.ProtectKeysWithCertificate(
-                X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(pfx), password: null, X509KeyStorageFlags.EphemeralKeySet));
+            dataProtection.ProtectKeysWithCertificate(cert);
         }
 
         return services;

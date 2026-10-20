@@ -6,7 +6,8 @@ using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Infrastructure.Links;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -30,7 +31,7 @@ public sealed class FireBriefJobTests
             ProjectedDate: new DateOnly(2041, 3, 1), MonthsToFire: 173m, HasStaleSleeves: false);
 
     private FireBriefJob Job() =>
-        new(_users.Object, _projection.Object, _alerts.Object, new ConfigurationBuilder().Build(), NullLogger<FireBriefJob>.Instance);
+        new(_users.Object, _projection.Object, _alerts.Object, Options.Create(new CompanionLinksOptions()), NullLogger<FireBriefJob>.Instance);
 
     private void ActiveUsers(params Guid[] userIds) =>
         _users

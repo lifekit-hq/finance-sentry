@@ -19,8 +19,6 @@ using OpenTelemetry.Trace;
 public static class OpenTelemetryConfiguration
 {
     private const string ServiceName = "finance-sentry";
-    private const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
-    private const string DefaultOtlpEndpoint = "http://otel-collector:4318";
     private const string OtlpTracesPath = "/v1/traces";
     private const string MetricsPath = "/metrics";
     private const string PollyMeterName = "Polly";
@@ -53,7 +51,7 @@ public static class OpenTelemetryConfiguration
     /// </summary>
     public static TracerProviderBuilder AddObservabilityTracing(this TracerProviderBuilder tracing, IConfiguration configuration)
     {
-        var otlpEndpoint = configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
+        var otlpEndpoint = ObservabilityOptions.From(configuration).Otlp.Endpoint;
 
         tracing
             .AddAspNetCoreInstrumentation(options =>

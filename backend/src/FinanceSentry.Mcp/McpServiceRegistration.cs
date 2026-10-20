@@ -67,7 +67,7 @@ public static class McpServiceRegistration
         services.AddExchangeRates(config);
 
         services.AddHttpContextAccessor();
-        services.AddSingleton<LocalMcpCredentialStore>();
+        services.AddLocalMcpCredentialStore();
         services.AddMcpOAuthTokenClient();
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
