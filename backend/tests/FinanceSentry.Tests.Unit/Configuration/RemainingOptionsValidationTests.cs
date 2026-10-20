@@ -81,6 +81,26 @@ public class RemainingOptionsValidationTests
     }
 
     [Fact]
+    public void AuthSeed_MalformedSmokeEmail_Fails()
+    {
+        var sp = Build(new() { ["Auth:SmokeAccount:Email"] = "not-an-email" },
+            s => s.AddOptions<AuthSeedOptions>().BindConfiguration("Auth").ValidateDataAnnotations());
+
+        var act = () => sp.GetRequiredService<IOptions<AuthSeedOptions>>().Value;
+
+        act.Should().Throw<OptionsValidationException>().WithMessage("*Auth:SmokeAccount:Email*");
+    }
+
+    [Fact]
+    public void AuthSeed_EmptySmokeEmail_Starts()
+    {
+        var sp = Build(new() { ["Auth:SmokeAccount:Email"] = string.Empty },
+            s => s.AddOptions<AuthSeedOptions>().BindConfiguration("Auth").ValidateDataAnnotations());
+
+        sp.GetRequiredService<IOptions<AuthSeedOptions>>().Value.SmokeAccount.Email.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
     public void Mcp_AbsentSettings_Start()
     {
         var sp = Build([], s => s.AddOptions<McpOptions>().BindConfiguration("Mcp").ValidateDataAnnotations());
