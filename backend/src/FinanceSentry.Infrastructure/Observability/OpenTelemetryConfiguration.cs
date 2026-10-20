@@ -48,8 +48,7 @@ public static class OpenTelemetryConfiguration
     /// Wires the HTTP trace spine (spec 023 amendment, 2026-09-13): ASP.NET Core + HttpClient +
     /// Npgsql spans, exported via OTLP/HTTP. <c>/metrics</c> scrapes are not traced, and Npgsql spans
     /// without a parent (background polling outside any request) are dropped by
-    /// <see cref="ParentlessNpgsqlSpanFilter"/>. The endpoint mirrors <c>Observability:Loki:Url</c>'s
-    /// shape: unset falls back to the in-network collector default, an explicit empty value disables
+    /// <see cref="ParentlessNpgsqlSpanFilter"/>. Unset falls back to the in-network collector default, an explicit empty value disables
     /// the exporter (dev).
     /// </summary>
     public static TracerProviderBuilder AddObservabilityTracing(this TracerProviderBuilder tracing, IConfiguration configuration)

@@ -3,30 +3,20 @@ namespace FinanceSentry.Infrastructure.Observability;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
-using Serilog.Formatting;
 using Serilog.Formatting.Compact;
-using Serilog.Sinks.Grafana.Loki;
 
 /// <summary>
 /// Central Serilog setup (FR-003/011). Console output is one compact JSON object per line — the
 /// platform contract's "JSON logs with a trace id on stdout" (guardrail 1, spec 048): the box log
-/// agent reads stdout, so the rendered message (<c>@m</c>) plus the W3C trace and span ids Serilog 4
-/// captures from <see cref="System.Diagnostics.Activity.Current"/> (<c>@tr</c>/<c>@sp</c>) is what every
-/// downstream reader sees. Keeps the api's rolling-file sink,
-/// suppresses the EF Core <c>Database.Command</c> SQL flood that made grep-based triage slow (FR-011,
-/// override-able via config), enriches every event with a bounded <c>module</c> + <c>app</c>, and —
-/// when a Loki URL is configured — ships structured logs to Loki via the batched sink (fire-and-forget:
-/// shipping failures are swallowed by the sink and never affect request handling, FR-003). The Loki
-/// sink stays until the box log agent lands (captain, 2026-09-16).
+/// agent reads stdout and ships it to Loki, so the rendered message (<c>@m</c>) plus the W3C trace and
+/// span ids Serilog 4 captures from <see cref="System.Diagnostics.Activity.Current"/> (<c>@tr</c>/<c>@sp</c>)
+/// is what every downstream reader sees. The api writes no log sink of its own (no Loki, no file).
+/// Suppresses the EF Core <c>Database.Command</c> SQL flood that made grep-based triage slow (FR-011,
+/// override-able via config) and enriches every event with a bounded <c>module</c> + <c>app</c>.
 /// </summary>
 public static class SerilogConfiguration
 {
     private const string AppName = "finance-sentry";
-    private const string LokiUrlConfigKey = "Observability:Loki:Url";
-
-    // FR-004 (feature 024): cap the rolling file so a single day's logs cannot exhaust host disk.
-    private const long FileSizeLimitBytes = 100L * 1024 * 1024;
-    private const int RetainedFileCountLimit = 14;
 
     /// <summary>Matches the <c>UseSerilog</c> host callback signature; tags events <c>app=finance-sentry</c>.</summary>
     public static void Configure(HostBuilderContext context, LoggerConfiguration loggerConfiguration)
@@ -34,26 +24,15 @@ public static class SerilogConfiguration
 
     /// <summary>
     /// The same setup for another host of this product (the MCP server), tagged with its own
-    /// <c>app</c> so the shared log stream tells the processes apart. Stdout only — no rolling file,
-    /// since such hosts have no log volume.
+    /// <c>app</c> so the shared log stream tells the processes apart.
     /// </summary>
     public static Action<HostBuilderContext, LoggerConfiguration> For(string appName)
-        => (context, loggerConfiguration) => Configure(context, loggerConfiguration, appName, writeToFile: false);
-
-    /// <summary>
-    /// The Loki body: one JSON object per event, with the event's W3C trace and span ids as <c>TraceId</c>
-    /// and <c>SpanId</c> body fields (the sink's own fields; off by default) — what the box Loki
-    /// datasource's derived field matches (<c>"TraceId":"…"</c>) to jump to the trace in Tempo. Body
-    /// fields only, never Loki labels: both are per-request and would explode label cardinality.
-    /// </summary>
-    public static ITextFormatter CreateLokiFormatter()
-        => new LokiJsonTextFormatter(new LokiExceptionFormatter(), enrichTraceId: true, enrichSpanId: true);
+        => (context, loggerConfiguration) => Configure(context, loggerConfiguration, appName);
 
     private static void Configure(
         HostBuilderContext context,
         LoggerConfiguration loggerConfiguration,
-        string appName,
-        bool writeToFile = true)
+        string appName)
     {
         var configuration = context.Configuration;
 
@@ -67,27 +46,5 @@ public static class SerilogConfiguration
             .Enrich.With<ModuleEnricher>()
             .Enrich.WithProperty("app", appName)
             .WriteTo.Console(new RenderedCompactJsonFormatter());
-
-        if (writeToFile)
-        {
-            loggerConfiguration.WriteTo.File(
-                "logs/app-.txt",
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: RetainedFileCountLimit,
-                fileSizeLimitBytes: FileSizeLimitBytes,
-                rollOnFileSizeLimit: true);
-        }
-
-        var lokiUrl = configuration[LokiUrlConfigKey];
-        if (!string.IsNullOrWhiteSpace(lokiUrl))
-        {
-            // JSON payload so structured properties (SourceContext, …) are searchable in Loki via
-            // `| json`; only app/module/level become labels so cardinality stays bounded (FR-007).
-            loggerConfiguration.WriteTo.GrafanaLoki(
-                lokiUrl,
-                textFormatter: CreateLokiFormatter(),
-                labels: [new LokiLabel { Key = "app", Value = appName }],
-                propertiesAsLabels: ["module", "level"]);
-        }
     }
 }

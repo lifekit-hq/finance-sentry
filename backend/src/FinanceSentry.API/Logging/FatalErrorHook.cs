@@ -5,8 +5,8 @@ using Serilog;
 /// <summary>
 /// Last-chance logging for an unhandled managed exception that is about to kill the process. The
 /// runtime gives no further chance after <see cref="AppDomain.UnhandledException"/>, so the exception is
-/// logged at Fatal and the Serilog pipeline is flushed here — otherwise buffered sink output (the rolling
-/// file, Loki batches) is lost with the process and the crash leaves no trace.
+/// logged at Fatal and the Serilog pipeline is flushed here — otherwise buffered console output
+/// is lost with the process and the crash leaves no trace.
 /// </summary>
 public static class FatalErrorHook
 {

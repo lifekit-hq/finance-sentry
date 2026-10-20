@@ -21,8 +21,8 @@ const string MetricsPath = "/metrics";
 
 // Platform contract (guardrail 1, spec 048): one compact JSON object per stdout line, with the W3C
 // trace and span ids Serilog captures from the current Activity (@tr/@sp) — the same shape the api and
-// the MCP write, so the box log agent reads every finance-sentry container the same way. No file or
-// Loki sink: the gateway keeps no disk state worth a second copy. `Serilog:` config sections still
+// the MCP write, so the box log agent reads every finance-sentry container the same way. Like the api,
+// it has no file or Loki sink of its own. `Serilog:` config sections still
 // apply through ReadFrom.Configuration.
 builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
     .ReadFrom.Configuration(context.Configuration)

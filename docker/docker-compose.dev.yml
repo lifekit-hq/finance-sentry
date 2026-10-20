@@ -80,8 +80,6 @@ services:
       Auth__Oidc__PublicBaseUrl: ${AUTH_OIDC_PUBLIC_BASE_URL:-}
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
-      # Ship structured logs to Loki (fire-and-forget); empty disables the sink.
-      Observability__Loki__Url: http://loki:3100
       # Trace spine (spec 023 amendment) OTLP exporter — empty so dev boots without a collector.
       Observability__Otlp__Endpoint: ""
     ports:
@@ -96,8 +94,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    volumes:
-      - ./logs:/app/logs
 
   mcp:
     build:
@@ -165,19 +161,6 @@ services:
       retries: 5
 
   # --- Observability stack (023) -------------------------------------------------
-  loki:
-    image: grafana/loki:3.1.1
-    container_name: finance-sentry-loki
-    restart: unless-stopped
-    command: -config.file=/etc/loki/loki-config.yml
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
-      - loki_data:/loki
-    networks:
-      - finance-sentry-network
-
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: finance-sentry-prometheus
@@ -211,14 +194,11 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
-      - loki
     networks:
       - finance-sentry-network
 
 volumes:
   postgres_data:
-    driver: local
-  loki_data:
     driver: local
   prometheus_data:
     driver: local

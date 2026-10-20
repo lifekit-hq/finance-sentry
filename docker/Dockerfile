@@ -45,7 +45,7 @@ RUN apk upgrade --no-cache && \
 
 COPY --from=build /app/publish .
 
-RUN mkdir -p /app/logs && chown -R nobody:nobody /app
+RUN chown -R nobody:nobody /app
 
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:5000 \
