@@ -46,7 +46,6 @@ Startup order enforced by health checks: `postgres → api → frontend`.
 | http://localhost:5001/hangfire | Hangfire dashboard |
 | http://localhost:3000 | Grafana (dashboards) — **dev compose only**; on the VPS it lives in lifekit-stack |
 | http://localhost:9090 | Prometheus — dev compose only (same) |
-| http://localhost:3100 | Loki (log store) — dev compose only (same) |
 
 ### Run everything
 
@@ -104,7 +103,7 @@ docker compose -f docker-compose.dev.yml down -v              # also drop postgr
 
 ## Observability (feature 023)
 
-The **dev** compose stack runs **Prometheus + Grafana + Loki** alongside the app so failures announce
+The **dev** compose stack runs **Prometheus + Grafana** alongside the app so failures announce
 themselves instead of being found days later via `ssh`+`grep`.
 
 On the VPS that trio moved out of this repo on 2026-09-06
@@ -112,22 +111,22 @@ On the VPS that trio moved out of this repo on 2026-09-06
 living in one product's compose file, on this product's private network, which is why Prometheus could
 only ever see one target and nothing else on the box had alerting at all. It now scrapes devclaw too and
 carries the box's alert rules. What stays this repo's job is unchanged — the `/metrics` endpoint, the
-Loki sink, and the dashboards below.
+dashboards below.
 
 - **Metrics** — the API is instrumented with OpenTelemetry and exposes Prometheus exposition at `/metrics`
   (ASP.NET Core request rate/latency/errors, .NET runtime, and custom `finance_jobs_*` per-job counters).
   Prometheus scrapes it every 15s; retention ~30d, hard-capped at 5GB.
 - **Logs** — every .NET host (api, gateway, mcp) writes one compact JSON object per stdout line with
-  the W3C trace and span ids as `@tr`/`@sp` (platform contract, spec 048); the api also ships to Loki
-  (fire-and-forget; a shipping outage never affects requests). EF Core SQL is suppressed to `Warning` by default (raise via
+  the W3C trace and span ids as `@tr`/`@sp` (platform contract, spec 048). No host writes a Loki or file
+  sink of its own: the box otel-collector's `filelog/docker` pipeline reads container stdout into Loki
+  (`service_name="docker"`; `app`/`module` live in the JSON body, so queries `| json`). Dev compose has no
+  collector — read logs with `docker compose logs`. EF Core SQL is suppressed to `Warning` by default (raise via
   `Serilog:MinimumLevel:Override` in config). An unhandled exception that kills the api process is logged
-  at `Fatal` and the sinks are flushed before exit (`FatalErrorHook`), so a crash reaches the log file.
-  Retention ~14d, size-capped.
+  at `Fatal` and the console is flushed before exit (`FatalErrorHook`).
 - **Traces** — a gateway → api → Npgsql trace spine: gateway and API export OpenTelemetry traces over
   OTLP/HTTP to `Observability__Otlp__Endpoint` (default `http://otel-collector:4318`; empty disables the
   exporter, which is how the dev compose runs — there is no collector in dev). API log lines carry
-  the W3C trace and span ids (`@tr`/`@sp` on stdout; `TraceId`/`SpanId` body fields in Loki, never
-  Loki labels), so a Tempo trace and its Loki lines join on the same id; the Grafana logs dashboard
+  the W3C trace and span ids (`@tr`/`@sp` in the JSON body, on stdout and in Loki), so a Tempo trace and its Loki lines join on the same id; the Grafana logs dashboard
   filters by that trace id. Hangfire jobs carry the context across the queue (`HangfireTracingFilter`,
   source `FinanceSentry.Hangfire`): an ad-hoc enqueue runs as a child span of the enqueuing request, while
   a recurring run — and every automatic retry, which may fire hours after the request closed — starts
@@ -148,7 +147,7 @@ Loki sink, and the dashboards below.
   account holding the `Owner` role (access path: [runbook §4](docs/OPERATIONS_RUNBOOK.md)).
 
 ```bash
-# bring the stack up (adds loki, prometheus, grafana)
+# bring the stack up (adds prometheus, grafana)
 cd docker && docker compose -f docker-compose.dev.yml up -d --build
 
 curl -s http://localhost:5001/metrics | grep finance_jobs_        # custom job metrics present
@@ -159,9 +158,7 @@ curl -s http://localhost:5001/api/v1/health/ready                 # {"status":"H
 **Production notes** — Grafana + Hangfire dashboards are reachable only over Tailscale serve (not the
 public funnel), and Hangfire additionally requires the owner's sign-in; `/metrics` is scrape-only.
 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` / `GRAFANA_ROOT_URL` now belong to **lifekit-stack's** env file, not this repo's `.env.sops`;
-`Observability__Loki__Url` stays here (it defaults to `http://loki:3100`, which still resolves — the api
-is on the shared `lifekit-shared` network where lifekit-stack's Loki lives). `Observability__Otlp__Endpoint`
-likewise stays here; api and gateway both join `lifekit-shared` to reach lifekit-stack's OTLP collector. Alert rules are no longer deferred
+`Observability__Otlp__Endpoint` stays here; api and gateway both join `lifekit-shared` to reach lifekit-stack's OTLP collector. Alert rules are no longer deferred
 and no longer this repo's: they are provisioned files in lifekit-stack, including job silent-failure alerting
 (`finance-job-consecutive-failures`, on the app's `finance_job_consecutive_failures{job}` gauge).
 

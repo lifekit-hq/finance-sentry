@@ -16,7 +16,7 @@ using Xunit;
 /// line, with the rendered message and — inside a traced request — the W3C trace id (<c>@tr</c>) Serilog
 /// 4 captures from <see cref="Activity.Current"/> with no enricher. Exercises the formatter
 /// <see cref="SerilogConfiguration"/> writes to the console, through a <see cref="TextWriter"/> so the test
-/// never touches the process stdout. Also pins the Loki body's <c>TraceId</c>/<c>SpanId</c> fields.
+/// never touches the process stdout.
 /// </summary>
 public class JsonConsoleLogLineTests
 {
@@ -42,22 +42,6 @@ public class JsonConsoleLogLineTests
     }
 
     [Fact]
-    public void UnderActivity_LokiBodyCarriesTheIdsAsTraceIdAndSpanIdFields()
-    {
-        using var listener = StartListener();
-        using var activity = ActivitySource.StartActivity("request");
-        activity.Should().NotBeNull();
-
-        var line = WriteOneLine("hello {Who}", "contract", SerilogConfiguration.CreateLokiFormatter());
-
-        using var doc = JsonDocument.Parse(line);
-        var root = doc.RootElement;
-        root.GetProperty("Message").GetString().Should().Be("hello \"contract\"");
-        root.GetProperty("TraceId").GetString().Should().Be(activity!.TraceId.ToHexString());
-        root.GetProperty("SpanId").GetString().Should().Be(activity.SpanId.ToHexString());
-    }
-
-    [Fact]
     public void WithoutActivity_LineIsJsonWithoutTraceId()
     {
         Activity.Current = null;
@@ -69,11 +53,11 @@ public class JsonConsoleLogLineTests
         doc.RootElement.GetProperty("@m").GetString().Should().Be("plain");
     }
 
-    private static string WriteOneLine(string template, string? argument, ITextFormatter? formatter = null)
+    private static string WriteOneLine(string template, string? argument)
     {
         var output = new StringWriter();
         var logger = new LoggerConfiguration()
-            .WriteTo.Sink(new FormattingSink(formatter ?? new RenderedCompactJsonFormatter(), output))
+            .WriteTo.Sink(new FormattingSink(new RenderedCompactJsonFormatter(), output))
             .CreateLogger();
 
         if (argument is null)

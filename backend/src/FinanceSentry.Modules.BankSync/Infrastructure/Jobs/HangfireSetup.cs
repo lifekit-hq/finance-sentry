@@ -37,7 +37,7 @@ public static class HangfireSetup
         {
             // FR-004 (feature 024): Hangfire auto-expires succeeded jobs after ~1 day by default, so the
             // `hangfire` schema stays bounded without extra configuration. Loki (30d) + Prometheus (30d)
-            // retention and the capped Serilog file sink bound the remaining log/metric growth.
+            // retention bound the remaining log/metric growth.
 
             // Tests run without a reachable database — keep them on in-memory storage so the host
             // still boots. Every other environment uses durable PostgreSQL storage.

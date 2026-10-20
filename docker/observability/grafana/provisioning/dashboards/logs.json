@@ -12,25 +12,17 @@
     "list": [
       {
         "name": "module",
-        "label": "Module",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values({app=\"finance-sentry\"}, module)",
-        "refresh": 2,
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true
+        "label": "Module (regex)",
+        "type": "textbox",
+        "query": ".*",
+        "current": { "text": ".*", "value": ".*" }
       },
       {
         "name": "level",
-        "label": "Level",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values({app=\"finance-sentry\"}, level)",
-        "refresh": 2,
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true
+        "label": "Level (regex)",
+        "type": "textbox",
+        "query": ".*",
+        "current": { "text": ".*", "value": ".*" }
       },
       {
         "name": "search",
@@ -57,7 +49,7 @@
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
-        { "refId": "A", "expr": "sum by (level) (count_over_time({app=\"finance-sentry\", module=~\"$module\"}[$__auto]))", "legendFormat": "{{level}}" }
+        { "refId": "A", "expr": "sum by (level) (count_over_time({service_name=\"docker\"} |= `\"app\":\"finance-sentry\"` | json | app=\"finance-sentry\" | label_format level=`{{ or ._l \"Information\" }}` | module=~\"$module\" [$__auto]))", "legendFormat": "{{level}}" }
       ],
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
@@ -66,11 +58,11 @@
       "id": 2,
       "type": "logs",
       "title": "Logs — filter by module / level, free text, trace id",
-      "description": "Structured app logs from Loki (US2). EF Core SQL is suppressed at the default level (FR-011); paste a W3C trace id to group one request's entries (SC-002).",
+      "description": "Structured app logs from the box collector's stdout pipeline (service_name=\"docker\"; app/module/level are read from the JSON line, not Loki labels). EF Core SQL is suppressed at the default level (FR-011); paste a W3C trace id to group one request's entries (SC-002).",
       "gridPos": { "h": 20, "w": 24, "x": 0, "y": 7 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
-        { "refId": "A", "expr": "{app=\"finance-sentry\", module=~\"$module\", level=~\"$level\"} |~ \"(?i)$search\" |~ \"$traceId\"" }
+        { "refId": "A", "expr": "{service_name=\"docker\"} |= `\"app\":\"finance-sentry\"` | json | app=\"finance-sentry\" | label_format level=`{{ or ._l \"Information\" }}` | module=~\"$module\" | level=~\"$level\" |~ \"(?i)$search\" |~ \"$traceId\"" }
       ],
       "options": {
         "showTime": true,
