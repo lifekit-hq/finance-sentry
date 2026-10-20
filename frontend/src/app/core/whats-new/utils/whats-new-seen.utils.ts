@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {WHATS_NEW_SEEN_STORAGE_KEY} from '../constants/whats-new.constants';
 
 /** The per-device "last seen" version; storage can be blocked, so every access is guarded. */

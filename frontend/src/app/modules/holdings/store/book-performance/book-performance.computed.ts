@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {

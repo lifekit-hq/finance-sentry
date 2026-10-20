@@ -44,8 +44,8 @@
       <cmn-dialog-actions align="between">
         <cmn-button (clicked)="edit()" variant="secondary" icon="ArrowLeft">Edit</cmn-button>
         <cmn-button
-          [loading]="store.isBusy()"
-          [disabled]="store.isBusy()"
+          [loading]="store.isConnectLoading()"
+          [disabled]="store.isConnectLoading()"
           (clicked)="confirm()"
           variant="primary"
         >

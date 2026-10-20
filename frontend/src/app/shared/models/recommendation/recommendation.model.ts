@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type Timestamped} from '../timestamped/timestamped.model';
 
 /** A Ledger proposal on one name (#1069). Hold only ever answers a fired event. */

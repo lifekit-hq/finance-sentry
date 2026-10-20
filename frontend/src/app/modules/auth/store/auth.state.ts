@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type SignInMethods} from '../models/auth/auth.model';
 
 export type SignInMethodsStatus = 'idle' | 'loading' | 'success' | 'error';

@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {
@@ -7,6 +8,13 @@ import {
 import {type InstitutionType} from '../../../../shared/models/provider/provider.model';
 import {type ModalStep} from '../../models/connect/connect.model';
 import {type ConnectState} from './connect.state';
+
+interface StatusSetters {
+  setConnectIdle(): void;
+  setConnectLoading(): void;
+  setConnectSuccess(): void;
+  setConnectError(errorCode: Nullable<string>): void;
+}
 
 const STEP_FOR_TYPE: Record<InstitutionType, ModalStep> = {
   bank: 'provider-picker',
@@ -35,87 +43,69 @@ const TYPE_FOR_PICKED_PROVIDER: Record<PickableProvider, InstitutionType> = {
   inzhur: 'broker',
 };
 
-export function connectMethods(store: WritableStateSource<ConnectState>) {
+export function connectMethods(store: StatusSetters & WritableStateSource<ConnectState>) {
   return {
     openModal(): void {
       patchState(store, {
         modalStep: 'type-picker',
-        status: 'idle',
-        errorCode: null,
         statusMessage: null,
         institutionType: null,
         importPending: false,
         selectedProvider: 'truelayer',
       });
+      store.setConnectIdle();
     },
     closeModal(): void {
-      patchState(store, {
-        modalStep: 'closed',
-        status: 'idle',
-        errorCode: null,
-        statusMessage: null,
-        institutionType: null,
-      });
+      patchState(store, {modalStep: 'closed', statusMessage: null, institutionType: null});
+      store.setConnectIdle();
     },
     selectInstitutionType(type: InstitutionType): void {
       patchState(store, {
         institutionType: type,
         modalStep: STEP_FOR_TYPE[type],
-        status: 'idle',
-        errorCode: null,
         statusMessage: null,
       });
+      store.setConnectIdle();
     },
     setInstitutionType(type: InstitutionType): void {
       patchState(store, {institutionType: type});
     },
     setModalStep(step: ModalStep): void {
-      patchState(store, {modalStep: step, status: 'idle', errorCode: null, statusMessage: null});
+      patchState(store, {modalStep: step, statusMessage: null});
+      store.setConnectIdle();
     },
     selectProvider(provider: Provider): void {
-      patchState(store, {
-        selectedProvider: provider,
-        status: 'idle',
-        errorCode: null,
-        statusMessage: null,
-      });
+      patchState(store, {selectedProvider: provider, statusMessage: null});
+      store.setConnectIdle();
     },
     selectPickedProvider(slug: PickableProvider): void {
       patchState(store, {
         selectedProvider: slug,
         institutionType: TYPE_FOR_PICKED_PROVIDER[slug],
         modalStep: STEP_FOR_PICKED_PROVIDER[slug],
-        status: 'idle',
-        errorCode: null,
         statusMessage: null,
       });
-    },
-    setInitializing(): void {
-      patchState(store, {status: 'initializing', errorCode: null, statusMessage: null});
-    },
-    setReady(): void {
-      patchState(store, {status: 'ready', errorCode: null});
+      store.setConnectIdle();
     },
     setSyncing(message: string): void {
-      patchState(store, {status: 'syncing', statusMessage: message, errorCode: null});
+      patchState(store, {statusMessage: message});
+      store.setConnectLoading();
     },
     setPolling(message: string): void {
-      patchState(store, {status: 'polling', statusMessage: message});
+      patchState(store, {statusMessage: message});
+      store.setConnectLoading();
     },
     setSuccess(importPending = false): void {
-      patchState(store, {
-        status: 'success',
-        importPending,
-        statusMessage: null,
-        errorCode: null,
-        modalStep: 'closed',
-      });
+      patchState(store, {importPending, statusMessage: null, modalStep: 'closed'});
+      store.setConnectSuccess();
     },
     setError(errorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', errorCode, statusMessage: null});
+      patchState(store, {statusMessage: null});
+      store.setConnectError(errorCode);
     },
     resetError(): void {
-      patchState(store, {status: 'idle', errorCode: null, statusMessage: null});
+      patchState(store, {statusMessage: null});
+      store.setConnectIdle();
     },
     clearStatus(): void {
       patchState(store, {statusMessage: null});

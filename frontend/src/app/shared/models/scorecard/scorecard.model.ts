@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** The verdict vocabulary (spec 726 OQ-3); `NotScored` is the non-verdict. */
 export type VerdictWord = 'StrongBuy' | 'Buy' | 'Wait' | 'Avoid' | 'NotScored';
 

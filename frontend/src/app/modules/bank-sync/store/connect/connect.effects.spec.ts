@@ -19,7 +19,7 @@ function buildStore() {
     setError: vi.fn(),
     setInstitutionType: vi.fn(),
     selectProvider: vi.fn(),
-    status: vi.fn().mockReturnValue('idle' as const),
+    connectStatus: vi.fn().mockReturnValue('idle' as const),
     institutionType: vi.fn().mockReturnValue(null),
   };
 }

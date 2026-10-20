@@ -1,4 +1,5 @@
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Alert} from '../models/alert/alert.model';
 import {AlertStatusUtils} from '../utils/alert-status.utils';

@@ -1,16 +1,15 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Provider} from '../../../../shared/models/provider/provider.model';
 import {type ModalStep} from '../../models/connect/connect.model';
 import {AccountsStore} from '../accounts/accounts.store';
-import {type ConnectStatus} from './connect.state';
 
 interface StateSignals {
   selectedProvider: Signal<Provider>;
-  status: Signal<ConnectStatus>;
-  errorCode: Signal<Nullable<string>>;
-  statusMessage: Signal<Nullable<string>>;
+  hasConnectError: Signal<boolean>;
+  connectErrorCode: Signal<Nullable<string>>;
   modalStep: Signal<ModalStep>;
 }
 
@@ -71,20 +70,14 @@ export function connectComputed(store: StateSignals) {
 
   return {
     isModalOpen: computed(() => store.modalStep() !== 'closed'),
-    isBusy: computed(() => {
-      const s = store.status();
-      return s === 'initializing' || s === 'syncing' || s === 'polling';
-    }),
-    isInitializing: computed(() => store.status() === 'initializing'),
-    isReady: computed(() => store.status() === 'ready'),
     errorMessage: computed(() => {
-      if (store.status() !== 'error') {
+      if (!store.hasConnectError()) {
         return '';
       }
       return mapErrorByProvider(
-        store.errorCode(),
+        store.connectErrorCode(),
         store.selectedProvider(),
-        resolveForProvider(errorMessages, store.errorCode(), store.selectedProvider())
+        resolveForProvider(errorMessages, store.connectErrorCode(), store.selectedProvider())
       );
     }),
     connectedProviders: computed<ReadonlySet<Provider>>(() => {

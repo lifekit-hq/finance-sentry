@@ -2,6 +2,7 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {PushSubscriptionService} from '@lifekit-hq/core/pwa';
+import {type Nullable} from '@lifekit-hq/ui';
 import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 

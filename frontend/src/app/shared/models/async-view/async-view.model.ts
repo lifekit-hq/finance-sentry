@@ -1,4 +1,4 @@
-import {type AsyncStateStatus} from '@lifekit-hq/ui';
+import {type AsyncStateStatus, type Nullable} from '@lifekit-hq/ui';
 
 export interface AsyncViewInput {
   isLoading: boolean;

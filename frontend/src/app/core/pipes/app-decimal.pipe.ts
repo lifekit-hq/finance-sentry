@@ -1,5 +1,6 @@
 import {DecimalPipe} from '@angular/common';
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 const DEFAULT_DIGITS_INFO = '1.2-2';
 

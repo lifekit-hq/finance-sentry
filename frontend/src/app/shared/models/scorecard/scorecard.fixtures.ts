@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type ScorecardDto, type VerdictConditionDto, type VerdictRuleDto} from './scorecard.model';
 
 /** Spec fixtures for the scorecard drill-down (spec 726 US2); never imported by app code. */

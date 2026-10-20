@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export type Provider = 'monobank' | 'binance' | 'revolut_x' | 'ibkr' | 'inzhur' | 'truelayer';
 
 export type BankProvider = Extract<Provider, 'monobank' | 'truelayer'>;

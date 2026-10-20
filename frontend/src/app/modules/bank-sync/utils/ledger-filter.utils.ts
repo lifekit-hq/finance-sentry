@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type LedgerFilter} from '../store/transaction-ledger/transaction-ledger.computed';
 
 export class LedgerFilterUtils {

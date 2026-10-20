@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export interface TrueLayerProvider {
   readonly providerId: string;
   readonly displayName: string;

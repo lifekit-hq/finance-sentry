@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** How far to trust a figure; the backend's `HeadlineQuality`, worst of its reasons. */
 export type HeadlineQuality = 'COMPLETE' | 'ESTIMATED' | 'DEGRADED' | 'UNAVAILABLE';
 

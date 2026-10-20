@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type ApiError} from '../models/api/api.model';
 
 export class ErrorUtils {

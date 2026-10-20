@@ -1,4 +1,5 @@
 import {type UrlParamCodec} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type TransactionType} from '../../models/transaction/transaction.model';
 

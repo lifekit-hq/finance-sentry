@@ -1,4 +1,5 @@
 import {extractErrorCode} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {catchError, EMPTY, type MonoTypeOperatorFunction} from 'rxjs';
 
 interface ErrorSink {

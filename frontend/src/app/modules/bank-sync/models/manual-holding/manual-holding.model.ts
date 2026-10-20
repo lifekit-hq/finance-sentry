@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** How freely an entered value can be spent (finance-framework §5.2): only `Cash` counts as cash. */
 export type Convertibility = 'Cash' | 'InEconomy' | 'Locked';
 

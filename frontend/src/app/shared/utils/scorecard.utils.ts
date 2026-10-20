@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   SCORECARD_MISSING,
   SCORECARD_NOT_APPLICABLE,

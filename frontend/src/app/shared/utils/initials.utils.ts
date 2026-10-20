@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export class InitialsUtils {
   /** First+last name initials when a name is known, else the email's first letter, else `?`. */
   public static fromProfile(

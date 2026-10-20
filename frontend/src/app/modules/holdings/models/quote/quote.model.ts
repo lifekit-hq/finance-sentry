@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** The slice of `research/quotes` the holdings page reads. */
 export interface QuoteDto {
   ticker: string;

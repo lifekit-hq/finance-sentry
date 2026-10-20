@@ -1,6 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it} from 'vitest';
 
 import {type FireProjection} from '../../models/fire/fire.model';

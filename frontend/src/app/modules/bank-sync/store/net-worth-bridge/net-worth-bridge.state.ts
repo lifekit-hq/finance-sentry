@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type NetWorthBridgeResponse} from '../../models/net-worth-bridge/net-worth-bridge.model';
 
 export interface NetWorthBridgeState {

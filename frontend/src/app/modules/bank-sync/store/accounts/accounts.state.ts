@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {type ManualHolding} from '../../models/manual-holding/manual-holding.model';

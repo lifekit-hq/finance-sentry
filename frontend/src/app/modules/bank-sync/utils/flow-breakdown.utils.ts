@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {DateUtils} from '../../../shared/utils/date.utils';
 import {type FlowBreakdownItem} from '../models/flow-breakdown/flow-breakdown.model';
 import {type GlobalTransactionDto} from '../models/transaction/transaction.model';

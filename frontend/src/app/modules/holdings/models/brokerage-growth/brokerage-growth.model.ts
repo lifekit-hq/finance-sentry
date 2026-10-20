@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 
 /** The sleeves with a contributions-vs-growth split: `GET /wealth/<sleeve>/growth`. */

@@ -59,7 +59,7 @@ export class IbkrOauthFormComponent {
   /** The shared connect error belongs here only when this path made the last attempt. */
   public readonly showsError = computed(() => this.ibkrStore.path() === 'oauth');
   public readonly isDuplicateError = computed(
-    () => this.showsError() && this.store.errorCode() === 'IBKR_DUPLICATE'
+    () => this.showsError() && this.store.connectErrorCode() === 'IBKR_DUPLICATE'
   );
 
   public async onFileSelected(event: Event, control: PemControlName): Promise<void> {

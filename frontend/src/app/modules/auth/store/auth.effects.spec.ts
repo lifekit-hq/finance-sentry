@@ -3,6 +3,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {NavigationEnd, Router} from '@angular/router';
 import {ErrorMessageService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {EMPTY} from 'rxjs';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';

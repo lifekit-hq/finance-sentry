@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** One plain-language line of a release; an owner line is hidden from Members. */
 export interface WhatsNewNote {
   text: string;

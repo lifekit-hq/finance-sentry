@@ -2,6 +2,7 @@ import {DOCUMENT} from '@angular/common';
 import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
 import {ErrorMessageService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
 

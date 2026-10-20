@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {type Alert} from '../models/alert/alert.model';
 import {type AlertNavigation} from '../models/alert/alert-destination.model';

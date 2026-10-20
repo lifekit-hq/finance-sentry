@@ -42,7 +42,9 @@ export class RevolutXFormComponent {
 
   public readonly helpUrl = REVOLUT_X_HELP_URL;
 
-  public readonly isDuplicateError = computed(() => this.store.errorCode() === 'ALREADY_CONNECTED');
+  public readonly isDuplicateError = computed(
+    () => this.store.connectErrorCode() === 'ALREADY_CONNECTED'
+  );
 
   public submit(): void {
     if (this.form.invalid) {

@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {SLEEVE_SOURCE_IDS} from '../constants/dashboard/dashboard.constants';
 import {type NetWorthSnapshotDto, type NetWorthSplit} from '../models/dashboard/dashboard.model';
 

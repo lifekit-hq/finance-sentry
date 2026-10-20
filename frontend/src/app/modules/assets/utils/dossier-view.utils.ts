@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   RECOMMENDATION_BUCKETS,
   RECOMMENDATION_BUY_LABEL,

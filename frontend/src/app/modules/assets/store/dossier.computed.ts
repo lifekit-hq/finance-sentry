@@ -1,6 +1,6 @@
 import {computed, type Signal} from '@angular/core';
 import {type AsyncStatus} from '@lifekit-hq/core';
-import {type AsyncStateStatus} from '@lifekit-hq/ui';
+import {type AsyncStateStatus, type Nullable} from '@lifekit-hq/ui';
 
 import {SECTION_AXIS} from '../constants/dossier/dossier-checks.constants';
 import {

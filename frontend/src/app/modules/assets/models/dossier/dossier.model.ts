@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
 

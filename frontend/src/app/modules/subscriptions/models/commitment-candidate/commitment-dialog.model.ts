@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type SubscriptionKind} from '../subscription/subscription.model';
 
 export interface CommitmentDialogData {

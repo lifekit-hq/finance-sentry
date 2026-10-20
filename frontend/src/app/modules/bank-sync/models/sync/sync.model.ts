@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export interface SyncStatusResponse {
   status: 'pending' | 'running' | 'success' | 'failed';
   transactionCountFetched: number;

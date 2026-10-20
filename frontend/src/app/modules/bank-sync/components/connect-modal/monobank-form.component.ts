@@ -63,7 +63,7 @@ export class MonobankFormComponent {
   });
 
   public readonly isDuplicateError = computed(
-    () => this.store.errorCode() === 'MONOBANK_TOKEN_DUPLICATE'
+    () => this.store.connectErrorCode() === 'MONOBANK_TOKEN_DUPLICATE'
   );
 
   public onPaste(event: ClipboardEvent): void {

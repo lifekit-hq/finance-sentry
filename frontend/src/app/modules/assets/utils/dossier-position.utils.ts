@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   ANALYST_TARGET_SOURCE,
   CAP_SCALE_HEADROOM,

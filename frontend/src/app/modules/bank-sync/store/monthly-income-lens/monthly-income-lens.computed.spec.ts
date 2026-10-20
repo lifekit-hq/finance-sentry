@@ -1,4 +1,5 @@
 import {signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it} from 'vitest';
 
 import {type MonthlyIncomeLens} from '../../models/income-lens/income-lens.model';

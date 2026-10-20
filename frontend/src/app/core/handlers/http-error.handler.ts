@@ -1,7 +1,7 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {type ErrorHandler, inject, Injectable} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
-import {ToastService} from '@lifekit-hq/ui';
+import {type Nullable, ToastService} from '@lifekit-hq/ui';
 
 const UNAUTHORIZED_STATUS = 401;
 const GENERIC_ERROR = 'An unexpected error occurred.';

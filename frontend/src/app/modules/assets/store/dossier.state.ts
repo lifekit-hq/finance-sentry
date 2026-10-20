@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {DEFAULT_CHART_RANGE} from '../constants/dossier/dossier-chart.constants';
 import {

@@ -11,7 +11,13 @@ import {
 } from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
-import {ButtonComponent, ChipComponent, type DateRange, DateRangeComponent} from '@lifekit-hq/ui';
+import {
+  ButtonComponent,
+  ChipComponent,
+  type DateRange,
+  DateRangeComponent,
+  type Nullable,
+} from '@lifekit-hq/ui';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';

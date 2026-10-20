@@ -1,7 +1,7 @@
 import {Clipboard} from '@angular/cdk/clipboard';
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
-import {CMN_DRAWER_DATA, CmnDrawerRef, ToastService} from '@lifekit-hq/ui';
+import {CMN_DRAWER_DATA, CmnDrawerRef, type Nullable, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, tap} from 'rxjs';
 
@@ -11,10 +11,10 @@ import {
 } from '../../../../shared/models/recommendation/recommendation.model';
 import {ORDER_COPIED_MESSAGE} from '../../constants/recommendation/recommendation.constants';
 import {RecommendationService} from '../../services/recommendation.service';
-import {type DecisionSheetStatus} from './decision-sheet.state';
 
 interface EffectsStore {
-  setStatus(status: DecisionSheetStatus): void;
+  setLoading(): void;
+  setSuccess(): void;
   setError(errorCode: Nullable<string>): void;
 }
 
@@ -31,7 +31,7 @@ export function decisionSheetEffects(store: EffectsStore) {
 
   const submit = rxMethod<string>(
     pipe(
-      tap(() => store.setStatus('submitting')),
+      tap(() => store.setLoading()),
       exhaustMap(text => {
         const trimmed = text.trim();
         const request$ =
@@ -40,7 +40,7 @@ export function decisionSheetEffects(store: EffectsStore) {
             : service.reject(data.recommendation.id, {reason: trimmed});
         return request$.pipe(
           tap(decided => {
-            store.setStatus('idle');
+            store.setSuccess();
             toast.success(
               data.verdict === 'confirm'
                 ? `Decision recorded. Place the ${decided.ticker} order at IBKR yourself.`

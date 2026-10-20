@@ -1,7 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, provideRouter, Router} from '@angular/router';
-import {CmnDialogService} from '@lifekit-hq/ui';
+import {CmnDialogService, type Nullable} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {type Headline} from '../../../../shared/models/headline/headline.model';

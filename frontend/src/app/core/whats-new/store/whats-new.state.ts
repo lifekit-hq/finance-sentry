@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type WhatsNewVersion} from '../models/whats-new.model';
 
 export interface WhatsNewState {

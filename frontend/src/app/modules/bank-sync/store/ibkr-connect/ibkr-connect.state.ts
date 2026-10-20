@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type IbkrFlexPreview} from '../../models/ibkr/ibkr.model';
 
 export type IbkrConnectPath = 'flex' | 'oauth';

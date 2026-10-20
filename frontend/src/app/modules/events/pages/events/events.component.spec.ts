@@ -2,6 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {type ChipRowOption} from '@lifekit-hq/elements';
+import {type Nullable} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {OUTCOME_META_REGISTRY} from '../../constants/event/event.constants';

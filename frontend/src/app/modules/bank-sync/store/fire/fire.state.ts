@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type FireProjection} from '../../models/fire/fire.model';
 
 export interface FireState {

@@ -1,4 +1,5 @@
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {InstitutionLogoUtils} from '../utils/institution-logo.utils';
 

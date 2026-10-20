@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export class VersionUtils {
   /** Whether semver `a` is newer than `b`; a version that is not `x.y.z` is never newer. */
   public static isNewer(a: string, b: string): boolean {

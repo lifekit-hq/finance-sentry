@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   RULES_PER_AXIS,
   WHEEL_LABEL_OFFSET,

@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type AlertNavigation} from '../../alerts/models/alert/alert-destination.model';
 import {AlertDestinationUtils} from '../../alerts/utils/alert-destination.utils';
 import {type FiredEvent, type UpcomingEvent} from '../models/event/event.model';

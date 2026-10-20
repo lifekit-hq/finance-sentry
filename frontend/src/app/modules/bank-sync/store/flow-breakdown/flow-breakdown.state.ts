@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {DEFAULT_MONTHS_PARAM} from '../../constants/url-params/url-params.constants';
 import {type FlowBreakdown} from '../../models/flow-breakdown/flow-breakdown.model';
 
