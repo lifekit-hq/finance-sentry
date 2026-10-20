@@ -9,7 +9,7 @@ import {MonthlyIncomeLensStore} from '../../store/monthly-income-lens/monthly-in
 @Component({
   selector: 'fns-monthly-income-lens',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block'},
+  host: {class: 'block empty:hidden'},
   providers: [MonthlyIncomeLensStore],
   templateUrl: './monthly-income-lens.component.html',
 })

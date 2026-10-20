@@ -37,8 +37,8 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {InvestmentsCardComponent} from '../../../holdings/components/investments-card/investments-card.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
-import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
+import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
 import {
   CASH_FLOW_SERIES_TYPES,
