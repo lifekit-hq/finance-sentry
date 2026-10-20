@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 
@@ -10,12 +10,11 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 /// Signed calls to the Revolut X REST API (<c>https://revx.revolut.com/api/1.0</c>). Read-only
 /// endpoints only: a read-only key is all Finance Sentry asks the user for.
 /// </summary>
-public sealed class RevolutXHttpClient(HttpClient httpClient, IConfiguration configuration, TimeProvider timeProvider)
+public sealed class RevolutXHttpClient(HttpClient httpClient, IOptions<RevolutXOptions> options, TimeProvider timeProvider)
 {
     public const string ApiPrefix = "/api/1.0";
-    private const string DefaultBaseUrl = "https://revx.revolut.com";
 
-    private readonly string _baseUrl = (configuration["RevolutX:BaseUrl"] ?? DefaultBaseUrl).TrimEnd('/');
+    private readonly string _baseUrl = options.Value.BaseUrl.TrimEnd('/');
 
     public async Task<IReadOnlyList<RevolutXBalance>> GetBalancesAsync(
         RevolutXCredentials credentials, CancellationToken ct = default) =>

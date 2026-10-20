@@ -54,6 +54,14 @@ public static class CryptoSyncModule
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
 
+        services.AddOptions<BinanceOptions>()
+            .BindConfiguration(BinanceOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<RevolutXOptions>()
+            .BindConfiguration(RevolutXOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddHttpClient<BinanceHttpClient>()
             .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddSingleton<BinanceHoldingsAggregator>();

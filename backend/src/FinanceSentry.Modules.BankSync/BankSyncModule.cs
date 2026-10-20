@@ -26,6 +26,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using FinanceSentry.Infrastructure.Persistence;
 
 public static class BankSyncModule
@@ -171,8 +172,12 @@ public static class BankSyncModule
         services.AddSingleton<ITransactionCategorizer, TransactionCategorizer>();
         services.AddScoped<ICategoryReadService, CategoryReadService>();
 
-        services.AddHttpClient<MonobankHttpClient>(client =>
-                client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"))
+        services.AddOptions<MonobankOptions>()
+            .BindConfiguration(MonobankOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddHttpClient<MonobankHttpClient>((sp, client) =>
+                client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<MonobankOptions>>().Value.BaseUrl))
             .AddMonobankResilience();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<MonobankBalanceCache>();
@@ -180,11 +185,23 @@ public static class BankSyncModule
         services.AddScoped<MonobankAdapter>();
         services.AddScoped<IBankProvider>(sp => sp.GetRequiredService<MonobankAdapter>());
 
-        var trueLayerAuthBase = new Uri(config["TrueLayer:AuthBaseUrl"] ?? "https://auth.truelayer-sandbox.com");
-        var trueLayerApiBase = new Uri(config["TrueLayer:ApiBaseUrl"] ?? "https://api.truelayer-sandbox.com");
-        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, c => c.BaseAddress = trueLayerAuthBase)
+        // Optional integration: validation only constrains what is set, so a host without TrueLayer keys
+        // still starts. PublicApiBaseUrl is a root key shared with the redirect-URI builders.
+        services.AddOptions<TrueLayerOptions>()
+            .BindConfiguration(TrueLayerOptions.SectionName)
+            .Configure<IConfiguration>((o, root) =>
+            {
+                if (!string.IsNullOrEmpty(root["PublicApiBaseUrl"]))
+                    o.PublicApiBaseUrl = root["PublicApiBaseUrl"]!;
+            })
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<TrueLayerOptions>, TrueLayerOptionsValidator>();
+        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, (sp, c) =>
+                c.BaseAddress = new Uri(sp.GetRequiredService<IOptions<TrueLayerOptions>>().Value.AuthBaseUrl))
             .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
-        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, c => c.BaseAddress = trueLayerApiBase)
+        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, (sp, c) =>
+                c.BaseAddress = new Uri(sp.GetRequiredService<IOptions<TrueLayerOptions>>().Value.ApiBaseUrl))
             .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
         services.AddSingleton<ITrueLayerClient, TrueLayerHttpClient>();
         services.AddSingleton<TrueLayerCategoryMapper>();

@@ -11,11 +11,12 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
+using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 
 namespace FinanceSentry.Tests.Unit.BankSync.API;
 
@@ -37,7 +38,7 @@ public class DeleteAccountControllerTests
             new Mock<ICommandHandler<BeginTrueLayerConnectCommand, BeginTrueLayerConnectResult>>().Object,
             new Mock<ICommandHandler<FinalizeTrueLayerConnectCommand, FinalizeTrueLayerConnectResult>>().Object,
             new Mock<ICommandHandler<DisconnectInstitutionCommand, DisconnectInstitutionResult>>().Object,
-            new Mock<IConfiguration>().Object,
+            Options.Create(new TrueLayerOptions()),
             NullLogger<BankSyncController>.Instance,
             _accounts.Object,
             new Mock<ITransactionRepository>().Object,

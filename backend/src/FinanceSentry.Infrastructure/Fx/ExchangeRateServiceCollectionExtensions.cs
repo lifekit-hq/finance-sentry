@@ -3,12 +3,10 @@ namespace FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Infrastructure.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 public static class ExchangeRateServiceCollectionExtensions
 {
-    private const string DefaultBaseUrl = "https://open.er-api.com/";
-    private const string DefaultNbuBaseUrl = "https://bank.gov.ua/";
-    private const string DefaultFrankfurterBaseUrl = "https://api.frankfurter.dev/";
     private const int RequestTimeoutSeconds = 15;
     private const int HistoryRequestTimeoutSeconds = 30;
 
@@ -21,48 +19,41 @@ public static class ExchangeRateServiceCollectionExtensions
     public static IServiceCollection AddExchangeRates(
         this IServiceCollection services, IConfiguration config)
     {
-        var baseUrl = config["ExchangeRates:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            baseUrl = DefaultBaseUrl;
+        services.AddOptions<ExchangeRatesOptions>()
+            .Bind(config.GetSection(ExchangeRatesOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         var latestRatesTimeout = TimeSpan.FromSeconds(RequestTimeoutSeconds);
-        services.AddHttpClient<IExchangeRateProvider, OpenErApiExchangeRateProvider>(client =>
+        services.AddHttpClient<IExchangeRateProvider, OpenErApiExchangeRateProvider>((sp, client) =>
         {
-            client.BaseAddress = new Uri(baseUrl);
+            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<ExchangeRatesOptions>>().Value.BaseUrl);
             client.Timeout = latestRatesTimeout;
         })
             .AddProviderResilience(latestRatesTimeout);
 
         services.AddTransient<ExchangeRateRefreshJob>();
 
-        AddHistoricalRates(services, config);
+        AddHistoricalRates(services);
 
         return services;
     }
 
-    private static void AddHistoricalRates(IServiceCollection services, IConfiguration config)
+    private static void AddHistoricalRates(IServiceCollection services)
     {
-        var nbuBaseUrl = config["ExchangeRates:NbuBaseUrl"];
-        if (string.IsNullOrWhiteSpace(nbuBaseUrl))
-            nbuBaseUrl = DefaultNbuBaseUrl;
-
-        var frankfurterBaseUrl = config["ExchangeRates:FrankfurterBaseUrl"];
-        if (string.IsNullOrWhiteSpace(frankfurterBaseUrl))
-            frankfurterBaseUrl = DefaultFrankfurterBaseUrl;
-
         // Historical windows can span years, so these get a longer timeout than the
         // single-shot latest-rates call.
         var historyTimeout = TimeSpan.FromSeconds(HistoryRequestTimeoutSeconds);
-        services.AddHttpClient<NbuHistoricalExchangeRateProvider>(client =>
+        services.AddHttpClient<NbuHistoricalExchangeRateProvider>((sp, client) =>
         {
-            client.BaseAddress = new Uri(nbuBaseUrl);
+            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<ExchangeRatesOptions>>().Value.NbuBaseUrl);
             client.Timeout = historyTimeout;
         })
             .AddProviderResilience(historyTimeout);
 
-        services.AddHttpClient<FrankfurterHistoricalExchangeRateProvider>(client =>
+        services.AddHttpClient<FrankfurterHistoricalExchangeRateProvider>((sp, client) =>
         {
-            client.BaseAddress = new Uri(frankfurterBaseUrl);
+            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<ExchangeRatesOptions>>().Value.FrankfurterBaseUrl);
             client.Timeout = historyTimeout;
         })
             .AddProviderResilience(historyTimeout);

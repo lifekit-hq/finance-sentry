@@ -3,8 +3,8 @@ using System.Net;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 
@@ -90,14 +90,12 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         BinanceHttpClient httpClient,
         BinanceHoldingsAggregator aggregator,
         ILogger<BinanceAdapter> logger,
-        IConfiguration configuration)
+        IOptions<BinanceOptions> options)
     {
         _httpClient = httpClient;
         _aggregator = aggregator;
         _logger = logger;
-        _dustThresholdUsd = decimal.TryParse(
-            configuration["Binance:DustThresholdUsd"],
-            out var threshold) ? threshold : 0.01m;
+        _dustThresholdUsd = options.Value.DustThresholdUsd;
     }
 
     public async Task ValidateCredentialsAsync(string apiKey, string apiSecret, CancellationToken ct = default)

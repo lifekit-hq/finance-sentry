@@ -12,11 +12,12 @@ using FluentAssertions;
 using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
+using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 
 /// <summary>
 /// The TrueLayer OAuth callback is JWT-exempt and identifies the pending connection by its
@@ -105,12 +106,7 @@ public class TrueLayerCallbackStateBindingTests
 
     private BankSyncController CreateController(bool authenticated, string? stateCookie = null)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["TrueLayer:FrontendRedirectBase"] = "http://localhost:4200"
-            })
-            .Build();
+        var configuration = Options.Create(new TrueLayerOptions { FrontendRedirectBase = "http://localhost:4200" });
 
         var controller = new BankSyncController(
             new Mock<ICommandHandler<ConnectMonobankAccountCommand, ConnectMonobankResult>>().Object,

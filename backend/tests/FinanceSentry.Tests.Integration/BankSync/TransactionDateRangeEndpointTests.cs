@@ -19,11 +19,12 @@ using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
+using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 
 /// <summary>
 /// Drives the transaction list endpoints with <c>from</c>/<c>to</c> query strings through the real
@@ -88,7 +89,7 @@ public sealed class TransactionDateRangeEndpointTests : IAsyncLifetime
             new Mock<ICommandHandler<BeginTrueLayerConnectCommand, BeginTrueLayerConnectResult>>().Object,
             new Mock<ICommandHandler<FinalizeTrueLayerConnectCommand, FinalizeTrueLayerConnectResult>>().Object,
             new Mock<ICommandHandler<DisconnectInstitutionCommand, DisconnectInstitutionResult>>().Object,
-            new Mock<IConfiguration>().Object,
+            Options.Create(new TrueLayerOptions()),
             NullLogger<BankSyncController>.Instance,
             new BankAccountRepository(context),
             transactions,

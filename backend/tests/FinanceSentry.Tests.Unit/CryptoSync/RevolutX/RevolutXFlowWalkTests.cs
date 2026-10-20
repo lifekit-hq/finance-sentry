@@ -5,9 +5,9 @@ using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
 
@@ -42,12 +42,12 @@ public class RevolutXFlowWalkTests
 
     private RevolutXAdapter CreateSut()
     {
-        var configuration = new ConfigurationBuilder().Build();
+        var options = Options.Create(new RevolutXOptions());
         return new RevolutXAdapter(
-            new RevolutXHttpClient(new HttpClient(_handler), configuration, TimeProvider.System),
+            new RevolutXHttpClient(new HttpClient(_handler), options, TimeProvider.System),
             new RevolutXHoldingsAggregator(),
             NullLogger<RevolutXAdapter>.Instance,
-            configuration);
+            options);
     }
 
     private Task<CryptoFlowPage> WalkAsync(DateTime? from = null, DateTime? asOf = null) =>

@@ -4,9 +4,9 @@ using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 using FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Tests.Unit.CryptoSync;
 
@@ -26,12 +26,12 @@ public class BinanceTradeFeeTests
 
     private BinanceAdapter CreateSut()
     {
-        var config = new ConfigurationBuilder().Build();
+        var options = Options.Create(new BinanceOptions());
         return new BinanceAdapter(
-            new BinanceHttpClient(new HttpClient(_handler), config),
+            new BinanceHttpClient(new HttpClient(_handler), options),
             new BinanceHoldingsAggregator(),
             NullLogger<BinanceAdapter>.Instance,
-            config);
+            options);
     }
 
     private const long DayMs = 86_400_000;

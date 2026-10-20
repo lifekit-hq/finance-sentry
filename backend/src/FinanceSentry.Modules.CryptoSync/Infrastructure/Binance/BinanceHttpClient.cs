@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 
@@ -12,11 +12,11 @@ public sealed class BinanceHttpClient
     private readonly string _baseUrl;
     private readonly int _recvWindowMs;
 
-    public BinanceHttpClient(HttpClient httpClient, IConfiguration configuration)
+    public BinanceHttpClient(HttpClient httpClient, IOptions<BinanceOptions> options)
     {
         _httpClient = httpClient;
-        _baseUrl = configuration["Binance:BaseUrl"] ?? "https://api.binance.com";
-        _recvWindowMs = int.TryParse(configuration["Binance:RecvWindowMs"], out var rw) ? rw : 5000;
+        _baseUrl = options.Value.BaseUrl;
+        _recvWindowMs = options.Value.RecvWindowMs;
     }
 
     // Spot wallet — retained for credential validation. Use the consolidated

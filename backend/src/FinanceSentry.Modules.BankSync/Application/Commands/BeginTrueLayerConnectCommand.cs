@@ -4,7 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 public record BeginTrueLayerConnectRequest(string ProviderId, string? ProviderName);
 
@@ -18,19 +18,15 @@ public record BeginTrueLayerConnectResult(string Link, string Reference);
 public class BeginTrueLayerConnectCommandHandler(
     ITrueLayerClient client,
     ITrueLayerConnectionRepository connections,
-    IConfiguration configuration)
+    IOptions<TrueLayerOptions> options)
     : ICommandHandler<BeginTrueLayerConnectCommand, BeginTrueLayerConnectResult>
 {
     public async Task<BeginTrueLayerConnectResult> Handle(
         BeginTrueLayerConnectCommand request, CancellationToken cancellationToken)
     {
-        var callbackPath = configuration["TrueLayer:CallbackPath"]
-            ?? "/api/v1/accounts/truelayer/callback";
-        var publicApiBase = configuration["PublicApiBaseUrl"]
-            ?? "http://localhost:5001";
 
         var reference = Guid.NewGuid().ToString("N");
-        var redirectUri = $"{publicApiBase.TrimEnd('/')}{callbackPath}";
+        var redirectUri = options.Value.RedirectUri;
 
         var link = client.BuildAuthLink(request.ProviderId, reference, redirectUri);
 

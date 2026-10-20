@@ -7,6 +7,7 @@ using FinanceSentry.Modules.BankSync.API.Extensions;
 using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.API.Validation;
 using FinanceSentry.Modules.BankSync.Application.Commands;
+using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 [ApiController]
 [Authorize]
@@ -31,7 +33,7 @@ public class BankSyncController(
     ICommandHandler<BeginTrueLayerConnectCommand, BeginTrueLayerConnectResult> beginTrueLayerConnectHandler,
     ICommandHandler<FinalizeTrueLayerConnectCommand, FinalizeTrueLayerConnectResult> finalizeTrueLayerConnectHandler,
     ICommandHandler<DisconnectInstitutionCommand, DisconnectInstitutionResult> disconnectInstitutionHandler,
-    Microsoft.Extensions.Configuration.IConfiguration configuration,
+    IOptions<TrueLayerOptions> trueLayerOptions,
     ILogger<BankSyncController> logger,
     IBankAccountRepository accounts,
     ITransactionRepository transactions,
@@ -377,8 +379,7 @@ public class BankSyncController(
         [FromQuery] string? error,
         CancellationToken ct = default)
     {
-        var frontendBase = (configuration["TrueLayer:FrontendRedirectBase"]
-            ?? "http://localhost:4200").TrimEnd('/');
+        var frontendBase = trueLayerOptions.Value.FrontendRedirectBase.TrimEnd('/');
 
         var boundState = Request.Cookies[TrueLayerStateCookie];
         Response.Cookies.Delete(TrueLayerStateCookie, TrueLayerStateCookieOptions(expires: null));
