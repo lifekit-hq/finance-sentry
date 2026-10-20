@@ -45,6 +45,7 @@ public static class SubscriptionDetectionAlgorithm
         "withdrawal",
         "atm",
         "cash",
+        "переказ",
     ];
 
     /// <summary>One charge as the algorithm needs it: the transaction plus its account's currency.</summary>

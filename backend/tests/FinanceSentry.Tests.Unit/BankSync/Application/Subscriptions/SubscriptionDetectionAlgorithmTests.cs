@@ -196,6 +196,26 @@ public class SubscriptionDetectionAlgorithmTests
         new(Guid.Empty, null, description, amount, new DateTime(year, month, day), null, mcc, currency);
 
     [Fact]
+    public void DetectSubscriptions_MonthlyCardTransferSeries_IsNotDetectedButMerchantIs()
+    {
+        var txs = new[]
+        {
+            Tx("Переказ на картку 5375****1234", 500m, 2026, 5, 3, currency: "UAH"),
+            Tx("Переказ на картку 5375****1234", 500m, 2026, 6, 3, currency: "UAH"),
+            Tx("Переказ на картку 5375****1234", 500m, 2026, 7, 3, currency: "UAH"),
+            Tx("Переказ на картку 5375****1234", 500m, 2026, 8, 3, currency: "UAH"),
+            Tx("Spotify", 9.99m, 2026, 5, 5),
+            Tx("Spotify", 9.99m, 2026, 6, 5),
+            Tx("Spotify", 9.99m, 2026, 7, 5),
+            Tx("Spotify", 9.99m, 2026, 8, 5),
+        };
+
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.MerchantNameNormalized.Should().Be("spotify");
+    }
+
+    [Fact]
     public void DetectSubscriptions_DiscontinuedPlanPrice_DoesNotPoisonCurrentPlan()
     {
         // Real Claude data: Pro (€22.14, ended June) + Max (€98.38 → €110.70 after a VAT
