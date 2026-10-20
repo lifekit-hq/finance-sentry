@@ -42,7 +42,7 @@ export class BinanceFormComponent {
   // Backend emits ALREADY_CONNECTED (409) for a duplicate Binance connection;
   // BINANCE_DUPLICATE is kept for backwards compatibility.
   public readonly isDuplicateError = computed(() => {
-    const code = this.store.errorCode();
+    const code = this.store.connectErrorCode();
     return code === 'ALREADY_CONNECTED' || code === 'BINANCE_DUPLICATE';
   });
 

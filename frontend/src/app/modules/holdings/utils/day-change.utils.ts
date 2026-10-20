@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {EQUITY_INSTRUMENT_TYPE} from '../constants/position/position.constants';
 import {type Position} from '../models/position/position.model';
 import {type QuoteDto} from '../models/quote/quote.model';

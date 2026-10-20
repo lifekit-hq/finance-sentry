@@ -1,5 +1,6 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';

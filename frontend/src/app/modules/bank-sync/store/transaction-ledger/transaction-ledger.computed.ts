@@ -1,5 +1,6 @@
 import {computed, type Signal} from '@angular/core';
 import {type AsyncStatus} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {

@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export type SubscriptionStatus = 'active' | 'dismissed' | 'potentially_cancelled' | 'completed';
 export type SubscriptionSort = 'date' | 'amount' | 'name';
 export type DismissedSubscription = Extract<SubscriptionStatus, 'dismissed'>;

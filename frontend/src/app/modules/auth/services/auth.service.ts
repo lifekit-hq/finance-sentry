@@ -1,6 +1,7 @@
 import {HttpContext} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {Observable} from 'rxjs';
 
 import {SESSION_PROBE, SKIP_AUTH_REFRESH} from '../constants/auth/auth-http-context.constants';

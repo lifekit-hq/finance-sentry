@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type WatchlistItem} from '../../models/watchlist/watchlist.model';
 
 export type WatchlistAction = 'add' | 'remove';

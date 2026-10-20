@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   BANK_NAME_DOMAINS,
   PROVIDER_DOMAINS,

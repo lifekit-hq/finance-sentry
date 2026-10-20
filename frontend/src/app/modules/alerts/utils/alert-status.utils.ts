@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type Alert} from '../models/alert/alert.model';
 
 export class AlertStatusUtils {

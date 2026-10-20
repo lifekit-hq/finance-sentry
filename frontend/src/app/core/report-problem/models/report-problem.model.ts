@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export type ProblemReportKind = 'Broken' | 'LooksWrong' | 'Idea';
 
 export type ProblemReportDevice = 'Phone' | 'Desktop';
@@ -18,5 +19,3 @@ export interface ProblemReportAccepted {
   /** What the person can quote, such as `FS-R-42`. */
   reference: string;
 }
-
-export type ReportProblemStatus = 'idle' | 'submitting' | 'error';

@@ -1,5 +1,6 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {forkJoin, map, type Observable, of} from 'rxjs';
 import {catchError} from 'rxjs/operators';
 

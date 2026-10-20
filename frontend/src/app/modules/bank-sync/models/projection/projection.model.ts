@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /**
  * A projected figure as a range (finance-framework C8): `central` at the central return assumption, `low` and
  * `high` the smallest and largest of the three scenarios, so `low <= central <= high` always holds.

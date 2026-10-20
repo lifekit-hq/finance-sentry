@@ -65,7 +65,7 @@ export class DecisionSheetComponent {
 
   /** A rejection needs its real reason (kept as the counterfactual); a confirmation's note is optional. */
   public readonly canSend = computed(
-    () => !this.store.isSubmitting() && (this.isConfirm || this.typed().trim() !== '')
+    () => !this.store.isLoading() && (this.isConfirm || this.typed().trim() !== '')
   );
 
   public send(): void {

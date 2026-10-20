@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
 import {type BudgetSummaryItem} from '../../models/budget/budget.model';

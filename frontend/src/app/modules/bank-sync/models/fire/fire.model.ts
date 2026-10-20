@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type ProjectionRange} from '../projection/projection.model';
 
 /** Mirrors the backend's `FireProjectionStatus`, written by name. */

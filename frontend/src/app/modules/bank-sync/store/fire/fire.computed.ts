@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type FireProjection} from '../../models/fire/fire.model';
 import {FireTileUtils} from '../../utils/fire-tile.utils';

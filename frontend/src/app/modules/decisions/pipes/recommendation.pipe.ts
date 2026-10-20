@@ -1,4 +1,5 @@
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {type OutcomeTone, RecommendationUtils} from '../utils/recommendation.utils';

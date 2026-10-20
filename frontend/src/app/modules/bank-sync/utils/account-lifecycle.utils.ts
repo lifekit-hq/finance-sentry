@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {DateUtils} from '../../../shared/utils/date.utils';
 import {
   CARD_EXPIRED_NOTE,

@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type AccountIdentity} from '../account-identity/account-identity.model';
 import {type MaybeHeadline} from '../headline/headline.model';
 

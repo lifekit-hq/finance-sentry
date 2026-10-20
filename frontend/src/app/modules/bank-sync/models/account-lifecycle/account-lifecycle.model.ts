@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** One retired account in the "Closed accounts" section, every line already worded. */
 export interface ClosedAccountRow {
   accountId: string;

@@ -1,103 +1,109 @@
-import {signalState} from '@ngrx/signals';
+import {TestBed} from '@angular/core/testing';
+import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {describe, expect, it} from 'vitest';
 
-import {connectMethods} from './connect.methods';
-import {initialConnectState} from './connect.state';
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
+import {BankSyncService} from '../../services/bank-sync.service';
+import {ConnectStore} from './connect.store';
+
+function createStore() {
+  TestBed.configureTestingModule({
+    providers: [
+      ConnectStore,
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
+      {provide: BankSyncService, useValue: {}},
+    ],
+  });
+  return TestBed.inject(ConnectStore);
+}
 
 describe('connectMethods', () => {
   it('selectProvider updates provider and clears error/status', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('X');
+    const store = createStore();
+    store.setError('X');
 
-    methods.selectProvider('monobank');
+    store.selectProvider('monobank');
 
-    expect(state.selectedProvider()).toBe('monobank');
-    expect(state.status()).toBe('idle');
-    expect(state.errorCode()).toBeNull();
-    expect(state.statusMessage()).toBeNull();
+    expect(store.selectedProvider()).toBe('monobank');
+    expect(store.connectStatus()).toBe('idle');
+    expect(store.connectErrorCode()).toBeNull();
+    expect(store.statusMessage()).toBeNull();
   });
 
   it('selectInstitutionType(crypto) resets error status and opens the provider picker', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.selectProvider('monobank');
-    methods.setError('X');
+    const store = createStore();
+    store.selectProvider('monobank');
+    store.setError('X');
 
-    methods.selectInstitutionType('crypto');
+    store.selectInstitutionType('crypto');
 
-    expect(state.modalStep()).toBe('provider-picker');
-    expect(state.institutionType()).toBe('crypto');
-    expect(state.selectedProvider()).toBe('monobank');
-    expect(state.status()).toBe('idle');
-    expect(state.errorCode()).toBeNull();
-    expect(state.statusMessage()).toBeNull();
+    expect(store.modalStep()).toBe('provider-picker');
+    expect(store.institutionType()).toBe('crypto');
+    expect(store.selectedProvider()).toBe('monobank');
+    expect(store.connectStatus()).toBe('idle');
+    expect(store.connectErrorCode()).toBeNull();
+    expect(store.statusMessage()).toBeNull();
   });
 
   it('selectInstitutionType(broker) resets error status and offers the broker picker', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('X');
+    const store = createStore();
+    store.setError('X');
 
-    methods.selectInstitutionType('broker');
+    store.selectInstitutionType('broker');
 
-    expect(state.modalStep()).toBe('provider-picker');
-    expect(state.institutionType()).toBe('broker');
-    expect(state.status()).toBe('idle');
-    expect(state.errorCode()).toBeNull();
+    expect(store.modalStep()).toBe('provider-picker');
+    expect(store.institutionType()).toBe('broker');
+    expect(store.connectStatus()).toBe('idle');
+    expect(store.connectErrorCode()).toBeNull();
   });
 
   it.each([
     ['ibkr', 'ibkr-form'],
     ['inzhur', 'inzhur-form'],
   ] as const)('selectPickedProvider(%s) opens %s as a broker', (slug, step) => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
+    const store = createStore();
 
-    methods.selectPickedProvider(slug);
+    store.selectPickedProvider(slug);
 
-    expect(state.modalStep()).toBe(step);
-    expect(state.selectedProvider()).toBe(slug);
-    expect(state.institutionType()).toBe('broker');
+    expect(store.modalStep()).toBe(step);
+    expect(store.selectedProvider()).toBe(slug);
+    expect(store.institutionType()).toBe('broker');
   });
 
   it('selectInstitutionType(bank) keeps the current provider until a bank is picked', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.selectProvider('monobank');
+    const store = createStore();
+    store.selectProvider('monobank');
 
-    methods.selectInstitutionType('bank');
+    store.selectInstitutionType('bank');
 
-    expect(state.modalStep()).toBe('provider-picker');
-    expect(state.selectedProvider()).toBe('monobank');
-    expect(state.status()).toBe('idle');
+    expect(store.modalStep()).toBe('provider-picker');
+    expect(store.selectedProvider()).toBe('monobank');
+    expect(store.connectStatus()).toBe('idle');
   });
 
   it('setModalStep resets error status on navigation between steps', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('MONOBANK_TOKEN_INVALID');
+    const store = createStore();
+    store.setError('MONOBANK_TOKEN_INVALID');
 
-    methods.setModalStep('provider-picker');
+    store.setModalStep('provider-picker');
 
-    expect(state.modalStep()).toBe('provider-picker');
-    expect(state.status()).toBe('idle');
-    expect(state.errorCode()).toBeNull();
-    expect(state.statusMessage()).toBeNull();
+    expect(store.modalStep()).toBe('provider-picker');
+    expect(store.connectStatus()).toBe('idle');
+    expect(store.connectErrorCode()).toBeNull();
+    expect(store.statusMessage()).toBeNull();
   });
 
   it('selectPickedProvider resets error status and sets the provider', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('X');
+    const store = createStore();
+    store.setError('X');
 
-    methods.selectPickedProvider('truelayer');
+    store.selectPickedProvider('truelayer');
 
-    expect(state.selectedProvider()).toBe('truelayer');
-    expect(state.institutionType()).toBe('bank');
-    expect(state.modalStep()).toBe('truelayer-picker');
-    expect(state.status()).toBe('idle');
-    expect(state.errorCode()).toBeNull();
+    expect(store.selectedProvider()).toBe('truelayer');
+    expect(store.institutionType()).toBe('bank');
+    expect(store.modalStep()).toBe('truelayer-picker');
+    expect(store.connectStatus()).toBe('idle');
+    expect(store.connectErrorCode()).toBeNull();
   });
 
   it.each([
@@ -105,80 +111,51 @@ describe('connectMethods', () => {
     ['binance', 'binance-form', 'crypto'],
     ['revolut_x', 'revolut-x-form', 'crypto'],
   ] as const)('selectPickedProvider(%s) opens %s under the %s type', (slug, step, type) => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
+    const store = createStore();
 
-    methods.selectPickedProvider(slug);
+    store.selectPickedProvider(slug);
 
-    expect(state.selectedProvider()).toBe(slug);
-    expect(state.modalStep()).toBe(step);
-    expect(state.institutionType()).toBe(type);
-  });
-
-  it('setInitializing clears error and statusMessage', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('X');
-    methods.setSyncing('old');
-
-    methods.setInitializing();
-
-    expect(state.status()).toBe('initializing');
-    expect(state.errorCode()).toBeNull();
-    expect(state.statusMessage()).toBeNull();
-  });
-
-  it('setReady transitions status and clears error', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setError('X');
-
-    methods.setReady();
-
-    expect(state.status()).toBe('ready');
-    expect(state.errorCode()).toBeNull();
+    expect(store.selectedProvider()).toBe(slug);
+    expect(store.modalStep()).toBe(step);
+    expect(store.institutionType()).toBe(type);
   });
 
   it('setSyncing carries the message and clears errors', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
+    const store = createStore();
 
-    methods.setSyncing('wait');
+    store.setSyncing('wait');
 
-    expect(state.status()).toBe('syncing');
-    expect(state.statusMessage()).toBe('wait');
-    expect(state.errorCode()).toBeNull();
+    expect(store.connectStatus()).toBe('loading');
+    expect(store.statusMessage()).toBe('wait');
+    expect(store.connectErrorCode()).toBeNull();
   });
 
   it('setPolling updates status and message', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
+    const store = createStore();
 
-    methods.setPolling('polling');
+    store.setPolling('polling');
 
-    expect(state.status()).toBe('polling');
-    expect(state.statusMessage()).toBe('polling');
+    expect(store.connectStatus()).toBe('loading');
+    expect(store.statusMessage()).toBe('polling');
   });
 
   it('setSuccess resets transient fields', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
-    methods.setSyncing('wait');
+    const store = createStore();
+    store.setSyncing('wait');
 
-    methods.setSuccess();
+    store.setSuccess();
 
-    expect(state.status()).toBe('success');
-    expect(state.statusMessage()).toBeNull();
-    expect(state.errorCode()).toBeNull();
+    expect(store.connectStatus()).toBe('success');
+    expect(store.statusMessage()).toBeNull();
+    expect(store.connectErrorCode()).toBeNull();
   });
 
   it('setError stores the code', () => {
-    const state = signalState(initialConnectState);
-    const methods = connectMethods(state);
+    const store = createStore();
 
-    methods.setError('BOOM');
+    store.setError('BOOM');
 
-    expect(state.status()).toBe('error');
-    expect(state.errorCode()).toBe('BOOM');
+    expect(store.connectStatus()).toBe('error');
+    expect(store.connectErrorCode()).toBe('BOOM');
   });
 });

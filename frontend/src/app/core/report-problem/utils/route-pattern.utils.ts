@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {UNKNOWN_ROUTE_PATTERN} from '../constants/report-problem.constants';
 
 /** The part of an `ActivatedRouteSnapshot` the pattern is built from. */

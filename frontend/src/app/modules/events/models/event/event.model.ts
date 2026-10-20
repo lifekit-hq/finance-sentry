@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export type EventKind = 'earnings' | 'ex_dividend' | 'filing_due' | 'macro' | 'thesis_catalyst';
 export type EventSourceName = 'corporate' | 'macro' | 'theses' | 'filings';
 export type EventSourceStatus = 'ok' | 'unavailable';

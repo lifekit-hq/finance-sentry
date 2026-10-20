@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type Invite, type Person} from '../../models/person/person.model';
 
 export interface PeopleState {

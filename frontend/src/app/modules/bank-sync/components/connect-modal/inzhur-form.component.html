@@ -42,8 +42,8 @@
     <cmn-dialog-actions align="between">
       <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
       <cmn-button
-        [loading]="store.isBusy()"
-        [disabled]="store.isBusy()"
+        [loading]="store.isConnectLoading()"
+        [disabled]="store.isConnectLoading()"
         variant="primary"
         type="submit"
       >

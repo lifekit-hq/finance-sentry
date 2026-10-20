@@ -1,7 +1,7 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ToastService} from '@lifekit-hq/ui';
+import {type Nullable, ToastService} from '@lifekit-hq/ui';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 

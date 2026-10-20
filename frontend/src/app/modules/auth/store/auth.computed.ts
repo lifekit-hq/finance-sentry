@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {Permission} from '../../../shared/enums/permission/permission.enum';
 import {InitialsUtils} from '../../../shared/utils/initials.utils';

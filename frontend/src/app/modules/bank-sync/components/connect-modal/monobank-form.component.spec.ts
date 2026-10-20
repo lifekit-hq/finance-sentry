@@ -1,5 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type Nullable} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AccountsStore} from '../../store/accounts/accounts.store';
@@ -10,9 +11,9 @@ import {MonobankFormComponent} from './monobank-form.component';
 
 function buildConnectStore(errorCode: Nullable<string> = null) {
   return {
-    errorCode: signal<Nullable<string>>(errorCode),
+    connectErrorCode: signal<Nullable<string>>(errorCode),
     errorMessage: signal('Token already in use'),
-    isBusy: signal(false),
+    isConnectLoading: signal(false),
     connect: vi.fn(),
     setModalStep: vi.fn(),
     resetError: vi.fn(),

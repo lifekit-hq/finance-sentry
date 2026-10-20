@@ -1,5 +1,6 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {type Observable} from 'rxjs';
 
 import {type CommitmentAnchor} from '../models/commitment-candidate/commitment-candidate.model';

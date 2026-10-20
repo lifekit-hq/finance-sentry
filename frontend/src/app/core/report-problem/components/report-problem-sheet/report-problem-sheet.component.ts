@@ -46,7 +46,7 @@ export class ReportProblemSheetComponent {
 
   /** Everything is optional, but an empty report would only spend one of the hourly sends. */
   public readonly canSend = computed(
-    () => !this.store.isSubmitting() && (this.store.kind() !== null || this.typed().trim() !== '')
+    () => !this.store.isLoading() && (this.store.kind() !== null || this.typed().trim() !== '')
   );
 
   public send(): void {

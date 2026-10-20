@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type BudgetSummaryItem} from '../../models/budget/budget.model';
 
 export interface BudgetsState {

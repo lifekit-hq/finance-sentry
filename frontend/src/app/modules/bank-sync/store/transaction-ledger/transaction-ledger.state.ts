@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {
   type GlobalTransactionDto,

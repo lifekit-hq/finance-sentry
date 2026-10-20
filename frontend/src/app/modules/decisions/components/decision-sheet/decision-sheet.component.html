@@ -81,7 +81,7 @@
 
   <cmn-button
     [disabled]="!canSend()"
-    [loading]="store.isSubmitting()"
+    [loading]="store.isLoading()"
     [variant]="isConfirm ? 'primary' : 'destructive'"
     type="submit"
     data-testid="decision-submit"

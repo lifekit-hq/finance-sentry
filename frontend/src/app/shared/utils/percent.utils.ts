@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 const PERCENT = 100;
 const MAX_PERCENT_DIGITS = 2;
 

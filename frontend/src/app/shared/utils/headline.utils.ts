@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {
   HEADLINE_BADGE_LABEL,
   HEADLINE_UNAVAILABLE_TEXT,

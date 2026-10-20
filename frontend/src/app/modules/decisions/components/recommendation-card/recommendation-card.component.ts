@@ -1,7 +1,7 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, input, output} from '@angular/core';
 import {RouterLink} from '@angular/router';
-import {ButtonComponent, CardComponent, TagComponent} from '@lifekit-hq/ui';
+import {ButtonComponent, CardComponent, type Nullable, TagComponent} from '@lifekit-hq/ui';
 
 import {ScorecardVerdictComponent} from '../../../../shared/components/scorecard-verdict/scorecard-verdict.component';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';

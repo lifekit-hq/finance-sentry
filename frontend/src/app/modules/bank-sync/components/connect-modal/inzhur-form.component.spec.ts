@@ -23,7 +23,7 @@ function buildInzhurStore(opts: {isReconnect?: boolean} = {}) {
 function buildConnectStore() {
   return {
     errorMessage: signal(''),
-    isBusy: signal(false),
+    isConnectLoading: signal(false),
     connect: vi.fn(),
     setModalStep: vi.fn(),
     resetError: vi.fn(),

@@ -1,14 +1,11 @@
-import {signalStore, withComputed, withMethods, withState} from '@ngrx/signals';
+import {withAsyncStatus} from '@lifekit-hq/core';
+import {signalStore, withMethods} from '@ngrx/signals';
 
-import {decisionSheetComputed} from './decision-sheet.computed';
+import {DECISION_FAILED_MESSAGE} from '../../constants/recommendation/recommendation.constants';
 import {decisionSheetEffects} from './decision-sheet.effects';
-import {decisionSheetMethods} from './decision-sheet.methods';
-import {initialDecisionSheetState} from './decision-sheet.state';
 
 /** Scoped to one Confirm or Reject sheet; it reads the proposal and verdict from the drawer data. */
 export const DecisionSheetStore = signalStore(
-  withState(initialDecisionSheetState),
-  withMethods(decisionSheetMethods),
-  withComputed(decisionSheetComputed),
+  withAsyncStatus({defaultErrorMessage: DECISION_FAILED_MESSAGE}),
   withMethods(decisionSheetEffects)
 );

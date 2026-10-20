@@ -1,4 +1,5 @@
 import {NEUTRAL_STEP} from '@lifekit-hq/charts-core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {MS_PER_DAY} from '../../../shared/constants/date/date.constants';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';

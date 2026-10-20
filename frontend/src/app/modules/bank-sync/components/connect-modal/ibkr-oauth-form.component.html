@@ -82,8 +82,8 @@
   }
 
   <cmn-button
-    [loading]="store.isBusy()"
-    [disabled]="form.invalid || store.isBusy()"
+    [loading]="store.isConnectLoading()"
+    [disabled]="form.invalid || store.isConnectLoading()"
     variant="secondary"
     type="submit"
   >

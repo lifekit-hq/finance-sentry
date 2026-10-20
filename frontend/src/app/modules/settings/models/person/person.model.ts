@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** Derived on the server from the account: not signed in yet, signed in, revoked, or closed by its owner. */
 export type PersonStatus = 'Invited' | 'Active' | 'Revoked' | 'Closed';
 

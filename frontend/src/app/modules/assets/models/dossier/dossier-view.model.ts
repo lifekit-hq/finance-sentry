@@ -1,4 +1,4 @@
-import {type AreaSeries} from '@lifekit-hq/ui';
+import {type AreaSeries, type Nullable} from '@lifekit-hq/ui';
 
 import {
   type ChartRangeId,

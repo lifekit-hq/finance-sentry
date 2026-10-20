@@ -1,6 +1,6 @@
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
-import {ToastService} from '@lifekit-hq/ui';
+import {type Nullable, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, concatMap, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 

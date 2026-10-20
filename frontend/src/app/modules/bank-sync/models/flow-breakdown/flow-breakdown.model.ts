@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /**
  * Classification bucket a transaction landed in for the month's flow figures — the audit
  * labels behind the dashboard tiles. Mirrors `FlowBuckets` on the backend.

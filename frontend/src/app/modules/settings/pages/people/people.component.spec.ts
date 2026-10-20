@@ -4,6 +4,7 @@ import {signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {API_BASE_URL} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 

@@ -1,4 +1,5 @@
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {DossierLabelUtils} from '../utils/dossier-label.utils';
 import {DossierViewUtils} from '../utils/dossier-view.utils';

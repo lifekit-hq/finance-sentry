@@ -1,6 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {type AsyncStatus, ErrorMessageService} from '@lifekit-hq/core';
 import {PushSubscriptionService} from '@lifekit-hq/core/pwa';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type PushDevice, type PushDeviceRow} from '../../models/push/push.model';
 import {type PushAction} from './push.state';

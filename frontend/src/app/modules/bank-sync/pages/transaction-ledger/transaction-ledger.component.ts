@@ -21,6 +21,7 @@ import {
   InstitutionAvatarComponent,
   ListItemRowComponent,
   ListSectionComponent,
+  type Nullable,
   PageContainerComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';

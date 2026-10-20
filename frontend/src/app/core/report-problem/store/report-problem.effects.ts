@@ -2,13 +2,12 @@ import {HttpErrorResponse, HttpStatusCode} from '@angular/common/http';
 import {inject, type Signal} from '@angular/core';
 import {Router} from '@angular/router';
 import {extractErrorCode} from '@lifekit-hq/core';
-import {CmnDrawerRef, CmnShellService, ToastService} from '@lifekit-hq/ui';
+import {CmnDrawerRef, CmnShellService, type Nullable, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, tap} from 'rxjs';
 
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
 import {REPORT_PROBLEM_RATE_LIMITED_CODE} from '../constants/report-problem.constants';
-import {type ReportProblemStatus} from '../models/report-problem.model';
 import {ReportProblemService} from '../services/report-problem.service';
 import {ClientInfoUtils} from '../utils/client-info.utils';
 import {RoutePatternUtils} from '../utils/route-pattern.utils';
@@ -16,7 +15,8 @@ import {type ReportProblemState} from './report-problem.state';
 
 interface EffectsStore {
   kind: Signal<ReportProblemState['kind']>;
-  setStatus(status: ReportProblemStatus): void;
+  setLoading(): void;
+  setSuccess(): void;
   setError(errorCode: Nullable<string>): void;
 }
 
@@ -30,7 +30,7 @@ export function reportProblemEffects(store: EffectsStore) {
   /** Sends the typed text (or nothing) with the client part; the sheet stays open with its text on any failure. */
   const submit = rxMethod<Nullable<string>>(
     pipe(
-      tap(() => store.setStatus('submitting')),
+      tap(() => store.setLoading()),
       exhaustMap(text =>
         service
           .submit({
@@ -44,7 +44,7 @@ export function reportProblemEffects(store: EffectsStore) {
           })
           .pipe(
             tap(accepted => {
-              store.setStatus('idle');
+              store.setSuccess();
               toast.success(`Thanks, report ${accepted.reference} sent.`);
               drawerRef.close();
             }),

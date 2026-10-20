@@ -1,6 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type Headline} from '../../../../shared/models/headline/headline.model';

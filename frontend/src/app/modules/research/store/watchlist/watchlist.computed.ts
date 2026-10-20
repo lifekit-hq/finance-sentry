@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {PaletteEntityUtils} from '../../../../core/shell/utils/palette-entity.utils';
 import {type WatchlistItem, type WatchlistRow} from '../../models/watchlist/watchlist.model';

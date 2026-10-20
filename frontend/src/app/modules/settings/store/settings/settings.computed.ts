@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {InitialsUtils} from '../../../../shared/utils/initials.utils';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';

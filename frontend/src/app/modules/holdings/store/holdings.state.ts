@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {type Position} from '../models/position/position.model';
 

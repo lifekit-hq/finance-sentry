@@ -1,4 +1,5 @@
 import {Pipe, type PipeTransform} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type AccountBalanceItem} from '../../../shared/models/wealth/wealth.model';
 import {MoneyUtils} from '../../../shared/utils/money.utils';

@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** `GET notifications/push/public-key`: whether the server can send push, and the VAPID key to subscribe with. */
 export interface PushPublicKey {
   available: boolean;

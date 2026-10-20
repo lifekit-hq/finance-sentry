@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';

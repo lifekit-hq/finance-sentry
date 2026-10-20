@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type ProblemReportDevice} from '../models/report-problem.model';
 
 /** Browser and OS family only, from the user agent; the API drops anything outside its known list anyway. */

@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export interface CloseAccountDialogData {
   /** The signed-in account's email; the user types it to confirm. */
   readonly email: string;

@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 export interface WatchlistItem {
   id: string;
   ticker: string;

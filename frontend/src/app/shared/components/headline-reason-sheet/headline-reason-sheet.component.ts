@@ -1,7 +1,7 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
-import {CMN_DRAWER_DATA} from '@lifekit-hq/ui';
+import {CMN_DRAWER_DATA, type Nullable} from '@lifekit-hq/ui';
 
 import {
   HEADLINE_BADGE_SUMMARY,

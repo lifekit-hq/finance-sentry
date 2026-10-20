@@ -1,5 +1,5 @@
 import {computed, type Signal} from '@angular/core';
-import {type DonutSegment} from '@lifekit-hq/ui';
+import {type DonutSegment, type Nullable} from '@lifekit-hq/ui';
 
 import {
   CASH_COLOUR,

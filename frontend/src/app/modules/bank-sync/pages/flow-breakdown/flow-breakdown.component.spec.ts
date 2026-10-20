@@ -1,7 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {CmnDrawerService} from '@lifekit-hq/ui';
+import {CmnDrawerService, type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it, vi} from 'vitest';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';

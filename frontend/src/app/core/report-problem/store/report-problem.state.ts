@@ -1,13 +1,11 @@
-import {type ProblemReportKind, type ReportProblemStatus} from '../models/report-problem.model';
+import {type Nullable} from '@lifekit-hq/ui';
+
+import {type ProblemReportKind} from '../models/report-problem.model';
 
 export interface ReportProblemState {
   kind: Nullable<ProblemReportKind>;
-  status: ReportProblemStatus;
-  errorCode: Nullable<string>;
 }
 
 export const initialReportProblemState: ReportProblemState = {
   kind: null,
-  status: 'idle',
-  errorCode: null,
 };

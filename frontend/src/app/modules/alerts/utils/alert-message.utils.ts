@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 const LONG_DECIMAL = /\d+\.\d{3,}/g;
 const DISPLAY_DECIMALS = 2;
 const TRAILING_SEC_URL = /\s*(https:\/\/(?:[\w-]+\.)*sec\.gov\/\S*)\s*$/;

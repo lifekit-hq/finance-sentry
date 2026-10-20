@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {type Nullable} from '@lifekit-hq/ui';
 
 import {type NetWorthProjection} from '../../models/projection/projection.model';
 import {ProjectionUtils} from '../../utils/projection.utils';

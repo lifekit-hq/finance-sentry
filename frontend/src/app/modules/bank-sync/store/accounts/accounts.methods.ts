@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 import {getState, patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealth.model';

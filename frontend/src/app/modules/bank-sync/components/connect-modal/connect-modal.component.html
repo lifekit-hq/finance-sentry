@@ -1,9 +1,9 @@
-@if (store.isBusy()) {
+@if (store.isConnectLoading()) {
   <fns-syncing-state />
 }
 <!-- Keep the current step alive (hidden) while busy so a failed submit returns
      the user to their still-populated form instead of a fresh instance. -->
-<div [class.hidden]="store.isBusy()">
+<div [class.hidden]="store.isConnectLoading()">
   @switch (store.modalStep()) {
     @case ('type-picker') {
       <fns-type-picker />

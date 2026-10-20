@@ -1,6 +1,6 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
-import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
+import {type AreaSeries, type BarSeries, type DonutSegment, type Nullable} from '@lifekit-hq/ui';
 
 import {
   CASH_COLOUR,

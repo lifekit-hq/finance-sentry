@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type PushDevice} from '../../models/push/push.model';
 
 export type PushAction = 'idle' | 'enabling' | 'saving' | 'removing';

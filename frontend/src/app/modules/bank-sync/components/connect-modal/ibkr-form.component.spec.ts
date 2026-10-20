@@ -1,5 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type Nullable} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AccountsStore} from '../../store/accounts/accounts.store';
@@ -36,9 +37,9 @@ function buildIbkrStore(hasPreview = false) {
 
 function buildConnectStore() {
   return {
-    errorCode: signal<Nullable<string>>(null),
+    connectErrorCode: signal<Nullable<string>>(null),
     errorMessage: signal(''),
-    isBusy: signal(false),
+    isConnectLoading: signal(false),
     connect: vi.fn(),
     setModalStep: vi.fn(),
     resetError: vi.fn(),

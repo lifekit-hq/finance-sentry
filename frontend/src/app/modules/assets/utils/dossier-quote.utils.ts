@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {MoneyUtils} from '../../../shared/utils/money.utils';
 import {
   EQUITY_ASSET_CLASS,

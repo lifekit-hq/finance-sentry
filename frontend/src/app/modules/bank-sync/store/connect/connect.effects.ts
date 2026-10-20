@@ -1,6 +1,7 @@
 import {effect, inject} from '@angular/core';
 import {Router} from '@angular/router';
-import {extractErrorCode} from '@lifekit-hq/core';
+import {type AsyncStatus, extractErrorCode} from '@lifekit-hq/core';
+import {type Nullable} from '@lifekit-hq/ui';
 import {BankSyncService} from '@modules/bank-sync/services/bank-sync.service';
 import {ConnectStrategy} from '@modules/bank-sync/strategies/connect-strategy';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
@@ -12,7 +13,6 @@ import {
   type Provider,
 } from '../../../../shared/models/provider/provider.model';
 import {AccountsStore} from '../accounts/accounts.store';
-import {type ConnectStatus} from './connect.state';
 
 interface EffectsStore {
   setSyncing: (msg: string) => void;
@@ -21,7 +21,7 @@ interface EffectsStore {
   setError: (code: Nullable<string>) => void;
   setInstitutionType: (type: InstitutionType) => void;
   selectProvider: (provider: Provider) => void;
-  status: () => ConnectStatus;
+  connectStatus: () => AsyncStatus;
   institutionType: () => Nullable<InstitutionType>;
 }
 
@@ -122,14 +122,14 @@ export function connectEffects(store: EffectsStore) {
 }
 
 interface SuccessHookStore {
-  status: () => ConnectStatus;
+  connectStatus: () => AsyncStatus;
   institutionType: () => Nullable<InstitutionType>;
 }
 
 export function connectSuccessRouter(store: SuccessHookStore): void {
   const router = inject(Router);
   effect(() => {
-    if (store.status() !== 'success') {
+    if (store.connectStatus() !== 'success') {
       return;
     }
     const type = store.institutionType();

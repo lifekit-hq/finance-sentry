@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {PUSH_DEVICE_STORAGE_KEY} from '../constants/push/push.constants';
 import {type RegisterPushRequest} from '../models/push/push.model';
 

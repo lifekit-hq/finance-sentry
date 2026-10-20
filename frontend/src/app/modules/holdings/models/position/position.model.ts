@@ -1,3 +1,5 @@
+import {type Nullable} from '@lifekit-hq/ui';
+
 import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {type HiddenReason} from '../../../../shared/models/wealth/wealth.model';
 

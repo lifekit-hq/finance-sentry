@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 /** Mirrors the backend's `MonthlyIncomeLensStatus`, written by name. */
 export type MonthlyIncomeLensStatus = 'Shown' | 'NoNetWorth';
 

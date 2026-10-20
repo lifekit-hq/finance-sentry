@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 const COINCAP_ICON_BASE = 'https://assets.coincap.io/assets/icons';
 const FMP_STOCK_IMAGE_BASE = 'https://financialmodelingprep.com/image-stock';
 
