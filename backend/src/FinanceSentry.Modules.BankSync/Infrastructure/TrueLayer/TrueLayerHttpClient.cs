@@ -8,12 +8,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Web;
 using FinanceSentry.Infrastructure.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 public sealed class TrueLayerHttpClient(
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration,
+    IOptions<TrueLayerOptions> options,
     ILogger<TrueLayerHttpClient> logger) : ITrueLayerClient
 {
     public const string AuthClientName = "truelayer-auth";
@@ -25,10 +25,10 @@ public sealed class TrueLayerHttpClient(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private readonly string _clientId = configuration["TrueLayer:ClientId"] ?? string.Empty;
-    private readonly string _clientSecret = configuration["TrueLayer:ClientSecret"] ?? string.Empty;
-    private readonly string _authBaseUrl = (configuration["TrueLayer:AuthBaseUrl"] ?? "https://auth.truelayer-sandbox.com").TrimEnd('/');
-    private readonly string _scopes = configuration["TrueLayer:Scopes"] ?? "info accounts balance transactions cards offline_access";
+    private readonly string _clientId = options.Value.ClientId;
+    private readonly string _clientSecret = options.Value.ClientSecret;
+    private readonly string _authBaseUrl = options.Value.AuthBaseUrl.TrimEnd('/');
+    private readonly string _scopes = options.Value.Scopes;
 
     public async Task<IReadOnlyList<TrueLayerProvider>> ListProvidersAsync(string? country, CancellationToken ct = default)
     {

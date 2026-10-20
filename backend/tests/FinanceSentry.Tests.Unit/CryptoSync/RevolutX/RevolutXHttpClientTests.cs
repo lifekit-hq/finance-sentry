@@ -3,8 +3,8 @@ using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
 
@@ -18,9 +18,7 @@ public class RevolutXHttpClientTests
     private RevolutXHttpClient CreateSut(string? baseUrl = null) =>
         new(
             new HttpClient(_handler),
-            new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?> { ["RevolutX:BaseUrl"] = baseUrl })
-                .Build(),
+            Options.Create(baseUrl is null ? new RevolutXOptions() : new RevolutXOptions { BaseUrl = baseUrl }),
             new FixedTimeProvider(SigningInstant));
 
     private static RevolutXCredentials Credentials() =>

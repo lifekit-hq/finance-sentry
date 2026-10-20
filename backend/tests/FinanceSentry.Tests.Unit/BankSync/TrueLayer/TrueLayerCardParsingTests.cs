@@ -4,10 +4,10 @@ using System.Net;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FinanceSentry.Tests.Unit.BankSync.Monobank;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 public class TrueLayerCardParsingTests
 {
@@ -18,7 +18,7 @@ public class TrueLayerCardParsingTests
         factory.Setup(f => f.CreateClient(TrueLayerHttpClient.ApiClientName))
             .Returns(new HttpClient(handler) { BaseAddress = new Uri("https://api.truelayer-sandbox.com") });
         return new TrueLayerHttpClient(
-            factory.Object, new ConfigurationBuilder().Build(), NullLogger<TrueLayerHttpClient>.Instance);
+            factory.Object, Options.Create(new TrueLayerOptions()), NullLogger<TrueLayerHttpClient>.Instance);
     }
 
     [Fact]

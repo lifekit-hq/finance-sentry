@@ -6,8 +6,8 @@ using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 public record FinalizeTrueLayerConnectCommand(string Reference, string Code) : ICommand<FinalizeTrueLayerConnectResult>;
 
@@ -23,7 +23,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
     IBankAccountRepository accounts,
     IScheduledSyncService syncService,
     IBankConnectionHealth connectionHealth,
-    IConfiguration configuration,
+    IOptions<TrueLayerOptions> options,
     ILogger<FinalizeTrueLayerConnectCommandHandler> logger)
     : ICommandHandler<FinalizeTrueLayerConnectCommand, FinalizeTrueLayerConnectResult>
 {
@@ -39,11 +39,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
         if (connection.Status == "LINKED")
             return new FinalizeTrueLayerConnectResult(connection.UserId, connection.BankAccounts.Count, []);
 
-        var callbackPath = configuration["TrueLayer:CallbackPath"]
-            ?? "/api/v1/accounts/truelayer/callback";
-        var publicApiBase = configuration["PublicApiBaseUrl"]
-            ?? "http://localhost:5001";
-        var redirectUri = $"{publicApiBase.TrimEnd('/')}{callbackPath}";
+        var redirectUri = options.Value.RedirectUri;
 
         var tokens = await client.ExchangeCodeAsync(request.Code, redirectUri, cancellationToken);
         if (string.IsNullOrEmpty(tokens.RefreshToken))

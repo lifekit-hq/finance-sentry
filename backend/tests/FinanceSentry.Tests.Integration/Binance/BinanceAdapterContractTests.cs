@@ -4,9 +4,9 @@ using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Tests.Integration.Binance;
 
@@ -18,25 +18,12 @@ public class BinanceAdapterContractTests
     private static BinanceHttpClient CreateHttpClient(HttpMessageHandler handler)
     {
         var http = new HttpClient(handler);
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Binance:BaseUrl"] = "https://api.binance.com",
-                ["Binance:RecvWindowMs"] = "5000",
-            })
-            .Build();
-        return new BinanceHttpClient(http, config);
+        return new BinanceHttpClient(http, Options.Create(new BinanceOptions()));
     }
 
     private static BinanceAdapter CreateAdapter(BinanceHttpClient httpClient)
     {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Binance:DustThresholdUsd"] = "0.01",
-            })
-            .Build();
-        return new BinanceAdapter(httpClient, new BinanceHoldingsAggregator(), NullLogger<BinanceAdapter>.Instance, config);
+                return new BinanceAdapter(httpClient, new BinanceHoldingsAggregator(), NullLogger<BinanceAdapter>.Instance, Options.Create(new BinanceOptions()));
     }
 
     [Fact]

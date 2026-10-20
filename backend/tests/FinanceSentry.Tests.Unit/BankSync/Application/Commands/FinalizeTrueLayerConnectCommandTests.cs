@@ -8,10 +8,10 @@ using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Regression coverage for issue #473: a provider account reference ending in an alphanumeric
@@ -37,7 +37,7 @@ public class FinalizeTrueLayerConnectCommandTests
         var encryption = new Mock<ICredentialEncryptionService>();
         var accounts = new Mock<IBankAccountRepository>();
         var syncService = new Mock<IScheduledSyncService>();
-        var configuration = new Mock<IConfiguration>();
+        var options = Options.Create(new TrueLayerOptions());
         var logger = new Mock<ILogger<FinalizeTrueLayerConnectCommandHandler>>();
 
         var connection = new TrueLayerConnection(UserId, "ob-revolut", "Revolut", "ref-473");
@@ -67,7 +67,7 @@ public class FinalizeTrueLayerConnectCommandTests
 
         var sut = new FinalizeTrueLayerConnectCommandHandler(
             client.Object, connections.Object, encryption.Object, accounts.Object,
-            syncService.Object, Mock.Of<IBankConnectionHealth>(), configuration.Object, logger.Object);
+            syncService.Object, Mock.Of<IBankConnectionHealth>(), options, logger.Object);
 
         return new Harness(sut, client, connections, accounts, syncService, connection);
     }

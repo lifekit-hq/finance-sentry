@@ -4,8 +4,8 @@ using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 
@@ -17,9 +17,8 @@ public sealed class RevolutXAdapter(
     RevolutXHttpClient httpClient,
     RevolutXHoldingsAggregator aggregator,
     ILogger<RevolutXAdapter> logger,
-    IConfiguration configuration) : ICryptoExchangeAdapter
+    IOptions<RevolutXOptions> options) : ICryptoExchangeAdapter
 {
-    private const decimal DefaultDustThresholdUsd = 0.01m;
 
     // The venue serves at most one week of fills per call.
     private const long WindowMs = 7L * 24 * 60 * 60 * 1000 - 2;
@@ -48,11 +47,7 @@ public sealed class RevolutXAdapter(
 
     private static readonly string[] UsdStablecoins = ["USDC", "USDT"];
 
-    private readonly decimal _dustThresholdUsd = decimal.TryParse(
-        configuration["RevolutX:DustThresholdUsd"],
-        System.Globalization.NumberStyles.Number,
-        System.Globalization.CultureInfo.InvariantCulture,
-        out var threshold) ? threshold : DefaultDustThresholdUsd;
+    private readonly decimal _dustThresholdUsd = options.Value.DustThresholdUsd;
 
     public string ExchangeName => CryptoExchangeProvider.RevolutX;
 

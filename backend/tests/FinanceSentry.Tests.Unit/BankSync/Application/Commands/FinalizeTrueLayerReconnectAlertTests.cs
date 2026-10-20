@@ -11,10 +11,10 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Connection health (Option B, S2) keys a TrueLayer "reconnect" alert on the connection id. A reconnect that moves the
@@ -89,7 +89,7 @@ public class FinalizeTrueLayerReconnectAlertTests
 
         return new FinalizeTrueLayerConnectCommandHandler(
             client.Object, _connections.Object, encryption.Object, _accounts.Object, sync.Object, health,
-            new ConfigurationBuilder().Build(), NullLogger<FinalizeTrueLayerConnectCommandHandler>.Instance);
+            Options.Create(new TrueLayerOptions()), NullLogger<FinalizeTrueLayerConnectCommandHandler>.Instance);
     }
 
     private async Task RaiseCredentialLossOnOldConnectionAsync(BankConnectionHealth health)
