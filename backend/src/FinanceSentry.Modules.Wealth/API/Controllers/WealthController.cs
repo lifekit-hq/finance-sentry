@@ -19,8 +19,10 @@ public class WealthController(
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
     IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> sleeveGrowthHandler,
     IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> netWorthProjectionHandler,
+    IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> monthlyIncomeLensHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> _monthlyIncomeLensHandler = monthlyIncomeLensHandler ?? throw new ArgumentNullException(nameof(monthlyIncomeLensHandler));
     private readonly IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> _netWorthProjectionHandler = netWorthProjectionHandler ?? throw new ArgumentNullException(nameof(netWorthProjectionHandler));
     private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
@@ -159,6 +161,34 @@ public class WealthController(
             ProjectedNetWorth = projection.ProjectedNetWorth is { } range
                 ? new ProjectionRange(Fx(range.Low), Fx(range.Central), Fx(range.High))
                 : null,
+            BaseCurrency = baseCurrency,
+        };
+    }
+
+    /// <summary>
+    /// The monthly-income lens (P5): net worth drawn at the shared safe withdrawal rate (C8), as a monthly amount:
+    /// <c>GET /api/v1/wealth/income-lens</c>.
+    /// </summary>
+    [HttpGet("income-lens")]
+    public async Task<IActionResult> GetMonthlyIncomeLens(CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _monthlyIncomeLensHandler.Handle(new GetMonthlyIncomeLensQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // The rate is untouched; only the two money amounts are re-expressed.
+    private static MonthlyIncomeLensResponse InBaseCurrency(MonthlyIncomeLensResponse lens, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return lens with { BaseCurrency = baseCurrency };
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        return lens with
+        {
+            NetWorth = Fx(lens.NetWorth),
+            MonthlyIncome = lens.MonthlyIncome is { } income ? Fx(income) : null,
             BaseCurrency = baseCurrency,
         };
     }

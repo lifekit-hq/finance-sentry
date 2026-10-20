@@ -376,7 +376,7 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
 - Every DTO crossing an aggregation boundary carries a `…Usd` field; aggregations sum only
   that field.
 - **Presentation currency (#851).** Aggregation stays USD. The dashboard (`GET dashboard/aggregated`),
-  net-worth history, wealth-summary and projection (`GET wealth/fire`, `GET wealth/projection`) controllers re-express those USD figures in the profile
+  net-worth history, wealth-summary and projection (`GET wealth/fire`, `GET wealth/projection`, `GET wealth/income-lens`) controllers re-express those USD figures in the profile
   `baseCurrency` once, at the response boundary (`CurrencyConverter.FromUsd`), and return the code
   (`baseCurrency` / `currency`; projection amounts carry no `…Usd` name and are plain base-currency amounts). USD, an unset profile, or a currency with no rate (e.g. BTC)
   resolves to USD (`CurrencyConverter.ResolveBase`). The `…Usd` field names are historical: on
@@ -1510,3 +1510,17 @@ net worth reaches the financial-independence target.
   assumptions in words, the months range and the disclosure. `InsufficientHistory` sends nothing; the job
   reads the snapshot with no person in scope, so the reader uses the `…Unscoped…` snapshot read keyed on
   the user id.
+
+### Monthly-income lens (dashboard hero, P5)
+
+`GET /wealth/income-lens` (`GetMonthlyIncomeLensQuery`, math in `IncomeLens.MonthlyIncome`) shows the latest
+snapshot's net worth as the monthly income it could pay: net worth × the safe withdrawal rate ÷ 12, in today's
+money. It reads `ProjectionInputsReader` like the two projections above, so the total and the rate are the
+ones the FIRE target uses, and it is that target's inverse (a total at the target pays exactly the annual
+spend). It needs no savings history: only the snapshot and the rate. The rate is single-valued in C8, so the
+lens is one figure, not a range. No snapshot, or a zero or negative net worth, gives `NoNetWorth` and no
+figure; the hero then renders nothing (the line holds no fixed slot). The hero reads "As income: about $X a
+month" with "Your $Y net worth drawn at R% a year, the safe withdrawal rate your financial-independence target
+uses. In today's money. Hypothetical, not a guarantee." beneath it (`fns-monthly-income-lens`), plus a
+stale-data note while `hasStaleSleeves` is set. `WealthController` converts the net worth and the income to the
+profile base currency (§3); the rate is not converted. No headline record yet (finance-framework §3.6).

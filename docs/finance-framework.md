@@ -30,7 +30,7 @@ rule or shape agreed but not implemented), **missing**.
 | C4 | **Compute in USD; show returns in the person's base currency**, using dated rates for flows and values. | Currency of M3–M5. Flows convert at the flow date's rate, positions at the valuation date's rate (§3.2 rule 5). |
 | C5 | The net-worth headline is the **total**, with "of which liquid" beneath. No toggle. | §5.3 totals; presentation pattern P10. |
 | C7(i) | **Designs only** from AGPL/GPL projects; **code only** from permissively licensed ones, with attribution. | What may be ported. AGPL/GPL code is never copied; AGPL designs are paraphrased. |
-| C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Built (G7 closed): `ProjectionAssumptions` is the one set, its real return a ±3-point range (2% / 5% / 8% on the default 5%, the FCA's COBS 13 spread) with the 4% withdrawal rate; the twelve-month figure and the FIRE projection both use it and state it in words. |
+| C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Built (G7 closed): `ProjectionAssumptions` is the one set, its real return a ±3-point range (2% / 5% / 8% on the default 5%, the FCA's COBS 13 spread) with the 4% withdrawal rate; the twelve-month figure and the FIRE projection both use it and state it in words; the P5 income lens reads its withdrawal rate. |
 | C2(a) | **Contributions vs growth for IBKR and Inzhur now, showing both MWR and TWR** (2026-10-15): "Contributed / Growth" with a Modified Dietz return on the Home Investments card, and Book vs SPY as a time-weighted return. MWR only was declined. | M2 and M4 on the brokerage sleeve (§3.4); M3 and M9 on Book vs SPY (G1 closed). Internal moves are not flows; dividends and interest count as growth unless withdrawn. |
 | C9 | **Per-holding checks first**, each threshold cited from a public source. No portfolio-level score. | Presentation pattern P7; the per-holding screen of #824. |
 | C6 | **Steam is not linked; the person enters it by hand** (2026-10-18): no wallet, inventory or API integration. The entry is valued at what they would receive after fees, L3, IN_ECONOMY. | The manual source (§5.4, §5.5): counted in total net worth, outside cash and liquid net worth, and the total ESTIMATED (`ESTIMATED_VALUE`). Bank-side Steam charges stay spending; the entry joins as a newly linked line (§3.2 rule 3), so nothing is counted twice. |
@@ -244,7 +244,7 @@ waterfall (3.7) shows it on Home.
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
 | M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates); per decision, the Ledger scoreboard (`get_ledger_scoreboard`, a 30-day price excess per proposal or pick, money-semantics §10) |
-| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration; range spread from FCA COBS 13 Annex 2 | a month-by-month simulation at each return | engine: `Projection` (twelve-month figure and FIRE, one assumption set, both as a range; G7 closed). The P5 lens is not built |
+| M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration; range spread from FCA COBS 13 Annex 2 | a month-by-month simulation at each return | engine: `Projection` (twelve-month figure and FIRE, one assumption set, both as a range; G7 closed); the P5 lens (`IncomeLens`) reads the same set |
 
 Choices the engine fixes once, so they stop being re-decided:
 
@@ -457,7 +457,8 @@ The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection car
 ### 3.7 Presentation patterns
 
 A big number becomes meaning through a small set of patterns. Each needs its measure first; the ones built are
-marked. R7 builds them in the order P3, P8, P2, P4, P5; P5 waits on M10 and C8.
+marked. R7 builds them in the order P3, P8, P2, P4, P5, each after its measure: P4 once the bridge was wired
+(M5), P5 once M10 and C8 had landed. All five are built.
 
 | Id | Pattern | What the person sees | Needs |
 |---|---|---|---|
@@ -465,7 +466,7 @@ marked. R7 builds them in the order P3, P8, P2, P4, P5; P5 waits on M10 and C8.
 | P2 | Growth of 10,000 | What 10,000 invested at the start would be worth now, book vs benchmark | M3, M9. **Done (R7)**: Home Investments card, the longest Book vs SPY window measured for both, in USD; end values only, no line yet |
 | P3 | Contributions vs growth | "You put in X; it grew by Y" | M2. **Done (R7)**: Home Investments card, a card per sleeve (brokerage, crypto) |
 | P4 | Bridge waterfall | Start → savings → investment return → FX → linked → end | M5. **Done (R7)**: Home card under the net-worth hero, over the hero's range in the base currency; the unexplained residual is always its own row, and above tolerance the card says so in place (DEGRADED, `RESIDUAL_ABOVE_TOLERANCE`); bars drawn in the app until `@lifekit-hq/ui` has a waterfall chart |
-| P5 | Monthly-income lens | A large total also shown as the monthly income it could pay | M10, C8 |
+| P5 | Monthly-income lens | A large total also shown as the monthly income it could pay | M10, C8. **Done (R7)**: Home hero, under the twelve-month figure: "As income: about $X a month", the net worth at the shared safe withdrawal rate ÷ 12 (`IncomeLens`, `GET /wealth/income-lens`), its assumption in words; one figure, as the withdrawal rate is single-valued; hidden with no positive net worth |
 | P6 | 1 / 5 / 10-year table | Average annual total return per standard window, book vs benchmark | M3, long history |
 | P7 | Checklist score | A few yes/no checks per holding, drawn as a shape; ideas only, thresholds cited (C9) | cited thresholds; fits #824 |
 | P8 | Timing gap | "Your investments returned A; your money earned B; the difference is timing" | M3, M4. **Done (R7)**: under each growth split, when both returns are measured |
@@ -996,7 +997,7 @@ classifies them. No IBKR deposits or withdrawals arrive, because the Flex query 
 **G7. Two projections use two different assumptions.** *Closed (M10, 2026-10-19): the twelve-month figure moved from the
 browser to `GET /wealth/projection`, and it and the FIRE projection both run on `Projection` with one
 `ProjectionAssumptions` set, each shown as a range with its assumptions in words (C8). Left: neither carries a
-headline record yet (§3.6), and the P5 monthly-income lens is not built. The history below is kept as the
+headline record yet (§3.6). The P5 monthly-income lens is built on the same set (R7). The history below is kept as the
 record.*
 The 12-month tile was median monthly savings × 12 with no market return; the FIRE projection compounded a 5%
 real return to a 4%-withdrawal target. Each stated its basis, but nothing shared one assumptions contract

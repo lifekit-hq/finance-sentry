@@ -37,6 +37,7 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {InvestmentsCardComponent} from '../../../holdings/components/investments-card/investments-card.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
+import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
 import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
 import {
@@ -82,6 +83,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     HeadlineBadgeComponent,
     IconComponent,
     InvestmentsCardComponent,
+    MonthlyIncomeLensComponent,
     NetWorthProjectionComponent,
     MerchantCategoryPipe,
     MoneyPipe,
@@ -248,6 +250,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 }
               </div>
               <fns-net-worth-projection />
+              <fns-monthly-income-lens />
               @if (store.historyErrorMessage()) {
                 <div class="flex items-center gap-cmn-2" data-testid="net-worth-history-error">
                   <cmn-alert variant="error" class="min-w-0 flex-1">{{
