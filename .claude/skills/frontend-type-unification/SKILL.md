@@ -35,8 +35,7 @@ Always check these first — extending an existing base is preferable to inventi
 | `AccountIdentity` | `accountId`, `bankName`, `accountType`, `accountNumberLast4`, `currency` | `shared/models/account-identity/account-identity.model.ts` |
 | `Timestamped` | `createdAt: string` | `shared/models/timestamped/timestamped.model.ts` |
 
-Globally available (in `global.d.ts`):
-- `Nullable<T>`, `AsyncStatus`, `ApiErrorResponse`, `OffsetPagination`, `OffsetPaginationParams`
+Imported from the library, never redeclared: `Nullable<T>` (`@lifekit-hq/ui`), `AsyncStatus` (`@lifekit-hq/core`).
 
 ## The audit loop
 
