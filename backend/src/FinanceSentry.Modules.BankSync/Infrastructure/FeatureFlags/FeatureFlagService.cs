@@ -3,7 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.FeatureFlags;
 using Microsoft.Extensions.Options;
 
 /// <summary>
-/// Simple feature flag service backed by IConfiguration (appsettings / env vars).
+/// Simple feature flag service backed by the bound <see cref="FeatureFlagOptions"/> section (appsettings / env vars).
 /// Keys are read from "FeatureFlags:{KEY}" — e.g. "FeatureFlags:BANK_SYNC_ENABLED=true".
 /// Supports gradual rollout by user ID hash when a percentage value (0-100) is configured.
 /// </summary>
