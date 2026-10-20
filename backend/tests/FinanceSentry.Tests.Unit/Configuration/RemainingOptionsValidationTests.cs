@@ -1,8 +1,10 @@
 namespace FinanceSentry.Tests.Unit.Configuration;
 
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Mcp.Abstractions;
+using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
 using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.FeatureFlags;
@@ -133,23 +135,19 @@ public class RemainingOptionsValidationTests
     [Fact]
     public void DataProtection_NoCertificate_Starts()
     {
-        var sp = Build([], s => s.AddOptions<FinanceSentry.Modules.Auth.Infrastructure.Authentication.DataProtectionCertificateOptions>()
-            .BindConfiguration("DataProtection").ValidateDataAnnotations());
+        var act = () => new ServiceCollection().AddAuthDataProtection(Config([]));
 
-        sp.GetRequiredService<IOptions<FinanceSentry.Modules.Auth.Infrastructure.Authentication.DataProtectionCertificateOptions>>()
-            .Value.TryLoad().Should().BeNull();
+        act.Should().NotThrow();
     }
 
     [Fact]
     public void DataProtection_GarbageCertificate_Fails()
     {
-        var sp = Build(new() { ["DataProtection:CertificatePfxBase64"] = "bm90IGEgY2VydA==" },
-            s => s.AddOptions<FinanceSentry.Modules.Auth.Infrastructure.Authentication.DataProtectionCertificateOptions>()
-                .BindConfiguration("DataProtection").ValidateDataAnnotations());
+        var config = Config(new() { ["DataProtection:CertificatePfxBase64"] = "bm90IGEgY2VydA==" });
 
-        var act = () => sp.GetRequiredService<IOptions<FinanceSentry.Modules.Auth.Infrastructure.Authentication.DataProtectionCertificateOptions>>().Value;
+        var act = () => new ServiceCollection().AddAuthDataProtection(config);
 
-        act.Should().Throw<OptionsValidationException>().WithMessage("*PKCS#12*");
+        act.Should().Throw<CryptographicException>();
     }
 
     [Fact]

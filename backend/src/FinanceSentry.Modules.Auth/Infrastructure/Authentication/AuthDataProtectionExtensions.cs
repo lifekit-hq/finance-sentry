@@ -26,13 +26,8 @@ public static class AuthDataProtectionExtensions
 
         // Production sets the certificate (docker-compose.prod.yml requires it), so the keys sit encrypted in the
         // database. Without one the platform stores them unprotected and says so in the log; local runs and tests.
-        // Optional: when set it must be the base64 of a loadable PKCS#12, checked at startup. The key ring is wired
-        // here, before the container exists, so the value is read from the section directly.
-        services.AddOptions<DataProtectionCertificateOptions>()
-            .BindConfiguration(DataProtectionCertificateOptions.SectionName)
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
+        // Optional: when set it must be the base64 of a loadable PKCS#12, or loading it here stops startup. The key
+        // ring is wired here, before the container exists, so the value is read from the section directly.
         var certificate = config.GetSection(DataProtectionCertificateOptions.SectionName).Get<DataProtectionCertificateOptions>();
         if (certificate?.TryLoad() is { } cert)
         {
