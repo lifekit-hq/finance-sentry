@@ -191,8 +191,8 @@ brokerage total forward, are corrected once by a migration (§8, *Inzhur history
   (§8) with no Inzhur-specific path.
 
 **Holdings slices.** `GET /brokerage/holdings` tags each position with `assetClass`, the
-`AssetClassNormalizer` bucket of its `InstrumentType`. The Home Investments card's donut, allocation rows
-and weights slice **Cash, Bonds, Real estate, Equities, Crypto**: broker `CASH` rows (IBKR
+`AssetClassNormalizer` bucket of its `InstrumentType`. The Accounts accordions' position groups and
+weights slice **Cash, Bonds, Real estate, Equities, Crypto**: broker `CASH` rows (IBKR
 `<CCY> Cash`, Inzhur `UAH Cash`) and venue fiat share the Cash slice; Inzhur `BOND` and `REIT`
 rows are Bonds and Real estate; other classes (commodities, unclassified) stay with Equities;
 non-fiat crypto is Crypto. A row's weight is its share of the whole page total, cash included,
@@ -361,7 +361,7 @@ The three preferences are edited in Settings → Preferences, saved with the pro
 at most 100 in the base currency (`SMALL_BALANCE_THRESHOLD_MAX` mirrors the server bound). Accounts applies
 them.
 
-`/crypto/holdings` and `/brokerage/holdings` (the Accounts accordions and the Home Investments card) annotate each position with `HiddenReason` the
+`/crypto/holdings` and `/brokerage/holdings` (the Accounts accordions) annotate each position with `HiddenReason` the
 same way, through the same `Classify` (`AssetVisibility.ClassifyPosition` wraps it). Their DTOs are in USD, so the
 base-currency threshold is converted once to USD at the handler (`AssetVisibility.ResolveInUsdAsync`, shared with
 `/wealth/summary`). A position with a quantity but no price is unpriced (value unknown) and a short or negative one
@@ -1013,10 +1013,10 @@ are closed periods.
   day at all keeps the old Banking / Brokerage / Crypto sleeve stack. The figure under the headline
   is labelled **Change** (last minus first `totalNetWorth` in the range, in amount and percent): it
   is a change in net worth, savings and cash included, not a return. There is no separate
-  invested-change line: the Home **Investments** card carries the invested book's figures instead
-  (its "Invested" header is the positions' value without the `cash` asset class, the same book as
-  `investedUsd` in §8 and the hero sub-line; contributions vs growth below). The twelve-month
-  projection is untouched (built from savings, not from this line; §11).
+  invested-change line: the chart's bands carry the split instead, named in the chart's legend
+  (Home's "Where it is" rows: each band's value and share of the total on the day shown), and
+  contributions vs growth (below) sit in the Accounts brokerage and crypto sections. The twelve-month
+  projection is untouched (built from savings, not from this line; §11); it is shown on Breakdown.
 - **Scope changes hide the change percentage**: `/net-worth/history` also returns `scopeChanges`
   (`source`, `kind` = `linked` | `removed`, `at` date, UTC) - the accounts or connections that
   entered or left the book on or after the first returned snapshot, collected from one
@@ -1030,8 +1030,8 @@ are closed periods.
   already-deactivated account reads as a removal - because credentials record no deactivation time;
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
   `CreatedAt` is re-stamped).
-- **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Home Investments card's
-  "Contributed vs growth" section; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
+- **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Accounts brokerage section's
+  "Contributed vs growth"; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
   the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
   `from`, which is `seriesStart` unless a provider linked on that first close moves it to the next close (§10);
@@ -1063,7 +1063,7 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Home Investments card's "Crypto: contributed vs
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Accounts crypto section's "Crypto: contributed vs
   growth" card, the same component as the brokerage one; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
@@ -1212,6 +1212,18 @@ end at the closing date's, as the history rows do (§3); every line between them
 and the FX line also carries the start's re-statement, start × (closing factor − opening factor), so the lines
 still sum to the converted End − Start. A date with no published rate takes today's (`FX_TODAY_RATE`). The
 tolerance flag stays the USD one.
+
+**Home's three lines** (`NetWorthBridgeUtils.summary`, presentation only): Home reads the same response as
+three lines and a total - *You saved* (savings), *Markets* (investment return) and *Exchange rates* (FX
+translation, with one plain sentence on what the rate move did) - and *Change*, End − Start. Revaluation, newly
+linked, unlinked and the residual are not lines there: they stay inside the Change total, and when together they
+are 1 unit of the currency or more a note under it names them ("Includes +$350 from accounts linked or removed,
+revaluations and moves not yet explained."). Nothing is recomputed or stored: the lines are the bridge's own
+amounts, so the three lines plus the note still add to the Change. Home carries no badge for the bridge: when its
+quality is not complete or the residual is above tolerance it shows one sentence that the figures are estimates, with
+a link to Breakdown, where the waterfall says why. The full statement, every line and the
+residual's own row, is the waterfall on Breakdown (`/dashboard/breakdown`); Home's "Full statement" link opens
+it on Home's window.
 
 ## 5b. Book drawdown (risk re-measurement, #700)
 
@@ -1362,7 +1374,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the Home Investments card reads for its "growth of 10,000" card (finance-framework P2): the longest period
+  which the Accounts brokerage section reads for its "growth of 10,000" card (finance-framework P2): the longest period
   with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
   10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
   to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply
@@ -1375,7 +1387,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   (`bookTwrFrom` to `bookTwrTo`, the last bar on or before each, M9), so `delta` and the `outperform` /
   `underperform` verdict compare like with like. The brief labels it "Book TWR". The fictional example from
   before the fix: 10,000 grows to 11,000, a 10,000 deposit makes it 21,000, it ends at 19,800 - the old figure
-  read +98%, this one reads +3.7%. The money-weighted split of the same sleeve is on the Home Investments card (§8).
+  read +98%, this one reads +3.7%. The money-weighted split of the same sleeve is in the Accounts brokerage section (§8).
 - **Cash-inclusive scope.** The TWR runs on `net_worth_snapshots.brokerage_total` (IBKR + Inzhur, idle
   broker cash included), not on `brokerage_invested`. A purchase from idle cash moves value inside the scope,
   so it is not a gain, and a deposit is a flow at the scope's edge, so it can be taken out. This deviates from
@@ -1480,11 +1492,11 @@ the savings path and the starting net worth (decision C8; gap G7 closed). Comput
   a headline record yet (finance-framework §3.6). Both tiles show a warning notice while it is set (the
   twelve-month line only while it shows a figure).
 
-### Twelve-month projection (dashboard hero)
+### Twelve-month projection (Breakdown)
 
 `GET /wealth/projection` (`GetNetWorthProjectionQuery`) returns the net worth twelve months out
 (`projectedNetWorth`: low / central / high) from the latest snapshot plus the savings path, compounded at
-each of the three returns. A negative savings path still projects: the range shows the drawdown. The hero
+each of the three returns. A negative savings path still projects: the range shows the drawdown. The Breakdown page
 reads "In 12 months: about $X ($low to $high)" with the assumptions line beneath it
 (`fns-net-worth-projection`); `InsufficientHistory` renders nothing in the line's fixed slot. Before M10
 this figure was computed in the browser as median monthly savings × 12 with no market return.
@@ -1511,7 +1523,7 @@ net worth reaches the financial-independence target.
   reads the snapshot with no person in scope, so the reader uses the `…Unscoped…` snapshot read keyed on
   the user id.
 
-### Monthly-income lens (dashboard hero, P5)
+### Monthly-income lens (Breakdown, P5)
 
 `GET /wealth/income-lens` (`GetMonthlyIncomeLensQuery`, math in `IncomeLens.MonthlyIncome`) shows the latest
 snapshot's net worth as the monthly income it could pay: net worth × the safe withdrawal rate ÷ 12, in today's

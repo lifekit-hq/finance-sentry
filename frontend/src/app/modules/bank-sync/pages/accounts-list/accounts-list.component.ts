@@ -53,6 +53,8 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
+import {BrokerageGrowthComponent} from '../../../holdings/components/brokerage-growth/brokerage-growth.component';
+import {GrowthOfTenThousandComponent} from '../../../holdings/components/growth-of-ten-thousand/growth-of-ten-thousand.component';
 import {type PositionRow} from '../../../holdings/store/holdings.computed';
 import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
@@ -103,12 +105,14 @@ const FEED_CURRENCY = 'USD';
     AlertComponent,
     AssetLogoPipe,
     AsyncStateComponent,
+    BrokerageGrowthComponent,
     ButtonComponent,
     CardComponent,
     DecimalPipe,
     DisclosureRowComponent,
     DisclosureToggleDirective,
     EmptyStateComponent,
+    GrowthOfTenThousandComponent,
     HeadlineBadgeComponent,
     IconComponent,
     InstitutionAvatarComponent,

@@ -26,6 +26,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         var filtered = filter?.ToLowerInvariant() switch
         {
             "unread" => baseQuery.Where(a => !a.IsRead),
+            "open" => baseQuery.Where(a => !a.IsRead && !a.IsResolved),
             "error" => baseQuery.Where(a => a.Severity == AlertSeverity.Error),
             "warning" => baseQuery.Where(a => a.Severity == AlertSeverity.Warning),
             "info" => baseQuery.Where(a => a.Severity == AlertSeverity.Info),

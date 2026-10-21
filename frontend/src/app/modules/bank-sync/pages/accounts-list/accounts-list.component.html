@@ -193,6 +193,17 @@
             </ul>
           </cmn-disclosure-row>
         }
+        <!-- How the sleeve grew, moved here from Home (#1186): contributed vs growth, and $10,000 over time. -->
+        @if (section.category === 'brokerage') {
+          <div class="px-cmn-4 pb-cmn-5" data-testid="brokerage-section-growth">
+            <fns-brokerage-growth />
+            <fns-growth-of-ten-thousand />
+          </div>
+        } @else if (section.category === 'crypto') {
+          <div class="px-cmn-4 pb-cmn-5" data-testid="crypto-section-growth">
+            <fns-brokerage-growth sleeve="crypto" />
+          </div>
+        }
       </cmn-list-section>
     }
 

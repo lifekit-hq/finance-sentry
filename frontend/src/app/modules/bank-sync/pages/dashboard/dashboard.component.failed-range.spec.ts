@@ -15,12 +15,6 @@ import {BankSyncService} from '../../services/bank-sync.service';
 import {DashboardComponent} from './dashboard.component';
 
 const OLD_FIGURE = '$111,111';
-const SKELETON_TEST_IDS = [
-  'net-worth-chart-skeleton',
-  'cash-flow-chart-skeleton',
-  'category-donut-skeleton',
-  'category-table-skeleton',
-];
 
 const dashboardData = (netWorth: number): DashboardData =>
   ({
@@ -65,7 +59,7 @@ function setup() {
       historyCalls.push(call);
       return call;
     }),
-    // The bridge card under the hero has its own store and is not under test here: it settles at once
+    // "Why it moved" under the hero has its own store and is not under test here: it settles at once
     // with no bridge to draw, so its skeleton never counts as the page shimmering.
     getNetWorthBridge: vi.fn(() => of({quality: 'UNAVAILABLE', reasons: [], currency: 'USD'})),
   };
@@ -118,12 +112,12 @@ function setup() {
     },
     retryButton: (): HTMLElement | null =>
       el.querySelector('[data-testid="net-worth-history-error"] cmn-button button'),
-    // The Investments card and the twelve-month projection load their own data, outside the range
-    // request this spec exercises.
     shimmering: (): number =>
-      el.querySelectorAll(
-        '.cmn-skeleton-sweep:not(.after\\:hidden):not(fns-investments-card *):not(fns-net-worth-projection *)'
-      ).length,
+      el.querySelectorAll('.cmn-skeleton-sweep:not(.after\\:hidden)').length,
+    tiles: (): string[] =>
+      ['home-spent-link', 'home-income-link'].map(
+        id => el.querySelector(`[data-testid="${id}"]`)?.textContent ?? ''
+      ),
     placeholders: (): number => el.querySelectorAll('.cmn-skeleton-sweep.after\\:hidden').length,
   };
 }
@@ -180,11 +174,7 @@ describe('DashboardComponent failed range change', () => {
     page.failData();
 
     expect(page.shimmering()).toBe(0);
-    for (const testId of SKELETON_TEST_IDS.filter(id => id !== 'net-worth-chart-skeleton')) {
-      expect(
-        page.el.querySelector(`[data-testid="${testId}"] .cmn-skeleton-sweep`)?.classList
-      ).toContain('after:hidden');
-    }
+    expect(page.tiles().every(text => text.includes('—'))).toBe(true);
     expect(page.el.textContent).toContain('Failed to load dashboard data');
     expect(page.el.textContent).not.toContain(OLD_FIGURE);
 

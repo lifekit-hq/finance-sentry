@@ -1,5 +1,6 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {BOOK_PERFORMANCE, BROKERAGE_GROWTH, CRYPTO_GROWTH} from './support/accounts-mocks';
 import {WEALTH_SUMMARY} from './support/dossier-mocks';
 
 const API = '**/api/v1';
@@ -109,6 +110,14 @@ test.describe('cmn-async-state surfaces', () => {
       fail
         ? route.fulfill({status: 500, contentType: 'application/json', body: '{}'})
         : route.fulfill(json(WEALTH_SUMMARY))
+    );
+    // The brokerage and crypto sections' growth cards have their own async states; they load fine.
+    await page.route(`${API}/wealth/brokerage/growth`, route =>
+      route.fulfill(json(BROKERAGE_GROWTH))
+    );
+    await page.route(`${API}/wealth/crypto/growth`, route => route.fulfill(json(CRYPTO_GROWTH)));
+    await page.route(`${API}/radar/book-performance`, route =>
+      route.fulfill(json(BOOK_PERFORMANCE))
     );
     await page.goto('/accounts/list');
 

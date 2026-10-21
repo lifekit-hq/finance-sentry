@@ -18,7 +18,7 @@ import {
 import {NetWorthBridgeStore} from '../../store/net-worth-bridge/net-worth-bridge.store';
 
 /**
- * Bridge waterfall (finance-framework P4): how net worth got from the start of the dashboard's range to its
+ * Bridge waterfall (finance-framework P4): how net worth got from the start of its page's window to its
  * end - savings, investment return, currency moves, revaluation and accounts linked or removed (M5) - with
  * the unexplained residual always on its own row. A residual above tolerance degrades the bridge and says
  * so in place, beside the badge's reason sheet.

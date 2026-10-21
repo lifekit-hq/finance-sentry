@@ -4,11 +4,11 @@ import {BROKERAGE_GROWTH} from './support/accounts-mocks';
 import {mockHome} from './support/home-mocks';
 import {mockGet} from './support/visual-baseline';
 
-test.describe('Home investments card: contributions vs growth', () => {
+test.describe('Accounts brokerage and crypto sections: contributions vs growth', () => {
   test('splits the brokerage change into what was paid in and what it earned', async ({page}) => {
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
-    await page.goto('/dashboard');
+    await page.goto('/accounts/list');
 
     const section = page.getByTestId('brokerage-growth');
     await expect(section).toContainText('since 30 Jun 2026');
@@ -22,7 +22,7 @@ test.describe('Home investments card: contributions vs growth', () => {
   }) => {
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
-    await page.goto('/dashboard');
+    await page.goto('/accounts/list');
 
     await expect(page.getByTestId('brokerage-growth-timing-gap')).toHaveText(
       'Your investments returned +7.1% (time-weighted); your money earned +9.9% ' +
@@ -34,7 +34,7 @@ test.describe('Home investments card: contributions vs growth', () => {
   test('splits the crypto change on its own card', async ({page}) => {
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
-    await page.goto('/dashboard');
+    await page.goto('/accounts/list');
 
     await expect(page.getByTestId('crypto-growth-since')).toContainText(
       'Binance and Revolut X since 30 Jun 2026'
@@ -49,7 +49,7 @@ test.describe('Home investments card: contributions vs growth', () => {
   }) => {
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
-    await page.goto('/dashboard');
+    await page.goto('/accounts/list');
 
     await expect(page.getByTestId('growth-of-ten-thousand-since')).toHaveText(
       /Put in on 14 Sept? 2025, worth on 14 Sept? 2026\./
@@ -80,7 +80,7 @@ test.describe('Home investments card: contributions vs growth', () => {
         reasons: [{code: 'UNKNOWN_FLOW', source: 'ibkr'}],
       },
     });
-    await page.goto('/dashboard');
+    await page.goto('/accounts/list');
 
     await expect(page.getByTestId('brokerage-growth-no-flows')).toContainText(
       'No contributions recorded yet for Interactive Brokers.'

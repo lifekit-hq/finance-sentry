@@ -70,8 +70,8 @@ const json = (body: unknown) => ({
 
 // Enough snapshots for the hero chart, so the baseline shows the figure, chart and range control as one card.
 // The first two days predate the cash / invested split (drawn as the "No split" band); the last two
-// carry it, with cash as the remainder, so the baseline shows the stacked Cash / invested chart and the
-// hero without an invested-change line (that figure lives in the Investments card).
+// carry it, with cash as the remainder, so the baseline shows the stacked Cash / invested chart, its legend
+// and the "Where it is" rows read off the latest day.
 const HISTORY = [
   ['2026-07-15', 41_000, 5_000, 1_000, null],
   ['2026-08-15', 42_500, 5_500, 1_200, null],
@@ -110,6 +110,32 @@ const BRIDGE = {
   currency: 'USD',
 };
 
+// The newest unread alert, Home's one insight, with two more waiting in Alerts.
+const UNREAD_ALERTS = {
+  items: [
+    {
+      id: 'alert-1',
+      type: 'LowBalance',
+      severity: 'Warning',
+      title: 'Low balance on Monzo',
+      message: 'Your Monzo current account dropped below $500.',
+      referenceId: null,
+      referenceLabel: null,
+      isRead: false,
+      isResolved: false,
+      createdAt: '2026-09-15T08:00:00Z',
+      resolvedAt: null,
+      occurrenceCount: 1,
+      lastOccurredAt: '2026-09-15T08:00:00Z',
+    },
+  ],
+  totalCount: 3,
+  unreadCount: 3,
+  page: 1,
+  pageSize: 1,
+  totalPages: 3,
+};
+
 async function openDashboard(page: Page): Promise<void> {
   await page.clock.install({time: FROZEN_NOW});
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
@@ -121,11 +147,14 @@ async function openDashboard(page: Page): Promise<void> {
   await page.route(`${API}/net-worth/bridge**`, route => route.fulfill(json(BRIDGE)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));
+  await page.route(`${API}/alerts?**`, route => route.fulfill(json(UNREAD_ALERTS)));
+  await page.route(`${API}/alerts/unread-count`, route => route.fulfill(json({count: 3})));
   await mockAccounts(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
-  await expect(page.getByTestId('investments-card-total')).toBeVisible();
-  await expect(page.getByTestId('net-worth-bridge-end')).toBeVisible();
+  await expect(page.getByTestId('net-worth-allocation')).toBeVisible();
+  await expect(page.getByTestId('net-worth-why-moved-change')).toBeVisible();
+  await expect(page.getByTestId('top-alert-more')).toHaveText('2 more in Alerts ›');
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.clock.runFor(CHART_SETTLE_MS);

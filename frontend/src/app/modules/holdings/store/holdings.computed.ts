@@ -1,17 +1,9 @@
 import {computed, type Signal} from '@angular/core';
-import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
 import {type AsyncStatus} from '@lifekit-hq/core';
-import {type DonutSegment, type Nullable} from '@lifekit-hq/ui';
+import {type Nullable} from '@lifekit-hq/ui';
 
-import {
-  CASH_COLOUR,
-  CRYPTO_COLOUR,
-  EQUITY_COLOUR,
-} from '../../../shared/constants/chart-colour/chart-colour.constants';
-import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {type HiddenReason} from '../../../shared/models/wealth/wealth.model';
-import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position, type PositionAssetClass} from '../models/position/position.model';
@@ -25,9 +17,6 @@ interface StateSignals {
 }
 
 const WEIGHT_TO_PERCENT = 100;
-
-/** How many positions the Home Investments card lists. */
-export const TOP_HOLDINGS_COUNT = 5;
 
 export type AssetClass = PositionAssetClass;
 
@@ -66,13 +55,6 @@ export interface PositionAssetGroup {
   totalValue: number;
 }
 
-export interface AllocationBreakdownRow {
-  label: string;
-  color: string;
-  value: number;
-  percent: number;
-}
-
 const ASSET_CLASS_ORDER: readonly AssetClass[] = [
   'cash',
   'bonds',
@@ -89,30 +71,12 @@ const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   crypto: 'Crypto',
 };
 
-// Equity, crypto and cash wear their fixed asset tokens (never the theme); bonds and real estate
-// have no fixed meaning and take series steps. A canvas cannot read a CSS var, so the donut resolves
-// the colour when it is built.
-export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
-  cash: CASH_COLOUR,
-  bonds: {step: CATEGORICAL_STEPS[3]},
-  realEstate: {step: CATEGORICAL_STEPS[4]},
-  equity: EQUITY_COLOUR,
-  crypto: CRYPTO_COLOUR,
-};
-
 export function holdingsComputed(store: StateSignals) {
   const totalPositionsValue = computed(() =>
     store.positions().reduce((sum, p) => sum + p.currentValue, 0)
   );
   // Everything but the cash asset class (broker cash, venue fiat): the book's `investedUsd`
   // (money-semantics §8), so Home's card and its hero sub-line state one figure.
-  const investedPositionsValue = computed(() =>
-    store
-      .positions()
-      .filter(p => p.assetClass !== 'cash')
-      .reduce((sum, p) => sum + p.currentValue, 0)
-  );
-
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
     const positions = store.positions();
     const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0);
@@ -168,10 +132,6 @@ export function holdingsComputed(store: StateSignals) {
     positions: store.positions,
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
-    investedPositionsValue,
-    // The total's record: its badge, and N/A (never 0) when every feed failed.
-    totalHeadline: computed((): Nullable<Headline> => store.headline()),
-    isTotalUnavailable: computed(() => HeadlineUtils.isUnavailable(store.headline())),
     // A failed feed is never read as an empty book: the total card keeps its N/A and badge.
     isEmpty: computed(
       () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null
@@ -190,32 +150,6 @@ export function holdingsComputed(store: StateSignals) {
         rows.sort((a, b) => b.currentValue - a.currentValue);
       }
       return byProvider;
-    }),
-    // Largest positions across every venue, for the Home card: cash balances have no dossier and
-    // hidden rows are tucked away, so neither is listed (both still count in the weights).
-    topHoldings: computed((): PositionRow[] =>
-      positionsByAssetClass()
-        .filter(group => group.assetClass !== 'cash')
-        .flatMap(group => group.rows)
-        .sort((a, b) => b.currentValue - a.currentValue)
-        .slice(0, TOP_HOLDINGS_COUNT)
-    ),
-    allocationSegments: computed((): DonutSegment[] =>
-      positionsByAssetClass().map(group => ({
-        label: group.label,
-        value: group.totalValue,
-        color: ChartColorUtils.canvas(ASSET_CLASS_COLOUR[group.assetClass]),
-      }))
-    ),
-    allocationBreakdown: computed((): AllocationBreakdownRow[] => {
-      const groups = positionsByAssetClass();
-      const total = groups.reduce((sum, g) => sum + g.totalValue, 0);
-      return groups.map(group => ({
-        label: group.label,
-        color: ChartColorUtils.css(ASSET_CLASS_COLOUR[group.assetClass]),
-        value: group.totalValue,
-        percent: total > 0 ? (group.totalValue / total) * WEIGHT_TO_PERCENT : 0,
-      }));
     }),
   };
 }

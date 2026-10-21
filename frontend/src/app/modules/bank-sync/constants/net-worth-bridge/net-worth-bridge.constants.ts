@@ -24,6 +24,27 @@ export const NET_WORTH_BRIDGE_LABELS = {
   end: 'End',
 } as const;
 
+/** Home's three "why it moved" lines and the change they add up to, in plain words. */
+export const NET_WORTH_BRIDGE_SUMMARY_LABELS = {
+  savings: 'You saved',
+  investmentReturn: 'Markets',
+  fxTranslation: 'Exchange rates',
+  change: 'Change',
+} as const;
+
+/** The one sentence under each "why it moved" line. */
+export const NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS = {
+  savings: 'Money that came in minus money you spent.',
+  investmentReturn: 'Price moves on your investments, plus dividends and interest, after fees.',
+} as const;
+
+/** Under the three lines when the bridge is not exact. */
+export const NET_WORTH_BRIDGE_ESTIMATE_NOTE =
+  'These figures are estimates: some history or exchange rates are missing or stale.';
+
+/** Under 1 unit of the currency, a move is too small to name: no "other" note, no rate move. */
+export const NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE = 1;
+
 /** The parts of the investment return its row names under it. */
 export const NET_WORTH_BRIDGE_RETURN_PARTS = {
   market: 'market',

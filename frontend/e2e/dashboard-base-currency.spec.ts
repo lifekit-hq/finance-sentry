@@ -125,18 +125,16 @@ test.describe('Base-currency totals (#851)', () => {
   test('dashboard totals are in euros', async ({page}) => {
     await page.goto('/dashboard');
 
-    const spending = page.getByRole('button', {name: /view spending details/i});
+    const spending = page.getByRole('link', {name: /view spending details/i});
     await expect(spending).toContainText('€3,100.00');
     await expect(spending).not.toContainText('$');
-    await expect(page.getByRole('button', {name: /view income details/i})).toContainText(
-      '€4,000.00'
-    );
+    await expect(page.getByRole('link', {name: /view income details/i})).toContainText('€4,000.00');
     await expect(page.getByTestId('net-worth-value')).toContainText('€2,000.00');
     await expect(page.getByTestId('net-worth-value')).not.toContainText('$');
   });
 
   test('FIRE card states its arithmetic in euros', async ({page}) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/breakdown');
 
     const assumptions = page.getByTestId('fire-assumptions');
     await expect(assumptions).toContainText('Target €930,000.00');
@@ -147,7 +145,7 @@ test.describe('Base-currency totals (#851)', () => {
   });
 
   test('twelve-month projection and its assumptions read in euros', async ({page}) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/breakdown');
 
     const line = page.getByTestId('net-worth-projection');
     await expect(line).toContainText('€13,140');

@@ -3,11 +3,11 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {pipe, switchMap, tap} from 'rxjs';
 
+import {type DateRange} from '../../../../shared/utils/date-range.utils';
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
-import {type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {type NetWorthBridgeResponse} from '../../models/net-worth-bridge/net-worth-bridge.model';
+import {NET_WORTH_BRIDGE_WINDOW} from '../../providers/net-worth-bridge-window.provider';
 import {BankSyncService} from '../../services/bank-sync.service';
-import {DashboardStore} from '../dashboard/dashboard.store';
 
 interface StoreMethods {
   setLoading(): void;
@@ -18,13 +18,13 @@ interface StoreMethods {
 
 export function netWorthBridgeEffects(store: StoreMethods) {
   const service = inject(BankSyncService);
-  const dashboard = inject(DashboardStore);
+  const bridgeWindow = inject(NET_WORTH_BRIDGE_WINDOW);
 
-  const load = rxMethod<HistoryRange>(
+  const load = rxMethod<DateRange>(
     pipe(
       tap(() => store.setLoading()),
-      switchMap(range =>
-        service.getNetWorthBridge(range).pipe(
+      switchMap(days =>
+        service.getNetWorthBridge(days).pipe(
           tap(bridge => {
             store.setBridge(bridge);
             store.setSuccess();
@@ -40,17 +40,17 @@ export function netWorthBridgeEffects(store: StoreMethods) {
   return {
     load,
     retry(): void {
-      load(dashboard.historyRange());
+      load(bridgeWindow());
     },
   };
 }
 
 export function netWorthBridgeHooks(store: ReturnType<typeof netWorthBridgeEffects>) {
-  const dashboard = inject(DashboardStore);
+  const bridgeWindow = inject(NET_WORTH_BRIDGE_WINDOW);
   return {
     onInit: () => {
-      // Follows the hero's range chips: the bridge explains the change the hero shows.
-      store.load(dashboard.historyRange);
+      // Follows the page's window: on Home the range chips, so it explains the change the hero shows.
+      store.load(bridgeWindow);
     },
   };
 }

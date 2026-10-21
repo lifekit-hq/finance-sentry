@@ -125,3 +125,14 @@ export interface DashboardData {
   cashHeadline?: MaybeHeadline;
   investedHeadline?: MaybeHeadline;
 }
+
+/** One band of the net worth chart at the point shown: Home's "where it is" row and legend. */
+export interface NetWorthAllocationRow {
+  label: string;
+  color: string;
+  value: number;
+  /** Share of the net worth shown; null when that total is not positive. */
+  percent: Nullable<number>;
+  /** The accounts page that lists this band; null for a band no page lists on its own. */
+  route: Nullable<string>;
+}

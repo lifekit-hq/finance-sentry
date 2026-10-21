@@ -31,7 +31,7 @@ export type AlertType =
   | 'PolicyReviewMissed'
   | 'RelativeUnderperformance';
 export type AlertSeverity = 'Error' | 'Warning' | 'Info';
-export type AlertFilter = 'all' | 'unread' | 'error' | 'warning' | 'info';
+export type AlertFilter = 'all' | 'unread' | 'open' | 'error' | 'warning' | 'info';
 
 export interface Alert {
   id: string;

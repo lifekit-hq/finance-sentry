@@ -37,23 +37,13 @@ import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDayUtils} from '../../utils/alert-day.utils';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
+import {AlertSeverityUtils} from '../../utils/alert-severity.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
 import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_SECTIONS = 2;
 const SKELETON_ROWS_PER_SECTION = 3;
 const ALERT_FILTER_CHIP_ID = 'filter';
-
-function severityFor(severity: AlertSeverity): AlertItemSeverity {
-  switch (severity) {
-    case 'Error':
-      return 'error';
-    case 'Warning':
-      return 'warning';
-    case 'Info':
-      return 'info';
-  }
-}
 
 @Component({
   selector: 'fns-alerts',
@@ -167,7 +157,7 @@ export class AlertsComponent {
   }
 
   public severityFor(severity: AlertSeverity): AlertItemSeverity {
-    return severityFor(severity);
+    return AlertSeverityUtils.toItemSeverity(severity);
   }
 
   public markAllRead(): void {

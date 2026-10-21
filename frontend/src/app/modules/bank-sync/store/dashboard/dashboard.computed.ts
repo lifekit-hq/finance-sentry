@@ -1,29 +1,28 @@
-import {computed, inject, type Signal} from '@angular/core';
-import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
-import {type AreaSeries, type BarSeries, type DonutSegment, type Nullable} from '@lifekit-hq/ui';
+import {computed, type Signal} from '@angular/core';
+import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
+import {type AreaSeries, type DonutSegment, type Nullable} from '@lifekit-hq/ui';
 
 import {
   CASH_COLOUR,
   CRYPTO_COLOUR,
   EQUITY_COLOUR,
-  FLOW_IN_COLOUR,
-  FLOW_OUT_COLOUR,
   NEUTRAL_COLOUR,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {APP_LOCALE, MS_PER_DAY} from '../../../../shared/constants/date/date.constants';
 import {STALE_SOURCE_CODE} from '../../../../shared/constants/headline/headline.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {type Headline, type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
-import {CategoryStore} from '../../../../shared/store/categories/categories.store';
-import {CategoryColourUtils} from '../../../../shared/utils/category-colour.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
+import {DateUtils} from '../../../../shared/utils/date.utils';
+import {type DateRange, DateRangeUtils} from '../../../../shared/utils/date-range.utils';
 import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
-import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
+import {NET_WORTH_SERIES_ROUTES} from '../../constants/dashboard/dashboard.constants';
 import {
   type DashboardData,
   type HistoryRange,
   type MonthlyFlow,
+  type NetWorthAllocationRow,
   type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
   type NetWorthSplit,
@@ -66,8 +65,7 @@ function formatMonthYear(date: Date): string {
 // collapse to a single repeated value — use day-level labels ("5 Jul") instead.
 const SHORT_SPAN_DAYS = 92;
 
-// Sleeves keep the colour of the asset class they hold, and income / spending the money-in and
-// money-out colours: none of them follow the theme. Resolved when a chart is built, since a canvas
+// Sleeves keep the colour of the asset class they hold: none of them follow the theme. Resolved when a chart is built, since a canvas
 // cannot read a CSS var.
 export const SLEEVE_COLOUR = {
   banking: CASH_COLOUR,
@@ -86,10 +84,7 @@ export const SPLIT_COLOUR = {
 } as const;
 export const NET_WORTH_BY_SLEEVE_LABEL = 'Net worth by sleeve';
 export const NET_WORTH_BY_SPLIT_LABEL = 'Net worth by cash and invested';
-const INCOME_COLOUR = FLOW_IN_COLOUR;
-const SPENDING_COLOUR = FLOW_OUT_COLOUR;
 const PERCENT = 100;
-const OTHER_CATEGORIES_LABEL = 'Other categories';
 const OTHER_SOURCES_LABEL = 'Other sources';
 
 // A savings rate over a single month is only meaningful once the month's income has actually
@@ -123,9 +118,9 @@ function formatPercent(percent: number | null | undefined): string {
     : `${percent > 0 ? '+' : ''}${percent.toFixed(CHANGE_PERCENT_DIGITS)}%`;
 }
 
-function formatMonthKey(key: string): string {
+function daysInMonth(key: string): number {
   const [year, month] = key.split('-').map(Number);
-  return formatMonthYear(new Date(Date.UTC(year, month - 1, 1)));
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 interface MonthTotals {
@@ -175,8 +170,6 @@ function savingsRateOf(totals: MonthTotals): number {
 }
 
 export function dashboardComputed(store: StateSignals) {
-  const categoryStore = inject(CategoryStore);
-
   // Every dashboard total arrives already converted to the profile's base currency.
   const baseCurrency = computed(() => store.data()?.baseCurrency ?? DEFAULT_BASE_CURRENCY);
 
@@ -423,21 +416,52 @@ export function dashboardComputed(store: StateSignals) {
     );
   });
 
-  // The split line's record: the cash and invested records together; null while scrubbing or
-  // when the API sent neither.
-  const bookSplitHeadline = computed((): Nullable<Headline> => {
-    const data = store.data();
-    if (scrubbedTotal() !== null || !data) {
-      return null;
-    }
-    return HeadlineUtils.combine([data.cashHeadline, data.investedHeadline]);
-  });
-
   // The window's change as a typed record; null while scrubbing (the pointer measures its own
   // span) and when the API sent none.
   const netWorthChangeHeadline = computed((): Nullable<Headline> =>
     scrubbedTotal() === null ? (store.historyChangeHeadline() ?? null) : null
   );
+
+  // The chart's bands at the point shown (the scrubbed day, else the latest): Home's "where it is"
+  // rows, which double as the chart's legend. A band empty on that day is left out.
+  const allocation = computed((): NetWorthAllocationRow[] => {
+    const series = netWorthAreaSeries();
+    if (series.length === 0) {
+      return [];
+    }
+    const index =
+      scrubbedTotal() === null ? series[0].points.length - 1 : (store.scrubIndex() ?? 0);
+    const total = chartedTotals()[index] ?? 0;
+    return series
+      .map(band => ({
+        label: band.label,
+        color: band.color ?? '',
+        value: band.points[index]?.value ?? 0,
+      }))
+      .filter(row => row.value !== 0)
+      .map(row => ({
+        ...row,
+        percent: total > 0 ? (row.value / total) * PERCENT : null,
+        route: NET_WORTH_SERIES_ROUTES.get(row.label) ?? null,
+      }));
+  });
+
+  // Spending over the window so far at the pace of the closed months loaded (their spending per
+  // day, times the window's days to today): what the window would have cost in a usual stretch.
+  // Null over ALL, which has no start, and before any month has closed.
+  const usualWindowSpending = computed((): Nullable<number> => {
+    const {from} = DashboardRangeUtils.windowDates(store.historyRange());
+    const closed = completeMonths();
+    if (!from || closed.length === 0) {
+      return null;
+    }
+    const closedDays = closed.reduce((sum, [key]) => sum + daysInMonth(key), 0);
+    const closedSpending = closed.reduce((sum, [, totals]) => sum + totals.outflow, 0);
+    const windowDays =
+      Math.round((Date.parse(DateUtils.isoDateUtc(new Date())) - Date.parse(from)) / MS_PER_DAY) +
+      1;
+    return (closedSpending / closedDays) * windowDays;
+  });
 
   const isFirstLoad = computed(() =>
     store.data() === null ? store.isLoading() : store.dataRange() !== store.historyRange()
@@ -451,7 +475,6 @@ export function dashboardComputed(store: StateSignals) {
   return {
     baseCurrency,
     netWorthHeadline,
-    bookSplitHeadline,
     netWorthChangeHeadline,
     // The scrubbed point's total while a pointer holds the chart, else the live net worth; N/A
     // (never 0) when the API says the figure is unavailable.
@@ -461,34 +484,12 @@ export function dashboardComputed(store: StateSignals) {
         MoneyUtils.format(scrubbedTotal() ?? store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
       )
     ),
-    // True when the split line has no figure to show but its record says why: it reads "N/A"
-    // with its badge instead of vanishing.
-    bookSplitUnavailable: computed((): boolean => {
-      const headline = bookSplitHeadline();
-      if (!headline) {
-        return false;
-      }
-      const {cashUsd, investedUsd} = store.data() ?? {};
-      return (cashUsd == null || investedUsd == null) && headline.quality !== 'COMPLETE';
-    }),
     // True when the change line has no figure but its record says why (a withheld change
     // reads "N/A" with its badge, never a 0 or a blank).
     netWorthChangeUnavailable: computed(
       (): boolean =>
         HeadlineUtils.isUnavailable(netWorthChangeHeadline()) && netWorthChange() === null
     ),
-    // "invested X · cash Y" under the live headline; null while scrubbing (the split is live
-    // only) and when the book was not read in full.
-    bookSplitFormatted: computed((): string | null => {
-      const data = store.data();
-      const {cashUsd, investedUsd} = data ?? {};
-      if (scrubbedTotal() !== null || cashUsd == null || investedUsd == null) {
-        return null;
-      }
-      const money = (amount: number): string =>
-        MoneyUtils.format(amount, baseCurrency(), WHOLE_DOLLARS);
-      return `invested ${money(investedUsd)} · cash ${money(cashUsd)}`;
-    }),
     // The scrubbed snapshot's date, replacing the range label beside the delta; null at rest.
     scrubDateFormatted: computed((): string | null => {
       const snapshot = scrubbed();
@@ -521,75 +522,40 @@ export function dashboardComputed(store: StateSignals) {
       return totals ? MoneyUtils.format(totals.inflow, baseCurrency()) : '—';
     }),
 
-    windowSavingsRateFormatted: computed(() => {
-      const rate = windowSavingsRate();
-      return rate === null ? '—' : `${Math.round(rate)}%`;
+    // How far the window's spending sits from the usual pace, in words; null with no usual to
+    // compare against.
+    windowSpendingVsUsual: computed((): Nullable<string> => {
+      const usual = usualWindowSpending();
+      const totals = windowTotals();
+      if (usual === null || !totals) {
+        return null;
+      }
+      const gap = totals.outflow - usual;
+      const amount = MoneyUtils.format(Math.abs(gap), baseCurrency(), WHOLE_DOLLARS);
+      return `${amount} ${gap > 0 ? 'above' : 'below'} your normal`;
     }),
+    // The window's savings rate, rounded, for the income tile's "Saved N%"; null as the tiles show "—".
+    windowSavingsRatePercent: computed((): Nullable<number> => {
+      const rate = windowSavingsRate();
+      return rate === null ? null : Math.round(rate);
+    }),
+    allocation,
+    // The donut beside the "where it is" rows: the bands holding money (a negative band has no slice).
+    allocationSegments: computed((): DonutSegment[] =>
+      allocation()
+        .filter(row => row.value > 0)
+        .map(row => ({label: row.label, value: row.value, color: row.color}))
+    ),
+    // The days the net worth bridge explains on Home: the range chips' window, up to today.
+    bridgeWindow: computed(
+      (): DateRange => DateRangeUtils.fromRelativeRange(store.historyRange()),
+      {equal: (a, b) => a.from === b.from && a.to === b.to}
+    ),
 
     netWorthAreaSeries,
     netWorthChartLabel: computed(() =>
       hasSplit() ? NET_WORTH_BY_SPLIT_LABEL : NET_WORTH_BY_SLEEVE_LABEL
     ),
-
-    incomeVsSpendingBars: computed((): BarSeries[] => {
-      const grouped = completeMonths();
-      if (grouped.length === 0) {
-        return [];
-      }
-      return [
-        {
-          label: 'Income',
-          color: ChartColorUtils.canvas(INCOME_COLOUR),
-          points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.inflow})),
-        },
-        {
-          label: 'Spending',
-          color: ChartColorUtils.canvas(SPENDING_COLOUR),
-          points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.outflow})),
-        },
-      ];
-    }),
-
-    // Gated on the same complete-month window the charts plot: a user whose only data is
-    // the in-progress month has nothing to chart yet, and rendering an empty frame reads
-    // as a broken widget rather than as "not enough history".
-    hasCashFlow: computed(() => completeMonths().length > 0),
-
-    // Each slice takes its category's own colour, so it does not move with range or rank. Past the
-    // categorical step count the tail folds into a single slate slice. The table lists them all.
-    categoryChartData: computed((): DonutSegment[] => {
-      const segments = (store.data()?.topCategories ?? []).map(c => ({
-        label: categoryStore.labelMap()[c.category] ?? MerchantCategoryUtils.format(c.category),
-        value: c.totalSpend,
-        color: ChartColorUtils.canvas(CategoryColourUtils.of(c.category)),
-      }));
-      if (segments.length <= CATEGORICAL_STEPS.length) {
-        return segments;
-      }
-      const named = segments.slice(0, CATEGORICAL_STEPS.length - 1);
-      const tail = segments.slice(named.length);
-      return [
-        ...named,
-        {
-          label: OTHER_CATEGORIES_LABEL,
-          value: tail.reduce((sum, s) => sum + s.value, 0),
-          color: seriesColor(NEUTRAL_STEP),
-        },
-      ];
-    }),
-
-    // Index-aligned with `categoryChartData`: the category each slice stands for, null for the
-    // folded "Other categories" slice, which is no single category and so has no drill-down.
-    categoryChartKeys: computed((): Nullable<string>[] => {
-      const categories = (store.data()?.topCategories ?? []).map(c => c.category);
-      if (categories.length <= CATEGORICAL_STEPS.length) {
-        return categories;
-      }
-      return [...categories.slice(0, CATEGORICAL_STEPS.length - 1), null];
-    }),
-
-    // Index-aligned with the x positions of `incomeVsSpendingBars`: the `YYYY-MM` each bar pair covers.
-    incomeVsSpendingMonthKeys: computed((): string[] => completeMonths().map(([key]) => key)),
 
     isHistoryLoading: computed(() => store.historyLoading()),
     // Keep content: a widget swaps for its skeleton while it has nothing to show for the selected

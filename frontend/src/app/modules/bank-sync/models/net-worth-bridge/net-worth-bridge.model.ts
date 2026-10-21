@@ -59,3 +59,24 @@ export interface NetWorthBridgeDegraded {
   reason: string;
   detail: string;
 }
+
+/** One of Home's three "why it moved" lines, with its sentence in plain words. */
+export interface NetWorthBridgeSummaryLine {
+  key: 'savings' | 'investmentReturn' | 'fxTranslation';
+  label: string;
+  amount: number;
+  explanation: string;
+}
+
+/**
+ * Home's plain reading of the bridge: three lines and the change. Revaluation, accounts linked or removed
+ * and the unexplained residual fold into the change (`changeNote` names them); the full statement stays on
+ * Breakdown.
+ */
+export interface NetWorthBridgeSummary {
+  lines: NetWorthBridgeSummaryLine[];
+  change: number;
+  /** What the other bridge lines added to the change; null when they moved nothing worth naming. */
+  changeNote: Nullable<string>;
+  currency: string;
+}

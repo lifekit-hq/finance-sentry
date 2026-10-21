@@ -1,0 +1,41 @@
+@if (row(); as row) {
+  <section aria-labelledby="top-alert-heading" data-testid="top-alert">
+    <div class="mb-cmn-2 flex items-baseline justify-between gap-cmn-2">
+      <h2 id="top-alert-heading" class="font-headline text-cmn-md font-semibold text-text-primary">
+        Worth a look
+      </h2>
+      <a
+        [routerLink]="alertsRoute"
+        class="text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+        data-testid="top-alert-more"
+      >
+        @if (store.moreCount() > 0) {
+          {{ store.moreCount() }} more in Alerts ›
+        } @else {
+          Alerts ›
+        }
+      </a>
+    </div>
+    <div class="relative rounded-cmn-md">
+      <cmn-alert-item
+        [title]="row.alert.title"
+        [message]="row.alert.message | alertMessage"
+        [severity]="row.severity"
+        [icon]="row.icon"
+        [badgeLabel]="row.badgeLabel"
+        [referenceLabel]="row.alert.referenceLabel"
+        [timestamp]="row.alert.createdAt"
+        [description]="row.alert | alertCaption"
+        [dismissible]="false"
+        density="flat"
+      />
+      <button
+        [attr.aria-label]="row.alert.title"
+        (click)="open(row.alert)"
+        class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+        type="button"
+        data-testid="top-alert-open"
+      ></button>
+    </div>
+  </section>
+}

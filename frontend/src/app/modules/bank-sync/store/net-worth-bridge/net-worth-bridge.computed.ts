@@ -14,6 +14,7 @@ import {
   type NetWorthBridgeDegraded,
   type NetWorthBridgeResponse,
   type NetWorthBridgeStep,
+  type NetWorthBridgeSummary,
 } from '../../models/net-worth-bridge/net-worth-bridge.model';
 import {NetWorthBridgeUtils} from '../../utils/net-worth-bridge.utils';
 
@@ -34,6 +35,16 @@ export function netWorthBridgeComputed(store: StateSignals) {
     headline: computed<Nullable<Headline>>(() => {
       const bridge = store.bridge();
       return bridge ? NetWorthBridgeUtils.headline(bridge) : null;
+    }),
+    /** Home's three-line reading; null until a bridge with figures loads. */
+    summary: computed<Nullable<NetWorthBridgeSummary>>(() => {
+      const bridge = store.bridge();
+      return bridge ? NetWorthBridgeUtils.summary(bridge) : null;
+    }),
+    /** Whether the figures are estimates: the bridge's quality is short of complete or its residual is above tolerance. */
+    isEstimate: computed(() => {
+      const bridge = store.bridge();
+      return !!bridge && (bridge.quality !== 'COMPLETE' || bridge.residualAboveTolerance);
     }),
     /** Why there is no bridge to draw (fewer than two snapshots in the window); null when there is one. */
     unavailableMessage: computed<Nullable<string>>(() => {

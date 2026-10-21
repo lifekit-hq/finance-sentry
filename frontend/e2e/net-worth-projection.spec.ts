@@ -64,16 +64,19 @@ async function mockApis(page: Page, projection: Record<string, unknown>): Promis
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/dashboard/aggregated**`, route => route.fulfill(json(DASHBOARD)));
+  await page.route(`${API}/dashboard/flow-breakdown**`, route =>
+    route.fulfill(json({month: '2026-09', items: []}))
+  );
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: [], hasHistory: false}))
   );
   await page.route(`${API}/wealth/projection`, route => route.fulfill(json(projection)));
 }
 
-test.describe('Dashboard — twelve-month net worth projection', () => {
+test.describe('Breakdown — twelve-month net worth projection', () => {
   test('shows the central figure, its range and its assumptions in words', async ({page}) => {
     await mockApis(page, PROJECTED);
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/breakdown');
 
     const line = page.getByTestId('net-worth-projection');
     await expect(line).toContainText('In 12 months: about $22,789');
@@ -89,8 +92,10 @@ test.describe('Dashboard — twelve-month net worth projection', () => {
 
   test('hides the line below three complete months', async ({page}) => {
     await mockApis(page, INSUFFICIENT);
-    await page.goto('/dashboard');
-    await expect(page.getByTestId('net-worth-value')).toContainText('$10,000.00');
+    const answered = page.waitForResponse('**/wealth/projection');
+    await page.goto('/dashboard/breakdown');
+    await answered;
+    await expect(page.getByTestId('breakdown-outlook')).toBeVisible();
 
     await expect(page.getByTestId('net-worth-projection')).toHaveCount(0);
     await expect(page.getByTestId('net-worth-projection-assumptions')).toHaveCount(0);
@@ -99,7 +104,7 @@ test.describe('Dashboard — twelve-month net worth projection', () => {
   test('fits a 390px phone without horizontal scroll', async ({page}) => {
     await page.setViewportSize({width: 390, height: 900});
     await mockApis(page, PROJECTED);
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/breakdown');
     await expect(page.getByTestId('net-worth-projection')).toBeVisible();
 
     const overflow = await page.evaluate(

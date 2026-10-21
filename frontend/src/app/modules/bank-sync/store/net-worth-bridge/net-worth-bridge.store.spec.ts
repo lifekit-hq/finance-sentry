@@ -5,10 +5,10 @@ import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {provideErrorMessages} from '../../../../core/providers/error-messages.provider';
-import {type HistoryRange} from '../../models/dashboard/dashboard.model';
+import {type DateRange} from '../../../../shared/utils/date-range.utils';
 import {type NetWorthBridgeResponse} from '../../models/net-worth-bridge/net-worth-bridge.model';
+import {NET_WORTH_BRIDGE_WINDOW} from '../../providers/net-worth-bridge-window.provider';
 import {BankSyncService} from '../../services/bank-sync.service';
-import {DashboardStore} from '../dashboard/dashboard.store';
 import {NetWorthBridgeStore} from './net-worth-bridge.store';
 
 const HTTP_SERVER_ERROR = 500;
@@ -48,22 +48,26 @@ const unavailable = (reasons = [{code: 'SHORT_HISTORY'}]): NetWorthBridgeRespons
     reasons,
   });
 
+const MONTH: DateRange = {from: '2026-09-01', to: '2026-10-01'};
+const YEAR: DateRange = {from: '2025-10-01', to: '2026-10-01'};
+const QUARTER: DateRange = {from: '2026-07-01', to: '2026-10-01'};
+
 describe('NetWorthBridgeStore', () => {
   const getNetWorthBridge = vi.fn();
-  let range: ReturnType<typeof signal<HistoryRange>>;
+  let range: ReturnType<typeof signal<DateRange>>;
 
   const create = (response: NetWorthBridgeResponse | HttpErrorResponse) => {
     getNetWorthBridge.mockReset();
     getNetWorthBridge.mockReturnValue(
       response instanceof HttpErrorResponse ? throwError(() => response) : of(response)
     );
-    range = signal<HistoryRange>('1m');
+    range = signal<DateRange>(MONTH);
     TestBed.configureTestingModule({
       providers: [
         provideErrorMessages(),
         NetWorthBridgeStore,
         {provide: BankSyncService, useValue: {getNetWorthBridge}},
-        {provide: DashboardStore, useValue: {historyRange: range}},
+        {provide: NET_WORTH_BRIDGE_WINDOW, useValue: range},
       ],
     });
     const store = TestBed.inject(NetWorthBridgeStore);
@@ -75,10 +79,10 @@ describe('NetWorthBridgeStore', () => {
     TestBed.resetTestingModule();
   });
 
-  it('loads the bridge over the dashboard range and draws its rows', () => {
+  it('loads the bridge over its page window and draws its rows', () => {
     const store = create(bridge());
 
-    expect(getNetWorthBridge).toHaveBeenCalledExactlyOnceWith('1m');
+    expect(getNetWorthBridge).toHaveBeenCalledExactlyOnceWith(MONTH);
     expect(store.status()).toBe('success');
     expect(store.steps().map(s => s.key)).toEqual([
       'start',
@@ -93,24 +97,24 @@ describe('NetWorthBridgeStore', () => {
     expect(store.degraded()).toBeNull();
   });
 
-  it('reloads when the dashboard range changes', () => {
+  it('reloads when the page window changes', () => {
     create(bridge());
 
-    range.set('1y');
+    range.set(YEAR);
     TestBed.tick();
 
-    expect(getNetWorthBridge).toHaveBeenLastCalledWith('1y');
+    expect(getNetWorthBridge).toHaveBeenLastCalledWith(YEAR);
   });
 
   it('retries over the range on screen', () => {
     const store = create(bridge());
-    range.set('3m');
+    range.set(QUARTER);
     TestBed.tick();
 
     store.retry();
 
     expect(getNetWorthBridge).toHaveBeenCalledTimes(3);
-    expect(getNetWorthBridge).toHaveBeenLastCalledWith('3m');
+    expect(getNetWorthBridge).toHaveBeenLastCalledWith(QUARTER);
   });
 
   it('names the residual above tolerance as the DEGRADED reason, with its size', () => {
