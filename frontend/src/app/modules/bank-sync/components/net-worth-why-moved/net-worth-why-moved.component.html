@@ -62,6 +62,21 @@
           }
         </li>
       </ul>
+      @if (store.isEstimate()) {
+        <p
+          class="mt-cmn-3 text-cmn-xs text-text-secondary"
+          data-testid="net-worth-why-moved-estimate"
+        >
+          {{ estimateNote }}
+          <a
+            [routerLink]="breakdownRoute"
+            [queryParams]="detailsParams()"
+            class="font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+            data-testid="net-worth-why-moved-estimate-link"
+            >See Breakdown →</a
+          >
+        </p>
+      }
     }
 
     <a

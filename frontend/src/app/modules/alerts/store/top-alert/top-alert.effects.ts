@@ -16,14 +16,14 @@ interface EffectsStore {
 export function topAlertEffects(store: EffectsStore) {
   const api = inject(AlertsService);
   return {
-    /** The newest unread alert and how many are unread: one row of the unread filter. */
+    /** The newest unread, unresolved alert and how many the Alerts badge counts. */
     load: rxMethod<void>(
       pipe(
         tap(() => store.setLoading()),
         switchMap(() =>
-          api.getAlerts('unread', 1, 1).pipe(
+          api.getAlerts('open', 1, 1).pipe(
             tap(res => {
-              store.setTopAlert(res.items[0], res.totalCount);
+              store.setTopAlert(res.items[0], res.unreadCount);
               store.setSuccess();
             }),
             catchError(() => {

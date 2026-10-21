@@ -89,6 +89,21 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
     }
 
     [Fact]
+    public async Task GetPagedAsync_open_filter_keeps_only_unread_unresolved_alerts()
+    {
+        var open = Add(AlertType.LowBalance, 10);
+        Add(AlertType.SyncFailure, 5, isResolved: true);
+        Add(AlertType.BudgetBreach, 3, isRead: true);
+        await _db.SaveChangesAsync();
+
+        var (items, total, unread) = await _repo.GetPagedAsync(User, filter: "open", page: 1, pageSize: 10);
+
+        items.Select(a => a.Id).Should().Equal(open.Id);
+        total.Should().Be(1);
+        unread.Should().Be(1);
+    }
+
+    [Fact]
     public async Task GetPagedAsync_search_matches_title_message_or_reference_label_ignoring_case()
     {
         var byTitle = Add(AlertType.LowBalance, 10);

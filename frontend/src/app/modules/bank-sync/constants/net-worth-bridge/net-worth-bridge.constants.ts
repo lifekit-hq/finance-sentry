@@ -38,6 +38,10 @@ export const NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS = {
   investmentReturn: 'Price moves on your investments, plus dividends and interest, after fees.',
 } as const;
 
+/** Under the three lines when the bridge is not exact. */
+export const NET_WORTH_BRIDGE_ESTIMATE_NOTE =
+  'These figures are estimates: some history or exchange rates are missing or stale.';
+
 /** Under 1 unit of the currency, a move is too small to name: no "other" note, no rate move. */
 export const NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE = 1;
 

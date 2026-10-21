@@ -41,6 +41,11 @@ export function netWorthBridgeComputed(store: StateSignals) {
       const bridge = store.bridge();
       return bridge ? NetWorthBridgeUtils.summary(bridge) : null;
     }),
+    /** Whether the figures are estimates: the bridge's quality is short of complete or its residual is above tolerance. */
+    isEstimate: computed(() => {
+      const bridge = store.bridge();
+      return !!bridge && (bridge.quality !== 'COMPLETE' || bridge.residualAboveTolerance);
+    }),
     /** Why there is no bridge to draw (fewer than two snapshots in the window); null when there is one. */
     unavailableMessage: computed<Nullable<string>>(() => {
       const bridge = store.bridge();

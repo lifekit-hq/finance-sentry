@@ -25,10 +25,14 @@ const ALERT: Alert = {
   lastOccurredAt: '2026-10-01T09:00:00Z',
 };
 
-const page = (items: Alert[], totalCount: number): AlertsPageResponse => ({
+const page = (
+  items: Alert[],
+  totalCount: number,
+  unreadCount = totalCount
+): AlertsPageResponse => ({
   items,
   totalCount,
-  unreadCount: totalCount,
+  unreadCount,
   page: 1,
   pageSize: 1,
   totalPages: totalCount,
@@ -42,11 +46,11 @@ function create(getAlerts: AlertsService['getAlerts']) {
 }
 
 describe('TopAlertStore', () => {
-  it('asks for one row of the unread alerts, the newest', () => {
+  it('asks for one row of the open alerts, the newest', () => {
     const getAlerts = vi.fn(() => of(page([ALERT], 1)));
     create(getAlerts);
 
-    expect(getAlerts).toHaveBeenCalledExactlyOnceWith('unread', 1, 1);
+    expect(getAlerts).toHaveBeenCalledExactlyOnceWith('open', 1, 1);
   });
 
   it('holds the newest unread alert and counts the rest', () => {
@@ -55,6 +59,12 @@ describe('TopAlertStore', () => {
     expect(store.alert()).toEqual(ALERT);
     expect(store.moreCount()).toBe(2);
     expect(store.status()).toBe('success');
+  });
+
+  it('counts the rest by the Alerts badge, not by every unread row', () => {
+    const store = create(() => of(page([ALERT], 5, 2)));
+
+    expect(store.moreCount()).toBe(1);
   });
 
   it('holds nothing when every alert is read', () => {

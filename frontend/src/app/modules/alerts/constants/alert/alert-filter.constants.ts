@@ -20,6 +20,7 @@ export const ALERT_SEVERITY_FILTERS: AlertFilterOption[] = [
 export const ALERT_FILTER_LABELS: Record<AlertFilter, string> = {
   all: 'All',
   unread: 'Unread',
+  open: 'Open',
   error: 'Errors',
   warning: 'Warnings',
   info: 'Info',

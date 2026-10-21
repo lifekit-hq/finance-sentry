@@ -109,6 +109,29 @@ describe('NetWorthWhyMovedComponent', () => {
     expect(el.querySelector('[data-testid="net-worth-why-moved-change"]')).toBeNull();
   });
 
+  it('says the figures are estimates, with a link to Breakdown, when the bridge is degraded', () => {
+    const el = render(bridge({quality: 'DEGRADED', reasons: [{code: 'FX_STALE'}]}));
+
+    expect(text(el.querySelector('[data-testid="net-worth-why-moved-estimate"]'))).toContain(
+      'These figures are estimates'
+    );
+    expect(
+      el.querySelector('[data-testid="net-worth-why-moved-estimate-link"]')?.getAttribute('href')
+    ).toBe('/dashboard/breakdown?from=2026-07-01&to=2026-10-01&months=3');
+  });
+
+  it('says the figures are estimates when the residual is above tolerance', () => {
+    const el = render(bridge({residualAboveTolerance: true, residual: 400, endValue: 11_400}));
+
+    expect(el.querySelector('[data-testid="net-worth-why-moved-estimate"]')).not.toBeNull();
+  });
+
+  it('does not call exact figures estimates', () => {
+    expect(
+      render(bridge()).querySelector('[data-testid="net-worth-why-moved-estimate"]')
+    ).toBeNull();
+  });
+
   it('links to the full statement in Breakdown for the same window', () => {
     const link = render(bridge()).querySelector('[data-testid="net-worth-why-moved-details"]');
 

@@ -4,7 +4,10 @@ import {AsyncStateComponent, CardComponent, SkeletonComponent} from '@lifekit-hq
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {NET_WORTH_BRIDGE_SUMMARY_LABELS} from '../../constants/net-worth-bridge/net-worth-bridge.constants';
+import {
+  NET_WORTH_BRIDGE_ESTIMATE_NOTE,
+  NET_WORTH_BRIDGE_SUMMARY_LABELS,
+} from '../../constants/net-worth-bridge/net-worth-bridge.constants';
 import {NetWorthBridgeStore} from '../../store/net-worth-bridge/net-worth-bridge.store';
 
 const SKELETON_LINES = 3;
@@ -29,5 +32,6 @@ export class NetWorthWhyMovedComponent {
   public readonly detailsParams = input<Params>({});
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly changeLabel = NET_WORTH_BRIDGE_SUMMARY_LABELS.change;
+  public readonly estimateNote = NET_WORTH_BRIDGE_ESTIMATE_NOTE;
   public readonly skeletonLines = Array.from({length: SKELETON_LINES});
 }
