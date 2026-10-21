@@ -171,8 +171,11 @@ function heavySummary(): typeof SUMMARY {
 
 // The shell's page-overflow spacer (a transparent block after the page frame) sits over the padding of
 // library rows that overflow the frame, so a tap lands on the row's label text, as a thumb does.
+/** A disclosure row's own toggle: it names its body (`aria-controls`) and states `aria-expanded`. */
+const ROW_TOGGLE = 'cmn-disclosure-row button[aria-controls]';
+
 async function toggle(row: Locator, name: string): Promise<void> {
-  await row.locator('summary').getByText(name, {exact: true}).click();
+  await row.getByText(name, {exact: true}).first().click();
 }
 
 async function openAccounts(page: Page, summary: unknown = SUMMARY): Promise<void> {
@@ -227,10 +230,10 @@ for (const [name, viewport] of Object.entries(PHONES)) {
     }) => {
       await openAccounts(page);
 
-      const groups = page.locator('cmn-disclosure-row details');
-      await expect(groups.nth(0)).toHaveJSProperty('open', true);
-      await expect(groups.nth(1)).toHaveJSProperty('open', false);
-      await expect(groups.nth(2)).toHaveJSProperty('open', false);
+      const groups = page.locator(ROW_TOGGLE);
+      await expect(groups.nth(0)).toHaveAttribute('aria-expanded', 'true');
+      await expect(groups.nth(1)).toHaveAttribute('aria-expanded', 'false');
+      await expect(groups.nth(2)).toHaveAttribute('aria-expanded', 'false');
     });
 
     test('opens a broker in place with value-first positions and no link out', async ({page}) => {
@@ -300,21 +303,21 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       page,
     }) => {
       await openAccounts(page);
-      const groups = page.locator('cmn-disclosure-row details');
-      await expect(groups.nth(0)).toHaveJSProperty('open', true);
+      const groups = page.locator(ROW_TOGGLE);
+      await expect(groups.nth(0)).toHaveAttribute('aria-expanded', 'true');
 
       await toggle(groups.nth(0), 'AIB');
       await toggle(groups.nth(1), 'Interactive Brokers');
-      await expect(groups.nth(0)).toHaveJSProperty('open', false);
-      await expect(groups.nth(1)).toHaveJSProperty('open', true);
+      await expect(groups.nth(0)).toHaveAttribute('aria-expanded', 'false');
+      await expect(groups.nth(1)).toHaveAttribute('aria-expanded', 'true');
       await expect
         .poll(() => page.evaluate(() => localStorage.getItem('fns.accounts.institutionOpen')))
         .toBe('{"truelayer:aib-1":false,"ibkr:ibkr-1":true}');
       await page.reload();
 
-      await expect(groups.nth(0)).toHaveJSProperty('open', false);
-      await expect(groups.nth(1)).toHaveJSProperty('open', true);
-      await expect(groups.nth(2)).toHaveJSProperty('open', false);
+      await expect(groups.nth(0)).toHaveAttribute('aria-expanded', 'false');
+      await expect(groups.nth(1)).toHaveAttribute('aria-expanded', 'true');
+      await expect(groups.nth(2)).toHaveAttribute('aria-expanded', 'false');
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
     });
 

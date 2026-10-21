@@ -108,7 +108,7 @@
         <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
         <cmn-button
           [loading]="ibkr.isValidating()"
-          [disabled]="form.invalid || ibkr.isValidating()"
+          [disabled]="ibkr.isValidating()"
           variant="primary"
           type="submit"
         >

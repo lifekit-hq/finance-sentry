@@ -1,7 +1,8 @@
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, Router} from '@angular/router';
-import {CmnDialogService} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
+import {onTestFinished} from 'vitest';
 
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {
@@ -18,6 +19,12 @@ import {type ManualHoldingRow} from '../../models/manual-holding/manual-holding.
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {baseInstitution, setup, setupFixture} from './accounts-list.component.fixtures';
+
+/** The first disclosure row's toggle under `root`: label and sublabel live on it, `aria-expanded` is its state. */
+const toggleIn = (root: ParentNode | null | undefined): HTMLButtonElement | null =>
+  root?.querySelector<HTMLButtonElement>('cmn-disclosure-row button[aria-controls]') ?? null;
+const isOpen = (root: ParentNode | null | undefined): boolean =>
+  toggleIn(root)?.getAttribute('aria-expanded') === 'true';
 
 describe('AccountsListComponent growth sections', () => {
   it('draws contributed vs growth and $10,000 under the brokerage section', () => {
@@ -77,7 +84,7 @@ describe('AccountsListComponent sync status', () => {
   it('keeps a healthy institution to the count and a green dot that names its last sync', () => {
     const element = setup({syncStatus: 'synced', lastSyncTimestamp: new Date().toISOString()});
 
-    const sublabel = element.querySelector('cmn-disclosure-row summary')?.textContent ?? '';
+    const sublabel = toggleIn(element)?.textContent ?? '';
     expect(sublabel).toContain('0 accounts');
     expect(sublabel).not.toContain('0 accounts ·');
     expect(dot(element)?.className).toContain('bg-status-success');
@@ -244,27 +251,22 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  const details = (element: HTMLElement): HTMLDetailsElement =>
-    element.querySelector('cmn-disclosure-row details') as HTMLDetailsElement;
-
   it('is one disclosure row with the compact sublabel and the total, like a bank', () => {
     const element = brokerage();
 
     expect(element.querySelectorAll('cmn-disclosure-row')).toHaveLength(1);
-    expect(element.querySelector('cmn-disclosure-row summary')?.textContent).toContain(
-      '2 positions · $400.00 cash'
-    );
+    expect(toggleIn(element)?.textContent).toContain('2 positions · $400.00 cash');
     expect(element.querySelector('[data-testid="institution-total"]')?.textContent).toContain(
       '$800.00'
     );
   });
 
   it('starts closed on a first visit', () => {
-    expect(details(brokerage()).open).toBe(false);
+    expect(isOpen(brokerage())).toBe(false);
   });
 
   it('opens when this device opened it', () => {
-    expect(details(brokerage({open: {'ibkr:ibkr-1': true}})).open).toBe(true);
+    expect(isOpen(brokerage({open: {'ibkr:ibkr-1': true}}))).toBe(true);
   });
 
   it('lists value-first position rows: ticker, size, then value', () => {
@@ -396,10 +398,6 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
 describe('AccountsListComponent sticky sections and remembered disclosure', () => {
   const KEY = 'truelayer:inst-1';
 
-  function details(element: HTMLElement): HTMLDetailsElement {
-    return element.querySelector('cmn-disclosure-row details') as HTMLDetailsElement;
-  }
-
   it('renders each category as a list section with its subtotal in the header', () => {
     const element = setup({syncStatus: 'synced'});
 
@@ -409,24 +407,22 @@ describe('AccountsListComponent sticky sections and remembered disclosure', () =
   });
 
   it('opens a banking group by default', () => {
-    expect(details(setup({syncStatus: 'synced'})).open).toBe(true);
+    expect(isOpen(setup({syncStatus: 'synced'}))).toBe(true);
   });
 
-  it('opens a collapsed group closed, with its total still in the summary', () => {
+  it('opens a collapsed group closed, with its total still in the header', () => {
     const fixture = setupFixture({syncStatus: 'synced'}, [], {open: {[KEY]: false}});
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(details(element).open).toBe(false);
-    expect(details(element).querySelector('summary')?.textContent).toContain('$100.00');
+    expect(isOpen(element)).toBe(false);
+    expect(toggleIn(element)?.parentElement?.textContent).toContain('$100.00');
   });
 
   it('records the open state when the user toggles the group', () => {
     const setInstitutionOpen = vi.fn();
     const fixture = setupFixture({syncStatus: 'synced'}, [], {setInstitutionOpen});
-    const group = details(fixture.nativeElement as HTMLElement);
 
-    group.open = false;
-    group.dispatchEvent(new Event('toggle'));
+    toggleIn(fixture.nativeElement as HTMLElement)?.click();
 
     expect(setInstitutionOpen).toHaveBeenCalledWith(KEY, false);
   });
@@ -526,7 +522,14 @@ describe('AccountsListComponent async states', () => {
     setupFixture({}, [], state).nativeElement as HTMLElement;
 
   it('shows skeleton rows and no institutions while loading', () => {
-    const el = render({isLoading: true});
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const fixture = setupFixture({}, [], {isLoading: true});
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
 
     expect(el.querySelectorAll('cmn-skeleton').length).toBeGreaterThan(0);
     expect(el.querySelector('[data-testid="account-row"]')).toBeNull();
@@ -730,10 +733,8 @@ describe('AccountsListComponent hidden rows', () => {
     const element = setupFixture({...cardsInstitution, hiddenCount: 3})
       .nativeElement as HTMLElement;
 
-    expect(hiddenGroup(element)?.querySelector('summary')?.textContent).toContain(
-      '3 hidden · $0.40'
-    );
-    expect(hiddenGroup(element)?.querySelector('details')?.open).toBe(false);
+    expect(toggleIn(hiddenGroup(element))?.textContent).toContain('3 hidden · $0.40');
+    expect(isOpen(hiddenGroup(element))).toBe(false);
   });
 
   it('lists only the visible rows and cards above it, and the hidden ones inside it', () => {
@@ -765,12 +766,10 @@ describe('AccountsListComponent hidden rows', () => {
       setInstitutionOpen,
     });
     const element = fixture.nativeElement as HTMLElement;
-    const details = hiddenGroup(element)?.querySelector('details') as HTMLDetailsElement;
 
-    expect(details.open).toBe(true);
+    expect(isOpen(hiddenGroup(element))).toBe(true);
 
-    details.open = false;
-    details.dispatchEvent(new Event('toggle'));
+    toggleIn(hiddenGroup(element))?.click();
     expect(setInstitutionOpen).toHaveBeenCalledWith('monobank:inst-1:hidden', false);
   });
 
@@ -801,8 +800,6 @@ describe('AccountsListComponent closed accounts', () => {
   };
   const section = (element: HTMLElement): HTMLElement | null =>
     element.querySelector('[data-testid="closed-accounts"]');
-  const group = (element: HTMLElement): HTMLDetailsElement =>
-    section(element)?.querySelector('details') ?? document.createElement('details');
 
   function setupClosed(state: Parameters<typeof setupFixture>[2] = {}) {
     const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
@@ -828,18 +825,17 @@ describe('AccountsListComponent closed accounts', () => {
   it('counts the closed accounts and starts collapsed', () => {
     const {element} = setupClosed();
 
-    expect(group(element).querySelector('summary')?.textContent).toContain('Closed accounts (1)');
-    expect(group(element).open).toBe(false);
+    expect(toggleIn(section(element))?.textContent).toContain('Closed accounts (1)');
+    expect(isOpen(section(element))).toBe(false);
   });
 
   it('opens when this device left it open, and records the toggle', () => {
     const setInstitutionOpen = vi.fn();
     const {element} = setupClosed({open: {'closed:accounts': true}, setInstitutionOpen});
 
-    expect(group(element).open).toBe(true);
+    expect(isOpen(section(element))).toBe(true);
 
-    group(element).open = false;
-    group(element).dispatchEvent(new Event('toggle'));
+    toggleIn(section(element))?.click();
     expect(setInstitutionOpen).toHaveBeenCalledWith('closed:accounts', false);
   });
 

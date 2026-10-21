@@ -318,23 +318,49 @@ describe('DashboardComponent chart click-through', () => {
 
 describe('DashboardComponent where it is', () => {
   const allocation = signal([
-    {label: 'Banking', color: '#111111', value: 2000, percent: 20, route: AppRoute.AccountsList},
-    {label: 'Brokerage', color: '#222222', value: 8000, percent: 80, route: AppRoute.Accounts},
+    {label: 'Banking', color: '#111111', value: 2000, route: AppRoute.AccountsList},
+    {label: 'Brokerage', color: '#222222', value: 8000, route: AppRoute.Accounts},
+  ]);
+  const allocationSegments = signal([
+    {label: 'Banking', color: '#111111', value: 2000},
+    {label: 'Brokerage', color: '#222222', value: 8000},
   ]);
 
-  it('lists each band with its share and its amount in the base currency, linked to its accounts', () => {
-    const {el} = render('3m', undefined, {allocation, allocationSegments: signal([])});
-    const rows = [...el.querySelectorAll('[data-testid="net-worth-allocation-row"]')];
+  it('draws each band as its share of the bar, named with its amount in the base currency', () => {
+    const {el} = render('3m', undefined, {allocation, allocationSegments});
+    const legend = [...el.querySelectorAll('cmn-allocation-bar li button')];
 
-    expect(
-      rows.map(row => [...row.querySelectorAll('a > span')].map(cell => cell.textContent?.trim()))
-    ).toEqual([
-      ['', 'Banking', '20%', '€2,000'],
-      ['', 'Brokerage', '80%', '€8,000'],
+    expect(el.querySelector('[data-testid="allocation-bar"]')?.getAttribute('aria-label')).toBe(
+      'Where your net worth is: Banking 20%, Brokerage 80%'
+    );
+    expect(legend.map(row => row.getAttribute('aria-label'))).toEqual([
+      'Banking, 20%, €2,000.00',
+      'Brokerage, 80%, €8,000.00',
     ]);
-    expect(rows.map(row => row.querySelector('a')?.getAttribute('href'))).toEqual([
-      '/accounts/list',
-      '/accounts',
+  });
+
+  it('opens the accounts page that lists a band from its legend row', () => {
+    const {el} = render('3m', undefined, {allocation, allocationSegments});
+    const navigateByUrl = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    (el.querySelectorAll('cmn-allocation-bar li button')[1] as HTMLButtonElement).click();
+
+    expect(navigateByUrl).toHaveBeenCalledWith(AppRoute.Accounts);
+  });
+
+  it('names a band below zero under the bar, which only draws money held', () => {
+    const {el} = render('3m', undefined, {
+      allocation,
+      allocationSegments,
+      allocationBelowZero: signal([
+        {label: 'Cash', color: '#333333', value: -1200, route: AppRoute.AccountsList},
+      ]),
+    });
+    const row = el.querySelector('[data-testid="net-worth-allocation-below-zero"]');
+
+    expect([...(row?.children ?? [])].map(cell => cell.textContent?.trim())).toEqual([
+      'Cash is below zero',
+      '-€1,200',
     ]);
   });
 

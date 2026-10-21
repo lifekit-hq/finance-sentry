@@ -1,8 +1,12 @@
 <cmn-page-container>
+  <!-- The host's spacing lays out these children directly;
+       the keep-content wrapper would put them in one box. -->
   <cmn-async-state
     [status]="dossierStatus()"
     [errorMessage]="store.dossierErrorMessage()"
+    [keepContent]="false"
     class="block space-y-cmn-5"
+    emptySubMessage="No position, thesis, valuation, coverage, news or signal is recorded for this asset yet."
   >
     <div skeleton data-testid="dossier-skeleton" class="space-y-cmn-5">
       <cmn-skeleton height="2rem" width="40%" />
@@ -592,6 +596,7 @@
                   [skeletonHeight]="chartSkeletonHeight"
                   [skeletonRows]="1"
                   (retry)="store.loadChart({symbol: dossier.symbol, range: store.chartRange()})"
+                  emptySubMessage="Pick a longer range to see more of its price history."
                   class="mt-cmn-3 block min-h-[23rem]"
                   retryable
                 >

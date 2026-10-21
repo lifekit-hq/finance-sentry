@@ -1,9 +1,10 @@
 import {DestroyRef, Directive, ElementRef, inject, output} from '@angular/core';
 
 /**
- * `cmn-disclosure-row` wraps a native `<details>` and exposes no open/close output, so a remembered
- * disclosure cannot hear the user toggle it. The `toggle` event does not bubble, but it can be caught on
- * the way down; this reports it until the library exposes an output.
+ * `cmn-disclosure-row` exposes no open/close output, so a remembered disclosure cannot hear the user
+ * toggle it. The row is one toggle button (`aria-expanded`, `aria-controls` naming its body); this
+ * catches a click on that button on the way down, before the row flips, and reports the state the
+ * row is about to take, until the library exposes an output.
  */
 // Attaches by element + attribute so templates need no extra opt-in; the prefix rule targets attribute-only selectors.
 
@@ -14,12 +15,14 @@ export class DisclosureToggleDirective {
   public readonly fnsDisclosureToggle = output<boolean>();
 
   constructor() {
-    const onToggle = (event: Event): void => {
-      if (event.target instanceof HTMLDetailsElement && event.target.parentElement === this.host) {
-        this.fnsDisclosureToggle.emit(event.target.open);
+    const onClick = (event: Event): void => {
+      // The row's own toggle comes first; a nested row's toggle or an action's control does not count.
+      const toggle = this.host.querySelector('button[aria-controls]');
+      if (toggle && event.target instanceof Element && event.target.closest('button') === toggle) {
+        this.fnsDisclosureToggle.emit(toggle.getAttribute('aria-expanded') !== 'true');
       }
     };
-    this.host.addEventListener('toggle', onToggle, true);
-    inject(DestroyRef).onDestroy(() => this.host.removeEventListener('toggle', onToggle, true));
+    this.host.addEventListener('click', onClick, true);
+    inject(DestroyRef).onDestroy(() => this.host.removeEventListener('click', onClick, true));
   }
 }

@@ -110,13 +110,14 @@ for (const [label, viewport] of [
       page,
     }) => {
       const hidden = await open(page);
-      const details = hidden.locator('details');
+      const rowToggle = hidden.locator('button[aria-controls]');
       await expect(page.getByTestId('position-ticker').first()).toHaveText('BTC');
-      await expect(details).toHaveJSProperty('open', false);
+      await expect(rowToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(hidden).toContainText('2 hidden · $0.62');
       await shot(page, `holdings-hidden-collapsed-${label}`);
 
-      const summary = hidden.locator('summary');
+      // The toggle's ::after covers the whole row, so the row is the press target.
+      const summary = rowToggle.locator('..');
       const box = await summary.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
       const offset = async (): Promise<number> => {
@@ -125,8 +126,8 @@ for (const [label, viewport] of [
         return summaryTop - top;
       };
       const before = await offset();
-      await summary.click();
-      await expect(details).toHaveJSProperty('open', true);
+      await rowToggle.click();
+      await expect(rowToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(hidden.getByTestId('hidden-rows-list')).toContainText('SHIB');
       await expect(hidden.getByTestId('hidden-rows-list')).toContainText('DOGE');
       expect(await offset()).toBe(before);

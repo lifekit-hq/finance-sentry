@@ -2,9 +2,9 @@ import {DialogRef} from '@angular/cdk/dialog';
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CMN_DIALOG_DATA} from '@lifekit-hq/ui';
 import {NEVER, type Observable, of, Subject, throwError} from 'rxjs';
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
@@ -360,7 +360,13 @@ describe('AddCommitmentDialogComponent candidate list states', () => {
   });
 
   it('shows a skeleton while the candidates load, not the empty copy', () => {
-    const {host} = render(vi.fn(() => NEVER));
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const {fixture, host} = render(vi.fn(() => NEVER));
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="candidates-skeleton"]')).not.toBeNull();
     expect(host.textContent).not.toContain('No matching outgoing transactions');

@@ -14,10 +14,14 @@
       </cmn-alert>
     }
 
+    <!-- The host's spacing lays out these children directly;
+         the keep-content wrapper would put them in one box. -->
     <cmn-async-state
       [status]="view().status"
       [errorMessage]="view().errorMessage"
       [isEmpty]="isEmpty()"
+      [emptySubMessage]="noActiveCopy.subMessage"
+      [keepContent]="false"
       (retry)="store.load()"
       class="block space-y-cmn-5"
       errorPlacement="above"

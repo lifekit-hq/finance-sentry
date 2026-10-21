@@ -16,7 +16,8 @@ import {WhatsNewVersionComponent} from '../whats-new-version/whats-new-version.c
       [isEmpty]="store.visibleVersions().length === 0"
       [skeletonRows]="3"
       class="block p-cmn-4 md:p-cmn-6"
-      emptyMessage="Nothing to show yet"
+      emptyMessage="No release notes yet"
+      emptySubMessage="Notes for each new version appear here once it ships."
       skeletonHeight="3rem"
     >
       <div class="space-y-cmn-6" data-testid="whats-new-list">

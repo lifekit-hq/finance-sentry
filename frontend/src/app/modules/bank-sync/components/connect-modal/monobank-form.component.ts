@@ -1,6 +1,13 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
-import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {
+  FormControl,
+  FormGroup,
+  FormResetEvent,
+  FormSubmittedEvent,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import {
   AlertComponent,
   ButtonComponent,
@@ -8,6 +15,7 @@ import {
   FormFieldComponent,
   InputComponent,
 } from '@lifekit-hq/ui';
+import {filter, map} from 'rxjs';
 
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -55,9 +63,19 @@ export class MonobankFormComponent {
 
   public readonly tokenControl = this.form.controls.token;
 
+  // cmn-form-field shows a field's error once its form is submitted, until a reset; the input's
+  // error border follows the same moment.
+  public readonly submitted = toSignal(
+    this.form.events.pipe(
+      filter(event => event instanceof FormSubmittedEvent || event instanceof FormResetEvent),
+      map(event => event instanceof FormSubmittedEvent)
+    ),
+    {initialValue: false}
+  );
+
   public readonly tokenError = computed(() => {
     this.tokenControlEvents();
-    return this.tokenControl.touched && this.tokenControl.invalid
+    return this.submitted() && this.tokenControl.invalid
       ? "This doesn't look like a Monobank token"
       : '';
   });

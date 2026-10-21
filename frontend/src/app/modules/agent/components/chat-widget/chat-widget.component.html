@@ -18,6 +18,7 @@
             <span class="font-medium">Ledger</span>
           </div>
           <div class="flex items-center gap-cmn-1">
+            <!-- eslint-disable-next-line lifekit/no-raw-controls -- an icon-only ghost button in the chat header; cmn-button has no ghost variant -->
             <button
               (click)="onNewChat()"
               type="button"
@@ -26,6 +27,7 @@
             >
               <cmn-icon [name]="newChatIcon" size="sm" />
             </button>
+            <!-- eslint-disable-next-line lifekit/no-raw-controls -- an icon-only ghost button in the chat header; cmn-button has no ghost variant -->
             <button
               (click)="toggle()"
               type="button"
@@ -50,6 +52,7 @@
       </section>
     }
 
+    <!-- eslint-disable-next-line lifekit/no-raw-controls -- the round floating launcher; cmn-button has no floating action shape -->
     <button
       #toggleButton
       [attr.aria-expanded]="isOpen()"

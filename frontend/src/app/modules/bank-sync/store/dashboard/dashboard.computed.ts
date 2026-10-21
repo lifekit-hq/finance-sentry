@@ -1,6 +1,6 @@
 import {computed, type Signal} from '@angular/core';
 import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
-import {type AreaSeries, type DonutSegment, type Nullable} from '@lifekit-hq/ui';
+import {type AllocationSegment, type AreaSeries, type Nullable} from '@lifekit-hq/ui';
 
 import {
   CASH_COLOUR,
@@ -431,7 +431,6 @@ export function dashboardComputed(store: StateSignals) {
     }
     const index =
       scrubbedTotal() === null ? series[0].points.length - 1 : (store.scrubIndex() ?? 0);
-    const total = chartedTotals()[index] ?? 0;
     return series
       .map(band => ({
         label: band.label,
@@ -439,11 +438,7 @@ export function dashboardComputed(store: StateSignals) {
         value: band.points[index]?.value ?? 0,
       }))
       .filter(row => row.value !== 0)
-      .map(row => ({
-        ...row,
-        percent: total > 0 ? (row.value / total) * PERCENT : null,
-        route: NET_WORTH_SERIES_ROUTES.get(row.label) ?? null,
-      }));
+      .map(row => ({...row, route: NET_WORTH_SERIES_ROUTES.get(row.label) ?? null}));
   });
 
   // Spending over the window so far at the pace of the closed months loaded (their spending per
@@ -540,12 +535,14 @@ export function dashboardComputed(store: StateSignals) {
       return rate === null ? null : Math.round(rate);
     }),
     allocation,
-    // The donut beside the "where it is" rows: the bands holding money (a negative band has no slice).
-    allocationSegments: computed((): DonutSegment[] =>
+    // The "where it is" bar: the bands holding money. The bar draws shares of a whole, so a band
+    // below zero has no segment and is listed under it instead.
+    allocationSegments: computed((): AllocationSegment[] =>
       allocation()
         .filter(row => row.value > 0)
         .map(row => ({label: row.label, value: row.value, color: row.color}))
     ),
+    allocationBelowZero: computed(() => allocation().filter(row => row.value < 0)),
     // The days the net worth bridge explains on Home: the range chips' window, up to today.
     bridgeWindow: computed(
       (): DateRange => DateRangeUtils.fromRelativeRange(store.historyRange()),

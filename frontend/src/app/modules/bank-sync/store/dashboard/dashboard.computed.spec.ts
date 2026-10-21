@@ -241,13 +241,13 @@ describe('dashboardComputed', () => {
   describe('where it is', () => {
     const history = [snapshot(1_000, 3_000, 0), snapshot(2_000, 6_000, 2_000)];
 
-    it('lists each band at the latest point with its share and its accounts page', () => {
+    it('lists each band at the latest point with its accounts page', () => {
       const rows = dashboardFor({monthlyFlow: [], netWorthHistory: history}).allocation();
 
-      expect(rows.map(r => [r.label, r.value, r.percent, r.route])).toEqual([
-        ['Banking', 2_000, 20, AppRoute.AccountsList],
-        ['Brokerage', 6_000, 60, AppRoute.Accounts],
-        ['Crypto', 2_000, 20, AppRoute.Accounts],
+      expect(rows.map(r => [r.label, r.value, r.route])).toEqual([
+        ['Banking', 2_000, AppRoute.AccountsList],
+        ['Brokerage', 6_000, AppRoute.Accounts],
+        ['Crypto', 2_000, AppRoute.Accounts],
       ]);
     });
 
@@ -264,11 +264,12 @@ describe('dashboardComputed', () => {
       ]);
     });
 
-    it('keeps a negative band as a row but gives it no donut slice', () => {
+    it('gives a negative band no bar segment and lists it below zero instead', () => {
       const c = dashboardFor({monthlyFlow: [], netWorthHistory: [snapshot(-500, 1_500, 0)]});
 
       expect(c.allocation().map(r => r.label)).toEqual(['Banking', 'Brokerage']);
       expect(c.allocationSegments().map(s => [s.label, s.value])).toEqual([['Brokerage', 1_500]]);
+      expect(c.allocationBelowZero().map(r => [r.label, r.value])).toEqual([['Banking', -500]]);
     });
 
     it('is empty without history', () => {

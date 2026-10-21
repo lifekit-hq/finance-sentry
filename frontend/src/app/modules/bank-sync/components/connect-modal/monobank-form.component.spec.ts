@@ -65,6 +65,27 @@ describe('MonobankFormComponent', () => {
     expect(cmp.tokenControl.touched).toBe(true);
   });
 
+  it('shows the token error once the form is submitted, not while typing', () => {
+    configure(buildConnectStore(), buildAccountsStore(), buildStrategy());
+
+    const fixture = TestBed.createComponent(MonobankFormComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+    const form = fixture.nativeElement.querySelector('form') as HTMLFormElement;
+    cmp.tokenControl.setValue('not-a-monobank-token');
+    cmp.tokenControl.markAsTouched();
+
+    expect(cmp.tokenError()).toBe('');
+
+    form.dispatchEvent(new Event('submit'));
+
+    expect(cmp.tokenError()).toBe("This doesn't look like a Monobank token");
+
+    cmp.tokenControl.setValue('uABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234');
+
+    expect(cmp.tokenError()).toBe('');
+  });
+
   it('trims pasted whitespace and marks the control touched', () => {
     const store = buildConnectStore();
     configure(store, buildAccountsStore(), buildStrategy());

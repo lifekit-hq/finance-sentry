@@ -83,16 +83,15 @@ for (const [label, viewport] of [
     test('stays collapsed, opens in place and keeps the page where it was', async ({page}) => {
       await open(page);
       const section = page.getByTestId('closed-accounts');
-      const details = section.locator('details');
-      await expect(details).toHaveJSProperty('open', false);
+      const header = section.locator('button[aria-controls]');
+      await expect(header).toHaveAttribute('aria-expanded', 'false');
       await expect(section).toContainText('Closed accounts (2)');
       await shot(page, `closed-collapsed-${label}`);
 
-      const header = section.locator('summary');
       await header.scrollIntoViewIfNeeded();
       const before = await header.boundingBox();
       await header.click();
-      await expect(details).toHaveJSProperty('open', true);
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
       const rows = section.getByTestId('closed-account-row');
       await expect(rows).toHaveCount(2);
       await expect(rows.first()).toContainText('No longer listed by Monobank');
@@ -115,7 +114,7 @@ for (const [label, viewport] of [
         return route.fulfill({status: 204});
       });
       const section = page.getByTestId('closed-accounts');
-      await section.locator('summary').click();
+      await section.locator('button[aria-controls]').click();
       await section
         .getByRole('button', {name: /^Actions for /})
         .first()

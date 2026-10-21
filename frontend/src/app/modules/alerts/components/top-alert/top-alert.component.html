@@ -16,26 +16,19 @@
         }
       </a>
     </div>
-    <div class="relative rounded-cmn-md">
-      <cmn-alert-item
-        [title]="row.alert.title"
-        [message]="row.alert.message | alertMessage"
-        [severity]="row.severity"
-        [icon]="row.icon"
-        [badgeLabel]="row.badgeLabel"
-        [referenceLabel]="row.alert.referenceLabel"
-        [timestamp]="row.alert.createdAt"
-        [description]="row.alert | alertCaption"
-        [dismissible]="false"
-        density="flat"
-      />
-      <button
-        [attr.aria-label]="row.alert.title"
-        (click)="open(row.alert)"
-        class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-        type="button"
-        data-testid="top-alert-open"
-      ></button>
-    </div>
+    <cmn-alert-item
+      [title]="row.alert.title"
+      [message]="row.alert.message | alertMessage"
+      [severity]="row.severity"
+      [icon]="row.icon"
+      [badgeLabel]="row.badgeLabel"
+      [referenceLabel]="row.alert.referenceLabel"
+      [timestamp]="row.alert.createdAt"
+      [description]="row.alert | alertCaption"
+      [dismissible]="false"
+      (read)="open(row.alert)"
+      density="flat"
+      data-testid="top-alert-item"
+    />
   </section>
 }

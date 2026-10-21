@@ -44,11 +44,15 @@
       </cmn-alert>
     }
 
+    <!-- The host's flex column lays out these children directly;
+         the keep-content wrapper would put them in one box. -->
     <cmn-async-state
       [status]="upcomingStatus()"
       [errorMessage]="store.upcomingErrorMessage()"
       [skeletonRows]="skeletonRows.length"
+      [keepContent]="false"
       class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      emptySubMessage="No dated events for your holdings, watchlist, theses or the macro calendar in this window."
       skeletonShape="section"
     >
       @if (store.isUpcomingEmpty()) {
@@ -135,12 +139,16 @@
       }
     </cmn-async-state>
   } @else {
+    <!-- The host's flex column lays out these children directly;
+         the keep-content wrapper would put them in one box. -->
     <cmn-async-state
       [status]="firedStatus()"
       [errorMessage]="store.firedErrorMessage() ?? ''"
       [isEmpty]="store.isFiredEmpty()"
+      [keepContent]="false"
       (retry)="retryFired()"
       class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      emptySubMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
       errorPlacement="above"
       retryable
     >

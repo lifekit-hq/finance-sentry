@@ -3,8 +3,8 @@ import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {provideRouter} from '@angular/router';
 import {type AsyncStatus} from '@lifekit-hq/core';
-import {TagComponent} from '@lifekit-hq/ui';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {ASYNC_STATE_SHOW_DELAY_MS, TagComponent} from '@lifekit-hq/ui';
+import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
@@ -313,8 +313,14 @@ describe('AssetDossierComponent', () => {
     fixture = TestBed.createComponent(AssetDossierComponent);
   });
 
-  it('renders skeletons while loading', () => {
+  it('renders skeletons once a load outlasts the show delay', () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     mockStore.isDossierLoading.set(true);
+    fixture.detectChanges();
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
     fixture.detectChanges();
 
     expect(byTestId('dossier-skeleton')).not.toBeNull();

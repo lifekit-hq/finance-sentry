@@ -8,6 +8,7 @@
           [class.bg-surface-hover]="conversation.id === store.activeConversationId()"
           class="flex items-center justify-between gap-cmn-1 rounded-cmn-md pr-cmn-1 hover:bg-surface-hover"
         >
+          <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that selects the conversation, not an action button -->
           <button
             (click)="onSelect(conversation)"
             type="button"
