@@ -1219,7 +1219,9 @@ translation, with one plain sentence on what the rate move did) - and *Change*, 
 linked, unlinked and the residual are not lines there: they stay inside the Change total, and when together they
 are 1 unit of the currency or more a note under it names them ("Includes +$350 from accounts linked or removed,
 revaluations and moves not yet explained."). Nothing is recomputed or stored: the lines are the bridge's own
-amounts, so the three lines plus the note still add to the Change. The full statement, every line and the
+amounts, so the three lines plus the note still add to the Change. Home carries no badge for the bridge: when its
+quality is not complete or the residual is above tolerance it shows one sentence that the figures are estimates, with
+a link to Breakdown, where the waterfall says why. The full statement, every line and the
 residual's own row, is the waterfall on Breakdown (`/dashboard/breakdown`); Home's "Full statement" link opens
 it on Home's window.
 
@@ -1490,11 +1492,11 @@ the savings path and the starting net worth (decision C8; gap G7 closed). Comput
   a headline record yet (finance-framework §3.6). Both tiles show a warning notice while it is set (the
   twelve-month line only while it shows a figure).
 
-### Twelve-month projection (dashboard hero)
+### Twelve-month projection (Breakdown)
 
 `GET /wealth/projection` (`GetNetWorthProjectionQuery`) returns the net worth twelve months out
 (`projectedNetWorth`: low / central / high) from the latest snapshot plus the savings path, compounded at
-each of the three returns. A negative savings path still projects: the range shows the drawdown. The hero
+each of the three returns. A negative savings path still projects: the range shows the drawdown. The Breakdown page
 reads "In 12 months: about $X ($low to $high)" with the assumptions line beneath it
 (`fns-net-worth-projection`); `InsufficientHistory` renders nothing in the line's fixed slot. Before M10
 this figure was computed in the browser as median monthly savings × 12 with no market return.
@@ -1521,7 +1523,7 @@ net worth reaches the financial-independence target.
   reads the snapshot with no person in scope, so the reader uses the `…Unscoped…` snapshot read keyed on
   the user id.
 
-### Monthly-income lens (dashboard hero, P5)
+### Monthly-income lens (Breakdown, P5)
 
 `GET /wealth/income-lens` (`GetMonthlyIncomeLensQuery`, math in `IncomeLens.MonthlyIncome`) shows the latest
 snapshot's net worth as the monthly income it could pay: net worth × the safe withdrawal rate ÷ 12, in today's
