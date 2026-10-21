@@ -8,7 +8,7 @@ import {initialAccountsState} from './accounts.state';
 
 export const AccountsStore = signalStore(
   withState(initialAccountsState),
-  withAsyncStatus({defaultErrorMessage: 'Failed to load accounts. Please try again.'}),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load accounts. Try again.'}),
   withMethods(accountsMethods),
   withComputed(accountsComputed),
   withMethods(accountsEffects),

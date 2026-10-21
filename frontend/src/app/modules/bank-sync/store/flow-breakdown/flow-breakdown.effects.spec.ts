@@ -158,7 +158,7 @@ describe('flowBreakdownHooks', () => {
       .flush({errorCode: 'UNKNOWN'}, {status: 500, statusText: 'Server Error'});
 
     expect(store.status()).toBe('error');
-    expect(store.errorMessage()).toBe('Failed to load the month breakdown. Please try again.');
+    expect(store.errorMessage()).toBe('Failed to load the month breakdown. Try again.');
     expect(store.breakdown()).toEqual(loaded);
   });
 });

@@ -229,7 +229,7 @@ describe('TransactionLedgerStore async status', () => {
     store.load();
 
     expect(store.status()).toBe('error');
-    expect(store.errorMessage()).toBe('Failed to load transactions. Please try again.');
+    expect(store.errorMessage()).toBe('Failed to load transactions. Try again.');
     expect(store.isEmpty()).toBe(false);
   });
 

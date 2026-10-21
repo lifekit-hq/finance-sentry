@@ -8,4 +8,4 @@ export const AGENT_SSE_EVENTS = {
 } as const;
 
 /** Default user-facing error message when no registry entry resolves. */
-export const AGENT_DEFAULT_ERROR = 'Ledger is unavailable right now. Please try again.';
+export const AGENT_DEFAULT_ERROR = 'Ledger is unavailable right now. Try again.';

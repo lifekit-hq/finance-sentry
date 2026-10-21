@@ -94,7 +94,7 @@ describe('EventsStore', () => {
     const store = inject();
 
     expect(store.upcomingStatus()).toBe('error');
-    expect(store.upcomingErrorMessage()).toContain('window is invalid');
+    expect(store.upcomingErrorMessage()).toContain('window is not allowed');
     expect(store.firedStatus()).toBe('success');
     expect(store.firedErrorMessage()).toBe('');
   });

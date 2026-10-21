@@ -21,9 +21,9 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   ACCOUNT_UPDATE_CONFLICT: 'Your account was changed elsewhere. Reload and try again.',
   ACCOUNT_CLOSED: 'This account is retired. Reopen it to sync again.',
   ACCOUNT_NOT_RETIRED: 'This account is not retired, so there is nothing to reopen.',
-  MONOBANK_TOKEN_INVALID: 'Invalid Monobank token. Please check and try again.',
+  MONOBANK_TOKEN_INVALID: 'That Monobank token was not accepted. Check it and try again.',
   MONOBANK_TOKEN_DUPLICATE: 'This Monobank token is already connected.',
-  MONOBANK_RATE_LIMITED: 'Monobank rate limit reached. Please wait 60 seconds and try again.',
+  MONOBANK_RATE_LIMITED: 'Monobank rate limit reached. Wait 60 seconds and try again.',
   BINANCE_INVALID_CREDENTIALS:
     'Binance rejected the provided credentials. Use a read-only API key with no IP restrictions.',
   BINANCE_DUPLICATE:
@@ -61,9 +61,9 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     "Inzhur didn't accept that session. Sign in on inzhur.reit again, copy a fresh refreshToken and paste it here.",
   INZHUR_UNAVAILABLE:
     'Inzhur is unavailable right now. Try again later; your saved holdings stay as they are.',
-  INZHUR_CONNECT_FAILED: "Couldn't connect Inzhur. Please try again.",
+  INZHUR_CONNECT_FAILED: "Couldn't connect Inzhur. Try again.",
   INZHUR_NOT_CONNECTED: 'Inzhur is not connected.',
-  VALIDATION_ERROR: 'Some fields look wrong — please review the highlighted errors.',
+  VALIDATION_ERROR: 'Some fields look wrong. Review the highlighted errors and correct them.',
   ALERT_NOT_FOUND: 'Alert not found.',
   PUSH_UNAVAILABLE: 'Push notifications are not available right now.',
   PUSH_SUBSCRIPTION_INVALID: 'This device could not be registered for push notifications.',
@@ -72,15 +72,15 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'Notifications are blocked for this site. Allow them in your browser settings, then try again.',
   PUSH_SUBSCRIBE_FAILED: 'This browser could not be set up for push notifications. Try again.',
   ALERT_LOAD_FAILED: 'Failed to load alerts.',
-  EVENTS_WINDOW_INVALID: 'The events window is invalid. Pick a range of at most a year.',
+  EVENTS_WINDOW_INVALID: 'That events window is not allowed. Pick a range of at most a year.',
   EVENTS_KINDS_INVALID: 'One of the requested event kinds is not recognised.',
   MACRO_STATUS_INVALID: 'Unknown macro event status. Use scheduled or released.',
   BUDGET_NOT_FOUND: 'Budget not found.',
   MANUAL_HOLDING_NOT_FOUND: 'That value is no longer there. Refresh to see your current list.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
-  BUDGET_INVALID_CATEGORY: 'Invalid budget category.',
+  BUDGET_INVALID_CATEGORY: 'That budget category is not recognized. Pick one from the list.',
   BUDGET_INVALID_LIMIT: 'Budget limit must be greater than zero.',
-  BUDGET_INVALID_PERIOD: 'Invalid budget period.',
+  BUDGET_INVALID_PERIOD: 'That budget month is not allowed. Pick a month from 2020 onward.',
   SUBSCRIPTION_NOT_FOUND: 'Subscription not found.',
   FORBIDDEN: 'This feature is not available for your account.',
   LEDGER_READ_UNAVAILABLE: 'Ledger could not produce a read right now. Try again shortly.',
@@ -94,10 +94,11 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'Another proposal on this ticker arrived at the same time. Reload and try again.',
   RECOMMENDATION_NOT_FOUND: 'That proposal no longer exists.',
   INVALID_CHART_RANGE: 'That chart range is not available. Pick 1M, 6M, YTD, 1Y, 5Y or Max.',
-  INVALID_DATE_RANGE: 'Invalid date range. Check the from/to dates and try again.',
-  INVALID_AMOUNT_RANGE: 'Invalid amount range. Check the min/max amounts and try again.',
+  INVALID_DATE_RANGE: 'That date range is not allowed. Check the from/to dates and try again.',
+  INVALID_AMOUNT_RANGE:
+    'That amount range is not allowed. Check the min/max amounts and try again.',
   INVALID_CATEGORY: 'One of the selected categories is not recognized.',
-  INVALID_TRANSACTION_TYPE: 'Invalid transaction type. Use debit or credit.',
+  INVALID_TRANSACTION_TYPE: 'That transaction type is not recognized. Use debit or credit.',
   INVALID_SEARCH: 'Search text is too long.',
   COMMITMENT_TRANSACTION_NOT_FOUND: 'That transaction is no longer available. Pick another one.',
   COMMITMENT_ALREADY_TRACKED: 'Charges like this one are already tracked on this page.',
@@ -112,7 +113,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   /* eslint-disable @typescript-eslint/naming-convention */
   agent_not_configured:
     'Ledger is not configured. An Anthropic API key must be set on the server to enable chat.',
-  llm_unavailable: 'Ledger is temporarily unavailable. Please try again in a moment.',
+  llm_unavailable: 'Ledger is temporarily unavailable. Try again in a moment.',
   conversation_not_found: 'Conversation not found.',
   /* eslint-enable @typescript-eslint/naming-convention */
 };

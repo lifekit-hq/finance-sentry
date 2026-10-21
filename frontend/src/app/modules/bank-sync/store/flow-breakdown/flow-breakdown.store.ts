@@ -27,7 +27,7 @@ export const FlowBreakdownStore = signalStore(
       codec: MONTHS_PARAM_CODEC,
     },
   }),
-  withAsyncStatus({defaultErrorMessage: 'Failed to load the month breakdown. Please try again.'}),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load the month breakdown. Try again.'}),
   withMethods(flowBreakdownMethods),
   withComputed(flowBreakdownComputed),
   withMethods(flowBreakdownEffects),
