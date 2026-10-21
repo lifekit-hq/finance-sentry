@@ -1,0 +1,75 @@
+<cmn-card data-testid="net-worth-why-moved">
+  <cmn-async-state
+    [status]="store.status()"
+    [errorMessage]="store.errorMessage()"
+    (retry)="store.retry()"
+    retryable
+  >
+    <div skeleton class="space-y-cmn-3">
+      <cmn-skeleton height="1rem" width="45%" />
+      @for (_ of skeletonLines; track $index) {
+        <cmn-skeleton height="0.875rem" width="100%" />
+      }
+    </div>
+
+    <div>
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+        Why it moved
+        <span class="font-normal text-text-secondary">· {{ period() }}</span>
+      </h2>
+    </div>
+
+    @if (store.unavailableMessage(); as message) {
+      <p
+        class="mt-cmn-1 text-cmn-sm text-text-secondary"
+        data-testid="net-worth-why-moved-unavailable"
+      >
+        {{ message }}
+      </p>
+    } @else if (store.summary(); as summary) {
+      <ul class="mt-cmn-3 divide-y divide-border-default" aria-label="Why net worth moved">
+        @for (line of summary.lines; track line.key) {
+          <li [attr.data-testid]="'net-worth-why-moved-' + line.key" class="py-cmn-3 first:pt-0">
+            <div class="flex items-baseline justify-between gap-cmn-3 text-cmn-sm">
+              <span class="font-medium text-text-primary">{{ line.label }}</span>
+              <span
+                [class.text-gain]="line.amount > 0"
+                [class.text-loss]="line.amount < 0"
+                [class.text-text-secondary]="line.amount === 0"
+                class="tabular-nums font-medium"
+                data-testid="net-worth-why-moved-amount"
+              >
+                {{ line.amount | money: summary.currency : {maxFractionDigits: 0, signed: true} }}
+              </span>
+            </div>
+            <p class="mt-cmn-1 text-cmn-xs text-text-secondary">{{ line.explanation }}</p>
+          </li>
+        }
+        <li class="pt-cmn-3" data-testid="net-worth-why-moved-change">
+          <div class="flex items-baseline justify-between gap-cmn-3 text-cmn-sm">
+            <span class="font-semibold text-text-primary">{{ changeLabel }}</span>
+            <span class="tabular-nums font-semibold text-text-primary">
+              {{ summary.change | money: summary.currency : {maxFractionDigits: 0, signed: true} }}
+            </span>
+          </div>
+          @if (summary.changeNote) {
+            <p
+              class="mt-cmn-1 text-cmn-xs text-text-secondary"
+              data-testid="net-worth-why-moved-change-note"
+            >
+              {{ summary.changeNote }}
+            </p>
+          }
+        </li>
+      </ul>
+    }
+
+    <a
+      [routerLink]="breakdownRoute"
+      [queryParams]="detailsParams()"
+      class="mt-cmn-3 inline-block text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+      data-testid="net-worth-why-moved-details"
+      >Full statement in Breakdown →</a
+    >
+  </cmn-async-state>
+</cmn-card>

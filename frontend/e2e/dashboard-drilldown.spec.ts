@@ -1,9 +1,6 @@
 import {expect, type Locator, type Page, test} from '@playwright/test';
 
 const LOWER_PLOT_FRACTION = 0.7;
-// The category donut's ring starts at twelve o'clock and runs clockwise, and its legend sits
-// under the ring, so the first slice is hit just right of the top edge, inside the ring's width.
-const RING_TOP_OFFSET_PX = 20;
 const CHART_SETTLE_TIMEOUT_MS = 10_000;
 
 // Chart.js grows a band up from the baseline on first paint, and a click resolves against the
@@ -369,26 +366,18 @@ test.describe('Dashboard drill-downs', () => {
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
     // The in-progress month is totalled in the range tiles, labelled by the selected range.
     await expect(page.getByText('Last 3 months')).toBeVisible();
-    await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
-    await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
-    await expect(page.getByRole('button', {name: /savings breakdown/i})).toBeVisible();
-  });
-
-  test('month-bucketed charts are labelled as complete months only', async ({page}) => {
-    await page.goto('/dashboard');
-    await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
-
-    await expect(page.getByText('Income vs Spending (complete months)')).toBeVisible();
+    await expect(page.getByRole('link', {name: /view income details/i})).toBeVisible();
+    await expect(page.getByRole('link', {name: /view spending details/i})).toBeVisible();
   });
 
   test('clicking the Income tile navigates to /transactions with credit filter', async ({page}) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    // Click the Income drill-down button
-    const incomeButton = page.getByRole('button', {name: /view income details/i});
-    await expect(incomeButton).toBeVisible();
-    await incomeButton.click();
+    // Click the Income drill-down link
+    const incomeLink = page.getByRole('link', {name: /view income details/i});
+    await expect(incomeLink).toBeVisible();
+    await incomeLink.click();
 
     await expect(page).toHaveURL(/\/transactions.*type=credit/);
   });
@@ -399,9 +388,9 @@ test.describe('Dashboard drill-downs', () => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    const spendingButton = page.getByRole('button', {name: /view spending details/i});
-    await expect(spendingButton).toBeVisible();
-    await spendingButton.click();
+    const spendingLink = page.getByRole('link', {name: /view spending details/i});
+    await expect(spendingLink).toBeVisible();
+    await spendingLink.click();
 
     await expect(page).toHaveURL(/\/transactions.*type=debit/);
   });
@@ -522,7 +511,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await aggregated;
     await expect(page.getByText('Last 7 days')).toBeVisible();
 
-    await page.getByRole('button', {name: /view spending details/i}).click();
+    await page.getByRole('link', {name: /view spending details/i}).click();
     await expect(page).toHaveURL(
       new RegExp(`/transactions\\?.*type=debit.*from=${from}.*to=${to}`)
     );
@@ -542,13 +531,13 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await aggregated;
     await expect(page.getByText('Month to date')).toBeVisible();
 
-    await page.getByRole('button', {name: /view income details/i}).click();
+    await page.getByRole('link', {name: /view income details/i}).click();
     await expect(page).toHaveURL(
       new RegExp(`/transactions\\?.*type=credit.*from=${from}.*to=${to}`)
     );
   });
 
-  test('the Savings tile opens the breakdown on the selected window, not the month', async ({
+  test('the Breakdown link opens the breakdown on the selected window, not the month', async ({
     page,
   }) => {
     const from = iso(utcDay(-6));
@@ -562,7 +551,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
         r.url().includes(`from=${from}`) &&
         r.url().includes(`to=${to}`)
     );
-    await page.getByRole('button', {name: /savings breakdown/i}).click();
+    await page.getByRole('link', {name: /breakdown of the selected window/i}).click();
     await breakdown;
 
     await expect(page).toHaveURL(/\/dashboard\/breakdown\?from=.*&to=.*&months=1/);
@@ -578,41 +567,6 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await page.getByRole('link', {name: /breakdown of the selected window/i}).click();
 
     await expect(page).toHaveURL(new RegExp(`/dashboard/breakdown\\?from=${from}&to=`));
-  });
-
-  test('a category row in the table drills into the transactions of the window', async ({page}) => {
-    const from = iso(utcDay(-6));
-    await page.goto('/dashboard?range=1w');
-    await expect(page.getByText('Last 7 days')).toBeVisible();
-
-    await page
-      .getByRole('row', {name: /Food And Drink|FOOD_AND_DRINK|Food/i})
-      .first()
-      .click();
-
-    await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=.*from=${from}`));
-  });
-
-  test('clicking a slice of the category donut drills into that category over the window', async ({
-    page,
-  }) => {
-    const from = iso(utcDay(-6));
-    await page.goto('/dashboard?range=1w');
-    const canvas = page.locator('cmn-donut-chart canvas');
-    await expect(canvas).toBeVisible();
-    // The donut sits below the fold; measure it only once it is where the click will land.
-    await canvas.scrollIntoViewIfNeeded();
-    const box = await canvas.boundingBox();
-    if (!box) {
-      throw new Error('donut canvas has no box');
-    }
-
-    // Food (800 of 1300) is the first slice, running clockwise from twelve o'clock.
-    await page.mouse.click(box.x + box.width / 2 + RING_TOP_OFFSET_PX, box.y + RING_TOP_OFFSET_PX);
-
-    await expect(page).toHaveURL(
-      new RegExp(`/transactions\\?.*type=debit.*category=FOOD_AND_DRINK.*from=${from}`)
-    );
   });
 
   test('clicking the net-worth chart opens the accounts page behind the band', async ({page}) => {
@@ -735,15 +689,15 @@ test.describe('Dashboard → Ledger spending consistency', () => {
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
     // Read the Spending tile value from the dashboard.
-    const spendingCard = page.getByRole('button', {name: /view spending details/i});
+    const spendingCard = page.getByRole('link', {name: /view spending details/i});
     await expect(spendingCard).toBeVisible();
     // The title now comes from the route, so it shows before the tile has loaded its value.
     await expect(spendingCard).toContainText(/\$[\d,.]+/);
     const spendingText = (await spendingCard.innerText()).trim();
     const dashboardAmount = extractAmount(spendingText);
 
-    // Navigate to the drill-down (same button the user clicks in the real flow).
-    await page.getByRole('button', {name: /view spending details/i}).click();
+    // Navigate to the drill-down (same link the user clicks in the real flow).
+    await page.getByRole('link', {name: /view spending details/i}).click();
     await expect(page).toHaveURL(/\/transactions.*type=debit/);
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
 
@@ -760,63 +714,4 @@ test.describe('Dashboard → Ledger spending consistency', () => {
     expect(ledgerAmount).toBeCloseTo(2900, 1);
     expect(dashboardAmount).toBeCloseTo(ledgerAmount, 1);
   });
-});
-
-// Top spendings counts the range's debits per category, including the computed FAMILY_SUPPORT
-// bucket and UNCATEGORIZED (null category). A row must open the ledger on exactly that slice:
-// the category shown as the ledger's Category chip and the query scoped to debits over the same range.
-test.describe('Top spendings → Ledger category drill-down', () => {
-  const CATEGORIES = [
-    {key: 'FOOD_AND_DRINK', label: 'Food & Drink', sortOrder: 10},
-    {key: 'FAMILY_SUPPORT', label: 'Family Support', sortOrder: 135},
-    {key: 'UNCATEGORIZED', label: 'Uncategorized', sortOrder: 999},
-  ];
-
-  for (const {key, label} of CATEGORIES) {
-    test(`the ${label} row opens the debit ledger filtered to ${key}`, async ({page}) => {
-      await mockApisWithLedger(page);
-      const ledgerQueries: URLSearchParams[] = [];
-      await page.route(`${API}/categories`, route =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(CATEGORIES),
-        })
-      );
-      await page.route(`${API}/dashboard/aggregated**`, route =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            ...DASHBOARD_DATA,
-            topCategories: [
-              {category: 'FAMILY_SUPPORT', totalSpend: 800, percentOfTotal: 40},
-              {category: 'FOOD_AND_DRINK', totalSpend: 700, percentOfTotal: 35},
-              {category: 'UNCATEGORIZED', totalSpend: 500, percentOfTotal: 25},
-            ],
-          }),
-        })
-      );
-      await page.route(`${API}/accounts/transactions**`, route => {
-        ledgerQueries.push(new URL(route.request().url()).searchParams);
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(LEDGER_TRANSACTIONS),
-        });
-      });
-
-      await page.goto('/dashboard?range=mtd');
-      await page.locator('cmn-data-table').getByText(label, {exact: true}).click();
-
-      await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
-      expect(new URL(page.url()).searchParams.get('type')).toBe('debit');
-      await expect(page.getByRole('button', {name: `Remove Category: ${label}`})).toBeVisible();
-      await expect.poll(() => ledgerQueries.at(-1)?.getAll('category')).toEqual([key]);
-      const query = ledgerQueries.at(-1);
-      expect(query?.get('transactionType')).toBe('debit');
-      expect(query?.get('from')).toMatch(/^\d{4}-\d{2}-01$/);
-      expect(query?.get('to')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    });
-  }
 });

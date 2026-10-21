@@ -190,4 +190,67 @@ describe('NetWorthBridgeUtils', () => {
       );
     });
   });
+
+  describe('summary', () => {
+    it('is null when the bridge has no figures', () => {
+      expect(NetWorthBridgeUtils.summary(unavailable())).toBeNull();
+    });
+
+    it('reads three lines and the change, with no note when they add up', () => {
+      const summary = NetWorthBridgeUtils.summary(bridge());
+
+      expect(summary?.lines.map(l => [l.key, l.label, l.amount])).toEqual([
+        ['savings', 'You saved', 600],
+        ['investmentReturn', 'Markets', 300],
+        ['fxTranslation', 'Exchange rates', 100],
+      ]);
+      expect(summary?.change).toBe(1_000);
+      expect(summary?.changeNote).toBeNull();
+      expect(summary?.currency).toBe('USD');
+    });
+
+    it('folds revaluation, the link lines and the residual into the change note', () => {
+      const summary = NetWorthBridgeUtils.summary(
+        bridge({
+          endValue: 11_350,
+          revaluation: 150,
+          newlyLinked: 400,
+          unlinked: -100,
+          residual: -100,
+        })
+      );
+
+      expect(summary?.change).toBe(1_350);
+      expect(summary?.changeNote).toBe(
+        'Includes +$350 from accounts linked or removed, revaluations and moves not yet explained.'
+      );
+    });
+
+    it('leaves a move under one unit out of the note', () => {
+      expect(NetWorthBridgeUtils.summary(bridge({endValue: 11_000.4}))?.changeNote).toBeNull();
+    });
+
+    it('reads a missing line as zero', () => {
+      const summary = NetWorthBridgeUtils.summary(bridge({savings: null, endValue: 10_400}));
+
+      expect(summary?.lines[0].amount).toBe(0);
+      expect(summary?.changeNote).toBeNull();
+    });
+
+    it('explains a rate move in one sentence, by direction', () => {
+      const sentence = (fxTranslation: number) =>
+        NetWorthBridgeUtils.summary(bridge({fxTranslation, endValue: 10_900 + fxTranslation}))
+          ?.lines[2].explanation;
+
+      expect(sentence(100)).toBe(
+        'Rates moved, so your accounts in other currencies are worth more in USD, though you did nothing.'
+      );
+      expect(sentence(-100)).toBe(
+        'Rates moved, so your accounts in other currencies are worth less in USD, though you did nothing.'
+      );
+      expect(sentence(0.2)).toBe(
+        'Accounts in other currencies are counted in USD; rates did not move them.'
+      );
+    });
+  });
 });

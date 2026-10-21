@@ -4,9 +4,9 @@ import {TestBed} from '@angular/core/testing';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {
-  type CategoryStat,
   type HistoryRange,
   type MonthlyFlow,
   type NetWorthSnapshotDto,
@@ -111,24 +111,6 @@ describe('dashboardComputed', () => {
     vi.useRealTimers();
   });
 
-  describe('the chart plots complete calendar months only', () => {
-    it('keeps the in-progress month out of income vs spending', () => {
-      const bars = computedFor(steadyHistory(500, 900)).incomeVsSpendingBars();
-
-      expect(bars.map(s => s.label)).toEqual(['Income', 'Spending']);
-      for (const series of bars) {
-        expect(series.points.map(p => p.label)).toEqual(["May '26", "Jun '26", "Jul '26"]);
-      }
-    });
-
-    it('reports no chartable data when only the in-progress month exists', () => {
-      const c = computedFor([flow('2026-08', 500, 900)]);
-
-      expect(c.hasCashFlow()).toBe(false);
-      expect(c.incomeVsSpendingBars()).toEqual([]);
-    });
-  });
-
   describe('tiles total the selected window', () => {
     it('sums the window months, in-progress month included, and drops older buckets', () => {
       // 3M in August spans June–August; the backend also sends May.
@@ -177,7 +159,7 @@ describe('dashboardComputed', () => {
     it('gates the savings rate on every day window while income has not landed', () => {
       const c = computedForWindow([], [flow('2026-08', 200, 900)], '1w');
 
-      expect(c.windowSavingsRateFormatted()).toBe('—');
+      expect(c.windowSavingsRatePercent()).toBeNull();
     });
 
     it('starts year-to-date at January', () => {
@@ -204,32 +186,93 @@ describe('dashboardComputed', () => {
       // read about -350% and mean nothing.
       const c = computedFor([flow('2026-08', 200, 900)], 'mtd');
 
-      expect(c.windowSavingsRateFormatted()).toBe('—');
+      expect(c.windowSavingsRatePercent()).toBeNull();
     });
 
     it("ignores last month's income when gating the month-to-date rate", () => {
       const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 200, 900)], 'mtd');
 
-      expect(c.windowSavingsRateFormatted()).toBe('—');
+      expect(c.windowSavingsRatePercent()).toBeNull();
     });
 
     it('reports the month-to-date rate once income has substantially landed', () => {
       const c = computedFor([flow('2026-08', 4000, 1000)], 'mtd');
 
-      expect(c.windowSavingsRateFormatted()).toBe('75%');
+      expect(c.windowSavingsRatePercent()).toBe(75);
     });
 
     it('reports the rate over a longer window without gating', () => {
       // (4000 + 4000 + 200 - 2000 - 2000 - 900) / 8200 ≈ 40%.
       const c = computedFor(steadyHistory(200, 900));
 
-      expect(c.windowSavingsRateFormatted()).toBe('40%');
+      expect(c.windowSavingsRatePercent()).toBe(40);
     });
 
     it('withholds the rate when the window has no income', () => {
       const c = computedFor([flow('2026-08', 0, 300)]);
 
-      expect(c.windowSavingsRateFormatted()).toBe('—');
+      expect(c.windowSavingsRatePercent()).toBeNull();
+    });
+  });
+
+  describe('spending against your normal', () => {
+    it('compares the window with the pace of the closed months', () => {
+      // May–July spent 6,000 over 92 days; June 1 to August 12 is 73 days at that pace (~4,761).
+      const c = computedFor(steadyHistory(500, 900));
+
+      expect(c.windowSpendingVsUsual()).toBe('$139 above your normal');
+    });
+
+    it('reads below when the window spent less than usual', () => {
+      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 500, 169.42)], 'mtd');
+
+      expect(c.windowSpendingVsUsual()).toBe('$605 below your normal');
+    });
+
+    it('has no comparison before a month has closed', () => {
+      expect(computedFor([flow('2026-08', 500, 900)]).windowSpendingVsUsual()).toBeNull();
+    });
+
+    it('has no comparison over all time, which has no start', () => {
+      expect(computedFor(steadyHistory(500, 900), 'all').windowSpendingVsUsual()).toBeNull();
+    });
+  });
+
+  describe('where it is', () => {
+    const history = [snapshot(1_000, 3_000, 0), snapshot(2_000, 6_000, 2_000)];
+
+    it('lists each band at the latest point with its share and its accounts page', () => {
+      const rows = dashboardFor({monthlyFlow: [], netWorthHistory: history}).allocation();
+
+      expect(rows.map(r => [r.label, r.value, r.percent, r.route])).toEqual([
+        ['Banking', 2_000, 20, AppRoute.AccountsList],
+        ['Brokerage', 6_000, 60, AppRoute.Accounts],
+        ['Crypto', 2_000, 20, AppRoute.Accounts],
+      ]);
+    });
+
+    it('follows the scrubbed point', () => {
+      const rows = dashboardFor({
+        monthlyFlow: [],
+        netWorthHistory: history,
+        scrubIndex: 0,
+      }).allocation();
+
+      expect(rows.map(r => [r.label, r.value])).toEqual([
+        ['Banking', 1_000],
+        ['Brokerage', 3_000],
+      ]);
+    });
+
+    it('keeps a negative band as a row but gives it no donut slice', () => {
+      const c = dashboardFor({monthlyFlow: [], netWorthHistory: [snapshot(-500, 1_500, 0)]});
+
+      expect(c.allocation().map(r => r.label)).toEqual(['Banking', 'Brokerage']);
+      expect(c.allocationSegments().map(s => [s.label, s.value])).toEqual([['Brokerage', 1_500]]);
+    });
+
+    it('is empty without history', () => {
+      expect(dashboardFor({monthlyFlow: []}).allocation()).toEqual([]);
     });
   });
 
@@ -322,56 +365,6 @@ describe('dashboardComputed', () => {
       });
     });
 
-    describe('invested / cash sub-line', () => {
-      it('reads invested then cash in whole dollars, leaving the headline as is', () => {
-        const c = dashboardFor({
-          monthlyFlow: [],
-          totalNetWorthUsd: 10_000.5,
-          cashUsd: 700.4,
-          investedUsd: 9_300,
-        });
-
-        expect(c.bookSplitFormatted()).toBe('invested $9,300 · cash $700');
-        expect(c.totalBalanceFormatted()).toBe('$10,000.50');
-      });
-
-      it('shows negative cash, as card debt nets against it', () => {
-        const c = dashboardFor({monthlyFlow: [], cashUsd: -1_200, investedUsd: 5_000});
-
-        expect(c.bookSplitFormatted()).toBe('invested $5,000 · cash -$1,200');
-      });
-
-      it('follows the base currency', () => {
-        const c = dashboardFor({
-          monthlyFlow: [],
-          baseCurrency: 'EUR',
-          cashUsd: 500,
-          investedUsd: 500,
-        });
-
-        expect(c.bookSplitFormatted()).toBe('invested €500 · cash €500');
-      });
-
-      it('is empty when the book split is unknown', () => {
-        expect(dashboardFor({monthlyFlow: []}).bookSplitFormatted()).toBeNull();
-        expect(
-          dashboardFor({monthlyFlow: [], cashUsd: null, investedUsd: null}).bookSplitFormatted()
-        ).toBeNull();
-      });
-
-      it('is empty while scrubbing, as the split is live only', () => {
-        const c = dashboardFor({
-          monthlyFlow: [],
-          cashUsd: 700,
-          investedUsd: 9_300,
-          netWorthHistory: [snapshot(10_000, 0, 0), snapshot(12_000, 0, 0)],
-          scrubIndex: 1,
-        });
-
-        expect(c.bookSplitFormatted()).toBeNull();
-      });
-    });
-
     describe('while scrubbing', () => {
       const points = [snapshot(10_000, 0, 0), snapshot(12_000, 0, 0), snapshot(11_000, 0, 0)];
 
@@ -456,53 +449,6 @@ describe('dashboardComputed', () => {
       expect(c.netWorthChangeFormatted()).toBe('');
       expect(c.netWorthChangePercentFormatted()).toBe('');
       expect(c.netWorthChangeDirection()).toBe(0);
-    });
-  });
-
-  describe('top spending categories donut', () => {
-    function categories(count: number): CategoryStat[] {
-      return Array.from({length: count}, (_, i) => ({
-        category: `cat-${i}`,
-        totalSpend: 100 - i,
-        percentOfTotal: 0,
-      }));
-    }
-
-    it('draws every category while each can keep its own colour', () => {
-      const c = dashboardFor({monthlyFlow: [], topCategories: categories(8)});
-
-      expect(c.categoryChartData().map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94, 93]);
-    });
-
-    it('colours a category by its identity, not by its rank in the range', () => {
-      const stat = (category: string, totalSpend: number): CategoryStat => ({
-        category,
-        totalSpend,
-        percentOfTotal: 0,
-      });
-      const colourOf = (cats: CategoryStat[], category: string): unknown =>
-        dashboardFor({monthlyFlow: [], topCategories: cats})
-          .categoryChartData()
-          .find((_, i) => cats[i].category === category)?.color;
-
-      const first = colourOf([stat('FOOD_AND_DRINK', 90), stat('TRAVEL', 50)], 'FOOD_AND_DRINK');
-      const second = colourOf([stat('TRAVEL', 90), stat('FOOD_AND_DRINK', 50)], 'FOOD_AND_DRINK');
-
-      expect(first).toBeDefined();
-      expect(first).toBe(second);
-    });
-
-    it('folds the tail past seven into one slate slice', () => {
-      const c = dashboardFor({monthlyFlow: [], topCategories: categories(10)});
-      const segments = c.categoryChartData();
-
-      expect(segments).toHaveLength(8);
-      expect(segments.slice(0, 7).map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94]);
-      expect(segments[7]).toEqual({
-        label: 'Other categories',
-        value: 93 + 92 + 91,
-        color: '#636a6d',
-      });
     });
   });
 });
@@ -632,36 +578,6 @@ describe('dashboardComputed headline quality', () => {
 
     expect(c.netWorthHeadline()).toBeNull();
     expect(c.totalBalanceFormatted()).not.toBe('N/A');
-  });
-
-  it('combines the cash and invested records on the split line', () => {
-    const c = compute({
-      monthlyFlow: [],
-      cashUsd: 100,
-      investedUsd: 900,
-      cashHeadline: headline({amount: 100}),
-      investedHeadline: headline({
-        amount: 900,
-        quality: 'DEGRADED',
-        reasons: [{code: 'STALE_SOURCE', source: 'brokerage'}],
-      }),
-    });
-
-    expect(c.bookSplitHeadline()).toMatchObject({quality: 'DEGRADED', amount: 1000});
-    expect(c.bookSplitUnavailable()).toBe(false);
-  });
-
-  it('marks the split unavailable when it is withheld', () => {
-    const c = compute({
-      monthlyFlow: [],
-      cashUsd: null,
-      investedUsd: null,
-      cashHeadline: unavailable('NO_SPLIT'),
-      investedHeadline: unavailable('NO_SPLIT'),
-    });
-
-    expect(c.bookSplitUnavailable()).toBe(true);
-    expect(c.bookSplitFormatted()).toBeNull();
   });
 
   it('marks the change unavailable only when the record says so and there is no change', () => {

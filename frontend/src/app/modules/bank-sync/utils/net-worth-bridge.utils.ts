@@ -8,11 +8,15 @@ import {
   NET_WORTH_BRIDGE_RETURN_PARTS,
   NET_WORTH_BRIDGE_SCALE_PADDING,
   NET_WORTH_BRIDGE_SCOPE,
+  NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS,
+  NET_WORTH_BRIDGE_SUMMARY_LABELS,
+  NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE,
 } from '../constants/net-worth-bridge/net-worth-bridge.constants';
 import {
   type NetWorthBridgeResponse,
   type NetWorthBridgeStep,
   type NetWorthBridgeStepKind,
+  type NetWorthBridgeSummary,
 } from '../models/net-worth-bridge/net-worth-bridge.model';
 
 const PERCENT = 100;
@@ -90,6 +94,60 @@ export class NetWorthBridgeUtils {
       }),
       total('end', endValue),
     ];
+  }
+
+  /**
+   * Home's three lines (you saved, markets, exchange rates) and the change, End − Start. The change
+   * keeps every other line folded in, so the three need not add up to it; `changeNote` names the gap.
+   * Null when the bridge has no figures. Presentation only: the amounts are the bridge's own.
+   */
+  public static summary(bridge: NetWorthBridgeResponse): Nullable<NetWorthBridgeSummary> {
+    const {startValue, endValue, currency} = bridge;
+    if (startValue == null || endValue == null) {
+      return null;
+    }
+    const savings = bridge.savings ?? 0;
+    const investmentReturn = bridge.investmentReturn ?? 0;
+    const fxTranslation = bridge.fxTranslation ?? 0;
+    const change = endValue - startValue;
+    const other = change - savings - investmentReturn - fxTranslation;
+    return {
+      lines: [
+        {
+          key: 'savings',
+          label: NET_WORTH_BRIDGE_SUMMARY_LABELS.savings,
+          amount: savings,
+          explanation: NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS.savings,
+        },
+        {
+          key: 'investmentReturn',
+          label: NET_WORTH_BRIDGE_SUMMARY_LABELS.investmentReturn,
+          amount: investmentReturn,
+          explanation: NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS.investmentReturn,
+        },
+        {
+          key: 'fxTranslation',
+          label: NET_WORTH_BRIDGE_SUMMARY_LABELS.fxTranslation,
+          amount: fxTranslation,
+          explanation: NetWorthBridgeUtils.exchangeRateSentence(fxTranslation, currency),
+        },
+      ],
+      change,
+      changeNote:
+        Math.abs(other) < NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE
+          ? null
+          : `Includes ${MoneyUtils.format(other, currency, {maxFractionDigits: 0, signed: true})} from accounts linked or removed, revaluations and moves not yet explained.`,
+      currency,
+    };
+  }
+
+  /** Why exchange rates move net worth with nothing done: other-currency accounts re-read in `currency`. */
+  private static exchangeRateSentence(amount: number, currency: string): string {
+    if (Math.abs(amount) < NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE) {
+      return `Accounts in other currencies are counted in ${currency}; rates did not move them.`;
+    }
+    const direction = amount > 0 ? 'more' : 'less';
+    return `Rates moved, so your accounts in other currencies are worth ${direction} in ${currency}, though you did nothing.`;
   }
 
   private static lines(bridge: NetWorthBridgeResponse): Line[] {

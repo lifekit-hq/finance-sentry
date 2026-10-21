@@ -3,6 +3,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {DateUtils} from '../../../../shared/utils/date.utils';
+import {type DateRange} from '../../../../shared/utils/date-range.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
   type FlowBreakdown,
@@ -11,6 +12,7 @@ import {
   type FlowBreakdownRequest,
   type FlowBucket,
 } from '../../models/flow-breakdown/flow-breakdown.model';
+import {FlowBreakdownUtils} from '../../utils/flow-breakdown.utils';
 import {MonthKeyUtils} from '../../utils/month-key.utils';
 
 interface StateSignals {
@@ -108,6 +110,20 @@ export function flowBreakdownComputed(store: StateSignals) {
     return window ? {kind: 'range', ...window} : {kind: 'month', month: month()};
   });
 
+  // The days the page's net worth bridge explains: the window, or the month up to today.
+  const bridgeWindow = computed(
+    (): DateRange => {
+      const window = range();
+      if (window) {
+        return {from: window.from, to: window.to};
+      }
+      const today = DateUtils.isoDateUtc(new Date());
+      const {from, to} = FlowBreakdownUtils.monthDates(month());
+      return {from: from ?? null, to: to && to < today ? to : today};
+    },
+    {equal: (a, b) => a.from === b.from && a.to === b.to}
+  );
+
   const filteredItems = computed((): FlowBreakdownItem[] => {
     const items = store.breakdown()?.items ?? [];
     const account = store.accountFilter();
@@ -132,6 +148,7 @@ export function flowBreakdownComputed(store: StateSignals) {
     range,
     month,
     request,
+    bridgeWindow,
     isEmpty: computed(() => store.status() === 'success' && filteredItems().length === 0),
     groups: computed((): BucketGroup[] =>
       BUCKET_META.map(meta => {

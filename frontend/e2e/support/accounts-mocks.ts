@@ -206,8 +206,8 @@ export const BOOK_PERFORMANCE = {
 };
 
 /**
- * The accounts page and the Home investments card read the wealth summary and both holdings feeds;
- * the card also reads both growth splits and the book against SPY. */
+ * The accounts page reads the wealth summary and both holdings feeds; its brokerage and crypto sections
+ * also read both growth splits and the book against SPY. */
 export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/summary', WEALTH_SUMMARY_FULL);
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);

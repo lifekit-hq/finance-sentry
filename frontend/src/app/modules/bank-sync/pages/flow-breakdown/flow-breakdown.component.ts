@@ -26,12 +26,17 @@ import {
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
+import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
+import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
+import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {
   ALL_ACCOUNTS_LABEL,
   ALL_ACCOUNTS_VALUE,
 } from '../../constants/account-filter/account-filter.constants';
 import {type FlowBreakdownItem} from '../../models/flow-breakdown/flow-breakdown.model';
+import {provideBreakdownBridgeWindow} from '../../providers/net-worth-bridge-window.provider';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {FlowBreakdownUtils} from '../../utils/flow-breakdown.utils';
 import {MonthKeyUtils} from '../../utils/month-key.utils';
@@ -48,10 +53,14 @@ const DRAWER_WIDTH = '480px';
     DatePipe,
     DecimalPipe,
     EmptyStateComponent,
+    FireTileComponent,
     ListItemRowComponent,
     MonthStepperComponent,
     MerchantCategoryPipe,
     MoneyPipe,
+    MonthlyIncomeLensComponent,
+    NetWorthBridgeComponent,
+    NetWorthProjectionComponent,
     RouterLink,
     SkeletonComponent,
     StatCardComponent,
@@ -61,7 +70,7 @@ const DRAWER_WIDTH = '480px';
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {class: 'block h-full'},
-  providers: [FlowBreakdownStore],
+  providers: [FlowBreakdownStore, provideBreakdownBridgeWindow()],
 })
 export class FlowBreakdownComponent {
   private readonly router = inject(Router);

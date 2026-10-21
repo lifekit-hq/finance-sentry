@@ -104,7 +104,7 @@ for (const [name, viewport] of [
       const baseline = (await card.boundingBox())?.height ?? 0;
       expect(baseline).toBeGreaterThan(0);
       // The tiles reload with the same range; their loading skeleton must match the loaded value.
-      const tiles = page.locator('cmn-card', {has: page.locator('button[aria-label]')}).first();
+      const tiles = page.getByTestId('home-spent-link');
       const tilesBaseline = (await tiles.boundingBox())?.height ?? 0;
 
       for (const range of RANGES) {

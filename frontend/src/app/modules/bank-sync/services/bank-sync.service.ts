@@ -5,7 +5,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {Observable} from 'rxjs';
 
 import {environment} from '../../../../environments/environment';
-import {DateRangeUtils} from '../../../shared/utils/date-range.utils';
+import {type DateRange, DateRangeUtils} from '../../../shared/utils/date-range.utils';
 import {AccountsResponse, ConnectMonobankResponse} from '../models/bank-account/bank-account.model';
 import {
   DashboardData,
@@ -157,9 +157,9 @@ export class BankSyncService extends ApiService {
     });
   }
 
-  /** The net-worth bridge (M5) over the same window as `getNetWorthHistory`. */
-  public getNetWorthBridge(range: HistoryRange): Observable<NetWorthBridgeResponse> {
-    const params = DateRangeUtils.toHttpParams(DateRangeUtils.fromRelativeRange(range));
+  /** The net-worth bridge (M5) over a window of days; an open `from` starts at the first snapshot. */
+  public getNetWorthBridge(days: DateRange): Observable<NetWorthBridgeResponse> {
+    const params = DateRangeUtils.toHttpParams(days);
     return this.http.get<NetWorthBridgeResponse>(`${environment.apiBaseUrl}/net-worth/bridge`, {
       params,
     });

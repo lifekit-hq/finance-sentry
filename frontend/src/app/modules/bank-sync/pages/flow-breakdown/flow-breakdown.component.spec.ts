@@ -1,11 +1,15 @@
+import {provideHttpClient, withXhr} from '@angular/common/http';
+import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {CmnDrawerService, type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it, vi} from 'vitest';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
+import {NET_WORTH_BRIDGE_WINDOW} from '../../providers/net-worth-bridge-window.provider';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {FlowBreakdownComponent} from './flow-breakdown.component';
 
@@ -70,17 +74,52 @@ function render(
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
+      // The whole-book cards (bridge, outlook, FIRE) load their own feeds; they stay pending here.
+      provideHttpClient(withXhr()),
+      provideHttpClientTesting(),
+      provideApiBaseUrl('http://localhost/api/v1'),
       {provide: CategoryStore, useValue: {labelMap: signal({})}},
       {provide: CmnDrawerService, useValue: drawer},
     ],
   });
   TestBed.overrideComponent(FlowBreakdownComponent, {
-    set: {providers: [{provide: FlowBreakdownStore, useValue: store}]},
+    set: {
+      providers: [
+        {provide: FlowBreakdownStore, useValue: store},
+        {
+          provide: NET_WORTH_BRIDGE_WINDOW,
+          useValue: signal({from: '2026-09-01', to: '2026-10-01'}),
+        },
+      ],
+    },
   });
   const fixture = TestBed.createComponent(FlowBreakdownComponent);
   fixture.detectChanges();
   return fixture.nativeElement as HTMLElement;
 }
+
+describe('FlowBreakdownComponent whole book', () => {
+  it('draws the bridge, the outlook and FIRE above the account filter', () => {
+    const el = render(GROUP, null, null, {
+      accountChips: [
+        {accountId: 'a', label: 'A'},
+        {accountId: 'b', label: 'B'},
+      ],
+    });
+    const book = el.querySelector('[data-testid="breakdown-book"]');
+    const filter = el.querySelector('lk-chip-row');
+
+    expect(book?.querySelector('fns-net-worth-bridge')).not.toBeNull();
+    expect(
+      book?.querySelector('[data-testid="breakdown-outlook"] fns-net-worth-projection')
+    ).not.toBeNull();
+    expect(
+      book?.querySelector('[data-testid="breakdown-outlook"] fns-monthly-income-lens')
+    ).not.toBeNull();
+    expect(book?.querySelector('fns-fire-tile')).not.toBeNull();
+    expect(book?.compareDocumentPosition(filter as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+});
 
 describe('FlowBreakdownComponent phone layout', () => {
   it('renders list rows with description, bank·date subtitle and both amounts below md', () => {

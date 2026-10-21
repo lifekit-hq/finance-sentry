@@ -77,9 +77,3 @@ export const NET_WORTH_SERIES_ROUTES: ReadonlyMap<string, AppRoute> = new Map([
   ['Crypto', AppRoute.Accounts],
   ['Crypto invested', AppRoute.Accounts],
 ]);
-
-/** The transactions `type` each income-vs-spending series drills into. */
-export const CASH_FLOW_SERIES_TYPES: ReadonlyMap<string, 'credit' | 'debit'> = new Map([
-  ['Income', 'credit'],
-  ['Spending', 'debit'],
-]);
