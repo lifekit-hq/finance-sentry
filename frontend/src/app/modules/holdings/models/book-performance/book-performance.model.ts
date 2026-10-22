@@ -28,12 +28,9 @@ export interface BookPerformance {
   asOf: string;
 }
 
-/** Growth of 10,000 (presentation pattern P2): one sum put into the book and into SPY on the same day. */
-export interface GrowthOfTenThousand {
+/** The book against SPY since the first day of the longest window both were measured over (P2). */
+export interface BookVsSpy {
   from: string;
-  to: string;
-  bookValue: number;
-  benchmarkValue: number;
   bookReturn: string;
   benchmarkReturn: string;
   /** The book TWR's quality, for its badge. */

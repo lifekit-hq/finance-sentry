@@ -35,6 +35,8 @@ export function brokerageGrowthComputed(store: StateSignals) {
         .join(' and ')
     ),
     isIbkrMissing: computed(() => missing().includes(IBKR_PROVIDER)),
+    /** The headline's Modified Dietz percent, for the stat's direction and colour; null whenever the split is withheld. */
+    returnPercent: computed(() => store.growth()?.headline.percent ?? null),
     /** The headline's Modified Dietz percent, signed; null whenever the split is withheld. */
     returnLabel: computed(() => {
       const percent = store.growth()?.headline.percent;

@@ -27,12 +27,12 @@ const isOpen = (root: ParentNode | null | undefined): boolean =>
   toggleIn(root)?.getAttribute('aria-expanded') === 'true';
 
 describe('AccountsListComponent growth sections', () => {
-  it('draws contributed vs growth and $10,000 under the brokerage section', () => {
+  it('draws one performance card under the brokerage section', () => {
     const el = setup({provider: 'ibkr', category: 'brokerage'});
     const growth = el.querySelector('[data-testid="brokerage-section-growth"]');
 
     expect(growth?.querySelector('fns-brokerage-growth')).not.toBeNull();
-    expect(growth?.querySelector('fns-growth-of-ten-thousand')).not.toBeNull();
+    expect(growth?.querySelector('fns-growth-of-ten-thousand')).toBeNull();
     expect(el.querySelector('[data-testid="crypto-section-growth"]')).toBeNull();
   });
 

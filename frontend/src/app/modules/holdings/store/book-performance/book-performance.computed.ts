@@ -3,16 +3,15 @@ import {type Nullable} from '@lifekit-hq/ui';
 
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {
+  BOOK_TWR_CURRENCY,
   BOOK_TWR_METHOD,
   BOOK_TWR_SCOPE,
-  GROWTH_OF_TEN_THOUSAND_AMOUNT,
-  GROWTH_OF_TEN_THOUSAND_CURRENCY,
   PERCENT_POINTS,
   RETURN_PERCENT_DIGITS,
 } from '../../constants/book-performance/book-performance.constants';
 import {
   type BookPerformance,
-  type GrowthOfTenThousand,
+  type BookVsSpy,
 } from '../../models/book-performance/book-performance.model';
 
 interface StateSignals {
@@ -25,9 +24,7 @@ export function bookPerformanceComputed(store: StateSignals) {
      * P2 over the longest window where the book and SPY were measured over the same dates; null when none
      * was, so the card stays out of the way instead of comparing different windows.
      */
-    growth: computed<Nullable<GrowthOfTenThousand>>(() => {
-      // shortcut: end values only, no line over the window; draw the line once the chained daily TWR
-      // series is exposed.
+    comparison: computed<Nullable<BookVsSpy>>(() => {
       const period = [...(store.performance()?.periods ?? [])]
         .reverse()
         .find(p => p.bookTwr != null && p.spyTwr != null && p.delta != null && p.bookTwrFrom);
@@ -41,9 +38,7 @@ export function bookPerformanceComputed(store: StateSignals) {
       }
       const window = {from: period.bookTwrFrom, to: period.bookTwrTo};
       return {
-        ...window,
-        bookValue: GROWTH_OF_TEN_THOUSAND_AMOUNT * (1 + period.bookTwr),
-        benchmarkValue: GROWTH_OF_TEN_THOUSAND_AMOUNT * (1 + period.spyTwr),
+        from: period.bookTwrFrom,
         bookReturn: PercentUtils.signed(period.bookTwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
         benchmarkReturn: PercentUtils.signed(period.spyTwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
         headline: period.bookTwrQuality
@@ -55,7 +50,7 @@ export function bookPerformanceComputed(store: StateSignals) {
               window,
               quality: period.bookTwrQuality,
               reasons: period.bookTwrReasons ?? [],
-              currency: GROWTH_OF_TEN_THOUSAND_CURRENCY,
+              currency: BOOK_TWR_CURRENCY,
             }
           : null,
       };

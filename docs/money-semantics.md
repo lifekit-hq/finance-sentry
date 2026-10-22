@@ -1033,11 +1033,11 @@ are closed periods.
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
   `CreatedAt` is re-stamped).
 - **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Accounts brokerage section's
-  "Contributed vs growth"; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
+  "Performance" card; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
   the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
   `from`, which is `seriesStart` unless a provider linked on that first close moves it to the next close (§10);
-  the card names `from`, and says the history starts that day only when `from` equals `seriesStart`.
+  the card's title names `from`.
   - **Flows.** `IBrokerageFlowReader` reads the cash rows the brokers report (`BrokerageCashTransactions`)
     and classifies them per provider by type, never by sign alone (`BrokerageFlowClassifier`): deposits and
     withdrawals are external flows; dividends, interest, bonuses, fees and taxes are return (income, fee,

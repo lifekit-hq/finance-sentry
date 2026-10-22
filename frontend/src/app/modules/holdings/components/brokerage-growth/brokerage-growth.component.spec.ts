@@ -2,7 +2,7 @@ import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
-import {of} from 'rxjs';
+import {NEVER, of} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {GROWTH_SLEEVE_COPY} from '../../constants/brokerage-growth/brokerage-growth.constants';
@@ -13,6 +13,7 @@ import {
   type GrowthSleeveCopy,
   type GrowthTimingGap,
 } from '../../models/brokerage-growth/brokerage-growth.model';
+import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {BrokerageGrowthComponent} from './brokerage-growth.component';
@@ -62,6 +63,7 @@ describe('BrokerageGrowthComponent', () => {
     hasHistory: ReturnType<typeof signal<boolean>>;
     view: ReturnType<typeof signal<BrokerageGrowthView>>;
     returnLabel: ReturnType<typeof signal<Nullable<string>>>;
+    returnPercent: ReturnType<typeof signal<Nullable<number>>>;
     showsNewlyLinked: ReturnType<typeof signal<boolean>>;
     missingProviderLabels: ReturnType<typeof signal<string>>;
     isIbkrMissing: ReturnType<typeof signal<boolean>>;
@@ -88,41 +90,54 @@ describe('BrokerageGrowthComponent', () => {
       hasHistory: signal(true),
       view: signal<BrokerageGrowthView>('split'),
       returnLabel: signal<Nullable<string>>('+10.0%'),
+      returnPercent: signal<Nullable<number>>(10),
       showsNewlyLinked: signal(true),
       missingProviderLabels: signal(''),
       isIbkrMissing: signal(false),
       load: vi.fn(),
     };
-    await TestBed.configureTestingModule({imports: [BrokerageGrowthComponent]})
+    await TestBed.configureTestingModule({
+      imports: [BrokerageGrowthComponent],
+      providers: [{provide: BookPerformanceService, useValue: {getPerformance: () => NEVER}}],
+    })
       .overrideComponent(BrokerageGrowthComponent, {
         set: {providers: [{provide: BrokerageGrowthStore, useValue: store}]},
       })
       .compileComponents();
   });
 
-  it('says the view starts where the value history starts', () => {
-    const el = render();
-
-    expect(text(el, 'brokerage-growth-since')).toContain(
-      'since 30 Jun 2026 - the day value history starts'
-    );
+  it('says the date the figures start from, in the title', () => {
+    expect(text(render(), 'brokerage-growth-since')).toBe('· since 30 Jun 2026');
   });
 
   it('names the window the figures cover once it has moved past the value history start', () => {
     store.growth.set({...GROWTH, from: '2026-07-02'});
-    const el = render();
 
-    const since = text(el, 'brokerage-growth-since');
-    expect(since).toContain('since 2 Jul 2026');
-    expect(since).not.toContain('value history starts');
+    expect(text(render(), 'brokerage-growth-since')).toBe('· since 2 Jul 2026');
   });
 
-  it('splits the change into contributions, newly linked value and growth with its return', () => {
+  it('shows contributed, growth with its return and value now as stats', () => {
     const el = render();
 
-    expect(text(el, 'brokerage-growth-contributed')).toBe('+$100.00');
+    expect(text(el, 'brokerage-growth-contributed')).toContain('$100.00');
+    expect(text(el, 'brokerage-growth-growth')).toContain('$110.00');
+    expect(text(el, 'brokerage-growth-growth')).toContain('+10.0%');
+    expect(text(el, 'brokerage-growth-value-now')).toContain('$1,720.00');
+  });
+
+  it('puts the newly linked value inside the disclosure', () => {
+    const el = render();
+
+    const disclosure = el.querySelector('details');
+    expect(disclosure?.textContent).toContain('How this is computed');
+    expect(
+      disclosure?.querySelector('[data-testid="brokerage-growth-newly-linked"]')
+    ).not.toBeNull();
     expect(text(el, 'brokerage-growth-newly-linked')).toBe('+$510.00');
-    expect(text(el, 'brokerage-growth-growth')).toBe('+$110.00 (+10.0%)');
+  });
+
+  it('draws the book against SPY line under the brokerage card', () => {
+    expect(render().querySelector('fns-book-vs-spy')).not.toBeNull();
   });
 
   it('leaves the newly linked line out when nothing was linked', () => {
@@ -194,7 +209,8 @@ describe('BrokerageGrowthComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(getGrowth).toHaveBeenCalledWith('crypto');
-    expect(text(el, 'crypto-growth-since')).toContain('Binance and Revolut X since 30 Jun 2026');
+    expect(text(el, 'crypto-growth-since')).toBe('· since 30 Jun 2026');
+    expect(el.querySelector('fns-book-vs-spy')).toBeNull();
     expect(el.querySelector('[data-testid="brokerage-growth"]')).toBeNull();
   });
 });

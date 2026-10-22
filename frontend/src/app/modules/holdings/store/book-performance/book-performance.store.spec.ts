@@ -49,20 +49,17 @@ describe('BookPerformanceStore', () => {
     TestBed.resetTestingModule();
   });
 
-  it('puts 10,000 into the book and into SPY over the longest window measured for both', () => {
+  it('compares the book with SPY over the longest window measured for both', () => {
     const store = create(
       performance([period({bookTwr: 0.01, bookTwrFrom: '2026-09-19'}), period()])
     );
 
     expect(getPerformance).toHaveBeenCalledOnce();
     expect(store.status()).toBe('success');
-    const growth = store.growth();
-    expect(growth?.from).toBe('2025-10-19');
-    expect(growth?.to).toBe('2026-10-19');
-    expect(growth?.bookValue).toBeCloseTo(11200);
-    expect(growth?.benchmarkValue).toBeCloseTo(11000);
-    expect(growth?.bookReturn).toBe('+12.0%');
-    expect(growth?.benchmarkReturn).toBe('+10.0%');
+    const comparison = store.comparison();
+    expect(comparison?.from).toBe('2025-10-19');
+    expect(comparison?.bookReturn).toBe('+12.0%');
+    expect(comparison?.benchmarkReturn).toBe('+10.0%');
   });
 
   it('skips a window where SPY was not measured over the book dates', () => {
@@ -70,7 +67,7 @@ describe('BookPerformanceStore', () => {
       performance([period({bookTwrFrom: '2026-09-19'}), period({spyTwr: null, delta: null})])
     );
 
-    expect(store.growth()?.from).toBe('2026-09-19');
+    expect(store.comparison()?.from).toBe('2026-09-19');
   });
 
   it('carries the book return quality and reasons as a TWR headline', () => {
@@ -79,7 +76,7 @@ describe('BookPerformanceStore', () => {
       performance([period({bookTwrQuality: 'ESTIMATED', bookTwrReasons: reasons})])
     );
 
-    expect(store.growth()?.headline).toEqual({
+    expect(store.comparison()?.headline).toEqual({
       amount: null,
       percent: 12,
       method: 'TWR',
@@ -94,13 +91,13 @@ describe('BookPerformanceStore', () => {
   it('wears no badge when an older API build sends no quality', () => {
     const store = create(performance([period({bookTwrQuality: undefined, bookTwrReasons: null})]));
 
-    expect(store.growth()?.headline).toBeNull();
+    expect(store.comparison()?.headline).toBeNull();
   });
 
   it('has nothing to show when no window is measured for both', () => {
     const store = create(performance([period({bookTwr: null}), period({bookTwrFrom: null})]));
 
-    expect(store.growth()).toBeNull();
+    expect(store.comparison()).toBeNull();
   });
 
   it('records a failed load', () => {
@@ -108,6 +105,6 @@ describe('BookPerformanceStore', () => {
 
     expect(store.status()).toBe('error');
     expect(store.errorMessage()).toBe('Failed to load the book against SPY.');
-    expect(store.growth()).toBeNull();
+    expect(store.comparison()).toBeNull();
   });
 });
