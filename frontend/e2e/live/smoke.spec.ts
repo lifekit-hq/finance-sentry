@@ -118,7 +118,8 @@ test.describe('Live smoke — deployed stack', () => {
   test('login lands on a populated dashboard', async () => {
     // The smoke account has a seeded bank account — the empty state must not show.
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
-    await expect(page.getByText('Last 3 months')).toBeVisible();
+    // Exact: the "Why it moved" heading also carries the period, as "· Last 3 months".
+    await expect(page.getByText('Last 3 months', {exact: true})).toBeVisible();
     await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
     await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
   });
