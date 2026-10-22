@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormsModule} from '@angular/forms';
-import {Router} from '@angular/router';
+import {type Params, Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   AsyncStateComponent,
@@ -57,6 +57,7 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
   imports: [
     PageContainerComponent,
     InputHintsDirective,
+    RouterLink,
     AlertComponent,
     AsyncStateComponent,
     CardComponent,
@@ -80,6 +81,7 @@ export class BudgetsComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(BudgetsStore);
+  public readonly transactionsRoute = AppRoute.Transactions;
   public readonly skeletonCards = Array.from({length: SKELETON_CARDS});
   // The cards belong to one month, so a failed or pending month never keeps the previous
   // month's cards on screen (`hasData: false`): it shows the skeleton or the error instead.
@@ -185,13 +187,17 @@ export class BudgetsComponent {
   }
 
   public viewTransactions(category: string): void {
+    void this.router.navigate([this.transactionsRoute], {
+      queryParams: this.transactionsParams(category),
+    });
+  }
+
+  public transactionsParams(category: string): Params {
     const year = this.store.selectedYear();
     const month = this.store.selectedMonth();
     const from = DateUtils.isoDateUtc(new Date(Date.UTC(year, month - 1, 1)));
     const to = DateUtils.isoDateUtc(new Date(Date.UTC(year, month, 0)));
-    void this.router.navigate([AppRoute.Transactions], {
-      queryParams: {category, type: 'debit', from, to},
-    });
+    return {category, type: 'debit', from, to};
   }
 
   public onMonthChange(month: Date): void {

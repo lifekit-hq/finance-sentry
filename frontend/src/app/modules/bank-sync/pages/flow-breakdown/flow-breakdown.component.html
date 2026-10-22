@@ -223,7 +223,7 @@
               }
             </div>
             <div class="hidden overflow-x-auto md:block">
-              <!-- eslint-disable-next-line lifekit/no-raw-controls -- a dense desktop transaction table whose rows open a drawer; cmn-data-table has no row action -->
+              <!-- eslint-disable-next-line lifekit/no-raw-controls -- rows open a drawer through a named native button stretched over the row (#952); cmn-data-table's rowsActionable instead makes the row a nameless tabindex target, and it takes no aria-label -->
               <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
                 <tbody>
                   @for (i of group.items; track i.transactionId) {

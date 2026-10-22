@@ -297,11 +297,10 @@
               class="flex items-center border-t border-border-default pr-cmn-2 transition-colors hover:bg-surface-card"
               data-testid="closed-account-row"
             >
-              <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the account, not an action button -->
-              <button
-                (click)="navigateToTransactions(row.accountId)"
+              <a
+                [routerLink]="transactionsRoute"
+                [queryParams]="{account: row.accountId}"
                 class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
-                type="button"
               >
                 <span class="min-w-0">
                   <span class="block truncate text-cmn-sm text-text-primary"
@@ -320,7 +319,7 @@
                   }}</span>
                   <span class="block text-cmn-xs">Last known</span>
                 </span>
-              </button>
+              </a>
               <cmn-menu
                 [items]="closedAccountMenu(row)"
                 [ariaLabel]="'Actions for closed ' + row.bankName + ' •••• ' + row.last4"
@@ -409,12 +408,10 @@
           </li>
         } @else {
           <li class="border-t border-border-default">
-            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the dossier, not an action button -->
-            <button
-              (click)="navigateToDossier(row.symbol)"
+            <a
+              [routerLink]="[assetDossierRoute, row.symbol]"
               class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
               data-testid="position-row"
-              type="button"
             >
               <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
                 <cmn-institution-avatar
@@ -470,7 +467,7 @@
                   }
                 </span>
               </span>
-            </button>
+            </a>
           </li>
         }
       }
@@ -499,12 +496,10 @@
           </li>
         } @else {
           <li class="border-t border-border-default">
-            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the dossier, not an action button -->
-            <button
-              (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
+            <a
+              [routerLink]="[assetDossierRoute, account.symbol ?? account.accountNumberLast4]"
               class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
               data-testid="position-row"
-              type="button"
             >
               <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
                 <cmn-institution-avatar
@@ -530,7 +525,7 @@
                 data-testid="position-value"
                 >{{ account | positionValue: store.baseCurrency() }}</span
               >
-            </button>
+            </a>
           </li>
         }
       }
@@ -539,12 +534,11 @@
 </ng-template>
 
 <ng-template #accountRow let-account let-title="title">
-  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the account, not an action button -->
-  <button
-    (click)="navigateToTransactions(account.accountId)"
+  <a
+    [routerLink]="transactionsRoute"
+    [queryParams]="{account: account.accountId}"
     class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
     data-testid="account-row"
-    type="button"
   >
     <div class="min-w-0">
       <p class="text-cmn-sm text-text-primary">{{ title }}</p>
@@ -570,7 +564,7 @@
       }
     </div>
     <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
-  </button>
+  </a>
 </ng-template>
 
 <ng-template #amountCell let-account>

@@ -102,7 +102,7 @@ for (const [label, viewport] of [
       expect((await header.boundingBox())?.y).toBe(before?.y);
       await shot(page, `closed-expanded-${label}`);
 
-      const target = await rows.first().locator('button').first().boundingBox();
+      const target = await rows.first().locator('a').first().boundingBox();
       expect(target?.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
     });
 
