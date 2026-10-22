@@ -125,6 +125,23 @@ describe('BrokerageGrowthComponent', () => {
     expect(text(el, 'brokerage-growth-value-now')).toContain('$1,720.00');
   });
 
+  it('signs contributed and growth with a plus and leaves value now unsigned', () => {
+    const el = render();
+
+    expect(text(el, 'brokerage-growth-contributed')).toContain('+$100.00');
+    expect(text(el, 'brokerage-growth-growth')).toContain('+$110.00');
+    expect(text(el, 'brokerage-growth-value-now')).not.toContain('+');
+  });
+
+  it('shows a net withdrawal and a loss with a minus', () => {
+    store.growth.set({...GROWTH, contributed: -250, growth: -40});
+
+    const el = render();
+
+    expect(text(el, 'brokerage-growth-contributed')).toContain('-$250.00');
+    expect(text(el, 'brokerage-growth-growth')).toContain('-$40.00');
+  });
+
   it('puts the newly linked value inside the disclosure', () => {
     const el = render();
 

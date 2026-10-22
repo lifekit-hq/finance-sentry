@@ -2,7 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type BookVsSpy} from '../../models/book-performance/book-performance.model';
 import {BookPerformanceStore} from '../../store/book-performance/book-performance.store';
@@ -18,7 +18,9 @@ const COMPARISON: BookVsSpy = {
 describe('BookVsSpyComponent', () => {
   let store: {
     status: ReturnType<typeof signal<AsyncStatus>>;
+    errorMessage: ReturnType<typeof signal<string>>;
     comparison: ReturnType<typeof signal<Nullable<BookVsSpy>>>;
+    load: ReturnType<typeof vi.fn>;
   };
 
   const render = (): HTMLElement => {
@@ -30,7 +32,9 @@ describe('BookVsSpyComponent', () => {
   beforeEach(async () => {
     store = {
       status: signal<AsyncStatus>('success'),
+      errorMessage: signal(''),
       comparison: signal<Nullable<BookVsSpy>>(COMPARISON),
+      load: vi.fn(),
     };
     await TestBed.configureTestingModule({imports: [BookVsSpyComponent]})
       .overrideComponent(BookVsSpyComponent, {
@@ -63,5 +67,21 @@ describe('BookVsSpyComponent', () => {
 
     expect(el.querySelector('cmn-skeleton')).not.toBeNull();
     expect(el.querySelector('[data-testid="book-vs-spy"]')).toBeNull();
+  });
+
+  it('says the request failed and retries it, instead of reading as no window measured', () => {
+    store.status.set('error');
+    store.errorMessage.set('Failed to load the book against SPY.');
+    store.comparison.set(null);
+
+    const el = render();
+
+    expect(el.textContent).toContain('Failed to load the book against SPY.');
+    expect(el.querySelector('[data-testid="book-vs-spy"]')).toBeNull();
+    const retry = Array.from(el.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Retry')
+    );
+    retry?.click();
+    expect(store.load).toHaveBeenCalledTimes(1);
   });
 });

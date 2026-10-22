@@ -38,22 +38,19 @@
             >
               <cmn-stat-card
                 [attr.data-testid]="store.sleeve + '-growth-contributed'"
-                [value]="growth.contributed"
-                [currency]="growth.currency"
+                [value]="growth.contributed | money: growth.currency : {signed: true}"
                 label="Contributed"
               />
               <cmn-stat-card
                 [attr.data-testid]="store.sleeve + '-growth-growth'"
-                [value]="growth.growth"
-                [currency]="growth.currency"
+                [value]="growth.growth | money: growth.currency : {signed: true}"
                 [delta]="store.returnPercent()"
                 [deltaLabel]="store.returnLabel() ?? ''"
                 label="Growth"
               />
               <cmn-stat-card
                 [attr.data-testid]="store.sleeve + '-growth-value-now'"
-                [value]="growth.endValue"
-                [currency]="growth.currency"
+                [value]="growth.endValue | money: growth.currency"
                 label="Value now"
               />
             </div>

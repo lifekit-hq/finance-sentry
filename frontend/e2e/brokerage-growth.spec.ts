@@ -12,8 +12,8 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
 
     const section = page.getByTestId('brokerage-growth');
     await expect(section).toContainText('since 30 Jun 2026');
-    await expect(page.getByTestId('brokerage-growth-contributed')).toContainText('$4,000.00');
-    await expect(page.getByTestId('brokerage-growth-growth')).toContainText('$3,300.00');
+    await expect(page.getByTestId('brokerage-growth-contributed')).toContainText('+$4,000.00');
+    await expect(page.getByTestId('brokerage-growth-growth')).toContainText('+$3,300.00');
     await expect(page.getByTestId('brokerage-growth-growth')).toContainText('+9.9%');
     await expect(page.getByTestId('brokerage-growth-value-now')).toBeVisible();
   });
@@ -39,7 +39,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await page.goto('/accounts/list');
 
     await expect(page.getByTestId('crypto-growth-since')).toContainText('since 30 Jun 2026');
-    await expect(page.getByTestId('crypto-growth-contributed')).toContainText('$500.00');
+    await expect(page.getByTestId('crypto-growth-contributed')).toContainText('+$500.00');
     await expect(page.getByTestId('crypto-growth-growth')).toContainText('+3.5%');
     await expect(page.getByTestId('crypto-growth').locator('fns-book-vs-spy')).toHaveCount(0);
     await expect(page.getByTestId('crypto-growth-timing-gap')).toHaveCount(0);
