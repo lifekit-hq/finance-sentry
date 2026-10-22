@@ -306,6 +306,27 @@ describe('EventsComponent', () => {
     }
   });
 
+  it('shows no second title on a fired row that only repeats the kind and subject', () => {
+    mockStore.view.set('fired');
+    mockStore.fired.set([
+      {
+        ...fired('a', 'judged_immaterial'),
+        kind: 'MarketStructure',
+        subject: 'USDT-USD',
+        title: 'Unusual move: USDT-USD',
+      },
+      {...fired('b', 'silent'), title: 'News cluster: MU'},
+      {...fired('c', 'silent'), title: 'Guidance cut at MU'},
+    ]);
+
+    const {host} = render();
+
+    const lines = Array.from(host.querySelectorAll('[data-testid="fired-line-2"]')).map(el =>
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+    );
+    expect(lines).toEqual(['Judged immaterial', 'Silent', 'Guidance cut at MU Silent']);
+  });
+
   it('links each ticker calendar row to its dossier and leaves the macro row plain', () => {
     const {host} = render();
 

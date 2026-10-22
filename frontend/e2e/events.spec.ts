@@ -191,10 +191,12 @@ test.describe('Events', () => {
     await page.goto('/events');
     await page.getByText('Fired', {exact: true}).click();
 
-    await expect(page.getByText('News cluster: MU')).toBeVisible();
+    await expect(page.getByText('News cluster', {exact: true})).toBeVisible();
+    await expect(page.getByText('MU', {exact: true})).toBeVisible();
+    await expect(page.getByText('News cluster: MU')).toHaveCount(0);
     await expect(page.getByText('Judged immaterial')).toBeVisible();
     await expect(page.getByText('already priced in')).toBeVisible();
     await expect(page.getByText('Silent', {exact: true})).toBeVisible();
-    await expect(page.getByText('Earnings ahead: PLTR')).toBeVisible();
+    await expect(page.getByText('Earnings ahead: PLTR')).toHaveCount(0);
   });
 });

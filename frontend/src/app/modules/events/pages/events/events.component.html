@@ -240,12 +240,16 @@
               </span>
             </div>
             <div class="mt-cmn-1 flex items-center gap-cmn-2" data-testid="fired-line-2">
-              <p class="min-w-0 flex-1 text-cmn-sm font-medium text-text-primary">
-                {{ event.title }}
-              </p>
+              @let rowTitle =
+                event.title | eventTitle: firedKindMeta(event.kind).label : event.subject;
+              @if (rowTitle) {
+                <p class="min-w-0 flex-1 text-cmn-sm font-medium text-text-primary">
+                  {{ rowTitle }}
+                </p>
+              }
               <cmn-tag
                 [variant]="outcomeMeta(event.outcome).variant"
-                class="shrink-0"
+                class="ml-auto shrink-0"
                 data-testid="outcome"
               >
                 {{ outcomeMeta(event.outcome).label }}

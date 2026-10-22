@@ -20,6 +20,16 @@ describe('EventTitleUtils.rowTitle', () => {
     expect(EventTitleUtils.rowTitle('News cluster: x', 'Earnings', 'MU')).toBe('News cluster: x');
   });
 
+  it('drops a detector prefix that differs from the kind label when only the subject follows', () => {
+    expect(EventTitleUtils.rowTitle('Unusual move: USDT-USD', 'Market move', 'USDT-USD')).toBe('');
+  });
+
+  it('keeps a differing-prefix title whose remainder is more than the subject', () => {
+    expect(EventTitleUtils.rowTitle('Unusual move: USDT-USD -4%', 'Market move', 'USDT-USD')).toBe(
+      'Unusual move: USDT-USD -4%'
+    );
+  });
+
   it('keeps the title when nothing would remain after the prefix', () => {
     expect(EventTitleUtils.rowTitle('Earnings: ', 'Earnings', 'MU')).toBe('Earnings: ');
   });
