@@ -12,7 +12,7 @@
             [label]="conversation.title || 'Untitled'"
             [action]="true"
             (activated)="onSelect(conversation)"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 [&_button]:px-cmn-2 [&_button]:py-cmn-2 [&_button]:hover:bg-transparent [&_button_div]:font-normal [&_button_div]:text-text-secondary"
           />
           <cmn-menu
             [items]="conversationMenuItems"
