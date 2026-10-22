@@ -52,4 +52,11 @@ describe('LedgerShellComponent tabs', () => {
     );
     expect(tabs.map(tab => tab.getAttribute('aria-current'))).toEqual(['page', null]);
   });
+
+  it('fits the slot under the title and follows the on-screen keyboard instead of scrolling the page', () => {
+    const fixture = TestBed.createComponent(LedgerShellComponent);
+    const classes: DOMTokenList = fixture.nativeElement.classList;
+    expect(classes).toContain('h-[calc(100%-var(--fns-keyboard-inset,0px))]');
+    expect(classes).toContain('md:h-[calc(100dvh-8rem)]');
+  });
 });
