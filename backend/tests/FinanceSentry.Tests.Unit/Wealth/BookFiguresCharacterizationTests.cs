@@ -60,9 +60,9 @@ public sealed class BookFiguresCharacterizationTests
 
         // Crypto first, then brokerage, as the figures have always been built.
         book.Positions.Should().Equal(
-            new BookFigurePosition("BTC", AssetClassNormalizer.Crypto, 0.15m, 6_000m, 9_000m, "binance"),
-            new BookFigurePosition("AAPL", AssetClassNormalizer.Normalize("Stock"), 10m, 1_500m, 1_800m, "ibkr"),
-            new BookFigurePosition("VWRA", AssetClassNormalizer.Normalize("ETF"), 5m, null, 600m, "ibkr"));
+            new BookFigurePosition("BTC", AssetClassNormalizer.Crypto, 0.15m, 6_000m, 9_000m, "binance", "Verified"),
+            new BookFigurePosition("AAPL", AssetClassNormalizer.Normalize("Stock"), 10m, 1_500m, 1_800m, "ibkr", "Verified"),
+            new BookFigurePosition("VWRA", AssetClassNormalizer.Normalize("ETF"), 5m, null, 600m, "ibkr", "Unknown"));
     }
 
     [Fact]
@@ -131,5 +131,5 @@ public sealed class BookFiguresCharacterizationTests
 
     private static BrokerageHoldingSummary Brokerage(
         string symbol, string type, decimal qty, decimal usd, decimal? costBasisUsd = null, FxStatus fxStatus = FxStatus.Exact) =>
-        new(symbol, type, qty, usd, DateTime.UnixEpoch, "ibkr", costBasisUsd, FxStatus: fxStatus);
+        new(symbol, type, qty, usd, DateTime.UnixEpoch, "ibkr", costBasisUsd, costBasisUsd is null ? "Unknown" : "Verified", FxStatus: fxStatus);
 }

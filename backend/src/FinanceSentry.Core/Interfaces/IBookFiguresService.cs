@@ -5,6 +5,9 @@ using FinanceSentry.Core.Utils;
 /// <summary>
 /// A single position in the invested (non-cash) portion of the book, already normalized
 /// to a canonical asset class by <see cref="Domain.AssetClassNormalizer"/>.
+/// <see cref="BasisState"/> is where the source's cost basis stands ("Verified", "Unverified" or "Unknown",
+/// <see cref="BrokerageHoldingSummary.BasisState"/>); null when the source reports no state, read as unknown.
+/// <see cref="CostBasisUsd"/> is set only for a "Verified" basis.
 /// </summary>
 public sealed record BookFigurePosition(
     string Symbol,
@@ -12,7 +15,8 @@ public sealed record BookFigurePosition(
     decimal Quantity,
     decimal? CostBasisUsd,
     decimal UsdValue,
-    string Provider);
+    string Provider,
+    string? BasisState = null);
 
 /// <summary>
 /// One registered <see cref="IWealthSource"/>'s read for a <see cref="BookFigures"/>. <see cref="Reading"/> is null
