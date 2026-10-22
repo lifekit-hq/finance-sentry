@@ -120,8 +120,8 @@ test.describe('Live smoke — deployed stack', () => {
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
     // Exact: the "Why it moved" heading also carries the period, as "· Last 3 months".
     await expect(page.getByText('Last 3 months', {exact: true})).toBeVisible();
-    await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
-    await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
+    await expect(page.getByRole('link', {name: 'View income details'})).toBeVisible();
+    await expect(page.getByRole('link', {name: 'View spending details'})).toBeVisible();
   });
 
   test('transaction ledger renders with live data', async () => {
