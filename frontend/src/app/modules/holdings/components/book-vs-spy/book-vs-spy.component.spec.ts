@@ -1,8 +1,8 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
-import {type Nullable} from '@lifekit-hq/ui';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {ASYNC_STATE_SHOW_DELAY_MS, type Nullable} from '@lifekit-hq/ui';
+import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {type BookVsSpy} from '../../models/book-performance/book-performance.model';
 import {BookPerformanceStore} from '../../store/book-performance/book-performance.store';
@@ -25,6 +25,18 @@ describe('BookVsSpyComponent', () => {
 
   const render = (): HTMLElement => {
     const fixture = TestBed.createComponent(BookVsSpyComponent);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  };
+
+  const renderAfterShowDelay = (): HTMLElement => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const fixture = TestBed.createComponent(BookVsSpyComponent);
+    fixture.detectChanges();
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   };
@@ -63,7 +75,7 @@ describe('BookVsSpyComponent', () => {
   it('shows a placeholder while loading', () => {
     store.status.set('loading');
 
-    const el = render();
+    const el = renderAfterShowDelay();
 
     expect(el.querySelector('cmn-skeleton')).not.toBeNull();
     expect(el.querySelector('[data-testid="book-vs-spy"]')).toBeNull();
