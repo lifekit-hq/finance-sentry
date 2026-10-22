@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {Router} from '@angular/router';
+import {provideRouter, Router} from '@angular/router';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
@@ -124,6 +124,8 @@ describe('BudgetsComponent hero copy', () => {
       overBudgetCount: signal(0),
       overallPct: signal(0),
       selectedMonthDate: signal(new Date(2026, 8, 1)),
+      selectedYear: signal(2026),
+      selectedMonth: signal(9),
       status: signal<AsyncStatus>('success'),
       refreshFailed: signal(false),
       loadSummary: vi.fn(),
@@ -147,7 +149,7 @@ describe('BudgetsComponent hero copy', () => {
     };
     TestBed.configureTestingModule({
       providers: [
-        {provide: Router, useValue: {navigate: vi.fn()}},
+        provideRouter([]),
         {provide: CmnDialogService, useValue: {open: vi.fn()}},
         {provide: CategoryStore, useValue: {categories: signal([])}},
       ],
@@ -218,7 +220,7 @@ describe('BudgetsComponent async states', () => {
     };
     TestBed.configureTestingModule({
       providers: [
-        {provide: Router, useValue: {navigate: vi.fn()}},
+        provideRouter([]),
         {provide: CmnDialogService, useValue: {open: vi.fn()}},
         {provide: CategoryStore, useValue: {categories: signal([])}},
       ],
@@ -289,5 +291,12 @@ describe('BudgetsComponent async states', () => {
     expect(host.textContent).toContain('Groceries');
     expect(host.querySelector('[data-testid="budgets-skeleton"]')).toBeNull();
     expect(host.textContent).not.toContain('No budgets for September');
+  });
+  it('links each category to its debit transactions within the month', () => {
+    const {host} = render('idle', true);
+
+    expect(host.querySelector('a[data-testid="budget-category-link"]')?.getAttribute('href')).toBe(
+      '/transactions?category=groceries&type=debit&from=2026-09-01&to=2026-09-30'
+    );
   });
 });

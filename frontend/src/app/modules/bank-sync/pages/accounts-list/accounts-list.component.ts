@@ -9,7 +9,7 @@ import {
   ViewContainerRef,
 } from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
-import {ActivatedRoute, Router} from '@angular/router';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
   AlertComponent,
@@ -123,6 +123,7 @@ const FEED_CURRENCY = 'USD';
     NgTemplateOutlet,
     PositionQuantityPipe,
     PositionValuePipe,
+    RouterLink,
     ScrollIntoViewDirective,
     SkeletonComponent,
     SyncStatusLabelPipe,
@@ -174,6 +175,8 @@ export class AccountsListComponent implements OnInit {
     })
   );
   public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
+  public readonly transactionsRoute = AppRoute.Transactions;
+  public readonly assetDossierRoute = AppRoute.AssetDossier;
   public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
   public readonly closedAccountsKey = CLOSED_ACCOUNTS_KEY;
   public readonly manualHoldingMenu = MANUAL_HOLDING_MENU;
@@ -486,14 +489,6 @@ export class AccountsListComponent implements OnInit {
           this.store.removeManualHolding(holding.id);
         }
       });
-  }
-
-  public navigateToDossier(symbol: string): void {
-    void this.router.navigate([AppRoute.AssetDossier, symbol]);
-  }
-
-  public navigateToTransactions(accountId: string): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {account: accountId}});
   }
 
   public disconnectInstitution(institution: Institution): void {

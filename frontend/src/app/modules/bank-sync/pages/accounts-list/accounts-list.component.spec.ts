@@ -195,14 +195,12 @@ describe('AccountsListComponent account row', () => {
       lastSyncTimestamp: null,
     };
     const fixture = setupFixture({accounts: [account]});
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const row = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      '[data-testid="account-row"]'
+      'a[data-testid="account-row"]'
     );
-    row?.click();
 
-    expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {account: 'acc-1'}});
+    expect(row?.getAttribute('href')).toBe('/transactions?account=acc-1');
   });
 });
 
@@ -295,13 +293,11 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       syncStatus: 'synced',
       accounts: [holding('a1', 'GOOGL', 'brokerage')],
     });
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const row = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      'a[data-testid="position-row"]'
+    );
 
-    (fixture.nativeElement as HTMLElement)
-      .querySelector<HTMLElement>('[data-testid="position-row"]')
-      ?.click();
-
-    expect(navigate).toHaveBeenCalledWith(['/assets', 'GOOGL']);
+    expect(row?.getAttribute('href')).toBe('/assets/GOOGL');
   });
 
   it('ends the list with no link out: the accordion is the inventory', () => {
@@ -856,18 +852,11 @@ describe('AccountsListComponent closed accounts', () => {
   });
 
   it('opens the account history from the row, apart from its menu', () => {
-    const {fixture, element} = setupClosed();
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const {element} = setupClosed();
+    const link = element.querySelector('[data-testid="closed-account-row"] > a');
 
-    (element.querySelector('[data-testid="closed-account-row"] > button') as HTMLElement).click();
-    fixture.detectChanges();
-
-    expect(navigate).toHaveBeenCalledWith(['/transactions'], {
-      queryParams: {account: 'closed-1'},
-    });
-    expect(
-      element.querySelector('[data-testid="closed-account-row"] > button cmn-menu')
-    ).toBeNull();
+    expect(link?.getAttribute('href')).toBe('/transactions?account=closed-1');
+    expect(link?.querySelector('cmn-menu')).toBeNull();
   });
 
   it('offers Reopen and Remove on a delisted row, only Remove on a replaced card', () => {

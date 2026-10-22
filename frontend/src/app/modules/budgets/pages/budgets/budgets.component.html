@@ -112,15 +112,14 @@
                   [style.background]="categoryColor(b.category)"
                   class="h-2.5 w-2.5 shrink-0 rounded-sm"
                 ></div>
-                <!-- eslint-disable-next-line lifekit/no-raw-controls -- an inline text link to the category transactions, not an action button -->
-                <button
-                  (click)="viewTransactions(b.category)"
+                <a
+                  [routerLink]="transactionsRoute"
+                  [queryParams]="transactionsParams(b.category)"
                   class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
                   data-testid="budget-category-link"
-                  type="button"
                 >
                   {{ b.categoryLabel }}
-                </button>
+                </a>
               </div>
               <div class="flex shrink-0 items-center gap-cmn-1">
                 @if (b.isOverBudget) {
