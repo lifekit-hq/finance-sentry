@@ -58,7 +58,7 @@
     "lucide-angular": "^1.0.0",
     "rxjs": "^7.8.0",
     "tslib": "^2.6.0",
-    "zone.js": "^0.16.0"
+    "zone.js": "^0.16.3"
   },
   "devDependencies": {
     "@angular-devkit/architect": "^0.2202.1",
