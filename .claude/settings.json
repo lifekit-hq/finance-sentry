@@ -10,7 +10,6 @@
     "code-simplifier@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true,
     "dotnet@dotnet-agent-skills": true,
     "dotnet-aspnetcore@dotnet-agent-skills": true,
     "dotnet-data@dotnet-agent-skills": true,
