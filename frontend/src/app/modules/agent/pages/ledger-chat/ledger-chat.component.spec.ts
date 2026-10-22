@@ -37,6 +37,21 @@ describe('LedgerChatComponent sessions panel', () => {
     expect(aside.querySelector('fns-sessions-list')).not.toBeNull();
   });
 
+  it('keeps the page from scrolling: the host clips, so only the message list scrolls', () => {
+    const {fixture} = setup();
+    expect(fixture.nativeElement.classList).toContain('overflow-hidden');
+    expect(fixture.nativeElement.classList).toContain('min-h-0');
+  });
+
+  it('runs the chat surface edge to edge on phone and as a bordered card from md', () => {
+    const {fixture} = setup();
+    const section: HTMLElement = fixture.nativeElement.querySelector('section');
+    expect(section.classList).toContain('md:border');
+    expect(section.classList).toContain('md:rounded-cmn-lg');
+    expect(section.classList).not.toContain('border');
+    expect(section.classList).not.toContain('rounded-cmn-lg');
+  });
+
   it('opens the sessions list in the shared drawer, handing it the store', () => {
     const {fixture, store, open} = setup();
     fixture.componentInstance.openSessions();

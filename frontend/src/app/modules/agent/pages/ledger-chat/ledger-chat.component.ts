@@ -16,7 +16,7 @@ const SESSIONS_TITLE = 'Sessions';
 @Component({
   selector: 'fns-ledger-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block min-h-0 flex-1'},
+  host: {class: 'block min-h-0 flex-1 overflow-hidden md:px-cmn-8 md:pb-cmn-4'},
   providers: [AgentChatStore],
   imports: [ButtonComponent, ChatComponent, SessionsListComponent],
   templateUrl: './ledger-chat.component.html',
