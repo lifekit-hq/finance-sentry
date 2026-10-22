@@ -8,11 +8,28 @@
     class="block space-y-cmn-5"
     emptySubMessage="No position, thesis, valuation, coverage, news or signal is recorded for this asset yet."
   >
-    <div skeleton data-testid="dossier-skeleton" class="space-y-cmn-5">
-      <cmn-skeleton height="2rem" width="40%" />
-      <cmn-skeleton height="10rem" width="100%" />
-      <cmn-skeleton height="12rem" width="100%" />
-      <cmn-skeleton height="12rem" width="100%" />
+    <!-- Mirrors the loaded page in order: hero card, section chips, then the question-led column beside the checks. -->
+    <!-- The host's space-y puts a top margin on this block (the sr-only status precedes it); the loaded hero starts flush. -->
+    <div skeleton data-testid="dossier-skeleton" class="!mt-0 space-y-cmn-5">
+      <div class="space-y-cmn-5">
+        <cmn-skeleton shape="row" />
+        <cmn-skeleton shape="row" />
+        <cmn-skeleton shape="stat" />
+        <cmn-skeleton shape="stat" />
+      </div>
+      <div class="h-[3.75rem] py-cmn-2 md:h-[2.8125rem]">
+        <cmn-skeleton height="100%" width="100%" />
+      </div>
+      <div class="space-y-cmn-5 lg:grid lg:grid-cols-3 lg:items-start lg:gap-cmn-5 lg:space-y-0">
+        <aside class="lg:order-last">
+          <cmn-skeleton shape="section" [count]="8" />
+        </aside>
+        <div class="space-y-cmn-5 lg:col-span-2">
+          <cmn-skeleton shape="chart" aspect="5 / 3" />
+          <cmn-skeleton shape="section" [count]="3" />
+          <cmn-skeleton shape="section" [count]="9" />
+        </div>
+      </div>
     </div>
 
     <!-- n/k tick strip: one tick per named rule of the axis that answers a section's question. -->
