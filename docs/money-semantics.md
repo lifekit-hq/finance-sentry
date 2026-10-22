@@ -1376,11 +1376,11 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the Accounts brokerage section reads for its "growth of 10,000" card (finance-framework P2): the longest period
-  with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
-  10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
-  to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply
-  (`HeadlineQualityMapper`), so the card's badge reads the same reasons the brief's "(est.)" does.
+  which the Accounts brokerage Performance card reads for its one "Book vs SPY" line (finance-framework P2): the
+  longest period with both TWRs and the window measured, shown from `bookTwrFrom` as the two signed percentages
+  `bookTwr` vs `spyTwr` (the TWR is computed on USD values; the line shows no money amount, so nothing is
+  converted to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons`
+  imply (`HeadlineQualityMapper`), so the line's badge reads the same reasons the brief's "(est.)" does.
 
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the
