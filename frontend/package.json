@@ -91,7 +91,7 @@
     "ng-packagr": "^22.2.4",
     "postcss": "^8.5.9",
     "prettier": "^3.8.1",
-    "storybook": "^10.3.5",
+    "storybook": "^10.6.2",
     "stylelint": "^17.6.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-prettier": "^5.0.3",
