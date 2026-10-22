@@ -51,7 +51,7 @@
     <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
     <cmn-button
       [loading]="store.isConnectLoading()"
-      [disabled]="form.invalid || store.isConnectLoading()"
+      [disabled]="store.isConnectLoading()"
       variant="primary"
       type="submit"
     >

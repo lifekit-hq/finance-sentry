@@ -27,7 +27,7 @@
           <cmn-input type="email" placeholder="name@example.com" autocomplete="off" />
         </cmn-form-field>
         <cmn-button
-          [disabled]="store.isInviteLoading() || inviteForm.invalid"
+          [disabled]="store.isInviteLoading()"
           [loading]="store.isInviteLoading()"
           type="submit"
           icon="UserPlus"

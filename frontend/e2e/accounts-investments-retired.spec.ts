@@ -28,12 +28,18 @@ test.describe('Retired Investments tab', () => {
 
     await expect(page).toHaveURL(/\/accounts\/list\?provider=ibkr$/);
     const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
-    await expect(broker.locator('details').first()).toHaveJSProperty('open', true);
+    await expect(broker.locator('button[aria-controls]').first()).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
     await expect(broker.getByTestId('position-row').first()).toBeInViewport();
     await expect(broker.getByTestId('position-pnl').first()).toContainText('%');
     await expect(
-      page.locator('cmn-disclosure-row', {hasText: 'Binance'}).locator('details').first()
-    ).toHaveJSProperty('open', false);
+      page
+        .locator('cmn-disclosure-row', {hasText: 'Binance'})
+        .locator('button[aria-controls]')
+        .first()
+    ).toHaveAttribute('aria-expanded', 'false');
     if (SHOTS_DIR) {
       await page.screenshot({path: `${SHOTS_DIR}/accounts-provider-deep-link.png`});
     }

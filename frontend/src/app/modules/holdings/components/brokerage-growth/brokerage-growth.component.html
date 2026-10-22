@@ -7,6 +7,7 @@
       [status]="store.status()"
       [errorMessage]="store.errorMessage()"
       (retry)="store.load()"
+      emptySubMessage="Growth shows once these holdings have value history."
       retryable
     >
       <div skeleton class="space-y-cmn-2">

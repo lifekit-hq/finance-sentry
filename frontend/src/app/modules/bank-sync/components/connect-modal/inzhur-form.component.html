@@ -2,6 +2,7 @@
   [status]="inzhur.asyncStatus()"
   [errorMessage]="inzhur.loadErrorMessage()"
   [skeletonRows]="3"
+  emptySubMessage="Paste your Inzhur session to connect your investments."
   skeletonHeight="48px"
 >
   <form [formGroup]="sessionForm" (ngSubmit)="connect()" class="flex flex-col gap-cmn-6">

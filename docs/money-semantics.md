@@ -1014,7 +1014,9 @@ are closed periods.
   is labelled **Change** (last minus first `totalNetWorth` in the range, in amount and percent): it
   is a change in net worth, savings and cash included, not a return. There is no separate
   invested-change line: the chart's bands carry the split instead, named in the chart's legend
-  (Home's "Where it is" rows: each band's value and share of the total on the day shown), and
+  (Home's "Where it is" bar: each band holding money with its value and its share of the money held -
+  the bands above zero - on the day shown; a band below zero has no segment and is listed under the
+  bar with its value), and
   contributions vs growth (below) sit in the Accounts brokerage and crypto sections. The twelve-month
   projection is untouched (built from savings, not from this line; §11); it is shown on Breakdown.
 - **Scope changes hide the change percentage**: `/net-worth/history` also returns `scopeChanges`

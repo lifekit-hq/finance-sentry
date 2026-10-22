@@ -39,6 +39,7 @@
       [status]="listStatus()"
       [errorMessage]="loadError() ?? ''"
       [skeletonRows]="4"
+      emptySubMessage="No banks match your search."
       skeletonHeight="56px"
     >
       @for (provider of filteredProviders(); track provider.providerId) {

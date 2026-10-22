@@ -13,12 +13,12 @@ interface StateSignals {
   modalStep: Signal<ModalStep>;
 }
 
-const DEFAULT_BINANCE_ERROR = 'Failed to connect Binance account. Please check your API keys.';
+const DEFAULT_BINANCE_ERROR = 'Failed to connect Binance account. Check your API keys.';
 const DEFAULT_REVOLUT_X_ERROR =
-  'Failed to connect Revolut X. Please check your API key and Ed25519 private key.';
-const DEFAULT_IBKR_ERROR = 'Failed to connect IBKR account. Please check your credentials.';
-const DEFAULT_INZHUR_ERROR = 'Failed to connect Inzhur. Please try again.';
-const DEFAULT_MONOBANK_ERROR = 'Failed to connect Monobank account. Please try again.';
+  'Failed to connect Revolut X. Check your API key and Ed25519 private key.';
+const DEFAULT_IBKR_ERROR = 'Failed to connect IBKR account. Check your credentials.';
+const DEFAULT_INZHUR_ERROR = 'Failed to connect Inzhur. Try again.';
+const DEFAULT_MONOBANK_ERROR = 'Failed to connect Monobank account. Try again.';
 
 function mapErrorByProvider(
   code: Nullable<string>,

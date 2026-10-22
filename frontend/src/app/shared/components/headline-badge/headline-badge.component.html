@@ -1,4 +1,5 @@
 @if (badge(); as b) {
+  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a pill badge that opens its explanation; cmn-button has no badge shape -->
   <button
     [attr.aria-label]="ariaLabel()"
     [attr.data-badge]="b.kind"

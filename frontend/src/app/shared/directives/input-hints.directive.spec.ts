@@ -7,7 +7,12 @@ import {InputHintsDirective} from './input-hints.directive';
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'fns-host',
   imports: [InputHintsDirective],
-  template: '<cmn-input inputmode="decimal" enterkeyhint="done"><input /></cmn-input>',
+  template: `
+    <cmn-input inputmode="decimal" enterkeyhint="done">
+      <!-- eslint-disable-next-line lifekit/no-raw-controls -- stands in for cmn-input's inner input -->
+      <input />
+    </cmn-input>
+  `,
 })
 class HostComponent {}
 

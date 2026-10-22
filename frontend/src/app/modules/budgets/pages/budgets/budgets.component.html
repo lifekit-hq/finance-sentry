@@ -8,11 +8,13 @@
       (valueChange)="onMonthChange($event)"
     />
 
+    <!-- Each month is its own query: a reload shows the skeleton, never last month's rows. -->
     <cmn-async-state
       [status]="view().status"
       [errorMessage]="view().errorMessage"
       [errorPlacement]="errorPlacement()"
       [isEmpty]="store.summaryItems().length === 0"
+      [keepContent]="false"
       [emptyMessage]="'No budgets for ' + store.monthName()"
       (retry)="store.loadSummary()"
       class="block space-y-cmn-5"
@@ -110,6 +112,7 @@
                   [style.background]="categoryColor(b.category)"
                   class="h-2.5 w-2.5 shrink-0 rounded-sm"
                 ></div>
+                <!-- eslint-disable-next-line lifekit/no-raw-controls -- an inline text link to the category transactions, not an action button -->
                 <button
                   (click)="viewTransactions(b.category)"
                   class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"

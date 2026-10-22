@@ -2,7 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {type ChipRowOption} from '@lifekit-hq/elements';
-import {type Nullable} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, type Nullable} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {OUTCOME_META_REGISTRY} from '../../constants/event/event.constants';
@@ -406,10 +406,12 @@ describe('EventsComponent', () => {
     mockStore.hasFiredRows.set(false);
     mockStore.isFiredLoading.set(true);
 
-    const {host, text} = render();
+    const {fixture, host} = render();
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="fired-loading"]')).not.toBeNull();
-    expect(text).not.toContain('Nothing has fired');
+    expect(host.textContent).not.toContain('Nothing has fired');
   });
 
   it('keeps the rows and hands the next-page state to the infinite list', () => {

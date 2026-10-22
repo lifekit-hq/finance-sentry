@@ -80,7 +80,7 @@ describe('TopAlertComponent', () => {
   it('marks the alert read and opens what it is about', () => {
     const {el, markRead, navigateByUrl} = render([ALERT], 1);
 
-    el.querySelector<HTMLButtonElement>('[data-testid="top-alert-open"]')?.click();
+    el.querySelector<HTMLButtonElement>('[data-testid="top-alert-item"] button')?.click();
 
     expect(markRead).toHaveBeenCalledExactlyOnceWith('a');
     expect(navigateByUrl).toHaveBeenCalledExactlyOnceWith('/accounts/list');

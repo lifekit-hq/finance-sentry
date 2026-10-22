@@ -54,6 +54,7 @@
     [status]="view().status"
     [errorMessage]="view().errorMessage"
     [isEmpty]="store.isEmpty()"
+    emptySubMessage="Connect a bank, exchange or broker, or add a value by hand."
     errorPlacement="above"
   >
     <div skeleton data-testid="accounts-skeleton">
@@ -81,7 +82,11 @@
       }
     </div>
 
-    <cmn-empty-state empty message="No accounts connected yet.">
+    <cmn-empty-state
+      empty
+      message="No accounts connected yet."
+      subMessage="Connect a bank, exchange or broker, or add a value by hand."
+    >
       <cmn-button (clicked)="connectAccount()" cta variant="primary"
         >Connect Your First Account</cmn-button
       >
@@ -224,6 +229,7 @@
             class="relative flex items-center border-t border-border-default pr-cmn-2 transition-colors first:border-t-0 hover:bg-surface-card"
             data-testid="manual-holding-row"
           >
+            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the holding, not an action button -->
             <button
               (click)="openManualHolding(row)"
               class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
@@ -252,6 +258,7 @@
           [class.border-t]="store.manualRows().length > 0"
           class="relative border-border-default transition-colors hover:bg-surface-card"
         >
+          <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that adds a holding, not an action button -->
           <button
             (click)="openManualHolding()"
             class="flex min-h-[2.75rem] w-full items-center gap-cmn-2 px-cmn-4 py-cmn-3 text-left text-cmn-sm font-medium text-text-primary"
@@ -290,6 +297,7 @@
               class="flex items-center border-t border-border-default pr-cmn-2 transition-colors hover:bg-surface-card"
               data-testid="closed-account-row"
             >
+              <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the account, not an action button -->
               <button
                 (click)="navigateToTransactions(row.accountId)"
                 class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
@@ -401,6 +409,7 @@
           </li>
         } @else {
           <li class="border-t border-border-default">
+            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the dossier, not an action button -->
             <button
               (click)="navigateToDossier(row.symbol)"
               class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
@@ -490,6 +499,7 @@
           </li>
         } @else {
           <li class="border-t border-border-default">
+            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the dossier, not an action button -->
             <button
               (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
               class="relative flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
@@ -529,6 +539,7 @@
 </ng-template>
 
 <ng-template #accountRow let-account let-title="title">
+  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the account, not an action button -->
   <button
     (click)="navigateToTransactions(account.accountId)"
     class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"

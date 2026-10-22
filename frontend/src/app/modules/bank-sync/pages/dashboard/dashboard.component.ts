@@ -10,18 +10,17 @@ import {type ChartPointClick} from '@lifekit-hq/charts-core';
 import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
+  AllocationBarComponent,
   AreaChartComponent,
   AsyncStateComponent,
   ButtonComponent,
   CardComponent,
-  DonutChartComponent,
   IconComponent,
   PageContainerComponent,
   SkeletonComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
 
-import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {
   GAIN_TEXT_CLASS,
@@ -65,12 +64,11 @@ const HISTORY_RANGES: ChipRowOption[] = [
   imports: [
     PageContainerComponent,
     AlertComponent,
-    AppDecimalPipe,
+    AllocationBarComponent,
     AreaChartComponent,
     AsyncStateComponent,
     ButtonComponent,
     CardComponent,
-    DonutChartComponent,
     HeadlineBadgeComponent,
     IconComponent,
     MoneyPipe,
@@ -92,12 +90,16 @@ const HISTORY_RANGES: ChipRowOption[] = [
           }}</cmn-alert>
         }
 
+        <!-- The host's flex gap lays out these children directly;
+             the keep-content wrapper would put them in one box. -->
         <cmn-async-state
           [status]="view().status"
           [errorMessage]="view().errorMessage"
           [isEmpty]="showEmptyState()"
           [errorPlacement]="errorPlacement()"
+          [keepContent]="false"
           class="flex flex-col gap-cmn-6"
+          emptySubMessage="Connect an account to populate this dashboard."
         >
           <cmn-button (clicked)="retry()" error-action variant="secondary" size="sm"
             >Retry</cmn-button
@@ -259,8 +261,8 @@ const HISTORY_RANGES: ChipRowOption[] = [
           <fns-net-worth-why-moved [period]="tileHeading()" [detailsParams]="breakdownParams()" />
 
           <!--
-            Where the money is now (or at the scrubbed point): the chart's bands as shares. The donut is
-            interim until the shared allocation bar ships in @lifekit-hq/ui.
+            Where the money is now (or at the scrubbed point): the chart's bands as shares of the
+            money held. A legend row opens the accounts page that lists its band, as the chart does.
           -->
           @if (store.isHistoryFirstLoad()) {
             <!-- Another range's history is still on hand: its shares never sit under the new range. -->
@@ -270,44 +272,26 @@ const HISTORY_RANGES: ChipRowOption[] = [
           } @else if (store.allocation().length > 0) {
             <cmn-card data-testid="net-worth-allocation">
               <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Where it is</h2>
-              <div
-                class="mt-cmn-3 grid grid-cols-1 items-center gap-cmn-4 sm:grid-cols-[10rem_1fr]"
-              >
-                <cmn-donut-chart
-                  [segments]="store.allocationSegments()"
-                  [currency]="store.baseCurrency()"
-                  [chrome]="false"
-                  [showLegend]="false"
-                  class="mx-auto block h-56 w-40"
-                  label="Where your net worth is"
-                />
-                <ul class="divide-y divide-border-default">
-                  @for (row of store.allocation(); track row.label) {
-                    <li data-testid="net-worth-allocation-row">
-                      <!-- A band no accounts page lists on its own (other sources, no split) opens nothing. -->
-                      <a
-                        [routerLink]="row.route"
-                        class="flex items-center gap-cmn-2 py-cmn-2 text-cmn-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-                      >
-                        <span
-                          [style.background-color]="row.color"
-                          class="inline-block h-2.5 w-2.5 shrink-0 rounded-cmn-full"
-                          aria-hidden="true"
-                        ></span>
-                        <span class="min-w-0 flex-1 truncate text-text-primary">{{
-                          row.label
-                        }}</span>
-                        <span class="tabular-nums text-text-secondary">{{
-                          row.percent === null ? '—' : (row.percent | appDecimal: '1.0-0') + '%'
-                        }}</span>
-                        <span class="w-24 text-right font-medium tabular-nums text-text-primary">{{
-                          row.value | money: store.baseCurrency() : wholeDollars
-                        }}</span>
-                      </a>
-                    </li>
-                  }
-                </ul>
-              </div>
+              <cmn-allocation-bar
+                [segments]="store.allocationSegments()"
+                [currency]="store.baseCurrency()"
+                (segmentClick)="openBand($event.label)"
+                class="mt-cmn-3"
+                emptyMessage="Nothing held above zero"
+                emptySubMessage="Every part of your net worth is below zero at this point."
+                label="Where your net worth is"
+              />
+              @for (row of store.allocationBelowZero(); track row.label) {
+                <p
+                  class="mt-cmn-2 flex items-center justify-between gap-cmn-2 text-cmn-sm"
+                  data-testid="net-worth-allocation-below-zero"
+                >
+                  <span class="text-text-secondary">{{ row.label }} is below zero</span>
+                  <span class="font-medium tabular-nums text-text-primary">{{
+                    row.value | money: store.baseCurrency() : wholeDollars
+                  }}</span>
+                </p>
+              }
             </cmn-card>
           }
 
@@ -467,9 +451,13 @@ export class DashboardComponent {
     void this.router.navigateByUrl(AppRoute.AccountsList);
   }
 
-  // A band is a sleeve of the book, so it opens the accounts page that lists that sleeve.
   public onNetWorthClick(click: ChartPointClick): void {
-    const route = NET_WORTH_SERIES_ROUTES.get(click.seriesLabel);
+    this.openBand(click.seriesLabel);
+  }
+
+  // A band is a sleeve of the book, so it opens the accounts page that lists that sleeve.
+  public openBand(label: string): void {
+    const route = NET_WORTH_SERIES_ROUTES.get(label);
     if (route) {
       void this.router.navigateByUrl(route);
     }

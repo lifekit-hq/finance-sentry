@@ -17,7 +17,7 @@ test.describe('Asset Dossier', () => {
   test('click holding symbol navigates to dossier page', async ({page}) => {
     await page.goto('/accounts/list');
     const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
-    await broker.locator('summary').click();
+    await broker.locator('button[aria-controls]').first().click();
     // The whole position row is the click target
     await broker.getByTestId('position-row').filter({hasText: 'AAPL'}).click();
 
@@ -157,7 +157,10 @@ test.describe('Asset Dossier', () => {
 
     await expect(page).toHaveURL(/\/accounts\/list\?provider=ibkr/);
     const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
-    await expect(broker.locator('details').first()).toHaveJSProperty('open', true);
+    await expect(broker.locator('button[aria-controls]').first()).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
     await expect(broker.getByTestId('position-row').first()).toBeVisible();
     await expect(broker.getByTestId('institution-investments-link')).toHaveCount(0);
   });
@@ -165,7 +168,7 @@ test.describe('Asset Dossier', () => {
   test('accounts list position row opens the asset dossier', async ({page}) => {
     await page.goto('/accounts/list');
     const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
-    await broker.locator('summary').click();
+    await broker.locator('button[aria-controls]').first().click();
 
     await broker.getByTestId('position-row').first().click();
 

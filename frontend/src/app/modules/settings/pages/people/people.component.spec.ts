@@ -4,9 +4,9 @@ import {signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {API_BASE_URL} from '@lifekit-hq/core';
-import {type Nullable} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, type Nullable} from '@lifekit-hq/ui';
 import {NEVER, of, throwError} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type Person} from '../../models/person/person.model';
@@ -63,8 +63,14 @@ describe('PeopleComponent', () => {
 
   it('shows a skeleton and no rows while the first load is in flight', () => {
     service.list.mockReturnValue(NEVER);
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
 
     const host = render();
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
 
     expect(host.querySelector('cmn-skeleton')).not.toBeNull();
     expect(host.textContent).not.toContain('friend@test.com');

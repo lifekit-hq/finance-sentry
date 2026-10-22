@@ -59,7 +59,7 @@ export const TransactionLedgerStore = signalStore(
       revalidating: true,
     }
   ),
-  withAsyncStatus({defaultErrorMessage: 'Failed to load transactions. Please try again.'}),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load transactions. Try again.'}),
   // The next page appends under the rows already on screen; `lk-infinite-list` shows its own
   // skeleton rows and inline retry from this status, so it never touches the first-load state.
   withNamedAsyncStatus('append', {defaultErrorMessage: "Couldn't load more transactions."}),

@@ -1,9 +1,9 @@
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {type Nullable} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, type Nullable} from '@lifekit-hq/ui';
 import {EMPTY, NEVER, of} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {
@@ -117,6 +117,10 @@ describe('DecisionsComponent', () => {
   });
 
   it('holds the place of the pending cards and the decided list while the queue loads', () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -127,6 +131,8 @@ describe('DecisionsComponent', () => {
       ],
     });
     const fixture = TestBed.createComponent(DecisionsComponent);
+    fixture.detectChanges();
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
     fixture.detectChanges();
     const skeleton = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid="decisions-skeleton"]'

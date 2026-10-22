@@ -1,7 +1,8 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
-import {CmnDialogService} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
+import {onTestFinished} from 'vitest';
 
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type Subscription} from '../../models/subscription/subscription.model';
@@ -181,7 +182,13 @@ describe('SubscriptionsComponent async states', () => {
   }
 
   it('shows a skeleton instead of the empty copy while the first load runs', () => {
-    const {host} = render({isLoading: true});
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const {fixture, host} = render({isLoading: true});
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="subscriptions-skeleton"]')).not.toBeNull();
     expect(host.textContent).not.toContain('No active subscriptions yet');

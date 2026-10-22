@@ -25,6 +25,7 @@
     [status]="view().status"
     [errorMessage]="view().errorMessage"
     [isEmpty]="store.alerts().length === 0"
+    [emptySubMessage]="emptySubtext()"
     [showDelay]="showDelay"
     [minDisplay]="minDisplay"
     (retry)="store.load(store.query())"
@@ -78,17 +79,22 @@
                 [timestamp]="alert.createdAt"
                 [isRead]="alert.isRead || alert.isResolved"
                 [description]="alert | alertCaption"
+                (read)="openAlert(alert)"
                 (dismissed)="dismiss(alert.id)"
-                class="[&_button]:relative [&_button]:z-10"
                 density="flat"
               />
-              <button
-                [attr.aria-label]="alert.title"
-                (click)="openAlert(alert)"
-                class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                type="button"
-                data-testid="alert-row-open"
-              ></button>
+              <!-- An unread item's title is its own control, stretched over the card; a read item
+                   has none, so this one opens it. -->
+              @if (alert.isRead || alert.isResolved) {
+                <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over a read cmn-alert-item, which has no control of its own -->
+                <button
+                  [attr.aria-label]="alert.title"
+                  (click)="openAlert(alert)"
+                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                  type="button"
+                  data-testid="alert-row-open"
+                ></button>
+              }
             </div>
           }
         </cmn-list-section>

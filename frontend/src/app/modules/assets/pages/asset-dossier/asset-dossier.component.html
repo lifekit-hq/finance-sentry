@@ -1,8 +1,12 @@
 <cmn-page-container>
+  <!-- The host's spacing lays out these children directly;
+       the keep-content wrapper would put them in one box. -->
   <cmn-async-state
     [status]="dossierStatus()"
     [errorMessage]="store.dossierErrorMessage()"
+    [keepContent]="false"
     class="block space-y-cmn-5"
+    emptySubMessage="No position, thesis, valuation, coverage, news or signal is recorded for this asset yet."
   >
     <div skeleton data-testid="dossier-skeleton" class="space-y-cmn-5">
       <cmn-skeleton height="2rem" width="40%" />
@@ -433,7 +437,7 @@
               <aside class="lg:sticky lg:top-[4.5rem] lg:order-last">
                 <cmn-card
                   [id]="sectionId.checks"
-                  class="block scroll-mt-[4.5rem]"
+                  class="block scroll-mt-20"
                   data-testid="dossier-checks"
                 >
                   <div class="flex items-baseline justify-between gap-cmn-3">
@@ -534,11 +538,7 @@
           <div class="space-y-cmn-5 lg:col-span-2">
             <!-- How has it moved? 1Y by default, the S&P 500 rebased onto its first close, the user's fills and average cost. -->
             @if (dossier.performance) {
-              <cmn-card
-                [id]="sectionId.chart"
-                class="block scroll-mt-[4.5rem]"
-                data-testid="price-chart"
-              >
+              <cmn-card [id]="sectionId.chart" class="block scroll-mt-20" data-testid="price-chart">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -592,6 +592,7 @@
                   [skeletonHeight]="chartSkeletonHeight"
                   [skeletonRows]="1"
                   (retry)="store.loadChart({symbol: dossier.symbol, range: store.chartRange()})"
+                  emptySubMessage="Pick a longer range to see more of its price history."
                   class="mt-cmn-3 block min-h-[23rem]"
                   retryable
                 >
@@ -647,11 +648,7 @@
 
             <!-- Where did the return come from? Held only; legs the ledger cannot state say so. -->
             @if (store.returnsView(); as returns) {
-              <cmn-card
-                [id]="sectionId.returns"
-                class="block scroll-mt-[4.5rem]"
-                data-testid="returns"
-              >
+              <cmn-card [id]="sectionId.returns" class="block scroll-mt-20" data-testid="returns">
                 <div class="flex items-baseline justify-between gap-cmn-3">
                   <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                     Where did the return come from?
@@ -701,7 +698,7 @@
             @if (store.hasValuationCard()) {
               <cmn-card
                 [id]="sectionId.valuation"
-                class="block scroll-mt-[4.5rem]"
+                class="block scroll-mt-20"
                 data-testid="valuation"
               >
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
@@ -964,7 +961,7 @@
 
             <!-- What do analysts say? -->
             @if (store.hasAnalysts() && dossier.analysts; as analysts) {
-              <cmn-card [id]="sectionId.analysts" class="block scroll-mt-[4.5rem]">
+              <cmn-card [id]="sectionId.analysts" class="block scroll-mt-20">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1075,7 +1072,7 @@
 
             <!-- What's the plan? The investment thesis. -->
             @if (dossier.thesis; as thesis) {
-              <cmn-card [id]="sectionId.thesis" class="block scroll-mt-[4.5rem]">
+              <cmn-card [id]="sectionId.thesis" class="block scroll-mt-20">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1151,7 +1148,7 @@
 
             <!-- What's next? -->
             @if (dossier.nextEarnings; as earnings) {
-              <cmn-card [id]="sectionId.earnings" class="block scroll-mt-[4.5rem]">
+              <cmn-card [id]="sectionId.earnings" class="block scroll-mt-20">
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                   What's next?
                 </h2>
@@ -1169,7 +1166,7 @@
 
             <!-- Recent News -->
             @if (dossier.recentNews.length > 0) {
-              <cmn-card [id]="sectionId.news" class="block scroll-mt-[4.5rem]">
+              <cmn-card [id]="sectionId.news" class="block scroll-mt-20">
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                   Recent News
                 </h2>
@@ -1196,7 +1193,7 @@
 
             <!-- Radar Signals -->
             @if (dossier.radarSignals.length > 0) {
-              <cmn-card [id]="sectionId.signals" class="block scroll-mt-[4.5rem]">
+              <cmn-card [id]="sectionId.signals" class="block scroll-mt-20">
                 <div class="flex items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1264,7 +1261,7 @@
             @if (!store.isCrypto()) {
               <cmn-card
                 [id]="sectionId.ownership"
-                class="block scroll-mt-[4.5rem]"
+                class="block scroll-mt-20"
                 data-testid="ownership"
               >
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1278,7 +1275,7 @@
             <section
               [id]="sectionId.dataStatus"
               aria-labelledby="data-status-heading"
-              class="scroll-mt-[4.5rem] border-t border-border-default pt-cmn-4"
+              class="scroll-mt-20 border-t border-border-default pt-cmn-4"
               data-testid="data-status"
             >
               <h2

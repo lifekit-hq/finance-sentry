@@ -104,10 +104,18 @@
       </div>
     }
 
+    <!-- The host's flex column lays out these children directly;
+         the keep-content wrapper would put them in one box. -->
     <cmn-async-state
       [status]="breakdownStatus()"
       [errorMessage]="store.errorMessage()"
       [isEmpty]="store.isEmpty()"
+      [emptySubMessage]="
+        store.range()
+          ? 'Pick another range on the dashboard or sync your accounts.'
+          : 'Pick another month or sync your accounts.'
+      "
+      [keepContent]="false"
       class="flex min-h-0 flex-1 flex-col"
       errorPlacement="above"
     >
@@ -203,6 +211,7 @@
                       </div>
                     </div>
                   </cmn-list-item-row>
+                  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
                   <button
                     [attr.aria-label]="i.description"
                     (click)="openTransaction(i)"
@@ -214,6 +223,7 @@
               }
             </div>
             <div class="hidden overflow-x-auto md:block">
+              <!-- eslint-disable-next-line lifekit/no-raw-controls -- a dense desktop transaction table whose rows open a drawer; cmn-data-table has no row action -->
               <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
                 <tbody>
                   @for (i of group.items; track i.transactionId) {
@@ -225,6 +235,7 @@
                         {{ i.date | date: 'MMM d' }}
                       </td>
                       <td class="max-w-[320px] truncate px-cmn-4 py-cmn-3 text-text-primary">
+                        <!-- eslint-disable-next-line lifekit/no-raw-controls -- the row title stretched over the table row as its hit area, not an action button -->
                         <button
                           (click)="openTransaction(i)"
                           class="block max-w-full cursor-pointer truncate text-left after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"

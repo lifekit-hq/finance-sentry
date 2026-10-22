@@ -14,7 +14,7 @@ import {
 
 export const DashboardStore = signalStore(
   withState(initialDashboardState),
-  withAsyncStatus({defaultErrorMessage: 'Failed to load dashboard data. Please try again.'}),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load dashboard data. Try again.'}),
   withUrlSync({
     historyRange: {
       param: 'range',

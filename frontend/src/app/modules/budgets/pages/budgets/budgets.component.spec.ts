@@ -2,9 +2,9 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {Router} from '@angular/router';
 import {type AsyncStatus} from '@lifekit-hq/core';
-import {CmnDialogService} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {BudgetsStore} from '../../store/budgets/budgets.store';
@@ -233,7 +233,13 @@ describe('BudgetsComponent async states', () => {
   }
 
   it('shows a skeleton while the month loads, never the empty copy', () => {
-    const {host} = render('loading');
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const {fixture, host} = render('loading');
+    vi.advanceTimersByTime(ASYNC_STATE_SHOW_DELAY_MS);
+    fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="budgets-skeleton"]')).not.toBeNull();
     expect(host.textContent).not.toContain('No budgets for September');

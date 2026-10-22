@@ -26,8 +26,10 @@
     [isEmpty]="picker.candidates().length === 0"
     (retry)="picker.load()"
     class="block"
-    emptyMessage="No matching outgoing transactions"
     emptyIcon="Search"
+    emptyKind="no-results"
+    emptyMessage="No matching outgoing transactions"
+    emptySubMessage="Try another merchant or description, or connect the account the charge was paid from."
     errorPlacement="above"
     retryable
   >
