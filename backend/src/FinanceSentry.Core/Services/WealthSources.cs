@@ -50,7 +50,7 @@ public sealed class BrokerageWealthSource(IBrokerageHoldingsReader reader) : IWe
             if (assetClass == AssetClassNormalizer.Cash)
                 cashUsd += h.UsdValue;
             else
-                positions.Add(new BookFigurePosition(h.Symbol, assetClass, h.Quantity, h.CostBasisUsd, h.UsdValue, h.Provider));
+                positions.Add(new BookFigurePosition(h.Symbol, assetClass, h.Quantity, h.CostBasisUsd, h.UsdValue, h.Provider, h.BasisState));
         }
 
         return new WealthSourceReading(cashUsd, positions, fxStatus);
@@ -84,7 +84,10 @@ public sealed class CryptoWealthSource(ICryptoHoldingsReader reader) : IWealthSo
                 continue;
             }
 
-            positions.Add(new BookFigurePosition(h.Asset, AssetClassNormalizer.Crypto, qty, h.CostBasisUsd, h.UsdValue, h.Provider));
+            // The venue sync computes the basis from the fills it persisted and nothing checks it against a second
+            // source, so a basis is "Verified" (counted) and its absence "Unknown"; "Unverified" cannot arise.
+            var basisState = h.CostBasisUsd is > 0m ? "Verified" : "Unknown";
+            positions.Add(new BookFigurePosition(h.Asset, AssetClassNormalizer.Crypto, qty, h.CostBasisUsd, h.UsdValue, h.Provider, basisState));
         }
 
         return new WealthSourceReading(cashUsd, positions, fxStatus);
