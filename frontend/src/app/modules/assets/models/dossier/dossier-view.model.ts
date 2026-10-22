@@ -53,6 +53,12 @@ export interface SizeCapView {
   overCap: boolean;
 }
 
+/** The held position per unit, in USD; `average` null when no cost basis is known. */
+export interface PositionUnitPricesView {
+  current: Nullable<number>;
+  average: Nullable<number>;
+}
+
 /** A marker on the "Is it cheap?" bar; `leftPct` 0-100 along the scale. */
 export interface TargetMarker {
   key: 'price' | 'analyst' | 'mine';

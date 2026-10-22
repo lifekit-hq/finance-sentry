@@ -49,6 +49,7 @@ import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pip
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
+import {UnitPricePipe} from '../../../../shared/pipes/unit-price.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
@@ -120,6 +121,7 @@ const FEED_CURRENCY = 'USD';
     ListSectionComponent,
     MenuComponent,
     MoneyPipe,
+    UnitPricePipe,
     NgTemplateOutlet,
     PositionQuantityPipe,
     PositionValuePipe,

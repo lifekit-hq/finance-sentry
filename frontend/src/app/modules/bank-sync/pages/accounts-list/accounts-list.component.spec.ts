@@ -312,6 +312,7 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       assetClass: 'equity',
       quantity: 3,
       currentPrice: 400,
+      averagePrice: 355.56,
       currentValue: 1200,
       pnlPercent: 12.5,
       pnlUsd: 133.33,
@@ -339,6 +340,29 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       );
       expect(rows[0]?.querySelector('[data-testid="position-day-change"]')?.textContent).toContain(
         '-1.25%'
+      );
+    });
+
+    it('shows the current and average price per unit on a position row', () => {
+      const element = withFeed([row({})]);
+
+      const row0 = element.querySelector('[data-testid="position-row"]');
+      expect(row0?.querySelector('[data-testid="position-unit-price"]')?.textContent).toBe(
+        '$400.00'
+      );
+      expect(row0?.querySelector('[data-testid="position-average-price"]')?.textContent).toBe(
+        '$355.56'
+      );
+    });
+
+    it('keeps the current price and shows the placeholder when no average is known', () => {
+      const element = withFeed([row({averagePrice: null})]);
+
+      expect(element.querySelector('[data-testid="position-unit-price"]')?.textContent).toBe(
+        '$400.00'
+      );
+      expect(element.querySelector('[data-testid="position-average-price"]')?.textContent).toBe(
+        '—'
       );
     });
 

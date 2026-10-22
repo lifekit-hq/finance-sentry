@@ -6,6 +6,7 @@ import {catchError} from 'rxjs/operators';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
+import {UnitPriceUtils} from '../../../shared/utils/unit-price.utils';
 import {BROKERAGE_ASSET_CLASS} from '../constants/position/position.constants';
 import {
   type BrokerageHoldingsDto,
@@ -52,8 +53,19 @@ function cryptoUnitPrice(holding: CryptoHoldingDto): Nullable<number> {
   if (holding.isFiat) {
     return null;
   }
-  const quantity = holding.freeQuantity + holding.lockedQuantity;
-  return quantity > 0 ? holding.usdValue / quantity : 0;
+  return UnitPriceUtils.perUnit(holding.usdValue, holding.freeQuantity + holding.lockedQuantity);
+}
+
+/** The venue's trade-derived average; venue cash has none. */
+function cryptoAveragePrice(holding: CryptoHoldingDto): Nullable<number> {
+  if (holding.isFiat) {
+    return null;
+  }
+  return UnitPriceUtils.average(
+    holding.averageBuyPriceUsd,
+    holding.costBasisUsd,
+    holding.freeQuantity + holding.lockedQuantity
+  );
 }
 
 /** The provider's own currency and amount, kept only for a non-USD row that reported both. */
@@ -100,7 +112,8 @@ export class PositionsService extends ApiService {
             instrumentType: p.instrumentType,
             quantity: p.quantity,
             currentValue: p.usdValue,
-            currentPrice: p.quantity > 0 ? p.usdValue / p.quantity : 0,
+            currentPrice: UnitPriceUtils.perUnit(p.usdValue, p.quantity),
+            averagePrice: UnitPriceUtils.average(p.averageCostUsd, p.costBasisUsd, p.quantity),
             pnlPercent: providerPnlPercent(p.usdValue, costBasisUsd),
             pnlUsd: providerPnlUsd(p.usdValue, costBasisUsd),
             isVenueCash: false,
@@ -119,6 +132,7 @@ export class PositionsService extends ApiService {
           quantity: h.freeQuantity + h.lockedQuantity,
           currentValue: h.usdValue,
           currentPrice: cryptoUnitPrice(h),
+          averagePrice: cryptoAveragePrice(h),
           pnlPercent: null,
           pnlUsd: null,
           isVenueCash: h.isFiat,

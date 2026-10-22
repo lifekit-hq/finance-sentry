@@ -126,6 +126,36 @@ describe('DossierPositionUtils.returns', () => {
   });
 });
 
+describe('DossierPositionUtils.unitPrices', () => {
+  it('is null without a position', () => {
+    expect(DossierPositionUtils.unitPrices(null)).toBeNull();
+  });
+
+  it('spreads the value and the cost basis over the units held', () => {
+    expect(
+      DossierPositionUtils.unitPrices(
+        position({quantity: 10, currentValueUsd: 1_500, costBasisUsd: 1_200})
+      )
+    ).toEqual({current: 150, average: 120});
+  });
+
+  it('keeps the current price and leaves the average unknown without a cost basis', () => {
+    expect(
+      DossierPositionUtils.unitPrices(
+        position({quantity: 10, currentValueUsd: 1_500, costBasisUsd: null})
+      )
+    ).toEqual({current: 150, average: null});
+  });
+
+  it('states neither figure for a zero quantity', () => {
+    expect(
+      DossierPositionUtils.unitPrices(
+        position({quantity: 0, currentValueUsd: 1_500, costBasisUsd: 1_200})
+      )
+    ).toEqual({current: null, average: null});
+  });
+});
+
 describe('DossierPositionUtils.sizeCap', () => {
   it('is null without a position', () => {
     expect(DossierPositionUtils.sizeCap(null)).toBeNull();
