@@ -72,8 +72,7 @@
         </span>
       }
 
-      <!-- The host's spacing lays out these children directly;
-           the keep-content wrapper would put them in one box. -->
+      <!-- Skeleton and list cards are the host's direct children; keep-content would wrap them in one box. -->
       <cmn-async-state
         [status]="view().status"
         [errorMessage]="view().errorMessage"
