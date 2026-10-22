@@ -8,14 +8,12 @@
           [class.bg-surface-hover]="conversation.id === store.activeConversationId()"
           class="flex items-center justify-between gap-cmn-1 rounded-cmn-md pr-cmn-1 hover:bg-surface-hover"
         >
-          <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that selects the conversation, not an action button -->
-          <button
-            (click)="onSelect(conversation)"
-            type="button"
-            class="min-w-0 flex-1 truncate px-cmn-2 py-cmn-2 text-left text-cmn-sm text-text-secondary"
-          >
-            {{ conversation.title || 'Untitled' }}
-          </button>
+          <cmn-list-item-row
+            [label]="conversation.title || 'Untitled'"
+            [action]="true"
+            (activated)="onSelect(conversation)"
+            class="min-w-0 flex-1"
+          />
           <cmn-menu
             [items]="conversationMenuItems"
             (itemSelect)="onConversationAction($event.id, conversation)"

@@ -12,6 +12,7 @@ import {
   CMN_DRAWER_DATA,
   CmnDrawerRef,
   IconComponent,
+  ListItemRowComponent,
   type LucideIconName,
   MenuComponent,
   type MenuItem,
@@ -34,7 +35,7 @@ const CONVERSATION_MENU_ITEMS: MenuItem[] = [
   selector: 'fns-sessions-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'flex h-full min-h-0 flex-col gap-cmn-3', '[class.p-cmn-4]': 'isInDrawer'},
-  imports: [ButtonComponent, IconComponent, MenuComponent],
+  imports: [ButtonComponent, IconComponent, ListItemRowComponent, MenuComponent],
   templateUrl: './sessions-list.component.html',
 })
 export class SessionsListComponent {

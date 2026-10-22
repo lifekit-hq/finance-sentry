@@ -187,12 +187,15 @@
             </div>
             <div class="md:hidden" data-testid="breakdown-rows">
               @for (i of group.items; track i.transactionId) {
-                <div class="relative" data-testid="breakdown-row">
+                <div data-testid="breakdown-row">
                   <cmn-list-item-row
                     [label]="i.description"
                     [sublabel]="
                       i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')
                     "
+                    [action]="true"
+                    (activated)="openTransaction(i)"
+                    data-testid="breakdown-row-open"
                   >
                     @if (i.counterpartyName) {
                       <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
@@ -211,14 +214,6 @@
                       </div>
                     </div>
                   </cmn-list-item-row>
-                  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
-                  <button
-                    [attr.aria-label]="i.description"
-                    (click)="openTransaction(i)"
-                    class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                    type="button"
-                    data-testid="breakdown-row-open"
-                  ></button>
                 </div>
               }
             </div>
