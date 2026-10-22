@@ -16,6 +16,7 @@ const EQUITY: Position = {
   quantity: 1,
   currentValue: 110,
   currentPrice: 110,
+  averagePrice: null,
   pnlPercent: null,
   pnlUsd: null,
   isVenueCash: false,

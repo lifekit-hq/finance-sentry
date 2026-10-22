@@ -177,6 +177,26 @@
                   </dd>
                 }
               </div>
+              @if (store.positionUnitPrices(); as unit) {
+                <div>
+                  <dt class="text-cmn-xs text-text-secondary">Price per unit</dt>
+                  <dd
+                    class="text-cmn-md font-semibold tabular-nums text-text-primary"
+                    data-testid="position-unit-price"
+                  >
+                    {{ unit.current | unitPrice }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-cmn-xs text-text-secondary">Average cost per unit</dt>
+                  <dd
+                    class="text-cmn-md font-semibold tabular-nums text-text-primary"
+                    data-testid="position-average-price"
+                  >
+                    {{ unit.average | unitPrice }}
+                  </dd>
+                </div>
+              }
             </dl>
 
             <!-- Size against the IPS cap: the fill is the share of book, the mark is the cap. -->

@@ -1,5 +1,6 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
+import {UnitPriceUtils} from '../../../shared/utils/unit-price.utils';
 import {
   ANALYST_TARGET_SOURCE,
   CAP_SCALE_HEADROOM,
@@ -17,6 +18,7 @@ import {
 } from '../models/dossier/dossier.model';
 import {
   type DossierReturnsView,
+  type PositionUnitPricesView,
   type ReturnLegView,
   type SizeCapView,
   type TargetBandView,
@@ -57,6 +59,22 @@ export class DossierPositionUtils {
         ? `${RETURNS_COVERAGE_NOTES.complete} (${returns.fillCount} ${returns.fillCount === 1 ? 'fill' : 'fills'}).`
         : RETURNS_COVERAGE_NOTES[returns.coverage];
     return {legs, total: returns.totalUsd, note};
+  }
+
+  /**
+   * The position's value and cost basis per unit held: what one unit is worth now and what it cost on
+   * average. The average comes from the cost basis only, never from the current price.
+   */
+  public static unitPrices(
+    position: Nullable<DossierPositionSection>
+  ): Nullable<PositionUnitPricesView> {
+    if (!position) {
+      return null;
+    }
+    return {
+      current: UnitPriceUtils.perUnit(position.currentValueUsd, position.quantity),
+      average: UnitPriceUtils.perUnit(position.costBasisUsd, position.quantity),
+    };
   }
 
   /** The position's share of the book against the IPS cap; the scale leaves room past the larger. */

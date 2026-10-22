@@ -42,6 +42,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
+import {UnitPricePipe} from '../../../../shared/pipes/unit-price.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {RecommendationCardComponent} from '../../../decisions/components/recommendation-card/recommendation-card.component';
 import {DECISION_RECORDED_TITLE} from '../../../decisions/constants/recommendation/recommendation.constants';
@@ -97,6 +98,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     InstitutionAvatarComponent,
     MarkdownPipe,
     MoneyPipe,
+    UnitPricePipe,
     NewsSourceLabelPipe,
     PeerSetLabelPipe,
     ProviderLabelPipe,

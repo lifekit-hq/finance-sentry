@@ -262,6 +262,7 @@ function buildMockStore() {
     performanceStrip: derived.performanceStrip,
     thesisHook: derived.thesisHook,
     sizeCap: derived.sizeCap,
+    positionUnitPrices: derived.positionUnitPrices,
     returnsView: derived.returnsView,
     wheel: derived.wheel,
     checkAxes: derived.checkAxes,
@@ -543,6 +544,8 @@ describe('AssetDossierComponent', () => {
       expect(hero).not.toBeNull();
       expect(hero?.querySelector('[data-testid="position-strip"]')).not.toBeNull();
       expect(byTestId('position-value')?.textContent).toContain('$431.94');
+      expect(byTestId('position-unit-price')?.textContent).toContain('$43.19');
+      expect(byTestId('position-average-price')?.textContent).toContain('$40.00');
       expect(byTestId('position-pnl')?.textContent).toContain('$31.94');
       expect(byTestId('position-pnl')?.textContent).toContain('7.99%');
       expect(byTestId('position-pnl')?.className).toContain('text-gain');

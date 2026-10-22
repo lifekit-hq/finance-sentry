@@ -157,6 +157,156 @@ describe('PositionsService', () => {
     ]);
   });
 
+  it('prices a crypto unit over free plus locked quantity and maps the venue average', () => {
+    const crypto: CryptoHoldingsDto = {
+      provider: 'multiple',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 9_200,
+      holdings: [
+        {
+          asset: 'ETH',
+          freeQuantity: 1.5,
+          lockedQuantity: 0.5,
+          usdValue: 8_000,
+          costBasisUsd: 6_000,
+          averageBuyPriceUsd: 3_000,
+          provider: 'binance',
+          isFiat: false,
+        },
+        {
+          asset: 'SOL',
+          freeQuantity: 6,
+          lockedQuantity: 0,
+          usdValue: 1_200,
+          costBasisUsd: 900,
+          averageBuyPriceUsd: null,
+          provider: 'binance',
+          isFiat: false,
+        },
+        {
+          asset: 'BTC',
+          freeQuantity: 0,
+          lockedQuantity: 0,
+          usdValue: 0,
+          provider: 'revolut_x',
+          isFiat: false,
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(null);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(crypto);
+
+    expect(positions.map(p => [p.symbol, p.currentPrice, p.averagePrice])).toEqual([
+      ['ETH', 4_000, 3_000],
+      ['SOL', 200, 150],
+      ['BTC', null, null],
+    ]);
+  });
+
+  it('states no average for a crypto row without trade history, and none for venue cash', () => {
+    const crypto: CryptoHoldingsDto = {
+      provider: 'revolut_x',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 7_080,
+      holdings: [
+        {
+          asset: 'BTC',
+          freeQuantity: 0.1,
+          lockedQuantity: 0,
+          usdValue: 6_000,
+          costBasisUsd: null,
+          averageBuyPriceUsd: null,
+          provider: 'revolut_x',
+          isFiat: false,
+        },
+        {
+          asset: 'EUR',
+          freeQuantity: 1_000,
+          lockedQuantity: 0,
+          usdValue: 1_080,
+          costBasisUsd: 1_000,
+          averageBuyPriceUsd: 1,
+          provider: 'revolut_x',
+          isFiat: true,
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(null);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(crypto);
+
+    expect(positions.map(p => [p.symbol, p.currentPrice, p.averagePrice])).toEqual([
+      ['BTC', 60_000, null],
+      ['EUR', null, null],
+    ]);
+  });
+
+  it("prices a broker unit from its value and takes the broker's average cost", () => {
+    const brokerage: BrokerageHoldingsDto = {
+      provider: 'ibkr',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 0,
+      positions: [
+        {
+          symbol: 'AAPL',
+          instrumentType: 'STK',
+          quantity: 10,
+          usdValue: 2_000,
+          costBasisUsd: 1_500,
+          averageCostUsd: 150,
+          provider: 'ibkr',
+        },
+        {
+          symbol: 'IZH',
+          instrumentType: 'REIT',
+          quantity: 4,
+          usdValue: 400,
+          costBasisUsd: 360,
+          averageCostUsd: null,
+          provider: 'inzhur',
+        },
+        {
+          symbol: 'MSFT',
+          instrumentType: 'STK',
+          quantity: 5,
+          usdValue: 2_000,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+        {
+          symbol: 'GONE',
+          instrumentType: 'STK',
+          quantity: 0,
+          usdValue: 0,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(null);
+
+    expect(positions.map(p => [p.symbol, p.currentPrice, p.averagePrice])).toEqual([
+      ['AAPL', 200, 150],
+      ['IZH', 100, 90],
+      ['MSFT', 400, null],
+      ['GONE', null, null],
+    ]);
+  });
+
   it('tags broker rows with the backend asset class, cash included, defaulting to equity', () => {
     const brokerage: BrokerageHoldingsDto = {
       provider: 'mixed',

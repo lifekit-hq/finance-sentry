@@ -133,6 +133,9 @@ export function dossierComputed(store: StateSignals) {
     }),
 
     currentPrice,
+    positionUnitPrices: computed(() =>
+      DossierPositionUtils.unitPrices(store.dossier()?.position ?? null)
+    ),
     targetBand: computed(() => {
       const dossier = store.dossier();
       return DossierPositionUtils.targetBand(

@@ -27,6 +27,8 @@ export interface PositionRow {
   assetClass: AssetClass;
   quantity: number;
   currentPrice: Nullable<number>;
+  /** Average purchase price per unit (USD); null when the provider gives no cost. */
+  averagePrice: Nullable<number>;
   currentValue: number;
   /** Set when the provider denominates the row outside USD: its amounts are shown in that currency. */
   nativeCurrency?: Nullable<string>;
@@ -95,6 +97,7 @@ export function holdingsComputed(store: StateSignals) {
         assetClass,
         quantity: p.quantity,
         currentPrice: p.currentPrice,
+        averagePrice: p.averagePrice,
         currentValue: p.currentValue,
         nativeCurrency: p.nativeCurrency ?? null,
         nativeValue: p.nativeValue ?? null,

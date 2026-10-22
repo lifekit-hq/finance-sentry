@@ -16,6 +16,7 @@ function position(overrides: Partial<Position>): Position {
     quantity: 1,
     currentValue: 0,
     currentPrice: 0,
+    averagePrice: null,
     pnlPercent: null,
     pnlUsd: null,
     isVenueCash: false,

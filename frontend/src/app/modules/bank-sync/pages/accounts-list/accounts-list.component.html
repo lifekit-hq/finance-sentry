@@ -426,6 +426,17 @@
                     data-testid="position-quantity"
                     >{{ row.quantity | number: '1.0-8' }}</span
                   >
+                  <span
+                    class="block truncate text-cmn-xs tabular-nums text-text-secondary"
+                    data-testid="position-unit-prices"
+                    ><span data-testid="position-unit-price">{{
+                      row.currentPrice | unitPrice
+                    }}</span>
+                    · avg
+                    <span data-testid="position-average-price">{{
+                      row.averagePrice | unitPrice
+                    }}</span></span
+                  >
                 </span>
               </span>
               <span class="flex shrink-0 flex-col items-end leading-tight">

@@ -37,6 +37,10 @@ export interface CryptoHoldingDto {
   freeQuantity: number;
   lockedQuantity: number;
   usdValue: number;
+  /** Trade-derived cost of the units held (USD); null when the venue's trade history does not cover them. */
+  costBasisUsd?: Nullable<number>;
+  /** Trade-derived average purchase price per unit (USD); null alongside `costBasisUsd`. */
+  averageBuyPriceUsd?: Nullable<number>;
   /** The venue this row is held on — holdings can span several. */
   provider: string;
   /** Fiat cash held on the venue (e.g. EUR on Revolut X): venue cash, never a crypto position. */
@@ -66,8 +70,10 @@ export interface Position {
   instrumentType: Nullable<string>;
   quantity: number;
   currentValue: number;
-  /** Null for venue cash — a currency balance has no unit price. */
+  /** USD per unit; null for venue cash (a currency balance has no unit price) and for a zero quantity. */
   currentPrice: Nullable<number>;
+  /** Average purchase price per unit in USD from the provider's cost; null when no cost is known. */
+  averagePrice: Nullable<number>;
   /** Fiat cash held on a crypto venue — its own asset class, never crypto and never bank cash. */
   isVenueCash: boolean;
   /** Slice the row counts in; broker and venue cash are both `cash`. */
