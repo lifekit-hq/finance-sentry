@@ -291,7 +291,9 @@ describe('FlowBreakdownComponent drill-downs', () => {
     const row = el.querySelector('div[data-testid="breakdown-row"]');
 
     expect(row?.hasAttribute('role')).toBe(false);
-    row?.querySelector<HTMLElement>('button[data-testid="breakdown-row-open"]')?.click();
+    row
+      ?.querySelector<HTMLElement>('cmn-list-item-row[data-testid="breakdown-row-open"] button')
+      ?.click();
     expect(drawer.open).toHaveBeenCalledTimes(1);
   });
 });

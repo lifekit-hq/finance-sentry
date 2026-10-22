@@ -229,22 +229,20 @@
             class="relative flex items-center border-t border-border-default pr-cmn-2 transition-colors first:border-t-0 hover:bg-surface-card"
             data-testid="manual-holding-row"
           >
-            <!-- eslint-disable-next-line lifekit/no-raw-controls -- a full-width list row that opens the holding, not an action button -->
-            <button
-              (click)="openManualHolding(row)"
-              class="flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-4 pr-cmn-2 text-left"
-              type="button"
+            <cmn-list-item-row
+              [label]="row.label"
+              [sublabel]="row.sublabel"
+              [action]="true"
+              (activated)="openManualHolding(row)"
+              class="min-w-0 flex-1"
             >
-              <span class="min-w-0">
-                <span class="block truncate text-cmn-sm text-text-primary">{{ row.label }}</span>
-                <span class="block text-cmn-xs text-text-secondary">{{ row.sublabel }}</span>
-              </span>
               <span
+                amount
                 class="shrink-0 text-cmn-sm tabular-nums text-text-primary"
                 data-testid="manual-holding-value"
                 >{{ row.amount | money: row.currency }}</span
               >
-            </button>
+            </cmn-list-item-row>
             <cmn-menu
               [items]="manualHoldingMenu"
               [ariaLabel]="'Actions for ' + row.label"
