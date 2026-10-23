@@ -161,7 +161,7 @@ test.describe('Base-currency totals (#851)', () => {
 
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
     const summary = page.getByTestId('ledger-summary');
-    await expect(summary).toContainText('€3,100.00 out this month');
+    await expect(summary).toContainText('€3,100.00 out all time');
     await expect(summary).not.toContainText('$');
   });
 });

@@ -603,6 +603,14 @@ test.describe('Retired Income page', () => {
   });
 });
 
+/** The ledger's "This month" period as the chip writes it: first of the month through today (UTC). */
+function thisMonthLedgerUrl(): string {
+  const now = new Date();
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  return `/transactions?from=${day(first)}&to=${day(now)}`;
+}
+
 test.describe('Transaction ledger — Monthly Outflow stat', () => {
   test.beforeEach(async ({page}) => {
     await mockApisWithLedger(page);
@@ -613,7 +621,7 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
   // the backend excludes but a client-side sum would include. This verifies the
   // stat reads the server-side aggregate, not a sum over the loaded page.
   test('Monthly Outflow shows server-side aggregate, not client-side page sum', async ({page}) => {
-    await page.goto('/transactions');
+    await page.goto(thisMonthLedgerUrl());
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     // Backend says $2,900 — the stat must match this, not the $1,900 client-side sum
     // (400 grocery + 500 pending + 1000 transfer = $1,900 from debits in page).
@@ -660,7 +668,7 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
       });
     });
 
-    await page.goto('/transactions');
+    await page.goto(thisMonthLedgerUrl());
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
 
@@ -703,7 +711,7 @@ test.describe('Dashboard → Ledger spending consistency', () => {
 
     // Read the monthly outflow figure from the ledger's summary line.
     const outflowSummary = page.getByTestId('ledger-summary');
-    await expect(outflowSummary).toContainText('out this month');
+    await expect(outflowSummary).toContainText(/ out (this month|in the last 3 months|all time)/);
     const ledgerAmount = extractAmount((await outflowSummary.innerText()).trim());
 
     // Transfer pair (tx-3 debit $1,000 + tx-6 credit $1,000) is in the loaded transaction

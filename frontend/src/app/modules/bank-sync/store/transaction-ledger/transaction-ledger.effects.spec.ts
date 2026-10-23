@@ -15,7 +15,6 @@ import {type LedgerFilter} from './transaction-ledger.computed';
 import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
-// Mirrors the private helper in effects.ts so test data stays in sync with the runtime.
 function currentUtcMonthKey(): string {
   const now = new Date();
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -159,7 +158,8 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
     setAppendSuccess: vi.fn(),
     setAppendError: vi.fn(),
     setAppendIdle: vi.fn(),
-    setMonthlyOutflowUsd: vi.fn(),
+    setMonthlyFlow: vi.fn(),
+    setAccountOutflow: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
@@ -311,7 +311,23 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('loadSummary', () => {
-    it('sets current-month outflow and the account options', () => {
+    it('keeps the month flow history and the account options', () => {
+      const store = buildStore();
+      const service = buildService();
+      const data = buildDashboardData(2900);
+      service.getDashboardData.mockReturnValue(of(data));
+      service.getAccounts.mockReturnValue(of(ACCOUNTS));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+
+      expect(store.setMonthlyFlow).toHaveBeenCalledWith(data.monthlyFlow, undefined);
+      expect(store.setAccounts).toHaveBeenCalledWith([
+        {accountId: 'acc-1', label: 'Test Bank · 1234'},
+      ]);
+    });
+
+    it('asks for the longest history so All time covers every month', () => {
       const store = buildStore();
       const service = buildService();
       service.getDashboardData.mockReturnValue(of(buildDashboardData(2900)));
@@ -320,40 +336,23 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined);
-      expect(store.setAccounts).toHaveBeenCalledWith([
-        {accountId: 'acc-1', label: 'Test Bank · 1234'},
-      ]);
+      expect(service.getDashboardData).toHaveBeenCalledWith(120);
     });
 
-    it('passes the dashboard base currency along with the outflow (#851)', () => {
+    it('passes the dashboard base currency along with the flow (#851)', () => {
       const store = buildStore();
       const service = buildService();
-      service.getDashboardData.mockReturnValue(
-        of({...buildDashboardData(2900), baseCurrency: 'EUR'})
-      );
+      const data = {...buildDashboardData(2900), baseCurrency: 'EUR'};
+      service.getDashboardData.mockReturnValue(of(data));
       service.getAccounts.mockReturnValue(of(ACCOUNTS));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, 'EUR');
+      expect(store.setMonthlyFlow).toHaveBeenCalledWith(data.monthlyFlow, 'EUR');
     });
 
-    it('sums only the current-month outflowUsd and ignores past-month rows', () => {
-      // Prior month has 3 000 outflowUsd - must NOT be included.
-      const store = buildStore();
-      const service = buildService();
-      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900, 3000)));
-      service.getAccounts.mockReturnValue(of(ACCOUNTS));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
-
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined); // not 5 900
-    });
-
-    it('degrades to null outflow and no accounts when both reads fail', () => {
+    it('degrades to no flow and no accounts when both reads fail', () => {
       const store = buildStore();
       const service = buildService();
       service.getDashboardData.mockReturnValue(throwError(() => new Error('network error')));
@@ -362,21 +361,107 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(null, undefined);
+      expect(store.setMonthlyFlow).toHaveBeenCalledWith(null, undefined);
       expect(store.setAccounts).toHaveBeenCalledWith([]);
       expect(store.setError).not.toHaveBeenCalled();
     });
+  });
 
-    it('sets outflow to 0 when monthlyFlow has no entry for the current month', () => {
+  describe('watchOutflowScope', () => {
+    const MAY = {from: '2026-05-01', to: '2026-05-31'};
+
+    function debit(amount: number, currency = 'EUR'): GlobalTransactionDto {
+      return {...TX_ITEM, amount: -amount, currency};
+    }
+
+    it('sums the account debits in the account currency over the selected dates', () => {
       const store = buildStore();
       const service = buildService();
-      service.getDashboardData.mockReturnValue(of({...buildDashboardData(2900), monthlyFlow: []}));
-      service.getAccounts.mockReturnValue(of(ACCOUNTS));
+      service.getAllTransactions.mockReturnValue(
+        of({items: [debit(40), debit(60)], totalCount: 2, offset: 0, limit: 200, hasMore: false})
+      );
       configure(service);
+      const scope = signal({accountId: 'acc-1', ...MAY});
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchOutflowScope(scope));
+      TestBed.tick();
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(0, undefined);
+      expect(service.getAllTransactions).toHaveBeenCalledWith(
+        expect.objectContaining({accountId: 'acc-1', transactionType: 'debit', ...MAY})
+      );
+      expect(store.setAccountOutflow).toHaveBeenCalledWith({
+        accountId: 'acc-1',
+        ...MAY,
+        amount: 100,
+        currency: 'EUR',
+      });
+    });
+
+    it('follows every page until the server has no more', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions
+        .mockReturnValueOnce(
+          of({items: [debit(10)], totalCount: 2, offset: 0, limit: 200, hasMore: true})
+        )
+        .mockReturnValueOnce(
+          of({items: [debit(5)], totalCount: 2, offset: 200, limit: 200, hasMore: false})
+        );
+      configure(service);
+      const scope = signal({accountId: 'acc-1', ...MAY});
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchOutflowScope(scope));
+      TestBed.tick();
+
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(2);
+      expect(service.getAllTransactions).toHaveBeenLastCalledWith(
+        expect.objectContaining({offset: 200})
+      );
+      expect(store.setAccountOutflow).toHaveBeenCalledWith(
+        expect.objectContaining({amount: 15, currency: 'EUR'})
+      );
+    });
+
+    it('reads nothing for every account over a quick period: the month flow answers', () => {
+      const store = buildStore();
+      const service = buildService();
+      configure(service);
+      const scope = signal({accountId: null, from: null, to: null});
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchOutflowScope(scope));
+      TestBed.tick();
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+
+    it('reads rows for a custom date range with every account', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(
+        of({items: [], totalCount: 0, offset: 0, limit: 200, hasMore: false})
+      );
+      configure(service);
+      const scope = signal({accountId: null, from: '2026-05-03', to: '2026-05-09'});
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchOutflowScope(scope));
+      TestBed.tick();
+
+      expect(store.setAccountOutflow).toHaveBeenCalledWith(
+        expect.objectContaining({accountId: null, amount: 0})
+      );
+    });
+
+    it('leaves the figure unknown when the read fails', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+      const scope = signal({accountId: 'acc-1', ...MAY});
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchOutflowScope(scope));
+      TestBed.tick();
+
+      expect(store.setAccountOutflow).not.toHaveBeenCalled();
     });
   });
 

@@ -1,12 +1,24 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
+import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {type LedgerFilter} from './transaction-ledger.computed';
+
+export interface OutflowScope {
+  accountId: Nullable<string>;
+  from: Nullable<string>;
+  to: Nullable<string>;
+}
+
+export interface AccountOutflow extends OutflowScope {
+  amount: number;
+  currency: string;
+}
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
@@ -15,8 +27,12 @@ export interface TransactionLedgerState {
   offset: number;
   /** Epoch ms of the last successful page load; drives the offline "last synced" notice. */
   lastSyncedAt: Nullable<number>;
-  monthlyOutflowUsd: number | null;
+  /** The dashboard's whole-month flow history; null until it has loaded (or when it failed). */
+  monthlyFlow: MonthlyFlow[] | null;
+  /** Currency of the `…Usd` figures in `monthlyFlow` (the profile's base currency). */
   monthlyOutflowCurrency: string;
+  /** Outflow of one account over a date range: month flow is per user, so an account is summed from its debit rows. */
+  accountOutflow: Nullable<AccountOutflow>;
   /** Server-side filter: a single account, or null for all. */
   accountId: Nullable<string>;
   /** Server-side filter: credits (In), debits (Out), or null for all. */
@@ -43,8 +59,9 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   hasMore: false,
   offset: 0,
   lastSyncedAt: null,
-  monthlyOutflowUsd: null,
+  monthlyFlow: null,
   monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
+  accountOutflow: null,
   accountId: null,
   transactionType: null,
   categories: [],
@@ -63,8 +80,9 @@ export const LEDGER_SESSION_FIELDS = [
   'hasMore',
   'offset',
   'lastSyncedAt',
-  'monthlyOutflowUsd',
+  'monthlyFlow',
   'monthlyOutflowCurrency',
+  'accountOutflow',
   'accounts',
   'rowsFilter',
 ] as const satisfies readonly (keyof TransactionLedgerState)[];

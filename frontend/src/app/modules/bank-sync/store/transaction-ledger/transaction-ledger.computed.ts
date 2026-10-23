@@ -3,19 +3,23 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
+import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
+import {OutflowUtils} from '../../utils/outflow.utils';
+import {type AccountOutflow, type OutflowScope} from './transaction-ledger.state';
 
 interface StateSignals {
   transactions: Signal<GlobalTransactionDto[]>;
   totalCount: Signal<number>;
   hasMore: Signal<boolean>;
   status: Signal<AsyncStatus>;
-  monthlyOutflowUsd: Signal<number | null>;
+  monthlyFlow: Signal<MonthlyFlow[] | null>;
   monthlyOutflowCurrency: Signal<string>;
+  accountOutflow: Signal<Nullable<AccountOutflow>>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
   search: Signal<string>;
@@ -52,8 +56,29 @@ export function transactionLedgerComputed(store: StateSignals) {
         store.transactionType() !== null ||
         store.search().trim() !== ''
     ),
-    monthlyOutflow: computed(() => store.monthlyOutflowUsd()),
-    monthlyOutflowCurrency: computed(() => store.monthlyOutflowCurrency()),
+    /** What the outflow figure is for: the account and dates the ledger is filtered to. */
+    outflowScope: computed<OutflowScope>(() => ({
+      accountId: store.accountId(),
+      from: store.from(),
+      to: store.to(),
+    })),
+    /** Out over the selected period and account, or null while it is not known. */
+    outflow: computed(() => {
+      const scope = {accountId: store.accountId(), from: store.from(), to: store.to()};
+      const account = store.accountOutflow();
+      if (!OutflowUtils.usesMonthFlow(scope)) {
+        return account && OutflowUtils.sameScope(account, scope)
+          ? {amount: account.amount, currency: account.currency}
+          : null;
+      }
+      const flow = store.monthlyFlow();
+      return flow
+        ? {
+            amount: OutflowUtils.sumMonths(flow, scope.from, scope.to),
+            currency: store.monthlyOutflowCurrency(),
+          }
+        : null;
+    }),
     topCategory: computed(() => {
       const counts: Record<string, number> = {};
       for (const t of store.transactions()) {

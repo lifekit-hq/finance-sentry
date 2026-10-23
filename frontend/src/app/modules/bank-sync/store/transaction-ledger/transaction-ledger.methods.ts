@@ -1,12 +1,18 @@
+import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
+import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
 } from '../../models/transaction/transaction.model';
 import {type LedgerFilter} from './transaction-ledger.computed';
-import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
+import {
+  type AccountOutflow,
+  PAGE_SIZE,
+  type TransactionLedgerState,
+} from './transaction-ledger.state';
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
@@ -57,8 +63,14 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         lastSyncedAt: Date.now(),
       }));
     },
-    setMonthlyOutflowUsd(value: number | null, currency: string = DEFAULT_BASE_CURRENCY): void {
-      patchState(store, {monthlyOutflowUsd: value, monthlyOutflowCurrency: currency});
+    setMonthlyFlow(
+      monthlyFlow: MonthlyFlow[] | null,
+      currency: string = DEFAULT_BASE_CURRENCY
+    ): void {
+      patchState(store, {monthlyFlow, monthlyOutflowCurrency: currency});
+    },
+    setAccountOutflow(accountOutflow: Nullable<AccountOutflow>): void {
+      patchState(store, {accountOutflow});
     },
     /** A blank box reads as no search, so it never reaches the `q` query param. */
     setSearch(search: string): void {

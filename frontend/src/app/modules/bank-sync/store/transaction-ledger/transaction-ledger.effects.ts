@@ -6,17 +6,23 @@ import {
   catchError,
   debounceTime,
   distinctUntilChanged,
+  EMPTY,
   exhaustMap,
+  expand,
   filter,
   forkJoin,
+  map,
+  type Observable,
   of,
   pipe,
+  reduce,
   Subject,
   switchMap,
   takeUntil,
   tap,
 } from 'rxjs';
 
+import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
@@ -27,17 +33,18 @@ import {
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {LedgerFilterUtils} from '../../utils/ledger-filter.utils';
-import {MonthKeyUtils} from '../../utils/month-key.utils';
+import {OutflowUtils} from '../../utils/outflow.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {type LedgerFilter} from './transaction-ledger.computed';
-import {PAGE_SIZE} from './transaction-ledger.state';
+import {type AccountOutflow, type OutflowScope, PAGE_SIZE} from './transaction-ledger.state';
 
 export const SEARCH_DEBOUNCE_MS = 300;
 
-function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
-  const key = MonthKeyUtils.currentUtc();
-  return monthlyFlow.filter(r => r.month === key).reduce((sum, r) => sum + r.outflowUsd, 0);
-}
+/** The dashboard's longest history, so "All time" sums every month the book has. */
+const FLOW_HISTORY_MONTHS = 120;
+/** The API's largest page; a scoped outflow reads at most `MAX_OUTFLOW_PAGES` of them. */
+const OUTFLOW_PAGE_SIZE = 200;
+const MAX_OUTFLOW_PAGES = 10;
 
 interface EffectsStore {
   transactions: Signal<GlobalTransactionDto[]>;
@@ -74,7 +81,8 @@ interface EffectsStore {
   setAppendSuccess: () => void;
   setAppendError: (errorCode: Nullable<string>) => void;
   setAppendIdle: () => void;
-  setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
+  setMonthlyFlow: (monthlyFlow: MonthlyFlow[] | null, currency?: string) => void;
+  setAccountOutflow: (outflow: Nullable<AccountOutflow>) => void;
 }
 
 function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
@@ -88,6 +96,35 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
     to: store.to() ?? undefined,
     search: store.search().trim() || undefined,
   };
+}
+
+/** Pages through the account's debit rows in the dates and totals them in the account's currency. */
+function readAccountOutflow(
+  service: BankSyncService,
+  scope: OutflowScope
+): Observable<AccountOutflow> {
+  const page = (offset: number) =>
+    service.getAllTransactions({
+      offset,
+      limit: OUTFLOW_PAGE_SIZE,
+      accountId: scope.accountId ?? undefined,
+      transactionType: 'debit',
+      from: scope.from ?? undefined,
+      to: scope.to ?? undefined,
+    });
+  return page(0).pipe(
+    expand((res, index) =>
+      res.hasMore && index + 1 < MAX_OUTFLOW_PAGES ? page((index + 1) * OUTFLOW_PAGE_SIZE) : EMPTY
+    ),
+    reduce(
+      (acc, res) => ({
+        amount: res.items.reduce((sum, t) => sum + Math.abs(t.amount), acc.amount),
+        currency: res.items[0]?.currency ?? acc.currency,
+      }),
+      {amount: 0, currency: DEFAULT_BASE_CURRENCY}
+    ),
+    map(total => ({...scope, ...total}))
+  );
 }
 
 export function transactionLedgerEffects(store: EffectsStore) {
@@ -167,16 +204,32 @@ export function transactionLedgerEffects(store: EffectsStore) {
       pipe(
         switchMap(() =>
           forkJoin({
-            dashboard$: bankSyncService.getDashboardData().pipe(catchError(() => of(null))),
+            dashboard$: bankSyncService
+              .getDashboardData(FLOW_HISTORY_MONTHS)
+              .pipe(catchError(() => of(null))),
             accounts$: bankSyncService.getAccounts().pipe(catchError(() => of(null))),
           }).pipe(
             tap(({dashboard$, accounts$}) => {
-              store.setMonthlyOutflowUsd(
-                dashboard$ ? sumCurrentMonthOutflow(dashboard$.monthlyFlow) : null,
-                dashboard$?.baseCurrency
-              );
+              store.setMonthlyFlow(dashboard$?.monthlyFlow ?? null, dashboard$?.baseCurrency);
               store.setAccounts(TransactionGroupUtils.toAccountOptions(accounts$?.accounts ?? []));
             })
+          )
+        )
+      )
+    ),
+    /**
+     * Sums one account's debit rows over the selected dates, in the account's own currency: the
+     * dashboard's month flow is per user and whole months, so an account or a custom date range
+     * is read from rows. Every other scope takes the month flow and reads nothing here.
+     */
+    watchOutflowScope: rxMethod<OutflowScope>(
+      pipe(
+        distinctUntilChanged(OutflowUtils.sameScope),
+        filter(scope => !OutflowUtils.usesMonthFlow(scope)),
+        switchMap(scope =>
+          readAccountOutflow(bankSyncService, scope).pipe(
+            tap(outflow => store.setAccountOutflow(outflow)),
+            catchError(() => of(null))
           )
         )
       )
@@ -208,11 +261,14 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
 interface HookStore {
   filter: Signal<LedgerFilter>;
+  outflowScope: Signal<OutflowScope>;
+  watchOutflowScope: (scope: Signal<OutflowScope>) => void;
   watchFilter: (filter: Signal<LedgerFilter>) => void;
   loadSummary: () => void;
 }
 
 export function transactionLedgerHooks(store: HookStore): void {
   store.watchFilter(store.filter);
+  store.watchOutflowScope(store.outflowScope);
   store.loadSummary();
 }

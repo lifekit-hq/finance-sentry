@@ -9,10 +9,11 @@ import {ERROR_MESSAGES, provideApiBaseUrl} from '@lifekit-hq/core';
 import {patchState} from '@ngrx/signals';
 import {unprotected} from '@ngrx/signals/testing';
 import {NEVER, of, throwError} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {type TransactionLedgerState} from './transaction-ledger.state';
 import {TransactionLedgerStore} from './transaction-ledger.store';
 
@@ -81,7 +82,11 @@ describe('TransactionLedgerStore URL → state', () => {
     expect(store.from()).toBe(DATE_FROM);
     expect(store.to()).toBe(DATE_TO);
     expect(store.search()).toBe('netflix');
-    expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    // The account's outflow insight reads its own debit pages besides the ledger page.
+    const ledgerPages = (
+      service.getAllTransactions.mock.calls as unknown as [{limit: number}][]
+    ).filter(([params]) => params.limit === 50);
+    expect(ledgerPages).toHaveLength(1);
     expect(service.getAllTransactions).toHaveBeenCalledWith({
       offset: 0,
       limit: 50,
@@ -363,5 +368,77 @@ describe('TransactionLedgerStore revisit', () => {
 
     expect(store.accountId()).toBeNull();
     expect(store.transactions()).toHaveLength(1);
+  });
+});
+
+describe('TransactionLedgerStore outflow insight', () => {
+  function monthKey(date: string): string {
+    return date.slice(0, 7);
+  }
+
+  const THIS_MONTH = LedgerPeriodUtils.dates('this-month');
+  const LAST_MONTH = LedgerPeriodUtils.dates('last-month');
+  const FLOW = [
+    {month: monthKey(LAST_MONTH.from), outflowUsd: 700},
+    {month: monthKey(THIS_MONTH.from), outflowUsd: 2900},
+  ].map(r => ({
+    ...r,
+    currency: 'USD',
+    inflow: 0,
+    outflow: r.outflowUsd,
+    net: -r.outflowUsd,
+    inflowUsd: 0,
+    netUsd: -r.outflowUsd,
+  }));
+
+  afterEach(() => {
+    service.getAllTransactions.mockImplementation(() => NEVER);
+  });
+
+  async function openWithFlow(url: string) {
+    const opened = await open(url);
+    patchState(unprotected(opened.store), {monthlyFlow: FLOW, monthlyOutflowCurrency: 'USD'});
+    return opened.store;
+  }
+
+  it('is the current month for This month', async () => {
+    const store = await openWithFlow(`/transactions?from=${THIS_MONTH.from}&to=${THIS_MONTH.to}`);
+
+    expect(store.outflow()).toEqual({amount: 2900, currency: 'USD'});
+  });
+
+  it('is the previous month for Last month', async () => {
+    const store = await openWithFlow(`/transactions?from=${LAST_MONTH.from}&to=${LAST_MONTH.to}`);
+
+    expect(store.outflow()).toEqual({amount: 700, currency: 'USD'});
+  });
+
+  it('is every month for All time', async () => {
+    const store = await openWithFlow('/transactions');
+
+    expect(store.outflow()).toEqual({amount: 3600, currency: 'USD'});
+  });
+
+  it('is the account debits in the account currency, not the month flow', async () => {
+    service.getAllTransactions.mockImplementation(((params: {transactionType?: string}) =>
+      of({
+        items: params.transactionType === 'debit' ? [{amount: -30, currency: 'EUR'}] : [],
+        totalCount: 1,
+        offset: 0,
+        limit: 200,
+        hasMore: false,
+      })) as never);
+
+    const store = await openWithFlow(
+      `/transactions?account=acc-1&from=${THIS_MONTH.from}&to=${THIS_MONTH.to}`
+    );
+
+    expect(store.outflow()).toEqual({amount: 30, currency: 'EUR'});
+  });
+
+  it('is unknown while another account is still being read', async () => {
+    const store = await openWithFlow('/transactions?account=acc-1');
+
+    expect(store.outflow()).toBeNull();
   });
 });
