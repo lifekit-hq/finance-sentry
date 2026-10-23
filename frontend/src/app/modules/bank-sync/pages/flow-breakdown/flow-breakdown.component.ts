@@ -18,6 +18,7 @@ import {
   MonthStepperComponent,
   type Nullable,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   StatCardComponent,
   TagComponent,
@@ -48,6 +49,7 @@ const DRAWER_WIDTH = '480px';
   selector: 'fns-flow-breakdown',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     AsyncStateComponent,
     CardComponent,
     DatePipe,

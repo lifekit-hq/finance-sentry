@@ -23,6 +23,7 @@ import {
   ListSectionComponent,
   type Nullable,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
@@ -69,6 +70,7 @@ const DRAWER_WIDTH = '480px';
   selector: 'fns-transaction-ledger',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     AlertComponent,
     AsyncStateComponent,
     ButtonComponent,

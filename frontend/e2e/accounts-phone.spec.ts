@@ -219,9 +219,9 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(rows.nth(0)).toContainText('Reconnect needed');
       await expect(rows.nth(1)).not.toContainText('Synced');
 
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      );
+      const overflow = await page
+        .locator('cmn-page-scroll')
+        .evaluate(el => el.scrollWidth - el.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
     });
 
@@ -289,13 +289,21 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       const header = page.locator('cmn-list-section h2').first();
       await expect(header).toBeVisible();
 
+      const region = page.locator('cmn-page-scroll');
       const pinnedAt = async (scrollTop: number): Promise<number> => {
-        await page.locator('main').evaluate((el, top) => (el.scrollTop = top), scrollTop);
+        const reached = await region.evaluate((el, top) => {
+          el.scrollTop = top;
+          return el.scrollTop;
+        }, scrollTop);
+        expect(reached).toBeCloseTo(scrollTop, 0);
         return (await header.boundingBox())?.y ?? -1;
       };
+      const regionTop = (await region.boundingBox())?.y ?? 0;
       const naturalY = await pinnedAt(0);
-      const before = await pinnedAt(naturalY);
-      const after = await pinnedAt(naturalY + PIN_SCROLL_PX);
+      const offset = Math.round(naturalY - regionTop);
+      const before = await pinnedAt(offset);
+      const after = await pinnedAt(offset + PIN_SCROLL_PX);
+      expect(before).toBeLessThan(naturalY - PIN_SCROLL_PX);
       expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
     });
 

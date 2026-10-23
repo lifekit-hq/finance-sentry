@@ -17,6 +17,7 @@ import {
   InputComponent,
   ListItemRowComponent,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
@@ -35,6 +36,7 @@ const SKELETON_ROWS = 3;
   selector: 'fns-people',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     ReactiveFormsModule,
     AlertComponent,
     AsyncStateComponent,

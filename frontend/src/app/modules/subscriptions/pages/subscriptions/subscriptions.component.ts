@@ -24,6 +24,7 @@ import {
   type MenuItem,
   type Nullable,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
@@ -83,6 +84,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
   selector: 'fns-subscriptions',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     ButtonComponent,
     CardComponent,
     AlertComponent,

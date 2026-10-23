@@ -1,5 +1,5 @@
-<cmn-page-container spacing="none">
-  <div class="space-y-cmn-5">
+<cmn-page-container spacing="none" fill>
+  <div class="flex min-h-0 flex-1 flex-col gap-cmn-5">
     <p class="text-cmn-sm text-text-secondary">Monthly spending limits</p>
 
     <cmn-month-stepper
@@ -9,187 +9,193 @@
     />
 
     <!-- Each month is its own query: a reload shows the skeleton, never last month's rows. -->
-    <cmn-async-state
-      [status]="view().status"
-      [errorMessage]="view().errorMessage"
-      [errorPlacement]="errorPlacement()"
-      [isEmpty]="store.summaryItems().length === 0"
-      [keepContent]="false"
-      [emptyMessage]="'No budgets for ' + store.monthName()"
-      (retry)="store.loadSummary()"
-      class="block space-y-cmn-5"
-      emptySubMessage="Set a monthly limit for a category to see how much you have left."
-      emptyIcon="PiggyBank"
-      retryable
-    >
-      <!-- Line boxes match the cards' text line heights, so the cards land where these sit -->
-      <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
-        <cmn-card>
-          <div class="flex items-center" style="height: 0.9375rem">
-            <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
+    <cmn-page-scroll label="Budgets">
+      <cmn-async-state
+        [status]="view().status"
+        [errorMessage]="view().errorMessage"
+        [errorPlacement]="errorPlacement()"
+        [isEmpty]="store.summaryItems().length === 0"
+        [keepContent]="false"
+        [emptyMessage]="'No budgets for ' + store.monthName()"
+        (retry)="store.loadSummary()"
+        class="block space-y-cmn-5"
+        emptySubMessage="Set a monthly limit for a category to see how much you have left."
+        emptyIcon="PiggyBank"
+        retryable
+      >
+        <!-- Line boxes match the cards' text line heights, so the cards land where these sit -->
+        <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
+          <cmn-card>
+            <div class="flex items-center" style="height: 0.9375rem">
+              <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
+            </div>
+            <div class="mt-cmn-1 flex items-center" style="height: 1.625rem">
+              <cmn-skeleton class="w-full" width="50%" height="1.25rem" />
+            </div>
+            <cmn-skeleton class="mt-cmn-3 block" height="0.625rem" />
+          </cmn-card>
+          <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
+            @for (_ of skeletonCards; track $index) {
+              <cmn-card>
+                <div class="mb-cmn-3 flex h-8 items-center justify-between gap-cmn-2">
+                  <cmn-skeleton class="flex-1" width="45%" height="0.875rem" />
+                  <cmn-skeleton width="2rem" height="2rem" />
+                </div>
+                <div class="flex items-center" style="height: 1.5rem">
+                  <cmn-skeleton class="w-full" width="40%" height="1rem" />
+                </div>
+                <cmn-skeleton class="mt-cmn-3 block" height="0.375rem" />
+                <div class="mt-cmn-1 flex items-center" style="height: 0.9375rem">
+                  <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+                </div>
+              </cmn-card>
+            }
           </div>
-          <div class="mt-cmn-1 flex items-center" style="height: 1.625rem">
-            <cmn-skeleton class="w-full" width="50%" height="1.25rem" />
+        </div>
+
+        <!-- Over-budget warning -->
+        @if (store.overBudgetCount() > 0) {
+          <cmn-alert variant="warning" class="block">
+            {{ store.overBudgetCount() }}
+            {{ store.overBudgetCount() === 1 ? 'category is' : 'categories are' }}
+            over budget this month.
+          </cmn-alert>
+        }
+
+        <!-- Left this month -->
+        @let over = store.totalSpent() > store.totalBudget();
+        @let heroAmount =
+          over
+            ? store.totalSpent() - store.totalBudget()
+            : store.totalBudget() - store.totalSpent();
+        <cmn-card class="block">
+          <div
+            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >
+            Left this month
           </div>
-          <cmn-skeleton class="mt-cmn-3 block" height="0.625rem" />
+          <div class="mt-cmn-1 flex flex-wrap items-baseline gap-x-cmn-2">
+            <span
+              [class.text-status-error]="over"
+              [class.text-text-primary]="!over"
+              class="tabular-nums text-cmn-xl font-bold"
+            >
+              {{ heroAmount | money }}
+            </span>
+            <span class="text-cmn-sm text-text-secondary">
+              {{
+                over
+                  ? 'over · ' + (store.totalBudget() | money) + ' budget'
+                  : 'left of ' + (store.totalBudget() | money)
+              }}
+            </span>
+          </div>
+          <div class="mt-cmn-3 h-2.5 overflow-hidden rounded-full bg-surface-raised">
+            <div
+              [style.width.%]="store.overallPct()"
+              [class.bg-status-error]="over"
+              [class.bg-accent-default]="!over"
+              class="h-full rounded-full"
+            ></div>
+          </div>
         </cmn-card>
+
+        <!-- Category cards grid -->
         <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
-          @for (_ of skeletonCards; track $index) {
+          @for (b of store.summaryItems(); track b.id) {
+            @let pct = barPct(b.spent, b.monthlyLimit);
+            @let nearOver = !b.isOverBudget && pct >= nearLimitPct;
+            @let isEditing = store.editingId() === b.id;
+            @let leftAmount = b.isOverBudget ? b.spent - b.monthlyLimit : b.remaining;
+
             <cmn-card>
-              <div class="mb-cmn-3 flex h-8 items-center justify-between gap-cmn-2">
-                <cmn-skeleton class="flex-1" width="45%" height="0.875rem" />
-                <cmn-skeleton width="2rem" height="2rem" />
+              <div class="mb-cmn-3 flex items-center justify-between gap-cmn-2">
+                <div class="flex min-w-0 items-center gap-cmn-2">
+                  <div
+                    [style.background]="categoryColor(b.category)"
+                    class="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  ></div>
+                  <a
+                    [routerLink]="transactionsRoute"
+                    [queryParams]="transactionsParams(b.category)"
+                    class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
+                    data-testid="budget-category-link"
+                  >
+                    {{ b.categoryLabel }}
+                  </a>
+                </div>
+                <div class="flex shrink-0 items-center gap-cmn-1">
+                  @if (b.isOverBudget) {
+                    <cmn-tag variant="error">Over</cmn-tag>
+                  } @else if (b.isOffPace) {
+                    <cmn-tag variant="warning">Off pace</cmn-tag>
+                  } @else if (nearOver) {
+                    <cmn-tag variant="warning">Near limit</cmn-tag>
+                  }
+                  <cmn-menu
+                    [items]="budgetMenuItems"
+                    (itemSelect)="onBudgetAction($event.id, b)"
+                    ariaLabel="Budget actions"
+                    triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
+                  >
+                    <cmn-icon name="Ellipsis" size="sm" />
+                  </cmn-menu>
+                </div>
               </div>
-              <div class="flex items-center" style="height: 1.5rem">
-                <cmn-skeleton class="w-full" width="40%" height="1rem" />
+
+              <!-- Amount left (or over) of the limit -->
+              <div class="flex flex-wrap items-baseline gap-x-cmn-2">
+                <span
+                  [class.text-status-error]="b.isOverBudget"
+                  [class.text-text-primary]="!b.isOverBudget"
+                  class="tabular-nums text-cmn-md font-bold"
+                >
+                  {{ leftAmount | money }}
+                </span>
+                <span class="text-cmn-xs text-text-secondary">
+                  {{ b.isOverBudget ? 'over ·' : 'left of' }}
+                  @if (!isEditing) {
+                    {{ b.monthlyLimit | money }}{{ b.isOverBudget ? ' budget' : '' }}
+                  }
+                </span>
+                @if (isEditing) {
+                  <cmn-input
+                    [ngModel]="editValue()"
+                    (ngModelChange)="editValue.set($event)"
+                    (focusout)="saveEdit(b.id)"
+                    (keydown.enter)="saveEdit(b.id)"
+                    (keydown.escape)="cancelEdit()"
+                    class="w-28"
+                    size="sm"
+                    type="number"
+                    inputmode="decimal"
+                    enterkeyhint="done"
+                    aria-label="Monthly limit"
+                  />
+                }
               </div>
-              <cmn-skeleton class="mt-cmn-3 block" height="0.375rem" />
-              <div class="mt-cmn-1 flex items-center" style="height: 0.9375rem">
-                <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+
+              <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
+                <div
+                  [style.width.%]="pct"
+                  [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
+                  class="h-full rounded-full"
+                ></div>
               </div>
+              <div class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                {{ b.spent | money }} spent
+              </div>
+              @if (b.isOffPace) {
+                <div class="mt-cmn-1 text-cmn-xs text-status-warning">
+                  On track to finish the month at {{ pacePct(b.paceRatio) }}% of the limit ({{
+                    b.projectedMonthEndSpend | money
+                  }})
+                </div>
+              }
             </cmn-card>
           }
         </div>
-      </div>
-
-      <!-- Over-budget warning -->
-      @if (store.overBudgetCount() > 0) {
-        <cmn-alert variant="warning" class="block">
-          {{ store.overBudgetCount() }}
-          {{ store.overBudgetCount() === 1 ? 'category is' : 'categories are' }}
-          over budget this month.
-        </cmn-alert>
-      }
-
-      <!-- Left this month -->
-      @let over = store.totalSpent() > store.totalBudget();
-      @let heroAmount =
-        over ? store.totalSpent() - store.totalBudget() : store.totalBudget() - store.totalSpent();
-      <cmn-card class="block">
-        <div
-          class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >
-          Left this month
-        </div>
-        <div class="mt-cmn-1 flex flex-wrap items-baseline gap-x-cmn-2">
-          <span
-            [class.text-status-error]="over"
-            [class.text-text-primary]="!over"
-            class="tabular-nums text-cmn-xl font-bold"
-          >
-            {{ heroAmount | money }}
-          </span>
-          <span class="text-cmn-sm text-text-secondary">
-            {{
-              over
-                ? 'over · ' + (store.totalBudget() | money) + ' budget'
-                : 'left of ' + (store.totalBudget() | money)
-            }}
-          </span>
-        </div>
-        <div class="mt-cmn-3 h-2.5 overflow-hidden rounded-full bg-surface-raised">
-          <div
-            [style.width.%]="store.overallPct()"
-            [class.bg-status-error]="over"
-            [class.bg-accent-default]="!over"
-            class="h-full rounded-full"
-          ></div>
-        </div>
-      </cmn-card>
-
-      <!-- Category cards grid -->
-      <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
-        @for (b of store.summaryItems(); track b.id) {
-          @let pct = barPct(b.spent, b.monthlyLimit);
-          @let nearOver = !b.isOverBudget && pct >= nearLimitPct;
-          @let isEditing = store.editingId() === b.id;
-          @let leftAmount = b.isOverBudget ? b.spent - b.monthlyLimit : b.remaining;
-
-          <cmn-card>
-            <div class="mb-cmn-3 flex items-center justify-between gap-cmn-2">
-              <div class="flex min-w-0 items-center gap-cmn-2">
-                <div
-                  [style.background]="categoryColor(b.category)"
-                  class="h-2.5 w-2.5 shrink-0 rounded-sm"
-                ></div>
-                <a
-                  [routerLink]="transactionsRoute"
-                  [queryParams]="transactionsParams(b.category)"
-                  class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
-                  data-testid="budget-category-link"
-                >
-                  {{ b.categoryLabel }}
-                </a>
-              </div>
-              <div class="flex shrink-0 items-center gap-cmn-1">
-                @if (b.isOverBudget) {
-                  <cmn-tag variant="error">Over</cmn-tag>
-                } @else if (b.isOffPace) {
-                  <cmn-tag variant="warning">Off pace</cmn-tag>
-                } @else if (nearOver) {
-                  <cmn-tag variant="warning">Near limit</cmn-tag>
-                }
-                <cmn-menu
-                  [items]="budgetMenuItems"
-                  (itemSelect)="onBudgetAction($event.id, b)"
-                  ariaLabel="Budget actions"
-                  triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
-                >
-                  <cmn-icon name="Ellipsis" size="sm" />
-                </cmn-menu>
-              </div>
-            </div>
-
-            <!-- Amount left (or over) of the limit -->
-            <div class="flex flex-wrap items-baseline gap-x-cmn-2">
-              <span
-                [class.text-status-error]="b.isOverBudget"
-                [class.text-text-primary]="!b.isOverBudget"
-                class="tabular-nums text-cmn-md font-bold"
-              >
-                {{ leftAmount | money }}
-              </span>
-              <span class="text-cmn-xs text-text-secondary">
-                {{ b.isOverBudget ? 'over ·' : 'left of' }}
-                @if (!isEditing) {
-                  {{ b.monthlyLimit | money }}{{ b.isOverBudget ? ' budget' : '' }}
-                }
-              </span>
-              @if (isEditing) {
-                <cmn-input
-                  [ngModel]="editValue()"
-                  (ngModelChange)="editValue.set($event)"
-                  (focusout)="saveEdit(b.id)"
-                  (keydown.enter)="saveEdit(b.id)"
-                  (keydown.escape)="cancelEdit()"
-                  class="w-28"
-                  size="sm"
-                  type="number"
-                  inputmode="decimal"
-                  enterkeyhint="done"
-                  aria-label="Monthly limit"
-                />
-              }
-            </div>
-
-            <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
-              <div
-                [style.width.%]="pct"
-                [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
-                class="h-full rounded-full"
-              ></div>
-            </div>
-            <div class="mt-cmn-1 text-cmn-xs text-text-secondary">{{ b.spent | money }} spent</div>
-            @if (b.isOffPace) {
-              <div class="mt-cmn-1 text-cmn-xs text-status-warning">
-                On track to finish the month at {{ pacePct(b.paceRatio) }}% of the limit ({{
-                  b.projectedMonthEndSpend | money
-                }})
-              </div>
-            }
-          </cmn-card>
-        }
-      </div>
-    </cmn-async-state>
+      </cmn-async-state>
+    </cmn-page-scroll>
   </div>
 </cmn-page-container>

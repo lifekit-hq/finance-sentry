@@ -21,84 +21,86 @@
     </ng-template>
   </cmn-filter-bar>
 
-  <cmn-async-state
-    [status]="view().status"
-    [errorMessage]="view().errorMessage"
-    [isEmpty]="store.alerts().length === 0"
-    [emptySubMessage]="emptySubtext()"
-    [showDelay]="showDelay"
-    [minDisplay]="minDisplay"
-    (retry)="store.load(store.query())"
-    class="mt-cmn-3 flex min-h-0 flex-1 flex-col"
-    crossfade
-    retryable
-    keepContent
-  >
-    <div skeleton class="space-y-cmn-4" data-testid="alerts-skeleton">
-      @for (_ of skeletonSections; track $index) {
-        <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
-      }
-    </div>
-    <div empty class="flex min-h-0 flex-1 items-center justify-center">
-      <cmn-empty-state
-        [message]="emptyTitle()"
-        [subMessage]="emptySubtext()"
-        [actionLabel]="canShowAll() ? 'Show all alerts' : null"
-        (action)="showAll()"
-        icon="CheckCircle2"
-        iconClass="text-status-success"
-      />
-    </div>
-    <lk-infinite-list
-      [hasMore]="store.hasMore()"
-      [loading]="store.isAppendLoading()"
-      [failed]="store.hasAppendError()"
-      (lk-infinite-list-load-more)="store.loadMore()"
-      (lk-infinite-list-retry)="store.loadMore()"
-      class="block space-y-cmn-4 md:min-h-0 md:flex-1 md:overflow-auto"
-      end-label="No more alerts"
-      error-label="Couldn't load more alerts."
-      data-testid="alerts-list"
+  <cmn-page-scroll class="mt-cmn-3" label="Alerts">
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [isEmpty]="store.alerts().length === 0"
+      [emptySubMessage]="emptySubtext()"
+      [showDelay]="showDelay"
+      [minDisplay]="minDisplay"
+      (retry)="store.load(store.query())"
+      class="flex flex-1 flex-col"
+      crossfade
+      retryable
+      keepContent
     >
-      @for (group of dayGroups(); track group.dayKey) {
-        <cmn-list-section [heading]="group.label" data-testid="alerts-day">
-          @for (alert of group.items; track alert.id) {
-            <div
-              [class]="alert.isResolved ? resolvedRowClass : ''"
-              [attr.data-resolved]="alert.isResolved"
-              class="relative rounded-cmn-md"
-              data-testid="alert-row"
-            >
-              <cmn-alert-item
-                [title]="alert.title"
-                [message]="alert.message | alertMessage"
-                [severity]="severityFor(alert.severity)"
-                [icon]="iconFor(alert.type)"
-                [badgeLabel]="typeLabel(alert.type)"
-                [referenceLabel]="alert.referenceLabel"
-                [timestamp]="alert.createdAt"
-                [isRead]="alert.isRead || alert.isResolved"
-                [description]="alert | alertCaption"
-                (read)="openAlert(alert)"
-                (dismissed)="dismiss(alert.id)"
-                density="flat"
-              />
-              <!-- An unread item's title is its own control, stretched over the card; a read item
+      <div skeleton class="space-y-cmn-4" data-testid="alerts-skeleton">
+        @for (_ of skeletonSections; track $index) {
+          <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
+        }
+      </div>
+      <div empty class="flex min-h-0 flex-1 items-center justify-center">
+        <cmn-empty-state
+          [message]="emptyTitle()"
+          [subMessage]="emptySubtext()"
+          [actionLabel]="canShowAll() ? 'Show all alerts' : null"
+          (action)="showAll()"
+          icon="CheckCircle2"
+          iconClass="text-status-success"
+        />
+      </div>
+      <lk-infinite-list
+        [hasMore]="store.hasMore()"
+        [loading]="store.isAppendLoading()"
+        [failed]="store.hasAppendError()"
+        (lk-infinite-list-load-more)="store.loadMore()"
+        (lk-infinite-list-retry)="store.loadMore()"
+        class="block space-y-cmn-4"
+        end-label="No more alerts"
+        error-label="Couldn't load more alerts."
+        data-testid="alerts-list"
+      >
+        @for (group of dayGroups(); track group.dayKey) {
+          <cmn-list-section [heading]="group.label" data-testid="alerts-day">
+            @for (alert of group.items; track alert.id) {
+              <div
+                [class]="alert.isResolved ? resolvedRowClass : ''"
+                [attr.data-resolved]="alert.isResolved"
+                class="relative rounded-cmn-md"
+                data-testid="alert-row"
+              >
+                <cmn-alert-item
+                  [title]="alert.title"
+                  [message]="alert.message | alertMessage"
+                  [severity]="severityFor(alert.severity)"
+                  [icon]="iconFor(alert.type)"
+                  [badgeLabel]="typeLabel(alert.type)"
+                  [referenceLabel]="alert.referenceLabel"
+                  [timestamp]="alert.createdAt"
+                  [isRead]="alert.isRead || alert.isResolved"
+                  [description]="alert | alertCaption"
+                  (read)="openAlert(alert)"
+                  (dismissed)="dismiss(alert.id)"
+                  density="flat"
+                />
+                <!-- An unread item's title is its own control, stretched over the card; a read item
                    has none, so this one opens it. -->
-              @if (alert.isRead || alert.isResolved) {
-                <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over a read cmn-alert-item, which has no control of its own -->
-                <button
-                  [attr.aria-label]="alert.title"
-                  (click)="openAlert(alert)"
-                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                  type="button"
-                  data-testid="alert-row-open"
-                ></button>
-              }
-            </div>
-          }
-        </cmn-list-section>
-      }
-    </lk-infinite-list>
-  </cmn-async-state>
+                @if (alert.isRead || alert.isResolved) {
+                  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over a read cmn-alert-item, which has no control of its own -->
+                  <button
+                    [attr.aria-label]="alert.title"
+                    (click)="openAlert(alert)"
+                    class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                    type="button"
+                    data-testid="alert-row-open"
+                  ></button>
+                }
+              </div>
+            }
+          </cmn-list-section>
+        }
+      </lk-infinite-list>
+    </cmn-async-state>
+  </cmn-page-scroll>
 </cmn-page-container>

@@ -5,6 +5,7 @@ import {
   AsyncStateComponent,
   CardComponent,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
@@ -44,6 +45,7 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
     CardComponent,
     DatePipe,
     PageContainerComponent,
+    PageScrollComponent,
     RecommendationCardComponent,
     RecommendationExcessPipe,
     RecommendationExcessTonePipe,
@@ -54,7 +56,7 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
   ],
   providers: [DecisionsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block'},
+  host: {class: 'flex min-h-0 flex-1 flex-col'},
   templateUrl: './decisions.component.html',
 })
 export class DecisionsComponent {

@@ -70,8 +70,8 @@ async function open(page: Page, holdings: unknown[]): Promise<void> {
 async function shot(page: Page, name: string, scrollToEnd = true): Promise<void> {
   if (SHOTS_DIR) {
     if (scrollToEnd) {
-      // The shell scrolls inside <main>, so show the bottom of the page where the section sits.
-      await page.locator('main').evaluate(el => (el.scrollTop = el.scrollHeight));
+      // The list scrolls inside cmn-page-scroll, so show the bottom of the page where the section sits.
+      await page.locator('cmn-page-scroll').evaluate(el => (el.scrollTop = el.scrollHeight));
       await page.waitForTimeout(SCROLL_SETTLE_MS);
     }
     await page.mouse.move(0, 0);

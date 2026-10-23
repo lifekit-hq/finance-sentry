@@ -1,7 +1,12 @@
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {RouterOutlet} from '@angular/router';
-import {CmnDialogService, CmnPageActionsService, PageContainerComponent} from '@lifekit-hq/ui';
+import {
+  CmnDialogService,
+  CmnPageActionsService,
+  PageContainerComponent,
+  PageScrollComponent,
+} from '@lifekit-hq/ui';
 
 import {ACCOUNTS_CONNECT_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
@@ -12,16 +17,16 @@ import {ConnectStore} from '../../store/connect/connect.store';
 // share one instance: the connect forms reload the accounts store they find above them.
 @Component({
   selector: 'fns-accounts-shell',
-  imports: [PageContainerComponent, RouterOutlet],
+  imports: [PageContainerComponent, PageScrollComponent, RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [AccountsStore, ConnectStore],
   template: `
-    <cmn-page-container spacing="none">
+    <cmn-page-container spacing="none" fill>
       <p class="text-cmn-sm text-text-secondary">Balances and holdings across every provider</p>
 
-      <div class="mt-cmn-6">
+      <cmn-page-scroll class="mt-cmn-6" label="Accounts">
         <router-outlet />
-      </div>
+      </cmn-page-scroll>
     </cmn-page-container>
   `,
 })
