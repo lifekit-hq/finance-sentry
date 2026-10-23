@@ -112,6 +112,9 @@ public sealed class BankConnectionHealthPostgresTests : IAsyncLifetime
             .Setup(t => t.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         transactions.Setup(t => t.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        transactions
+            .Setup(t => t.GetRetiredPendingByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         var encryption = new Mock<ICredentialEncryptionService>();
         encryption
             .Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))

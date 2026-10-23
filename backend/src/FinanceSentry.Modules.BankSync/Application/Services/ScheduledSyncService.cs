@@ -581,6 +581,12 @@ public class ScheduledSyncService(
         return detail.Length <= MaxLastSyncErrorLength ? detail : detail[..MaxLastSyncErrorLength];
     }
 
+    private static void Settle(Domain.Transaction row, TransactionCandidate candidate)
+    {
+        row.IsPending = false;
+        row.PostedDate = candidate.PostedDate ?? row.PostedDate ?? row.TransactionDate;
+    }
+
     /// <summary>
     /// Persists newly-synced candidates (deduplicated) and then retires any existing pending
     /// row that now has a settled/posted twin, so pending transactions don't linger as stale
@@ -602,23 +608,45 @@ public class ScheduledSyncService(
         var pendingByHash = existingRows
             .Where(t => t.IsPending)
             .ToDictionary(t => t.UniqueHash);
+        var settledInPlace = new List<Domain.Transaction>();
         if (pendingByHash.Count > 0)
         {
-            var settled = false;
             foreach (var candidate in candidateList.Where(c => !c.IsPending))
             {
                 var hash = _dedup.ComputeHash(
                     candidate.AccountId, candidate.Amount, candidate.HashDate, candidate.Description);
                 if (hash is not null && pendingByHash.TryGetValue(hash, out var row))
                 {
-                    row.IsPending = false;
-                    row.PostedDate = candidate.PostedDate ?? row.PostedDate ?? row.TransactionDate;
-                    settled = true;
+                    Settle(row, candidate);
+                    settledInPlace.Add(row);
                 }
             }
-            if (settled)
-                await _transactions.SaveChangesAsync(ct);
         }
+
+        // A pending row the reconciler retired keeps its hash on the unique index, so its settled copy
+        // would be dropped below as a duplicate and the payment lost for good (#1229). Reactivate the
+        // row and settle it instead; it joins the account's active rows for the reconciliation pass.
+        var retiredByHash = (await _transactions.GetRetiredPendingByAccountIdUnscopedAsync(accountId, ct))
+            .ToDictionary(t => t.UniqueHash);
+        if (retiredByHash.Count > 0)
+        {
+            foreach (var candidate in candidateList.Where(c => !c.IsPending))
+            {
+                var hash = _dedup.ComputeHash(
+                    candidate.AccountId, candidate.Amount, candidate.HashDate, candidate.Description);
+                if (hash is not null && retiredByHash.Remove(hash, out var row))
+                {
+                    row.IsActive = true;
+                    row.DeletedAt = null;
+                    Settle(row, candidate);
+                    existingRows.Add(row);
+                    settledInPlace.Add(row);
+                }
+            }
+        }
+
+        if (settledInPlace.Count > 0)
+            await _transactions.SaveChangesAsync(ct);
 
         var entities = _dedup.FilterDuplicates(candidateList, existingHashes)
             .Select(_dedup.ToEntity)
@@ -630,7 +658,7 @@ public class ScheduledSyncService(
         if (entities.Count > 0)
             await _transactions.AddRangeAsync(entities, ct);
 
-        var stale = PendingReconciler.SelectStalePending(existingRows, entities);
+        var stale = PendingReconciler.SelectStalePending(existingRows, entities, settledInPlace, retiredByHash.Values);
         if (stale.Count > 0)
         {
             var now = DateTime.UtcNow;

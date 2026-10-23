@@ -13,6 +13,14 @@ public class PendingReconcilerTests
     private static Transaction Tx(decimal amount, string description, bool pending, string hash) =>
         new(Account, User, amount, new DateTime(2026, 7, 5, 0, 0, 0, DateTimeKind.Utc), description, hash, pending);
 
+    private static readonly DateTime Day = new(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    private static Transaction Pending(DateTime date, string hash, decimal amount = -900m) =>
+        new(Account, User, amount, date, "Rent", hash, isPending: true);
+
+    private static Transaction Posted(DateTime date, string hash, DateTime? postedDate = null, decimal amount = -900m) =>
+        new(Account, User, amount, date, "Rent", hash, isPending: false) { PostedDate = postedDate ?? date };
+
     [Fact]
     public void RetiresPending_WhenPostedTwinExistsAmongExisting()
     {
@@ -105,5 +113,95 @@ public class PendingReconcilerTests
         var stale = PendingReconciler.SelectStalePending([pending, posted], []);
 
         stale.Should().BeEmpty();
+    }
+
+    // ── #1229: the match is date-aware and one-to-one ────────────────────────
+
+    [Fact]
+    public void KeepsPending_WhenTheOnlyPostedTwinIsOlderThanIt()
+    {
+        // Last month's rent posted; this month's identical rent is pending. The old posted row is no settlement of it.
+        var lastMonth = Posted(Day.AddDays(-30), "h-old");
+        var pending = Pending(Day, "h-pending");
+
+        PendingReconciler.SelectStalePending([lastMonth, pending], []).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RetiresPending_WhenPostedTwinSettlesWithinTheWindowAfterIt()
+    {
+        var pending = Pending(Day, "h-pending");
+        var posted = Posted(Day, "h-posted", postedDate: Day.AddDays(PendingReconciler.SettlementWindowDays));
+
+        PendingReconciler.SelectStalePending([pending, posted], []).Should().ContainSingle().Which.Should().BeSameAs(pending);
+    }
+
+    [Fact]
+    public void KeepsPending_WhenPostedTwinSettlesPastTheWindow()
+    {
+        var pending = Pending(Day, "h-pending");
+        var posted = Posted(Day, "h-posted", postedDate: Day.AddDays(PendingReconciler.SettlementWindowDays + 1));
+
+        PendingReconciler.SelectStalePending([pending, posted], []).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OnePostedRow_RetiresOnlyOnePendingRow()
+    {
+        // Two identical pending payments, one settlement so far: the second stays pending.
+        var first = Pending(Day, "h-1");
+        var second = Pending(Day.AddDays(1), "h-2");
+        var posted = Posted(Day.AddDays(1), "h-posted");
+
+        PendingReconciler.SelectStalePending([first, second, posted], [])
+            .Should().ContainSingle().Which.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void TwoPostedRows_RetireTwoPendingRows()
+    {
+        var first = Pending(Day, "h-1");
+        var second = Pending(Day.AddDays(1), "h-2");
+        var postedA = Posted(Day.AddDays(1), "h-a");
+        var postedB = Posted(Day.AddDays(2), "h-b");
+
+        var stale = PendingReconciler.SelectStalePending([first, second, postedA, postedB], []);
+
+        stale.Should().HaveCount(2);
+        stale.Should().Contain(first).And.Contain(second);
+    }
+
+    [Fact]
+    public void IgnoresARowThatWasJustSettledInPlace()
+    {
+        // A pending row settled by hash this run is no twin of another pending row.
+        var settledInPlace = Posted(Day.AddDays(1), "h-settled");
+        var other = Pending(Day, "h-other");
+
+        PendingReconciler.SelectStalePending([other, settledInPlace], [], [settledInPlace]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void PostedRow_ThatAlreadyRetiredAnEarlierPending_DoesNotRetireTheNextOne()
+    {
+        // P1 was retired against the booking in an earlier sync; the booking still sits in P2's window.
+        var retired = Pending(Day, "h-1");
+        var next = Pending(Day.AddDays(1), "h-2");
+        var posted = Posted(Day.AddDays(2), "h-posted");
+
+        PendingReconciler.SelectStalePending([next, posted], [], retiredPending: [retired]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RetiredPending_WithNoPostedRowInItsWindow_ClaimsNothing()
+    {
+        // A row the old reconciler retired against last month's rent has no twin of its own, so it does not
+        // hold back the booking of the pending row that follows it.
+        var retired = Pending(Day.AddDays(-30), "h-retired");
+        var next = Pending(Day, "h-2");
+        var posted = Posted(Day.AddDays(1), "h-posted");
+
+        PendingReconciler.SelectStalePending([next, posted], [], retiredPending: [retired])
+            .Should().ContainSingle().Which.Should().BeSameAs(next);
     }
 }
