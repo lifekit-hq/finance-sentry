@@ -30,6 +30,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     public DbSet<Counterparty> Counterparties { get; set; } = null!;
     public DbSet<CounterpartyRule> CounterpartyRules { get; set; } = null!;
     public DbSet<CommittedMerchantPin> CommittedMerchantPins { get; set; } = null!;
+    public DbSet<CoverageHole> CoverageHoles { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -172,6 +173,15 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         // duplicate the policy could never tell apart.
         cmp.HasIndex(p => new { p.UserId, p.MerchantKey }).IsUnique()
            .HasDatabaseName("idx_committed_merchant_pin_user_merchant_unique");
+
+        var chb = modelBuilder.Entity<CoverageHole>();
+        chb.ToTable("coverage_holes");
+        chb.HasKey(h => h.Id);
+        chb.Property(h => h.UserId).IsRequired();
+        chb.HasIndex(h => new { h.UserId, h.From }).HasDatabaseName("idx_coverage_hole_user_from");
+        // One open hole per account: the sentinel's daily re-run must never stack a second one.
+        chb.HasIndex(h => h.AccountId).IsUnique().HasFilter("\"To\" IS NULL")
+           .HasDatabaseName("idx_coverage_hole_open_account_unique");
 
         var sjb = modelBuilder.Entity<SyncJob>();
         sjb.HasKey(sj => sj.Id);

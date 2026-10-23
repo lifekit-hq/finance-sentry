@@ -1294,6 +1294,17 @@ holdings-based current drawdown of section 5b is a separate measurement of the i
 - A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
   balance read is seen by the balance first, so the ledger books it as unpriced quantity and
   that holding's cost basis stays null until the position is next closed.
+- **Coverage holes (#1238).** A bank account can sync successfully and still not carry the person's day-to-day
+  spend (the Revolut credit card is not exposed by TrueLayer, so card spend moved to an account we never see). The daily
+  `CoverageSentinelJob` watches each open account's weekly (Mon-Sun, UTC, USD-converted) debit spend in the
+  day-to-day categories (food and drink, transportation, general merchandise, entertainment, personal care): when
+  two or more complete weeks fall under 20% of the trailing 13-week median (at least 6 weeks of history, a median of
+  at least $20 a week, a successful sync in the last 3 days) it raises a `CoverageGap` alert and records a
+  `coverage_holes` row (`From` = Monday of the first quiet week, `To` null while open). The hole closes when two
+  consecutive complete weeks are no longer quiet (at or above 20% of the opening baseline) and the account's sync is succeeding. A hole whose account (or its person) is closed ends with the latest complete week, and its alert
+  resolves. Budget and estimate readers can query `ICoverageHoleReader.GetHolesAsync` to skip the
+  period instead of reading it as frugal; nothing consumes it yet, so existing budget and estimate figures are
+  unchanged.
 
 ## 10. Benchmark-relative track record
 

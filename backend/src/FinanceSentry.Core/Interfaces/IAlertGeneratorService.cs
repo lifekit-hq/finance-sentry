@@ -98,6 +98,25 @@ public interface IAlertGeneratorService
         string? replacedBy,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Raises a Warning alert that an account's day-to-day spend has nearly stopped while its syncs succeed, so the spend
+    /// may be moving through an account the app does not see. <paramref name="baselineWeeklySpendUsd"/> is the usual
+    /// weekly spend it fell from. Deduped per account.
+    /// </summary>
+    Task GenerateCoverageGapAlertAsync(
+        Guid userId,
+        Guid accountId,
+        string accountName,
+        int quietWeeks,
+        decimal baselineWeeklySpendUsd,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the coverage-gap alert once the account's daily spend flows again.</summary>
+    Task ResolveCoverageGapAlertAsync(
+        Guid userId,
+        Guid accountId,
+        CancellationToken ct = default);
+
     Task DeleteAlertsForAccountAsync(
         Guid accountId,
         CancellationToken ct = default);

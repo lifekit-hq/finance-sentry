@@ -51,6 +51,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "MacroEventReleased" => CompanionEventKind.MacroEventReleased,
         "ConnectionDormant" => CompanionEventKind.ConnectionDormant,
         "AccountRetired" => CompanionEventKind.AccountRetired,
+        "CoverageGap" => CompanionEventKind.CoverageGap,
         _ => null,
     };
 

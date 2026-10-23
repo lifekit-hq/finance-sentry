@@ -45,4 +45,7 @@ public enum CompanionEventKind
 
     /// <summary>A bank account was retired (absent from its provider's list, or replaced by a reissue): one digest line, never a wake.</summary>
     AccountRetired,
+
+    /// <summary>An account's day-to-day spend has nearly stopped while its syncs succeed: spend may be moving off-book.</summary>
+    CoverageGap,
 }

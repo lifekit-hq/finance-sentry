@@ -22,6 +22,7 @@ public class PolicyAlertMapTests
     {
         AlertType.LowBalance, // operator-set per-account threshold, not a policy floor
         AlertType.SyncFailure,
+        AlertType.CoverageGap, // account-level silence, not a policy floor
         AlertType.UnusualSpend,
         AlertType.ThesisBroken,
         AlertType.MarketStructure,

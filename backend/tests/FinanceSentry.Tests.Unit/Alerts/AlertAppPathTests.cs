@@ -60,6 +60,7 @@ public class AlertAppPathTests
         { AlertType.SyncFailure, Account, "Monobank", "/accounts/list" },
         { AlertType.ConsentExpiring, Account, "AIB", "/accounts/list" },
         { AlertType.ConnectionDormant, Account, "Monobank ···1234", "/accounts/list" },
+        { AlertType.CoverageGap, Account, "Revolut ···3725", "/accounts/list" },
         { AlertType.AccountRetired, Account, "Monobank ···1234", "/accounts/list" },
         { AlertType.FamilyStatement, null, null, "/accounts/list" },
         { AlertType.PriceHike, Guid.NewGuid(), "Netflix", "/subscriptions" },

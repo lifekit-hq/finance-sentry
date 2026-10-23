@@ -453,6 +453,14 @@ public class RunThesisMonitorHandlerTests
         public Task GenerateAccountRetiredAlertAsync(Guid userId, Guid accountId, string accountName, string? replacedBy, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateCoverageGapAlertAsync(
+            Guid userId, Guid accountId, string accountName, int quietWeeks, decimal baselineWeeklySpendUsd,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveCoverageGapAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
             => Task.CompletedTask;
 
