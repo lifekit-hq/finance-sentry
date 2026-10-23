@@ -20,8 +20,9 @@ public static class MerchantKeywordMatcher
             .ToList();
 
     /// <summary>
-    /// Returns the category of the first (longest) keyword contained in the description,
-    /// or UNCATEGORIZED when none match. <paramref name="prepared"/> must come from
+    /// Returns the category of the first (longest) keyword contained in the description
+    /// (a keyword ending in a space must also start at a word boundary), or UNCATEGORIZED
+    /// when none match. <paramref name="prepared"/> must come from
     /// <see cref="Prepare"/> (lowercased, longest-first).
     /// </summary>
     public static string Resolve(
@@ -33,9 +34,29 @@ public static class MerchantKeywordMatcher
         var haystack = description.ToLowerInvariant();
         foreach (var (keyword, categoryKey) in prepared)
         {
-            if (haystack.Contains(keyword, StringComparison.Ordinal))
+            if (ContainsKeyword(haystack, keyword))
                 return categoryKey;
         }
         return CategoryKeys.Uncategorized;
+    }
+
+    // A keyword with a trailing space ("sky ", "eir ") names a whole word, so it must not start
+    // mid-word: "esky eskyie" (a flights agency) is not "sky ", nor "their " "eir ".
+    private static bool ContainsKeyword(string haystack, string keyword)
+    {
+        if (keyword[^1] != ' ' || !char.IsLetterOrDigit(keyword[0]))
+            return haystack.Contains(keyword, StringComparison.Ordinal);
+
+        var from = 0;
+        while (from < haystack.Length)
+        {
+            var at = haystack.IndexOf(keyword, from, StringComparison.Ordinal);
+            if (at < 0)
+                return false;
+            if (at == 0 || !char.IsLetterOrDigit(haystack[at - 1]))
+                return true;
+            from = at + 1;
+        }
+        return false;
     }
 }

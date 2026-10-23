@@ -101,6 +101,13 @@ public static class MerchantKeywordSeedData
         ("ryanair", CategoryKeys.Travel),
         ("aer lingus", CategoryKeys.Travel),
         ("expedia", CategoryKeys.Travel),
+        ("esky", CategoryKeys.Travel),
+        ("kiwi.com", CategoryKeys.Travel),
+        ("skyscanner", CategoryKeys.Travel),
+        ("opodo", CategoryKeys.Travel),
+        ("lastminute", CategoryKeys.Travel),
+        ("easyjet", CategoryKeys.Travel),
+        ("wizz air", CategoryKeys.Travel),
         ("hotel", CategoryKeys.Travel),
         ("hostel", CategoryKeys.Travel),
 
