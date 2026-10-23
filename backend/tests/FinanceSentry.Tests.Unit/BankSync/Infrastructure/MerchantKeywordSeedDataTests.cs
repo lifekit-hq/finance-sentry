@@ -47,9 +47,23 @@ public class MerchantKeywordSeedDataTests
     [InlineData("Lego Blanchardstown", CategoryKeys.GeneralMerchandise)]
     [InlineData("Makeup", CategoryKeys.PersonalCare)]
     [InlineData("Clubwise Software Ltd", CategoryKeys.Medical)]
+    // Travel agencies: "esky eskyie" contains "sky " and used to land in RENT_AND_UTILITIES (#1235)
+    [InlineData("ESKY ESKYIE", CategoryKeys.Travel)]
+    [InlineData("Skyscanner Ltd", CategoryKeys.Travel)]
+    [InlineData("Kiwi.com Brno", CategoryKeys.Travel)]
+    [InlineData("Opodo Ltd", CategoryKeys.Travel)]
+    [InlineData("Sky Digital 1234", CategoryKeys.RentAndUtilities)]
+    [InlineData("DD Sky Ireland", CategoryKeys.RentAndUtilities)]
     public void Resolve_KnownMerchantDescriptions_MapToExpectedCategory(string description, string expected)
     {
         MerchantKeywordMatcher.Resolve(description, Prepared).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Resolve_TrailingSpaceKeyword_DoesNotMatchMidWord()
+    {
+        MerchantKeywordMatcher.Resolve("Esky Eskyie", MerchantKeywordMatcher.Prepare([("sky ", CategoryKeys.RentAndUtilities)]))
+            .Should().Be(CategoryKeys.Uncategorized);
     }
 
     [Fact]

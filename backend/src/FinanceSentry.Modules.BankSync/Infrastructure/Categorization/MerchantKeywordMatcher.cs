@@ -33,9 +33,29 @@ public static class MerchantKeywordMatcher
         var haystack = description.ToLowerInvariant();
         foreach (var (keyword, categoryKey) in prepared)
         {
-            if (haystack.Contains(keyword, StringComparison.Ordinal))
+            if (ContainsKeyword(haystack, keyword))
                 return categoryKey;
         }
         return CategoryKeys.Uncategorized;
+    }
+
+    // A keyword with a trailing space ("sky ", "eir ") names a whole word, so it must not start
+    // mid-word: "esky eskyie" (a flights agency) is not "sky ", nor "their " "eir ".
+    private static bool ContainsKeyword(string haystack, string keyword)
+    {
+        if (keyword[^1] != ' ' || !char.IsLetterOrDigit(keyword[0]))
+            return haystack.Contains(keyword, StringComparison.Ordinal);
+
+        var from = 0;
+        while (from < haystack.Length)
+        {
+            var at = haystack.IndexOf(keyword, from, StringComparison.Ordinal);
+            if (at < 0)
+                return false;
+            if (at == 0 || !char.IsLetterOrDigit(haystack[at - 1]))
+                return true;
+            from = at + 1;
+        }
+        return false;
     }
 }
