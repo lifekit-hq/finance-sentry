@@ -465,10 +465,19 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   is a null-guard, not a different date.
 - **Settle-in-place**: if a posted candidate hashes identically to a stored *pending* row
   (Monobank holds keep their date when they clear), the stored row is flipped to posted
-  (`ScheduledSyncService.PersistAndReconcileAsync`).
+  (`ScheduledSyncService.PersistAndReconcileAsync`). The same step covers a pending row the
+  reconciler already retired: its hash still sits on the unique index, so a settled candidate
+  that hashes to it **reactivates and settles that row** instead of being dropped as a duplicate
+  (#1229).
 - **PendingReconciler**: a pending row whose posted twin exists under a *different* hash
   (date moved — the TrueLayer case) is retired (soft-deleted, `IsActive = false`). The twin is
-  matched on account + amount + description, and the description goes through
+  matched on account + amount + description, **dated on or after the pending row and at most
+  `PendingReconciler.SettlementWindowDays` (7) later, and claimed one-to-one**: oldest pending
+  row first takes the earliest free posted row in its window, and a posted row that already
+  retired a pending row (the account's retired rows are loaded for this) cannot retire another
+  across syncs. Without the window, last month's posted rent retired this month's pending rent
+  (#1229). A row that settled in place in the same run never retires another pending row. The
+  description goes through
   `SettlementDescriptionNormalizer` first, because a provider may also **rewrite the text** on
   settlement: AIB splices a `TxnDate: 02Sep2026` stamp into the booked copy that the pending
   copy never carried. Comparing raw text missed the twin, so neither row was retired and the
@@ -477,6 +486,12 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   The **amount** is compared as-is, so **a hold that settles at a different amount is never
   retired** — it stays active alongside its posted row. That is routine for a cross-currency
   charge, where the settled amount is the bank's, not the hold's.
+- **Repair of rows retired before the date-aware rule (#1229)**: `repair-retired-pending
+  [--dry-run]` (`scripts/repair-retired-pending.sh`; `RetiredPendingRepairService`) reactivates
+  rows the old reconciler retired (no archive reason, retired on or after 2026-07-23 11:20 UTC,
+  active account) that have neither an active same-day twin (account, type, amount, day) nor a
+  posted row the current reconciler rule would pair with them, and settles those the provider now
+  reports as booked. Idempotent; run once by the owner, after the fix is deployed.
 - **Sync lookback overlap**: settled transactions keep their original timestamp, so a pure
   watermark fetch would never re-observe them once the watermark passes — every
   incremental sync therefore re-reads a trailing 7-day window (`ResyncLookbackDays` in
