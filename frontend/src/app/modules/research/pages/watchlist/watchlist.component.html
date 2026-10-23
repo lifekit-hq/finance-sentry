@@ -1,14 +1,15 @@
 <cmn-page-container spacing="none">
-  <div class="space-y-cmn-5">
+  <div class="max-w-[900px] space-y-cmn-6">
     <p class="text-cmn-sm text-text-secondary">
       Names you are watching, with the trigger that would make you act
     </p>
 
-    <cmn-card>
+    <cmn-card class="block">
+      <h2 class="mb-cmn-4 font-label text-cmn-sm font-semibold text-text-primary">Add a name</h2>
       <form
         [formGroup]="form"
         (ngSubmit)="submit()"
-        class="space-y-cmn-3"
+        class="space-y-cmn-4"
         data-testid="watchlist-form"
       >
         <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
@@ -43,8 +44,11 @@
         </cmn-form-field>
         <cmn-button
           [disabled]="store.isAddLoading() || store.isLoadLoading()"
+          [loading]="store.isAddLoading()"
           type="submit"
           variant="primary"
+          icon="Plus"
+          class="block sm:w-fit"
           data-testid="watchlist-add"
         >
           Add to watchlist
@@ -53,75 +57,90 @@
     </cmn-card>
 
     @if (store.actionErrorMessage()) {
-      <cmn-alert variant="error" data-testid="watchlist-action-error">{{
+      <cmn-alert variant="error" class="block" data-testid="watchlist-action-error">{{
         store.actionErrorMessage()
       }}</cmn-alert>
     }
 
-    <!-- The host's spacing lays out these children directly;
-         the keep-content wrapper would put them in one box. -->
-    <cmn-async-state
-      [status]="view().status"
-      [errorMessage]="view().errorMessage"
-      [isEmpty]="isEmpty()"
-      [emptyMessage]="emptyCopy.message"
-      [emptySubMessage]="emptyCopy.subMessage"
-      [emptyIcon]="emptyCopy.icon"
-      [keepContent]="false"
-      (retry)="store.load()"
-      class="block space-y-cmn-5"
-      errorPlacement="above"
-      retryable
-    >
-      <cmn-card skeleton padding="none" data-testid="watchlist-skeleton">
-        <cmn-skeleton [count]="skeletonRowCount" shape="row" />
-      </cmn-card>
+    <section class="space-y-cmn-3">
+      @if (store.items().length > 0) {
+        <span
+          class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          data-testid="watchlist-count"
+        >
+          Watching · {{ store.items().length }}
+        </span>
+      }
 
-      <cmn-card padding="none" data-testid="watchlist-list">
-        @for (row of store.rows(); track row.id) {
-          <div
-            [class.opacity-60]="isPending(row)"
-            class="flex items-start gap-cmn-3 border-b border-border-subtle p-cmn-4 last:border-b-0"
-            data-testid="watchlist-row"
-          >
-            <div class="min-w-0 flex-1 space-y-cmn-1">
-              <div class="flex flex-wrap items-baseline gap-x-cmn-2">
-                <a
-                  [routerLink]="row.dossierRoute"
-                  class="text-cmn-base font-semibold text-text-primary hover:underline"
-                  data-testid="watchlist-ticker-link"
-                >
-                  {{ row.ticker }}
-                </a>
-                @if (row.exchange) {
-                  <span class="text-cmn-xs text-text-secondary">{{ row.exchange }}</span>
-                }
-                <span class="text-cmn-xs text-text-disabled">
-                  added {{ row.addedAt | date: 'd MMM y' }}
-                </span>
-              </div>
-              @if (row.note) {
-                <p
-                  class="whitespace-pre-line break-words text-cmn-sm text-text-secondary"
-                  data-testid="watchlist-row-note"
-                >
-                  {{ row.note }}
-                </p>
-              }
-            </div>
-            <cmn-button
-              [disabled]="isPending(row) || store.isLoadLoading()"
-              (clicked)="confirmRemove(row)"
-              variant="secondary"
-              size="sm"
-              icon="Trash2"
-              data-testid="watchlist-remove"
+      <!-- Skeleton and list cards are the host's direct children; keep-content would wrap them in one box. -->
+      <cmn-async-state
+        [status]="view().status"
+        [errorMessage]="view().errorMessage"
+        [isEmpty]="isEmpty()"
+        [emptySubMessage]="emptyCopy.subMessage"
+        [keepContent]="false"
+        (retry)="store.load()"
+        class="block"
+        errorPlacement="above"
+        retryable
+      >
+        <cmn-card skeleton padding="none" class="block" data-testid="watchlist-skeleton">
+          <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+        </cmn-card>
+
+        <cmn-empty-state
+          [message]="emptyCopy.message"
+          [subMessage]="emptyCopy.subMessage"
+          [icon]="emptyCopy.icon"
+          empty
+          iconClass="text-text-secondary"
+        />
+
+        <cmn-card padding="none" class="block" data-testid="watchlist-list">
+          @for (row of store.rows(); track row.id) {
+            <div
+              [class.opacity-60]="isPending(row)"
+              class="flex items-start gap-cmn-3 border-b border-border-subtle p-cmn-4 last:border-b-0"
+              data-testid="watchlist-row"
             >
-              Remove
-            </cmn-button>
-          </div>
-        }
-      </cmn-card>
-    </cmn-async-state>
+              <div class="min-w-0 flex-1 space-y-cmn-1">
+                <div class="flex flex-wrap items-center gap-x-cmn-2 gap-y-cmn-1">
+                  <a
+                    [routerLink]="row.dossierRoute"
+                    class="text-cmn-base font-semibold text-text-primary hover:underline"
+                    data-testid="watchlist-ticker-link"
+                  >
+                    {{ row.ticker }}
+                  </a>
+                  @if (row.exchange) {
+                    <cmn-tag variant="neutral">{{ row.exchange }}</cmn-tag>
+                  }
+                  <span class="text-cmn-xs text-text-secondary">
+                    Added {{ row.addedAt | date: 'd MMM y' }}
+                  </span>
+                </div>
+                @if (row.note) {
+                  <p
+                    class="whitespace-pre-line break-words text-cmn-sm text-text-secondary"
+                    data-testid="watchlist-row-note"
+                  >
+                    {{ row.note }}
+                  </p>
+                }
+              </div>
+              <cmn-button
+                [disabled]="isPending(row) || store.isLoadLoading()"
+                [aria-label]="'Remove ' + row.ticker"
+                (clicked)="confirmRemove(row)"
+                variant="secondary"
+                size="sm"
+                icon="Trash2"
+                data-testid="watchlist-remove"
+              />
+            </div>
+          }
+        </cmn-card>
+      </cmn-async-state>
+    </section>
   </div>
 </cmn-page-container>

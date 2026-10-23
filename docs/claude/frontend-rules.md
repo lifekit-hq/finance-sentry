@@ -133,7 +133,7 @@ A list bound to a query (the budgets month) passes `hasData: false` to `AsyncVie
 
 Adopters: `events` (calendar and fired), `truelayer-picker`, `inzhur-form`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`, `people`, `budgets`, `subscriptions`, `alerts`, `add-commitment-dialog`.
 
-When the primitive wraps several children, they are no longer direct children of the old parent, so the parent's spacing (`space-y-cmn-5` of `cmn-page-container`, or the page's own `space-y-*`) goes on the `cmn-async-state` host. Since `@lifekit-hq/ui` 4.0 turns `keepContent` on by default, which puts the content in one wrapper `div`, a host whose own `space-y-*`, `gap-*` or flex column lays out those children (dashboard, subscriptions, watchlist, asset dossier, events, flow breakdown, budgets) passes `[keepContent]="false"`; transactions and alerts keep content and lay out inside the wrapper.
+When the primitive wraps several children, they are no longer direct children of the old parent, so the parent's spacing (`space-y-cmn-5` of `cmn-page-container`, or the page's own `space-y-*`) goes on the `cmn-async-state` host. Since `@lifekit-hq/ui` 4.0 turns `keepContent` on by default, which puts the content in one wrapper `div`, a host whose own `space-y-*`, `gap-*` or flex column lays out those children (dashboard, subscriptions, asset dossier, events, flow breakdown, budgets) passes `[keepContent]="false"`; transactions and alerts keep content and lay out inside the wrapper.
 
 Remaining local markup (a gap in the primitive, not a surface left unconverted):
 

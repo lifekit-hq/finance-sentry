@@ -80,6 +80,16 @@ test.describe('Watchlist', () => {
     await expect(page.getByTestId('watchlist-form')).toBeVisible();
     await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
     await expect(page.getByText(/your watchlist is empty/i)).toBeVisible();
+    await expect(page.getByTestId('watchlist-count')).toHaveCount(0);
+  });
+
+  test('counts the names and names each icon-only remove button after its ticker', async ({
+    page,
+  }) => {
+    await mockWatchlist(page, [PLTR]);
+    await page.goto('/watchlist');
+    await expect(page.getByTestId('watchlist-count')).toHaveText(/watching\s*·\s*1/i);
+    await expect(page.getByRole('button', {name: 'Remove PLTR'})).toBeVisible();
   });
 
   test('lists the full note and links the ticker to its dossier', async ({page}) => {
