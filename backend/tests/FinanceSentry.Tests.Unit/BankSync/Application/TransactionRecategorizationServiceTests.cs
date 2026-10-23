@@ -439,4 +439,53 @@ public class TransactionRecategorizationServiceTests
         tx.MerchantCategory.Should().Be(CategoryKeys.TransferOut);
         result.ReResolved.Should().Be(0);
     }
+
+    private Transaction[] ArrangeScopedRows()
+    {
+        var accountId = Guid.NewGuid();
+        Transaction Row(int mcc, string category) =>
+            new(accountId, UserId, 10m, DateTime.UtcNow, "row", Guid.NewGuid().ToString())
+            { Mcc = mcc, MerchantCategory = category };
+
+        var rows = new[]
+        {
+            Row(4722, CategoryKeys.RentAndUtilities), // resolves to travel -> the only row to move
+            Row(8099, CategoryKeys.RentAndUtilities), // resolves elsewhere -> stays
+            Row(4722, CategoryKeys.FoodAndDrink),     // resolves to travel but is not in the source category -> stays
+        };
+        _resolver.Setup(r => r.ResolveMcc(4722)).Returns(CategoryKeys.Travel);
+        _resolver.Setup(r => r.ResolveMcc(8099)).Returns(CategoryKeys.Medical);
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(rows);
+        return rows;
+    }
+
+    [Fact]
+    public async Task ScopedMove_ChangesOnlyRowsInTheSourceCategoryThatNowResolveToTheTarget_AndIsIdempotent()
+    {
+        var rows = ArrangeScopedRows();
+        var scope = new RecategorizationScope(CategoryKeys.RentAndUtilities, CategoryKeys.Travel, DryRun: false);
+
+        var first = await BuildSut().RecategorizeUserAsync(UserId, scope: scope);
+        var second = await BuildSut().RecategorizeUserAsync(UserId, scope: scope);
+
+        rows.Select(r => r.MerchantCategory).Should().Equal(
+            CategoryKeys.Travel, CategoryKeys.RentAndUtilities, CategoryKeys.FoodAndDrink);
+        first.ReResolved.Should().Be(1);
+        second.ReResolved.Should().Be(0);
+        _transactions.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ScopedMove_DryRun_CountsTheRowsWithoutWriting()
+    {
+        var rows = ArrangeScopedRows();
+
+        var result = await BuildSut().RecategorizeUserAsync(
+            UserId, scope: new RecategorizationScope(CategoryKeys.RentAndUtilities, CategoryKeys.Travel, DryRun: true));
+
+        result.ReResolved.Should().Be(1);
+        rows[0].MerchantCategory.Should().Be(CategoryKeys.RentAndUtilities);
+        _transactions.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

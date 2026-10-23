@@ -13,6 +13,9 @@ using Microsoft.Extensions.DependencyInjection;
 ///
 /// Invoked via <c>dotnet FinanceSentry.API.dll recategorize [userId]</c> — not a web endpoint.
 /// Omit the userId to process every user that has bank accounts.
+///
+/// <c>--from CATEGORY --to CATEGORY [--dry-run]</c> narrows the pass to one idempotent category move
+/// (rows in CATEGORY the ladder now resolves to the target; no provider re-fetch; nothing else changes).
 /// </summary>
 public static class RecategorizationCommand
 {
@@ -25,6 +28,7 @@ public static class RecategorizationCommand
         var db = sp.GetRequiredService<BankSyncDbContext>();
 
         List<Guid> userIds;
+        var moveScope = ParseScope(args);
         if (args.Length > 1 && Guid.TryParse(args[1], out var userId))
             userIds = [userId];
         else
@@ -37,11 +41,28 @@ public static class RecategorizationCommand
         Console.WriteLine($"[recategorize] processing {userIds.Count} user(s)...");
         foreach (var id in userIds)
         {
-            var r = await service.RecategorizeUserAsync(id);
+            var r = await service.RecategorizeUserAsync(id, scope: moveScope);
             Console.WriteLine(
                 $"[recategorize] {id}: examined={r.Examined} re-resolved={r.ReResolved} " +
                 $"re-fetched={r.ReFetchedUpdated} still-uncategorized={r.StillUncategorized}");
         }
         Console.WriteLine("[recategorize] done.");
+    }
+
+    private static RecategorizationScope? ParseScope(string[] args)
+    {
+        var from = ArgValue(args, "--from");
+        var to = ArgValue(args, "--to");
+        if (from is null && to is null)
+            return null;
+        if (from is null || to is null)
+            throw new ArgumentException("--from and --to must be given together.");
+        return new RecategorizationScope(from, to, args.Contains("--dry-run"));
+    }
+
+    private static string? ArgValue(string[] args, string flag)
+    {
+        var i = Array.IndexOf(args, flag);
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }
 }
