@@ -27,6 +27,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         [AlertType.ThesisBroken] = TimeSpan.FromHours(24),
         // An account reopened by its reappearance and retired again must not repeat the notice within the week.
         [AlertType.AccountRetired] = TimeSpan.FromDays(7),
+        // The sentinel re-checks daily; a dismissed gap stays quiet for two weeks while it persists.
+        [AlertType.CoverageGap] = TimeSpan.FromDays(14),
         [AlertType.MarketStructure] = TimeSpan.FromHours(24),
         [AlertType.PolicyViolation] = TimeSpan.FromHours(24),
         [AlertType.Opportunity] = TimeSpan.FromHours(24),
@@ -179,6 +181,24 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
                 Dedup = AlertDedup.SilenceOnly,
             },
             ct);
+
+    public Task GenerateCoverageGapAlertAsync(
+        Guid userId, Guid accountId, string accountName, int quietWeeks, decimal baselineWeeklySpendUsd,
+        CancellationToken ct = default)
+        => EmitAsync(
+            userId,
+            new AlertDraft(
+                AlertType.CoverageGap, AlertSeverity.Warning, accountId, accountName,
+                $"Daily spend on {accountName} has nearly stopped",
+                string.Create(CultureInfo.InvariantCulture,
+                    $"Daily spend on {accountName} has nearly stopped: for {quietWeeks} weeks it has been under a fifth of the usual ${baselineWeeklySpendUsd:F0} a week, while its syncs keep succeeding. Are you paying from an account we don't see? Until it is back, budgets and estimates skip this period."))
+            {
+                Dedup = AlertDedup.ActiveThenSilence,
+            },
+            ct);
+
+    public Task ResolveCoverageGapAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.CoverageGap, accountId, ct);
 
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
         => _alerts.DeleteByReferenceIdAsync(accountId, ct);

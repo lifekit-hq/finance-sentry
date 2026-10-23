@@ -1,0 +1,162 @@
+namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
+
+using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+/// <summary>
+/// Daily coverage sentinel: an account whose day-to-day spend used to flow and has gone quiet (see
+/// <see cref="CoverageGapDetector"/>) while its syncs succeed is most likely not where the person pays any more. It
+/// raises a <c>CoverageGap</c> alert and records the period as a <see cref="CoverageHole"/> that budget and estimate
+/// readers skip (<see cref="ICoverageHoleReader"/>). The hole closes, and the alert resolves, when the account's spend
+/// flows again. Only reads transactions and sync history we already hold: no provider call.
+/// </summary>
+public sealed class CoverageSentinelJob(
+    BankSyncDbContext db,
+    IClosedAccountsReader closedAccounts,
+    IAlertGeneratorService alerts,
+    TimeProvider time,
+    ILogger<CoverageSentinelJob> logger)
+{
+    /// <summary>The newest successful sync an account needs for its quiet to count: a failing sync is a different alert.</summary>
+    public const int SyncRecencyDays = 3;
+
+    /// <summary>
+    /// Weeks of spend read: the longest quiet run plus the baseline before it, with one spare week so a run that starts at
+    /// the window's edge is still seen whole.
+    /// </summary>
+    private const int ReadWeeks = CoverageGapDetector.MaxQuietWeeks + CoverageGapDetector.BaselineWeeks + 1;
+
+    [Hangfire.AutomaticRetry(Attempts = 0)]
+    public async Task ExecuteAsync(CancellationToken ct = default)
+    {
+        var now = time.GetUtcNow();
+        var latestWeek = CoverageGapDetector.LatestCompleteWeek(DateOnly.FromDateTime(now.UtcDateTime));
+        var readFrom = latestWeek.AddDays(-7 * ReadWeeks).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        var closedUsers = (await closedAccounts.GetClosedUserIdsAsync(ct)).ToList();
+
+        var accounts = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking()
+            .Where(a => a.ClosedAt == null && !closedUsers.Contains(a.UserId))
+            .Select(a => new AccountRow(a.Id, a.UserId, a.Currency, a.BankName, a.AccountNumberLast4))
+            .ToListAsync(ct);
+        var accountIds = accounts.Select(a => a.Id).ToList();
+
+        var rows = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking()
+            .Where(t => t.IsActive
+                     && !t.IsPending
+                     && t.TransactionType == "debit"
+                     && t.MerchantCategory != null
+                     && CoverageGapDetector.DailyCategories.Contains(t.MerchantCategory)
+                     && t.TransactionDate >= readFrom
+                     && accountIds.Contains(t.AccountId))
+            .Select(t => new SpendRow(t.AccountId, t.TransactionDate, t.Amount))
+            .ToListAsync(ct);
+
+        var syncedSince = now.UtcDateTime.AddDays(-SyncRecencyDays);
+        var recentlySynced = (await db.SyncJobs.IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .AsNoTracking()
+                .Where(j => j.Status == "success" && j.CompletedAt >= syncedSince && accountIds.Contains(j.AccountId))
+                .Select(j => j.AccountId)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var openHoles = await db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(h => h.To == null)
+            .ToDictionaryAsync(h => h.AccountId, ct);
+
+        var spendByAccount = rows
+            .GroupBy(r => r.AccountId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var account in accounts)
+        {
+            openHoles.TryGetValue(account.Id, out var openHole);
+            if (!spendByAccount.TryGetValue(account.Id, out var accountRows) && openHole is null)
+                continue;
+
+            try
+            {
+                var weekly = Weekly(account.Currency, accountRows ?? []);
+                var synced = recentlySynced.Contains(account.Id);
+
+                if (openHole is not null)
+                    await ReviewOpenHoleAsync(account, openHole, weekly, latestWeek, synced, ct);
+                else if (synced)
+                    await DetectAsync(account, weekly, latestWeek, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "CoverageSentinelJob: failed for account {AccountId}", account.Id);
+                db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    private async Task DetectAsync(
+        AccountRow account, Dictionary<DateOnly, decimal> weekly, DateOnly latestWeek, CancellationToken ct)
+    {
+        if (weekly.Count == 0)
+            return;
+
+        var finding = CoverageGapDetector.Detect(weekly, weekly.Keys.Min(), latestWeek);
+        if (finding is null)
+            return;
+
+        // Alert first: when it fails nothing is stored, so tomorrow's run finds the gap again instead of leaving a hole
+        // that never told anyone. The alert's own dedup absorbs the repeat when only the save fails.
+        await alerts.GenerateCoverageGapAlertAsync(
+            account.UserId, account.Id, account.DisplayName, finding.QuietWeeks, finding.BaselineWeeklySpendUsd, ct);
+
+        db.CoverageHoles.Add(new CoverageHole
+        {
+            UserId = account.UserId,
+            AccountId = account.Id,
+            From = finding.QuietFrom,
+            BaselineWeeklySpendUsd = finding.BaselineWeeklySpendUsd,
+        });
+        await db.SaveChangesAsync(ct);
+
+        logger.LogWarning(
+            "Coverage gap on account {AccountId}: daily spend quiet for {Weeks} weeks from {From} (usual ${Baseline:F0} a week).",
+            account.Id, finding.QuietWeeks, finding.QuietFrom, finding.BaselineWeeklySpendUsd);
+    }
+
+    private async Task ReviewOpenHoleAsync(
+        AccountRow account, CoverageHole hole, Dictionary<DateOnly, decimal> weekly, DateOnly latestWeek, bool synced,
+        CancellationToken ct)
+    {
+        // Spend that stays quiet keeps the hole open. So does a sync that is not succeeding: with no fresh read the
+        // account's week says nothing about whether the spend came back.
+        if (!synced || latestWeek < hole.From
+            || CoverageGapDetector.IsQuiet(CoverageGapDetector.Spend(weekly, latestWeek), hole.BaselineWeeklySpendUsd))
+            return;
+
+        hole.To = latestWeek.AddDays(-1);
+        await db.SaveChangesAsync(ct);
+        await alerts.ResolveCoverageGapAlertAsync(account.UserId, account.Id, ct);
+
+        logger.LogInformation("Coverage gap on account {AccountId} closed: daily spend flows again from {Week}.", account.Id, latestWeek);
+    }
+
+    /// <summary>Weekly spend in USD by week-start Monday; converted once here, where the account's currency is in scope.</summary>
+    private static Dictionary<DateOnly, decimal> Weekly(string currency, List<SpendRow> rows)
+        => rows
+            .GroupBy(r => CoverageGapDetector.WeekStart(DateOnly.FromDateTime(r.Date)))
+            .ToDictionary(g => g.Key, g => g.Sum(r => CurrencyConverter.ToUsd(Math.Abs(r.Amount), currency)));
+
+    private sealed record SpendRow(Guid AccountId, DateTime Date, decimal Amount);
+
+    private sealed record AccountRow(Guid Id, Guid UserId, string Currency, string BankName, string Last4)
+    {
+        public string DisplayName => $"{BankName} ···{Last4}";
+    }
+}

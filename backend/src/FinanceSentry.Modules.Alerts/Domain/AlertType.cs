@@ -25,6 +25,11 @@ public static class AlertType
     /// </summary>
     public const string AccountRetired = "AccountRetired";
     /// <summary>
+    /// An account's day-to-day spend has nearly stopped while its syncs succeed: the spend may be moving through an account
+    /// the app does not see (the coverage sentinel). Resolved when the spend flows again.
+    /// </summary>
+    public const string CoverageGap = "CoverageGap";
+    /// <summary>
     /// The operational-alert type. Failing jobs no longer raise it (the Grafana rule on
     /// <c>finance_job_consecutive_failures</c> replaced that, #935); the silent-detector alert still does, and
     /// rows already stored under it keep resolving to a known type.

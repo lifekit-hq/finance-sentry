@@ -303,6 +303,47 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     b.ToTable("counterparty_rules", "bank_sync");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.CoverageHole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BaselineWeeklySpendUsd")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("numeric(15,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("From")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("To")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_coverage_hole_open_account_unique")
+                        .HasFilter("\"To\" IS NULL");
+
+                    b.HasIndex("UserId", "From")
+                        .HasDatabaseName("idx_coverage_hole_user_from");
+
+                    b.ToTable("coverage_holes", "bank_sync");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.MccCategory", b =>
                 {
                     b.Property<int>("Mcc")

@@ -95,6 +95,10 @@ public static class BankSyncModule
                 "category-spike-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily());
+            mgr.AddOrUpdate<CoverageSentinelJob>(
+                "coverage-sentinel",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily());
             mgr.AddOrUpdate<FxSpreadDetectionJob>(
                 "fx-spread-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -256,6 +260,8 @@ public static class BankSyncModule
         services.AddScoped<PriceHikeDetectionJob>();
         services.AddScoped<DuplicateChargeDetectionJob>();
         services.AddScoped<CategorySpikeDetectionJob>();
+        services.AddScoped<CoverageSentinelJob>();
+        services.AddScoped<ICoverageHoleReader, CoverageHoleReader>();
         services.AddScoped<FxSpreadDetectionJob>();
         services.AddCompanionLinks();
         services.AddScoped<FamilyClearingStatementJob>();

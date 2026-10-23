@@ -13,6 +13,7 @@ public sealed class MaterialityPolicyTests
     [Theory]
     [InlineData("PolicyViolation", CompanionEventKind.RiskViolation)]
     [InlineData("SyncFailure", CompanionEventKind.SyncFailure)]
+    [InlineData("CoverageGap", CompanionEventKind.CoverageGap)]
     [InlineData("UnusualSpend", CompanionEventKind.UnusualSpend)]
     [InlineData("Opportunity", CompanionEventKind.Opportunity)]
     [InlineData("ThesisBroken", CompanionEventKind.ThesisBreak)]
