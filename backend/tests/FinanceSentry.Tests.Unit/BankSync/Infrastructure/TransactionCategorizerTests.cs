@@ -55,6 +55,22 @@ public class TransactionCategorizerTests
         Categorize("Amazon installment 3 of 12").Should().Be(CategoryKeys.GeneralMerchandise);
     }
 
+    // ── ATM cash lodgement (#1239) ───────────────────────────────────────────────
+
+    [Fact]
+    public void CashLodgement_Credit_BeatsTheProviderCategory()
+    {
+        Categorize("*ATMLDG CAPEL ST", providerCategory: CategoryKeys.TransferIn, transactionType: "credit", amount: 200m)
+            .Should().Be(CategoryKeys.Income);
+    }
+
+    [Fact]
+    public void CashLodgement_Debit_IsNotIncome()
+    {
+        Categorize("*ATMLDG CAPEL ST", transactionType: "debit")
+            .Should().NotBe(CategoryKeys.Income);
+    }
+
     // ── Rung 5: the MCC map is direction-aware for transfers ─────────────────────
 
     [Fact]

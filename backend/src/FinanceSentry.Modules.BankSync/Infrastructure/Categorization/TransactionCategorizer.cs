@@ -20,6 +20,9 @@ public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) :
     /// wire-transfer MCC 4829 and would otherwise vanish into <c>TRANSFER_OUT</c>; unlike a
     /// keyword the rule also reaches the mortgage, whose description is a bare masked card
     /// number (#553).</item>
+    /// <item><b>ATM cash lodgement</b> — an AIB <c>*ATMLDG</c> credit is income by the owner's
+    /// call (#1239); it sits above the provider category so a bank's generic wording cannot
+    /// reclassify it.</item>
     /// <item><b>provider category</b> — a bank's own semantic classification beats the
     /// directional-prefix heuristic below it: a TrueLayer "To Go Sushi" classified
     /// <c>Restaurants</c> is food, not a transfer.</item>
@@ -28,7 +31,7 @@ public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) :
     /// description is the only trustworthy signal that they are internal moves.</item>
     /// <item><b>MCC map</b> — the coarse catch-all for everything still unclaimed.</item>
     /// </list>
-    /// Rungs 3 and 5 read structured signals that no single provider supplies both of, so their
+    /// Rungs 4 and 6 read structured signals that no single provider supplies both of, so their
     /// relative order is a statement of intent rather than a live tie-break.
     /// <para>
     /// A rung that resolves to <see cref="CategoryKeys.Uncategorized"/> has not claimed the
@@ -46,6 +49,7 @@ public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) :
             ?? LoanRepaymentClassifier.Resolve(
                 signals.TransactionType, signals.MerchantName, signals.Description,
                 signals.Amount, signals.Mcc, activeInstallmentPlans)
+            ?? CashLodgementClassifier.Resolve(signals.Description, signals.TransactionType)
             ?? Claimed(_categoryResolver.ResolveCanonicalKey(signals.ProviderCategory))
             ?? TransferDescriptionClassifier.Resolve(signals.Description)
             ?? DirectionAware(Claimed(_categoryResolver.ResolveMcc(signals.Mcc)), signals.TransactionType);
