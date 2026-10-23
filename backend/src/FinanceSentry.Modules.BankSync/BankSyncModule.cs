@@ -11,6 +11,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FinanceSentry.Modules.BankSync.Infrastructure.FeatureFlags;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
+using FinanceSentry.Modules.BankSync.Infrastructure.Maintenance;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Modules.BankSync.Infrastructure.Performance;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -219,6 +220,8 @@ public static class BankSyncModule
         services.AddSingleton<TrueLayerFailureClassifier>();
         services.AddScoped<IBankConnectionHealth, BankConnectionHealth>();
         services.AddScoped<IScheduledSyncService, ScheduledSyncService>();
+        services.AddScoped<IProviderHistoryFetcher, ProviderHistoryFetcher>();
+        services.AddScoped<IRetiredPendingRepairService, RetiredPendingRepairService>();
         services.AddScoped<ITransactionSyncCoordinator, TransactionSyncCoordinator>();
         services.AddScoped<ITrueLayerTokenRefreshService, TrueLayerTokenRefreshService>();
         services.AddScoped<IAccountLifecycle, AccountLifecycle>();

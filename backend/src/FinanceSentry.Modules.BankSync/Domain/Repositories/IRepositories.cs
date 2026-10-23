@@ -153,6 +153,14 @@ public interface ITransactionRepository
     Task<IEnumerable<Transaction>> GetByAccountIdUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The account's pending rows the pending reconciler retired (soft-deleted while still pending, with no
+    /// archive reason — an account removal or retention purge stamps one). Tracked, so a settled copy of the
+    /// same hash can reactivate the row (#1229). Opts out of the Owner and soft-delete query filters, as the
+    /// scheduled sync has no person in scope.
+    /// </summary>
+    Task<IReadOnlyList<Transaction>> GetRetiredPendingByAccountIdUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get transactions by account ID with pagination.
     /// </summary>
     Task<IEnumerable<Transaction>> GetByAccountIdAsync(Guid accountId, int skip, int take, CancellationToken cancellationToken = default);

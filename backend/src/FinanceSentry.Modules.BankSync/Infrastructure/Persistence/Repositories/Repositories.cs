@@ -288,6 +288,13 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Transaction>> GetRetiredPendingByAccountIdUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        return await AllUsersIncludingArchived
+            .Where(t => t.AccountId == accountId && !t.IsActive && t.IsPending && t.ArchivedReason == null)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<Transaction>> GetByAccountIdAsync(Guid accountId, int skip, int take, CancellationToken cancellationToken = default)
     {
         return await _context.Transactions

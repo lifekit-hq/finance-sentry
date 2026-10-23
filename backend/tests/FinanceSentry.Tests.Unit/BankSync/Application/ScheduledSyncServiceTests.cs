@@ -130,6 +130,8 @@ public class ScheduledSyncServiceTests
             .ReturnsAsync("access-token");
         txRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([]);
+        txRepo.Setup(r => r.GetRetiredPendingByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync([]);
 
         var bankProvider = new Mock<IBankProvider>();
         providerFactory.Setup(f => f.Resolve(provider)).Returns(bankProvider.Object);
@@ -489,6 +491,104 @@ public class ScheduledSyncServiceTests
         pendingRow.IsPending.Should().BeFalse("the cleared hold must settle the stored row in place");
         pendingRow.PostedDate.Should().Be(txDate);
         h.TxRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── #1229: a settled copy must not be retired by, or dropped for, an older identical row ───
+
+    [Fact]
+    public async Task PerformFullSyncAsync_LastMonthsPostedRent_DoesNotRetireThisMonthsPendingRent()
+    {
+        // Month 1's rent is posted; month 2's identical rent appears pending, then settles the same day.
+        // The old reconciler matched on amount + text alone, so month 1's row retired month 2's pending row
+        // and its settled copy (same hash) was then dropped as a duplicate: the payment vanished.
+        var h = BuildSut();
+
+        var month1 = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var month2 = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        var posted1 = new Transaction(h.Account.Id, UserId, -900m, month1, "Rent", "rent_m1", isPending: false) { PostedDate = month1 };
+        var pending2 = new Transaction(h.Account.Id, UserId, -900m, month2, "Rent", "rent_m2", isPending: true);
+        h.TxRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync([posted1, pending2]);
+        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(["rent_m1", "rent_m2"]);
+
+        var settled = new TransactionCandidate(
+            h.Account.Id, UserId, -900m, month2, month2, "Rent", IsPending: false, "debit", null, null);
+        SetupProviderCandidates(h, [settled]);
+        h.Dedup.Setup(d => d.ComputeHash(h.Account.Id, -900m, It.IsAny<DateTime>(), "Rent")).Returns("rent_m2");
+        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
+             .Returns([]);
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeTrue();
+        pending2.IsActive.Should().BeTrue("last month's rent is not this month's settlement");
+        pending2.IsPending.Should().BeFalse("the same-hash settled copy settles the row in place");
+        pending2.PostedDate.Should().Be(month2);
+        posted1.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_SettledCandidateOfARetiredPendingRow_ReactivatesAndSettlesIt()
+    {
+        // A row the old reconciler already retired: its settled copy hashes like it and used to be dropped
+        // with the soft-deleted hashes. It now brings the row back, settled, instead of losing it.
+        var h = BuildSut();
+
+        var txDate = DateTime.UtcNow.AddDays(-1).Date;
+        var retired = new Transaction(h.Account.Id, UserId, -50m, txDate, "Coffee", "coffee_hash", isPending: true)
+        {
+            IsActive = false,
+            DeletedAt = DateTime.UtcNow.AddHours(-3),
+        };
+        h.TxRepo.Setup(r => r.GetRetiredPendingByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync([retired]);
+        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(["coffee_hash"]);
+
+        var settled = new TransactionCandidate(
+            h.Account.Id, UserId, -50m, txDate, txDate, "Coffee", IsPending: false, "debit", null, null);
+        SetupProviderCandidates(h, [settled]);
+        h.Dedup.Setup(d => d.ComputeHash(h.Account.Id, -50m, It.IsAny<DateTime>(), "Coffee")).Returns("coffee_hash");
+        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
+             .Returns([]);
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeTrue();
+        retired.IsActive.Should().BeTrue();
+        retired.DeletedAt.Should().BeNull();
+        retired.IsPending.Should().BeFalse();
+        retired.PostedDate.Should().Be(txDate);
+        h.TxRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_PendingCandidateOfARetiredRow_LeavesItRetired()
+    {
+        // Only a booked copy brings a retired row back; a still-pending report of it does not.
+        var h = BuildSut();
+
+        var txDate = DateTime.UtcNow.AddDays(-1).Date;
+        var retired = new Transaction(h.Account.Id, UserId, -50m, txDate, "Coffee", "coffee_hash", isPending: true)
+        {
+            IsActive = false,
+            DeletedAt = DateTime.UtcNow.AddHours(-3),
+        };
+        h.TxRepo.Setup(r => r.GetRetiredPendingByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync([retired]);
+
+        var pending = new TransactionCandidate(
+            h.Account.Id, UserId, -50m, txDate, null, "Coffee", IsPending: true, "debit", null, null);
+        SetupProviderCandidates(h, [pending]);
+        h.Dedup.Setup(d => d.ComputeHash(h.Account.Id, -50m, It.IsAny<DateTime>(), "Coffee")).Returns("coffee_hash");
+        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
+             .Returns([]);
+
+        await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        retired.IsActive.Should().BeFalse();
+        retired.IsPending.Should().BeTrue();
     }
 
     // ── Failure handling, policy-driven: the provider is in ConnectionHealth:ActiveProviders (Option B, S2) ──
