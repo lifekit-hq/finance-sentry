@@ -53,11 +53,14 @@ public static class RecategorizationCommand
     {
         var from = ArgValue(args, "--from");
         var to = ArgValue(args, "--to");
+        var dryRun = args.Contains("--dry-run");
         if (from is null && to is null)
-            return null;
+            return dryRun
+                ? throw new ArgumentException("--dry-run requires --from and --to.")
+                : null;
         if (from is null || to is null)
             throw new ArgumentException("--from and --to must be given together.");
-        return new RecategorizationScope(from, to, args.Contains("--dry-run"));
+        return new RecategorizationScope(from, to, dryRun);
     }
 
     private static string? ArgValue(string[] args, string flag)
