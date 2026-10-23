@@ -112,9 +112,9 @@ async function expectShellNeverScrolls(page: Page): Promise<string[]> {
   return result.scrollers;
 }
 
-// Phone: the page flows in main, so main is the one and only scroller.
-async function expectOnlyMainScrolls(page: Page): Promise<void> {
-  expect(await expectShellNeverScrolls(page)).toEqual(['main']);
+// Phone: the list region inside main is the one and only scroller; main itself stays put.
+async function expectOnlyListScrolls(page: Page): Promise<void> {
+  expect(await expectShellNeverScrolls(page)).toEqual(['in-main']);
 }
 
 // @lifekit-hq/ui 3.7.0 tab bar: edge-to-edge, flush with the bottom of the viewport, 49pt tall
@@ -167,12 +167,12 @@ for (const scheme of ['light', 'dark'] as const) {
   test.describe(`phone overlay shell (${scheme})`, () => {
     test.use({viewport: PHONE, colorScheme: scheme, hasTouch: true, isMobile: true});
 
-    test('tab bar is fully visible and content scrolls under both bars', async ({page}) => {
+    test('tab bar is fully visible and the list scrolls between the bars', async ({page}) => {
       await openAlerts(page, {top: INSET_TOP, bottom: INSET_BOTTOM});
 
       const tabBar = page.locator('cmn-bottom-tab-bar');
       const topBar = page.locator('cmn-top-bar');
-      await expectOnlyMainScrolls(page);
+      await expectOnlyListScrolls(page);
       await expectTabBarFullyVisible(page);
 
       const tabBox = await box(tabBar);
@@ -188,25 +188,25 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(firstAtRest.y).toBeGreaterThanOrEqual(topBox.y + topBox.height);
       await page.screenshot({path: `test-results/phone-overlay-${scheme}.png`});
 
-      await page.locator('cmn-app-layout main').evaluate(el => {
+      const list = page.locator('fns-alerts cmn-page-scroll');
+      const listBox = await box(list);
+      expect(listBox.y).toBeGreaterThanOrEqual(topBox.y + topBox.height);
+      expect(listBox.y + listBox.height).toBeLessThanOrEqual(tabBox.y);
+
+      const scrolledBy = await list.evaluate(el => {
         el.scrollTop = el.scrollHeight / 2;
+        return el.scrollTop;
       });
-      const rects = await rows.evaluateAll(els =>
-        els.map(el => {
-          const r = el.getBoundingClientRect();
-          return {top: r.top, bottom: r.bottom};
-        })
-      );
-      const underTopBar = rects.some(r => r.top < topBox.y + topBox.height && r.bottom > topBox.y);
-      const underTabBar = rects.some(r => r.top < tabBox.y + tabBox.height && r.bottom > tabBox.y);
-      expect(underTopBar).toBe(true);
-      expect(underTabBar).toBe(true);
-      await expectOnlyMainScrolls(page);
+      expect(scrolledBy).toBeGreaterThan(0);
+      expect((await box(rows.first())).y).toBeCloseTo(firstAtRest.y - scrolledBy, 0);
+      expect(await box(topBar)).toEqual(topBox);
+      expect(await box(tabBar)).toEqual(tabBox);
+      await expectOnlyListScrolls(page);
 
       await page.screenshot({path: `test-results/phone-overlay-${scheme}-scrolled.png`});
 
       // At the end of the list the last row has scrolled fully clear of the tab bar.
-      await page.locator('cmn-app-layout main').evaluate(el => {
+      await list.evaluate(el => {
         el.scrollTop = el.scrollHeight;
       });
       const last = await box(rows.last());
@@ -219,7 +219,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await openAlerts(page, {top: 0, bottom: INSET_BOTTOM});
       await page.addStyleTag({content: VIEWPORT_UNITS_TALLER_BY_INSET});
 
-      await expectOnlyMainScrolls(page);
+      await expectOnlyListScrolls(page);
       await expectTabBarFullyVisible(page);
     });
   });
