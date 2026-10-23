@@ -48,13 +48,16 @@ public sealed class CoverageSentinelJob(
             .ToListAsync(ct);
         var accountIds = accounts.Select(a => a.Id).ToList();
 
+        // A materialised array: EF Core translates Contains over it, not over the IReadOnlySet the detector publishes.
+        var dailyCategories = CoverageGapDetector.DailyCategories.ToArray();
+
         var rows = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(t => t.IsActive
                      && !t.IsPending
                      && t.TransactionType == "debit"
                      && t.MerchantCategory != null
-                     && CoverageGapDetector.DailyCategories.Contains(t.MerchantCategory)
+                     && dailyCategories.Contains(t.MerchantCategory)
                      && t.TransactionDate >= readFrom
                      && accountIds.Contains(t.AccountId))
             .Select(t => new SpendRow(t.AccountId, t.TransactionDate, t.Amount))
