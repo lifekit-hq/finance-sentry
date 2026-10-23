@@ -1,5 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {mockAccounts} from './support/accounts-mocks';
+import {BROKERAGE_HOLDINGS} from './support/dossier-mocks';
 import {PENDING_AAPL} from './support/recommendation-mocks';
 
 const API = '**/api/v1';
@@ -21,6 +23,55 @@ const AUTH_RESPONSE = {
 };
 
 const json = (body: unknown) => ({contentType: 'application/json', body: JSON.stringify(body)});
+
+const holding = (i: number, category: 'banking' | 'brokerage', provider: string) => ({
+  accountId: `${provider}-${i}`,
+  bankName: provider,
+  accountType: category === 'banking' ? 'Current' : 'Stock',
+  accountNumberLast4: `${provider}${i}`.slice(-4),
+  currency: 'USD',
+  provider,
+  category,
+  currentBalance: 100,
+  balanceInBaseCurrency: 100,
+  syncStatus: 'synced',
+  lastSyncTimestamp: TIMESTAMP,
+});
+
+// One bank with `count` accounts and one broker with `count` positions; no categories when empty.
+function wealthSummary(count: number): unknown {
+  const section = (category: 'banking' | 'brokerage', provider: string, name: string) => ({
+    category,
+    totalInBaseCurrency: count * 100,
+    institutionCount: 1,
+    institutions: [
+      {
+        institutionId: `${provider}-1`,
+        provider,
+        name,
+        category,
+        totalInBaseCurrency: count * 100,
+        syncStatus: 'synced',
+        lastSyncTimestamp: TIMESTAMP,
+        lastSuccessfulSyncTimestamp: TIMESTAMP,
+        accounts: Array.from({length: count}, (_, i) => holding(i, category, provider)),
+        cards: null,
+      },
+    ],
+  });
+  return {
+    totalNetWorth: count * 200,
+    baseCurrency: 'USD',
+    appliedFilters: {category: null, provider: null},
+    categories:
+      count === 0
+        ? []
+        : [
+            section('banking', 'truelayer', 'Monzo'),
+            section('brokerage', 'ibkr', 'Interactive Brokers'),
+          ],
+  };
+}
 
 async function mockApis(page: Page, count: number): Promise<void> {
   const rows = (make: (i: number) => unknown) => Array.from({length: count}, (_, i) => make(i));
@@ -224,6 +275,24 @@ async function mockApis(page: Page, count: number): Promise<void> {
       })
     )
   );
+  await mockAccounts(page);
+  await page.route(`${API}/wealth/summary`, route => route.fulfill(json(wealthSummary(count))));
+  await page.route(`${API}/brokerage/holdings`, route =>
+    route.fulfill(
+      json({
+        ...BROKERAGE_HOLDINGS,
+        positions: rows(i => ({
+          symbol: `SYM${i}`,
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 100,
+          costBasisUsd: 90,
+          averageCostUsd: 90,
+        })),
+        totalUsdValue: count * 100,
+      })
+    )
+  );
 }
 
 // Every element that scrolls vertically right now, `main` and the document included.
@@ -254,6 +323,8 @@ const PAGES = [
   {path: '/subscriptions'},
   {path: '/budgets'},
   {path: '/ledger/decisions'},
+  {path: '/accounts'},
+  {path: '/investments?provider=ibkr'},
   {path: '/settings/people', tallWhenEmpty: true},
   {path: '/watchlist', tallWhenEmpty: true},
   {path: '/dashboard/breakdown?month=2026-10', tallWhenEmpty: true},
