@@ -1033,11 +1033,11 @@ are closed periods.
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
   `CreatedAt` is re-stamped).
 - **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Accounts brokerage section's
-  "Contributed vs growth"; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
+  "Performance" card; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
   the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
   `from`, which is `seriesStart` unless a provider linked on that first close moves it to the next close (§10);
-  the card names `from`, and says the history starts that day only when `from` equals `seriesStart`.
+  the card's title names `from`.
   - **Flows.** `IBrokerageFlowReader` reads the cash rows the brokers report (`BrokerageCashTransactions`)
     and classifies them per provider by type, never by sign alone (`BrokerageFlowClassifier`): deposits and
     withdrawals are external flows; dividends, interest, bonuses, fees and taxes are return (income, fee,
@@ -1065,8 +1065,8 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Accounts crypto section's "Crypto: contributed vs
-  growth" card, the same component as the brokerage one; finance-framework M2
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Accounts crypto section's "Crypto performance"
+  card, the same component as the brokerage one; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).
@@ -1376,11 +1376,11 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the Accounts brokerage section reads for its "growth of 10,000" card (finance-framework P2): the longest period
-  with both TWRs and the window measured, 10,000 put in on `bookTwrFrom` read as 10,000 × (1 + `bookTwr`) and
-  10,000 × (1 + `spyTwr`) on `bookTwrTo`, in USD (the TWR is computed on USD values; the card does not convert
-  to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons` imply
-  (`HeadlineQualityMapper`), so the card's badge reads the same reasons the brief's "(est.)" does.
+  which the Accounts brokerage Performance card reads for its one "Book vs SPY" line (finance-framework P2): the
+  longest period with both TWRs and the window measured, shown from `bookTwrFrom` as the two signed percentages
+  `bookTwr` vs `spyTwr` (the TWR is computed on USD values; the line shows no money amount, so nothing is
+  converted to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons`
+  imply (`HeadlineQualityMapper`), so the line's badge reads the same reasons the brief's "(est.)" does.
 
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the

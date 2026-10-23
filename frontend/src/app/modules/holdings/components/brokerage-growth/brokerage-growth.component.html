@@ -1,13 +1,10 @@
 @if (store.status() !== 'success' || store.hasHistory()) {
-  <section
-    [attr.data-testid]="store.sleeve + '-growth'"
-    class="mt-cmn-6 border-t border-border-default pt-cmn-5"
-  >
+  <cmn-card [attr.data-testid]="store.sleeve + '-growth'">
     <cmn-async-state
       [status]="store.status()"
       [errorMessage]="store.errorMessage()"
       (retry)="store.load()"
-      emptySubMessage="Growth shows once these holdings have value history."
+      emptySubMessage="Performance shows once these holdings have value history."
       retryable
     >
       <div skeleton class="space-y-cmn-2">
@@ -20,6 +17,11 @@
         <div class="flex items-baseline justify-between gap-cmn-2">
           <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
             {{ store.copy.title }}
+            <span
+              [attr.data-testid]="store.sleeve + '-growth-since'"
+              class="font-normal text-text-secondary"
+              >· since {{ growth.from ?? growth.seriesStart | date: 'd MMM y' }}</span
+            >
           </h2>
           <fns-headline-badge
             [headline]="growth.headline"
@@ -27,92 +29,36 @@
             [attr.data-testid]="store.sleeve + '-growth-quality'"
           />
         </div>
-        <p
-          [attr.data-testid]="store.sleeve + '-growth-since'"
-          class="mt-cmn-1 text-cmn-xs text-text-secondary"
-        >
-          {{ store.copy.scope }} since
-          {{ growth.from ?? growth.seriesStart | date: 'd MMM y' }}
-          @if (!growth.from || growth.from === growth.seriesStart) {
-            - the day value history starts
-          }
-          .
-        </p>
 
         @switch (store.view()) {
           @case ('split') {
-            <div [attr.data-testid]="store.sleeve + '-growth-split'" class="mt-cmn-4 space-y-cmn-2">
-              <div class="flex items-center justify-between text-cmn-sm">
-                <span class="text-text-secondary">Value then</span>
-                <span class="tabular-nums text-text-primary">
-                  {{ growth.startValue | money: growth.currency }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between text-cmn-sm">
-                <span class="text-text-secondary">Contributed</span>
-                <span
-                  [attr.data-testid]="store.sleeve + '-growth-contributed'"
-                  class="tabular-nums text-text-primary"
-                >
-                  {{ growth.contributed | money: growth.currency : {signed: true} }}
-                </span>
-              </div>
-              @if (store.showsNewlyLinked()) {
-                <div class="flex items-center justify-between text-cmn-sm">
-                  <span class="text-text-secondary">Newly linked accounts</span>
-                  <span
-                    [attr.data-testid]="store.sleeve + '-growth-newly-linked'"
-                    class="tabular-nums text-text-primary"
-                  >
-                    {{ growth.newlyLinked | money: growth.currency : {signed: true} }}
-                  </span>
-                </div>
-              }
-              <div class="flex items-center justify-between text-cmn-sm">
-                <span class="text-text-secondary">Growth</span>
-                <span
-                  [attr.data-testid]="store.sleeve + '-growth-growth'"
-                  class="tabular-nums font-semibold text-text-primary"
-                >
-                  {{ growth.growth | money: growth.currency : {signed: true} }}
-                  @if (store.returnLabel(); as returnLabel) {
-                    <span class="ml-cmn-1 font-normal text-text-secondary"
-                      >({{ returnLabel }})</span
-                    >
-                  }
-                </span>
-              </div>
-              <div
-                class="flex items-center justify-between border-t border-border-default pt-cmn-2 text-cmn-sm"
-              >
-                <span class="text-text-secondary">Value now</span>
-                <span class="tabular-nums text-text-primary">
-                  {{ growth.endValue | money: growth.currency }}
-                </span>
-              </div>
-              <p class="text-cmn-xs text-text-secondary">
-                {{ store.copy.includes }} The percentage is money-weighted: it counts each deposit
-                only from the day it arrived.
-              </p>
-              @if (store.timingGap(); as gap) {
-                <p
-                  [attr.data-testid]="store.sleeve + '-growth-timing-gap'"
-                  class="text-cmn-xs text-text-secondary"
-                >
-                  Your investments returned
-                  <span class="tabular-nums text-text-primary">{{ gap.investments }}</span>
-                  (time-weighted); your money earned
-                  <span class="tabular-nums text-text-primary">{{ gap.money }}</span>
-                  (money-weighted). The difference, {{ gap.points }} points, is the timing of your
-                  deposits and withdrawals.
-                </p>
-              }
+            <div
+              [attr.data-testid]="store.sleeve + '-growth-split'"
+              class="mt-cmn-3 grid grid-cols-1 gap-cmn-2 sm:grid-cols-3"
+            >
+              <cmn-stat-card
+                [attr.data-testid]="store.sleeve + '-growth-contributed'"
+                [value]="growth.contributed | money: growth.currency : {signed: true}"
+                label="Contributed"
+              />
+              <cmn-stat-card
+                [attr.data-testid]="store.sleeve + '-growth-growth'"
+                [value]="growth.growth | money: growth.currency : {signed: true}"
+                [delta]="store.returnPercent()"
+                [deltaLabel]="store.returnLabel() ?? ''"
+                label="Growth"
+              />
+              <cmn-stat-card
+                [attr.data-testid]="store.sleeve + '-growth-value-now'"
+                [value]="growth.endValue | money: growth.currency"
+                label="Value now"
+              />
             </div>
           }
           @case ('no-flows') {
             <div
               [attr.data-testid]="store.sleeve + '-growth-no-flows'"
-              class="mt-cmn-4 space-y-cmn-1 text-cmn-sm text-text-secondary"
+              class="mt-cmn-3 space-y-cmn-1 text-cmn-sm text-text-secondary"
             >
               <p class="text-text-primary">
                 No contributions recorded yet for {{ store.missingProviderLabels() }}.
@@ -130,13 +76,67 @@
           @default {
             <p
               [attr.data-testid]="store.sleeve + '-growth-short-history'"
-              class="mt-cmn-4 text-cmn-sm text-text-secondary"
+              class="mt-cmn-3 text-cmn-sm text-text-secondary"
             >
               Growth shows once there are two days of value history.
             </p>
           }
         }
+
+        @if (store.sleeve === 'brokerage') {
+          <fns-book-vs-spy class="mt-cmn-3 block" />
+        }
+
+        @if (store.view() === 'split') {
+          <details class="mt-cmn-3 text-cmn-xs text-text-secondary">
+            <summary
+              class="inline-block cursor-pointer font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+              data-testid="growth-how-computed"
+            >
+              How this is computed
+            </summary>
+            <div class="mt-cmn-2 space-y-cmn-2">
+              <div class="flex items-center justify-between text-cmn-sm">
+                <span>Value then</span>
+                <span class="tabular-nums text-text-primary">
+                  {{ growth.startValue | money: growth.currency }}
+                </span>
+              </div>
+              @if (store.showsNewlyLinked()) {
+                <div class="flex items-center justify-between text-cmn-sm">
+                  <span>Newly linked accounts</span>
+                  <span
+                    [attr.data-testid]="store.sleeve + '-growth-newly-linked'"
+                    class="tabular-nums text-text-primary"
+                  >
+                    {{ growth.newlyLinked | money: growth.currency : {signed: true} }}
+                  </span>
+                </div>
+              }
+              <p>
+                {{ store.copy.scope }}. {{ store.copy.includes }} The percentage is money-weighted:
+                it counts each deposit only from the day it arrived.
+              </p>
+              @if (store.timingGap(); as gap) {
+                <p [attr.data-testid]="store.sleeve + '-growth-timing-gap'">
+                  Your investments returned
+                  <span class="tabular-nums text-text-primary">{{ gap.investments }}</span>
+                  (time-weighted); your money earned
+                  <span class="tabular-nums text-text-primary">{{ gap.money }}</span>
+                  (money-weighted). The difference, {{ gap.points }} points, is the timing of your
+                  deposits and withdrawals.
+                </p>
+              }
+              @if (store.sleeve === 'brokerage') {
+                <p>
+                  Book vs SPY is time-weighted, so your own deposits and withdrawals move neither.
+                  SPY reads its adjusted close, dividends reinvested.
+                </p>
+              }
+            </div>
+          </details>
+        }
       }
     </cmn-async-state>
-  </section>
+  </cmn-card>
 }

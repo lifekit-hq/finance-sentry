@@ -1,9 +1,7 @@
-/** The sum the growth chart puts in on day one. */
-export const GROWTH_OF_TEN_THOUSAND_AMOUNT = 10_000;
-
-// shortcut: the sum is in USD because the returns are measured in USD (C4); show it in the base currency
-// once the book TWR is measured in it.
-export const GROWTH_OF_TEN_THOUSAND_CURRENCY = 'USD';
+/**
+ * The brokerage book's return is measured in USD (C4).
+ */
+export const BOOK_TWR_CURRENCY = 'USD';
 
 /** The book TWR runs on the cash-inclusive brokerage sleeve (C3). */
 export const BOOK_TWR_SCOPE = 'sleeve:brokerage';

@@ -17,13 +17,13 @@ export const DEFAULT_GROWTH_SLEEVE: GrowthSleeve = 'brokerage';
 
 export const GROWTH_SLEEVE_COPY: Readonly<Record<GrowthSleeve, GrowthSleeveCopy>> = {
   brokerage: {
-    title: 'Contributed vs growth',
-    scope: 'Interactive Brokers and Inzhur, cash included,',
+    title: 'Performance',
+    scope: 'Interactive Brokers and Inzhur, cash included',
     includes: 'Growth includes dividends and interest.',
     badgeLabel: 'Brokerage growth',
   },
   crypto: {
-    title: 'Crypto: contributed vs growth',
+    title: 'Crypto performance',
     scope: 'Binance and Revolut X',
     includes: 'Growth includes rewards and is after fees.',
     badgeLabel: 'Crypto growth',

@@ -1,0 +1,29 @@
+<cmn-async-state
+  [status]="store.status()"
+  [errorMessage]="store.errorMessage()"
+  [keepContent]="false"
+  (retry)="store.load()"
+  emptySubMessage="The book against SPY shows once a window was measured for both."
+  retryable
+>
+  <cmn-skeleton skeleton height="1rem" width="70%" />
+
+  @if (store.comparison(); as comparison) {
+    <div
+      class="flex items-baseline justify-between gap-cmn-3 text-cmn-sm"
+      data-testid="book-vs-spy"
+    >
+      <span class="text-text-secondary">
+        Book vs SPY · since {{ comparison.from | date: 'd MMM y' }}
+      </span>
+      <span class="flex items-baseline gap-cmn-2">
+        @if (comparison.headline; as headline) {
+          <fns-headline-badge [headline]="headline" label="Book return" />
+        }
+        <span class="tabular-nums font-medium text-text-primary" data-testid="book-vs-spy-returns">
+          {{ comparison.bookReturn }} vs {{ comparison.benchmarkReturn }}
+        </span>
+      </span>
+    </div>
+  }
+</cmn-async-state>
