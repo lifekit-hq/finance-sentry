@@ -243,6 +243,31 @@ public class CoverageSentinelJobTests
         _alerts.Verify(a => a.ResolveCoverageGapAlertAsync(userId, account.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_hole_closes_and_its_alert_resolves_once_the_account_or_its_person_is_closed(bool closeThePerson)
+    {
+        var userId = Guid.NewGuid();
+        var account = AddAccount(userId);
+        Spend(account, Start, new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc), 25m);
+        await _db.SaveChangesAsync();
+        await Job().ExecuteAsync();
+        Assert.Null((await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync()).To);
+
+        if (!closeThePerson)
+        {
+            account.Retire(Today, "closed by the bank");
+            await _db.SaveChangesAsync();
+        }
+
+        await (closeThePerson ? Job(userId) : Job()).ExecuteAsync();
+
+        // Today's latest complete week is 09-14..09-20: the hole ends with it.
+        Assert.Equal(new DateOnly(2026, 9, 20), (await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync()).To);
+        _alerts.Verify(a => a.ResolveCoverageGapAlertAsync(userId, account.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task A_still_quiet_account_keeps_its_hole_open()
     {

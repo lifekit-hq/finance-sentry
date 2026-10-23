@@ -99,6 +99,33 @@ public sealed class CoverageSentinelJob(
                 db.ChangeTracker.Clear();
             }
         }
+
+        var watched = accountIds.ToHashSet();
+        foreach (var hole in openHoles.Values.Where(h => !watched.Contains(h.AccountId)))
+        {
+            try
+            {
+                await CloseUnwatchedHoleAsync(hole, latestWeek, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "CoverageSentinelJob: failed to close the hole of unwatched account {AccountId}", hole.AccountId);
+                db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    /// <summary>
+    /// An account that is closed, or whose person is, is no longer watched, so its open hole would never close: it ends
+    /// with the latest complete week and its alert resolves.
+    /// </summary>
+    private async Task CloseUnwatchedHoleAsync(CoverageHole hole, DateOnly latestWeek, CancellationToken ct)
+    {
+        await alerts.ResolveCoverageGapAlertAsync(hole.UserId, hole.AccountId, ct);
+        hole.To = latestWeek.AddDays(6);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Coverage gap on account {AccountId} closed: the account is no longer watched.", hole.AccountId);
     }
 
     private async Task DetectAsync(
