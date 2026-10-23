@@ -84,8 +84,7 @@ function openSheet(root: HTMLElement, close: () => void): AlertFilterSheetCompon
     {data: {template: TemplateRef<FilterBarSheetContext>}},
   ];
   const view = config.data.template.createEmbeddedView({
-    $implicit: drawerOpen.mock.results.at(-1)
-      ?.value as unknown as FilterBarSheetContext['$implicit'],
+    $implicit: drawerOpen.mock.results.at(-1)?.value,
     close,
   });
   TestBed.inject(ApplicationRef).attachView(view);
@@ -306,7 +305,7 @@ describe('AlertsComponent async states', () => {
   });
 
   it('groups the rows under a labelled day section', () => {
-    const older = {...ALERT, id: 'a0', createdAt: '2026-09-20T10:00:00Z'} as unknown as Alert;
+    const older = {...ALERT, id: 'a0', createdAt: '2026-09-20T10:00:00Z'};
     const {el} = render('all', 1, [ALERT, older]);
     const sections = Array.from(el.querySelectorAll('cmn-list-section section'));
 
@@ -319,7 +318,7 @@ describe('AlertsComponent async states', () => {
   });
 
   it('mutes a resolved alert by recolour, fading only its icon, never the whole row', () => {
-    const resolved = {...ALERT, id: 'a2', isResolved: true} as unknown as Alert;
+    const resolved = {...ALERT, id: 'a2', isResolved: true};
     const {el} = render('all', 2, [ALERT, resolved]);
     const [open, done] = Array.from(el.querySelectorAll('[data-testid="alert-row"]'));
 

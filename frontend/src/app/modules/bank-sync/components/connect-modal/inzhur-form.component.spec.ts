@@ -33,7 +33,7 @@ function buildConnectStore() {
 function setup(inzhur = buildInzhurStore(), store = buildConnectStore()) {
   const strategy: ConnectStrategy = {
     slug: 'inzhur',
-    formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+    formComponent: class {},
     submit: vi.fn(),
   };
   TestBed.configureTestingModule({

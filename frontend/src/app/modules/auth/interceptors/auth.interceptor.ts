@@ -13,10 +13,7 @@ import {AuthRefreshService} from '../services/auth-refresh.service';
 import {AuthStore} from '../store/auth.store';
 
 function isUnauthorizedError(err: unknown): boolean {
-  return (
-    err instanceof HttpErrorResponse &&
-    (err.status as HttpStatusCode) === HttpStatusCode.Unauthorized
-  );
+  return err instanceof HttpErrorResponse && err.status === Number(HttpStatusCode.Unauthorized);
 }
 
 export const authInterceptor: HttpInterceptorFn = (

@@ -144,7 +144,7 @@ describe('DashboardStore loaded range', () => {
 
   it('refuses a snapshot whose history was not loaded for the range', async () => {
     service.getDashboardData.mockReturnValueOnce(of(data) as never);
-    service.getNetWorthHistory.mockReturnValueOnce(NEVER as never);
+    service.getNetWorthHistory.mockReturnValueOnce(NEVER);
     const {harness} = await open('/dashboard?range=1y');
     await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
 

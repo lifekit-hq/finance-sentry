@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {type PartialMatchRouteSnapshot, type Route, Router, type UrlSegment} from '@angular/router';
+import {type PartialMatchRouteSnapshot, Router, type UrlSegment} from '@angular/router';
 import {beforeEach, describe, expect, it} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
@@ -13,11 +13,7 @@ describe('permissionGuard', () => {
 
   function run() {
     return TestBed.runInInjectionContext(() =>
-      permissionGuard(Permission.AiUse)(
-        {} as Route,
-        [] as UrlSegment[],
-        {} as PartialMatchRouteSnapshot
-      )
+      permissionGuard(Permission.AiUse)({}, [] as UrlSegment[], {} as PartialMatchRouteSnapshot)
     );
   }
 

@@ -11,7 +11,7 @@ import {type AccountsState, initialAccountsState} from './accounts.state';
 
 function setup() {
   const state = signalState<AccountsState>(initialAccountsState);
-  return {state, methods: accountsMethods(state as never)};
+  return {state, methods: accountsMethods(state)};
 }
 
 describe('accountsMethods institution open state', () => {

@@ -224,7 +224,7 @@ describe('TransactionLedgerStore async status', () => {
   it('shows the default message on a failed load and never reads as empty', async () => {
     const {store} = await open('/transactions');
     service.getAllTransactions.mockReturnValueOnce(
-      throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'UNKNOWN'}})) as never
+      throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'UNKNOWN'}}))
     );
     store.load();
 
@@ -238,7 +238,7 @@ describe('TransactionLedgerStore async status', () => {
     service.getAllTransactions.mockReturnValueOnce(of(page) as never);
     store.load();
     service.getAllTransactions.mockReturnValueOnce(
-      throwError(() => new HttpErrorResponse({status: 500})) as never
+      throwError(() => new HttpErrorResponse({status: 500}))
     );
     store.loadMore();
 
@@ -246,7 +246,7 @@ describe('TransactionLedgerStore async status', () => {
     expect(store.hasAppendError()).toBe(true);
     expect(store.transactions()).toHaveLength(1);
 
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
     store.loadMore();
 
     expect(store.isAppendLoading()).toBe(true);
@@ -258,7 +258,7 @@ describe('TransactionLedgerStore async status', () => {
     const {store} = await open('/transactions');
     service.getAllTransactions.mockReturnValueOnce(of(page) as never);
     store.load();
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
     store.retry();
 
     expect(store.status()).toBe('loading');
@@ -309,7 +309,7 @@ describe('TransactionLedgerStore revisit', () => {
 
   it('repaints rows loaded for the same filter and revalidates them', async () => {
     const harness = await visitAndLeave('/transactions?account=acc-1');
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
 
     const store = await revisit(harness, '/transactions?account=acc-1');
 
@@ -322,7 +322,7 @@ describe('TransactionLedgerStore revisit', () => {
   it('keeps the restored rows when their revalidation fails', async () => {
     const harness = await visitAndLeave('/transactions?account=acc-1');
     service.getAllTransactions.mockReturnValueOnce(
-      throwError(() => new HttpErrorResponse({status: 500})) as never
+      throwError(() => new HttpErrorResponse({status: 500}))
     );
 
     const store = await revisit(harness, '/transactions?account=acc-1');
@@ -333,7 +333,7 @@ describe('TransactionLedgerStore revisit', () => {
 
   it('does not restore rows loaded for another filter', async () => {
     const harness = await visitAndLeave('/transactions?account=acc-1');
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
 
     const store = await revisit(harness, '/transactions?account=acc-2');
 
@@ -344,7 +344,7 @@ describe('TransactionLedgerStore revisit', () => {
 
   it('refuses rows cached for the empty filter when the URL asks for an account', async () => {
     const harness = await visitAndLeave('/transactions');
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
 
     const store = await revisit(harness, '/transactions?account=acc-1');
 
@@ -357,7 +357,7 @@ describe('TransactionLedgerStore revisit', () => {
     const harness = await visitAndLeave('/transactions', store =>
       patchState(unprotected(store), {accountId: 'acc-2'})
     );
-    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    service.getAllTransactions.mockReturnValueOnce(NEVER);
 
     const store = await revisit(harness, '/transactions');
 

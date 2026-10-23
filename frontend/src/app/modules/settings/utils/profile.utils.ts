@@ -26,6 +26,6 @@ export class ProfileUtils {
     change: Partial<UpdateProfileRequest>
   ): Partial<UserProfile> {
     const keys = Object.keys(change) as (keyof UpdateProfileRequest)[];
-    return Object.fromEntries(keys.map(key => [key, profile[key]])) as Partial<UserProfile>;
+    return Object.fromEntries(keys.map(key => [key, profile[key]]));
   }
 }

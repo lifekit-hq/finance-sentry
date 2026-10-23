@@ -51,7 +51,7 @@ function monobankStrategy(
 ): ConnectStrategy {
   return {
     slug: 'monobank',
-    formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+    formComponent: class {},
     submit: vi.fn().mockImplementation(submitImpl),
   };
 }
@@ -87,7 +87,7 @@ describe('connectEffects.connect', () => {
     const bankSync = buildBankSync();
     const strategy: ConnectStrategy = {
       slug: 'binance',
-      formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+      formComponent: class {},
       submit: vi
         .fn()
         .mockReturnValue(of({successCode: 'POLLING', count: 1, institutionType: 'crypto'})),

@@ -40,7 +40,7 @@ function buildAccountsStore() {
 function buildStrategy(): ConnectStrategy {
   return {
     slug: 'ibkr',
-    formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+    formComponent: class {},
     submit: vi.fn(),
   };
 }
