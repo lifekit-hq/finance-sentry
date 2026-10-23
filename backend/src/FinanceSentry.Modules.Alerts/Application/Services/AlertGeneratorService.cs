@@ -191,7 +191,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
                 AlertType.CoverageGap, AlertSeverity.Warning, accountId, accountName,
                 $"Daily spend on {accountName} has nearly stopped",
                 string.Create(CultureInfo.InvariantCulture,
-                    $"Daily spend on {accountName} has nearly stopped: for {quietWeeks} weeks it has been under a fifth of the usual ${baselineWeeklySpendUsd:F0} a week, while its syncs keep succeeding. Are you paying from an account we don't see? Until it is back, budgets and estimates skip this period."))
+                    $"Daily spend on {accountName} has nearly stopped: for {quietWeeks} weeks it has been under a fifth of the usual ${baselineWeeklySpendUsd:F0} a week, while its syncs keep succeeding. Are you paying from an account we don't see?"))
             {
                 Dedup = AlertDedup.ActiveThenSilence,
             },

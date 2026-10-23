@@ -173,8 +173,8 @@ public class CoverageSentinelJobTests
         await _db.SaveChangesAsync();
         await Job().ExecuteAsync();
 
-        // Three weeks later, with the week of 09-28 back to normal.
-        Spend(account, new DateTime(2026, 9, 28, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc), 25m);
+        // Weeks of 09-21 and 09-28 both back to normal.
+        Spend(account, new DateTime(2026, 9, 21, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc), 25m);
         _db.SyncJobs.Add(new SyncJob(account.Id, userId)
         {
             Status = "success", StartedAt = Today.UtcDateTime.AddDays(15), CompletedAt = Today.UtcDateTime.AddDays(15),
@@ -185,7 +185,61 @@ public class CoverageSentinelJobTests
         await Job().ExecuteAsync();
 
         var hole = await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
-        Assert.Equal(new DateOnly(2026, 9, 27), hole.To);
+        Assert.Equal(new DateOnly(2026, 9, 20), hole.To);
+        _alerts.Verify(a => a.ResolveCoverageGapAlertAsync(userId, account.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task One_stray_purchase_week_does_not_close_the_hole()
+    {
+        var userId = Guid.NewGuid();
+        var account = AddAccount(userId);
+        Spend(account, Start, new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc), 25m);
+        await _db.SaveChangesAsync();
+        await Job().ExecuteAsync();
+
+        // Only the week of 09-28 is back to normal; the week of 09-21 stayed quiet.
+        Spend(account, new DateTime(2026, 9, 28, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc), 25m);
+        _db.SyncJobs.Add(new SyncJob(account.Id, userId)
+        {
+            Status = "success", StartedAt = Today.UtcDateTime.AddDays(15), CompletedAt = Today.UtcDateTime.AddDays(15),
+        });
+        await _db.SaveChangesAsync();
+        _time.SetUtcNow(Today.AddDays(15)); // 2026-10-07
+
+        await Job().ExecuteAsync();
+
+        Assert.Null((await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync()).To);
+        _alerts.Verify(a => a.ResolveCoverageGapAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_failing_resolve_leaves_the_hole_open_so_the_next_run_retries()
+    {
+        var userId = Guid.NewGuid();
+        var account = AddAccount(userId);
+        Spend(account, Start, new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc), 25m);
+        await _db.SaveChangesAsync();
+        await Job().ExecuteAsync();
+
+        Spend(account, new DateTime(2026, 9, 21, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc), 25m);
+        _db.SyncJobs.Add(new SyncJob(account.Id, userId)
+        {
+            Status = "success", StartedAt = Today.UtcDateTime.AddDays(15), CompletedAt = Today.UtcDateTime.AddDays(15),
+        });
+        await _db.SaveChangesAsync();
+        _time.SetUtcNow(Today.AddDays(15));
+        _alerts.Setup(a => a.ResolveCoverageGapAlertAsync(userId, account.Id, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("alerts down"));
+
+        await Job().ExecuteAsync();
+        Assert.Null((await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync()).To);
+
+        _alerts.Reset();
+        await Job().ExecuteAsync();
+
+        Assert.Equal(new DateOnly(2026, 9, 20), (await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync()).To);
         _alerts.Verify(a => a.ResolveCoverageGapAlertAsync(userId, account.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 

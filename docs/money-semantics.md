@@ -1300,8 +1300,8 @@ holdings-based current drawdown of section 5b is a separate measurement of the i
   day-to-day categories (food and drink, transportation, general merchandise, entertainment, personal care): when
   two or more complete weeks fall under 20% of the trailing 13-week median (at least 6 weeks of history, a median of
   at least $20 a week, a successful sync in the last 3 days) it raises a `CoverageGap` alert and records a
-  `coverage_holes` row (`From` = Monday of the first quiet week, `To` null while open). The hole closes when a week
-  is back above the line. Budget and estimate readers can query `ICoverageHoleReader.GetHolesAsync` to skip the
+  `coverage_holes` row (`From` = Monday of the first quiet week, `To` null while open). The hole closes when two
+  consecutive complete weeks are back above the line. Budget and estimate readers can query `ICoverageHoleReader.GetHolesAsync` to skip the
   period instead of reading it as frugal; nothing consumes it yet, so existing budget and estimate figures are
   unchanged.
 

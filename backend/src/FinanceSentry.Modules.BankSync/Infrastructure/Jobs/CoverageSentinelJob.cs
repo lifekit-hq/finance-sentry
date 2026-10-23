@@ -134,17 +134,21 @@ public sealed class CoverageSentinelJob(
         AccountRow account, CoverageHole hole, Dictionary<DateOnly, decimal> weekly, DateOnly latestWeek, bool synced,
         CancellationToken ct)
     {
-        // Spend that stays quiet keeps the hole open. So does a sync that is not succeeding: with no fresh read the
-        // account's week says nothing about whether the spend came back.
-        if (!synced || latestWeek < hole.From
-            || CoverageGapDetector.IsQuiet(CoverageGapDetector.Spend(weekly, latestWeek), hole.BaselineWeeklySpendUsd))
+        // Closing mirrors opening: the hole stays open until MinQuietWeeks consecutive complete weeks are no longer
+        // quiet, so one stray purchase in a quiet stretch does not end it. A sync that is not succeeding keeps it open
+        // too: with no fresh read the account's weeks say nothing about whether the spend came back.
+        var recoveredFrom = latestWeek.AddDays(-7 * (CoverageGapDetector.MinQuietWeeks - 1));
+        if (!synced || recoveredFrom <= hole.From
+            || Enumerable.Range(0, CoverageGapDetector.MinQuietWeeks).Any(i => CoverageGapDetector.IsQuiet(
+                CoverageGapDetector.Spend(weekly, recoveredFrom.AddDays(7 * i)), hole.BaselineWeeklySpendUsd)))
             return;
 
-        hole.To = latestWeek.AddDays(-1);
-        await db.SaveChangesAsync(ct);
+        // Resolve first (idempotent): when it fails the hole stays open and tomorrow's run retries the resolve.
         await alerts.ResolveCoverageGapAlertAsync(account.UserId, account.Id, ct);
+        hole.To = recoveredFrom.AddDays(-1);
+        await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("Coverage gap on account {AccountId} closed: daily spend flows again from {Week}.", account.Id, latestWeek);
+        logger.LogInformation("Coverage gap on account {AccountId} closed: daily spend flows again from {Week}.", account.Id, recoveredFrom);
     }
 
     /// <summary>Weekly spend in USD by week-start Monday; converted once here, where the account's currency is in scope.</summary>
