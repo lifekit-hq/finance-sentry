@@ -327,6 +327,13 @@ async function mockApisWithLedger(page: Page): Promise<void> {
       body: JSON.stringify(DASHBOARD_DATA),
     })
   );
+  await page.route(`${API}/dashboard/spending-summary**`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({outflow: 2900, currency: 'USD', topCategory: 'FOOD_AND_DRINK'}),
+    })
+  );
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill({
       status: 200,
@@ -616,7 +623,7 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
     await mockApisWithLedger(page);
   });
 
-  // The backend mock returns outflowUsd: 2900 for the current month.
+  // The spending-summary mock returns an outflow of 2900 for the period.
   // The page also has a pending debit ($500) and a transfer debit ($1,000) that
   // the backend excludes but a client-side sum would include. This verifies the
   // stat reads the server-side aggregate, not a sum over the loaded page.

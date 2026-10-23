@@ -121,6 +121,31 @@ public class DashboardController(
         return Ok(data);
     }
 
+    // ── GET /api/dashboard/spending-summary ───────────────────────────────────
+
+    /// <summary>
+    /// The outflow and top spending category of one account (all when omitted) over a UTC day
+    /// range (open ends reach the first day ever / today), in the profile's base currency.
+    /// Read from the flow breakdown's spending bucket, so transfers and investment routing are
+    /// outside both figures exactly as in the dashboard tiles.
+    /// </summary>
+    [HttpGet("spending-summary")]
+    public async Task<IActionResult> GetSpendingSummary(
+        [FromQuery] Guid? accountId = null,
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        CancellationToken ct = default)
+    {
+        if (from is { } start && to is { } end && end < start)
+            return BadRequest(new { errorCode = "INVALID_RANGE", message = "to must not be before from" });
+
+        var userId = User.RequireUserId();
+        var summary = await _flowBreakdown.GetSpendingSummaryAsync(userId, accountId, from, to, ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(new SpendingSummaryResponse(
+            CurrencyConverter.FromUsd(summary.OutflowUsd, baseCurrency), baseCurrency, summary.TopCategory));
+    }
+
     // ── GET /api/dashboard/transfers ── T410 ──────────────────────────────────
 
     [HttpGet("transfers")]

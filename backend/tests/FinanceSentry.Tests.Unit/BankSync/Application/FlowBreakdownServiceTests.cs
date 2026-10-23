@@ -240,4 +240,137 @@ public class FlowBreakdownServiceTests
 
         result.Items.Should().HaveCount(2);
     }
+
+    private static FlowBreakdownService SutFor(
+        IReadOnlyList<Transaction> transactions, params BankAccount[] accounts)
+    {
+        var txRepo = new Mock<ITransactionRepository>();
+        txRepo.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(transactions);
+        var accountRepo = new Mock<IBankAccountRepository>();
+        accountRepo.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(accounts);
+        var counterparty = new Mock<ICounterpartyClassificationService>();
+        counterparty.Setup(c => c.ClassifyForWindowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(CounterpartyResults.None);
+        return new FlowBreakdownService(
+            txRepo.Object, accountRepo.Object, new TransferDetectionService(), counterparty.Object);
+    }
+
+    [Fact]
+    public async Task SpendingSummary_ScopedToAnAccount_CountsOnlyThatAccountsSpending()
+    {
+        var (first, firstId) = MakeAccount("USD");
+        var (second, secondId) = MakeAccount("USD");
+        var onFirst = MakeTx(firstId, 40m, "debit", InMonth, "Coffee");
+        var onSecond = MakeTx(secondId, 700m, "debit", InMonth, "Rent");
+
+        var summary = await SutFor([onFirst, onSecond], first, second)
+            .GetSpendingSummaryAsync(UserId, firstId, null, null);
+
+        summary.OutflowUsd.Should().Be(40m);
+    }
+
+    [Fact]
+    public async Task SpendingSummary_ForAllAccounts_SumsInUsdAcrossCurrencies()
+    {
+        var (usd, usdId) = MakeAccount("USD");
+        var (eur, eurId) = MakeAccount("EUR");
+        var inUsd = MakeTx(usdId, 100m, "debit", InMonth, "US spend");
+        var inEur = MakeTx(eurId, 100m, "debit", InMonth, "EU spend");
+
+        var summary = await SutFor([inUsd, inEur], usd, eur)
+            .GetSpendingSummaryAsync(UserId, null, null, null);
+
+        // Against the converter, not a literal: the process-wide rate table may have been swapped.
+        summary.OutflowUsd.Should().Be(100m + FinanceSentry.Core.Utils.CurrencyConverter.ToUsd(100m, "EUR"));
+    }
+
+    [Fact]
+    public async Task SpendingSummary_LeavesOutTransfers_OnTheAccountThatSentThem()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var (other, otherId) = MakeAccount("USD");
+        // A pair-matched move between the user's own accounts, plus a category-marked transfer.
+        var sentLeg = MakeTx(accountId, 500m, "debit", InMonth, "internal move alpha");
+        var receivedLeg = MakeTx(otherId, 500m, "credit", InMonth, "internal move alpha");
+        var markedTransfer = MakeTx(accountId, 90m, "debit", InMonth, "To a friend", "TRANSFER_OUT");
+        var groceries = MakeTx(accountId, 25m, "debit", InMonth, "Groceries", "GROCERIES");
+
+        var summary = await SutFor([sentLeg, receivedLeg, markedTransfer, groceries], account, other)
+            .GetSpendingSummaryAsync(UserId, accountId, null, null);
+
+        summary.OutflowUsd.Should().Be(25m);
+        summary.TopCategory.Should().Be("GROCERIES");
+    }
+
+    [Fact]
+    public async Task SpendingSummary_CoversBothEdgeDaysOfTheRange_AndNothingOutsideIt()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var before = MakeTx(accountId, 1m, "debit", new DateTime(2026, 5, 9, 23, 59, 59, DateTimeKind.Utc));
+        var firstDay = MakeTx(accountId, 2m, "debit", new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc));
+        var lastDay = MakeTx(accountId, 4m, "debit", new DateTime(2026, 5, 12, 23, 59, 59, DateTimeKind.Utc));
+        var after = MakeTx(accountId, 8m, "debit", new DateTime(2026, 5, 13, 0, 0, 0, DateTimeKind.Utc));
+
+        var summary = await SutFor([before, firstDay, lastDay, after], account)
+            .GetSpendingSummaryAsync(UserId, null, new DateOnly(2026, 5, 10), new DateOnly(2026, 5, 12));
+
+        summary.OutflowUsd.Should().Be(6m);
+    }
+
+    [Fact]
+    public async Task SpendingSummary_OpenFrom_ReachesTheOldestTransaction()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var old = MakeTx(accountId, 3m, "debit", new DateTime(2024, 1, 15, 12, 0, 0, DateTimeKind.Utc));
+        var recent = MakeTx(accountId, 5m, "debit", DateTime.UtcNow.AddDays(-1));
+
+        var summary = await SutFor([old, recent], account)
+            .GetSpendingSummaryAsync(UserId, null, null, null);
+
+        summary.OutflowUsd.Should().Be(8m);
+    }
+
+    [Fact]
+    public async Task SpendingSummary_TopCategory_IsTheLargestByAmount_NotByCount()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var txs = new List<Transaction>
+        {
+            MakeTx(accountId, 5m, "debit", InMonth, "a", "GROCERIES"),
+            MakeTx(accountId, 5m, "debit", InMonth, "b", "GROCERIES"),
+            MakeTx(accountId, 5m, "debit", InMonth, "c", "GROCERIES"),
+            MakeTx(accountId, 400m, "debit", InMonth, "d", "TRAVEL"),
+            MakeTx(accountId, 2000m, "credit", InMonth, "salary", "INCOME"),
+        };
+
+        var summary = await SutFor(txs, account).GetSpendingSummaryAsync(UserId, null, null, null);
+
+        summary.TopCategory.Should().Be("TRAVEL");
+        summary.OutflowUsd.Should().Be(415m);
+    }
+
+    [Fact]
+    public async Task SpendingSummary_WithNoSpending_IsZeroWithoutACategory()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var salary = MakeTx(accountId, 1000m, "credit", InMonth, "Salary");
+
+        var summary = await SutFor([salary], account).GetSpendingSummaryAsync(UserId, null, null, null);
+
+        summary.OutflowUsd.Should().Be(0m);
+        summary.TopCategory.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SpendingSummary_NamesAnUncategorizedRow_WithTheUncategorizedKey()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var tx = MakeTx(accountId, 12m, "debit", InMonth, "Mystery");
+
+        var summary = await SutFor([tx], account).GetSpendingSummaryAsync(UserId, null, null, null);
+
+        summary.TopCategory.Should().Be("UNCATEGORIZED");
+    }
 }

@@ -12,6 +12,7 @@ import {
   type HistoryRange,
   type NetWorthHistoryResponse,
 } from '../models/dashboard/dashboard.model';
+import {type SpendingSummary} from '../models/dashboard/spending-summary.model';
 import {type FlowBreakdown} from '../models/flow-breakdown/flow-breakdown.model';
 import {type NetWorthBridgeResponse} from '../models/net-worth-bridge/net-worth-bridge.model';
 import {SyncStatusResponse, TriggerSyncResponse} from '../models/sync/sync.model';
@@ -146,6 +147,27 @@ export class BankSyncService extends ApiService {
   ): Observable<FlowBreakdown> {
     const params: Record<string, string | number> = from ? {from, to, months} : {to, months};
     return this.http.get<FlowBreakdown>(`${environment.apiBaseUrl}/dashboard/flow-breakdown`, {
+      params,
+    });
+  }
+
+  /** Out and top category for one account (all when null) over a day range; null ends are open. */
+  public getSpendingSummary(scope: {
+    accountId: Nullable<string>;
+    from: Nullable<string>;
+    to: Nullable<string>;
+  }): Observable<SpendingSummary> {
+    const params: Record<string, string> = {};
+    if (scope.accountId) {
+      params['accountId'] = scope.accountId;
+    }
+    if (scope.from) {
+      params['from'] = scope.from;
+    }
+    if (scope.to) {
+      params['to'] = scope.to;
+    }
+    return this.http.get<SpendingSummary>(`${environment.apiBaseUrl}/dashboard/spending-summary`, {
       params,
     });
   }

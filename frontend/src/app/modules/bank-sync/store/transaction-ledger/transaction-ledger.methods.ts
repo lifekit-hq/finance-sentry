@@ -1,16 +1,14 @@
 import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
-import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
-import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
 } from '../../models/transaction/transaction.model';
 import {type LedgerFilter} from './transaction-ledger.computed';
 import {
-  type AccountOutflow,
   PAGE_SIZE,
+  type ScopedSpending,
   type TransactionLedgerState,
 } from './transaction-ledger.state';
 
@@ -63,14 +61,8 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         lastSyncedAt: Date.now(),
       }));
     },
-    setMonthlyFlow(
-      monthlyFlow: MonthlyFlow[] | null,
-      currency: string = DEFAULT_BASE_CURRENCY
-    ): void {
-      patchState(store, {monthlyFlow, monthlyOutflowCurrency: currency});
-    },
-    setAccountOutflow(accountOutflow: Nullable<AccountOutflow>): void {
-      patchState(store, {accountOutflow});
+    setSpending(spending: Nullable<ScopedSpending>): void {
+      patchState(store, {spending});
     },
     /** A blank box reads as no search, so it never reaches the `q` query param. */
     setSearch(search: string): void {
