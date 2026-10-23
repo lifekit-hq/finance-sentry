@@ -35,8 +35,7 @@ function setup(
   const drawerOpen = vi.fn(() => ({beforeClose$: new Subject<void>(), close: vi.fn()}));
   const store = {
     accounts: signal([]),
-    monthlyOutflow: signal(null),
-    monthlyOutflowCurrency: signal('USD'),
+    outflow: signal<{amount: number; currency: string} | null>(null),
     topCategory: signal(null),
     errorMessage: signal(''),
     load: vi.fn(),
@@ -182,6 +181,37 @@ describe('TransactionLedgerComponent period chips', () => {
   it('selects no period chip for a custom range', () => {
     const {chip} = setup(null, {from: '2020-01-01', to: '2020-01-31'});
     expect((chip('period-chips') as ChipRowElement).selected).toEqual([]);
+  });
+});
+
+describe('TransactionLedgerComponent summary line', () => {
+  function summary(extra: Record<string, string>, currency = 'EUR'): string {
+    const {store, fixture, root} = setup(null, extra);
+    store.outflow.set({amount: 1200, currency});
+    fixture.detectChanges();
+    return root.querySelector('[data-testid="ledger-summary"]')?.textContent?.trim() ?? '';
+  }
+
+  it.each([
+    ['this-month', 'out this month'],
+    ['last-month', 'out last month'],
+    ['3m', 'out in the last 3 months'],
+  ] as const)('names the %s period in the outflow', (period, phrase) => {
+    expect(summary({...LedgerPeriodUtils.dates(period)})).toContain(phrase);
+  });
+
+  it('says all time without a date filter', () => {
+    expect(summary({})).toContain('out all time');
+  });
+
+  it('says this range for a custom range', () => {
+    expect(summary({from: '2020-01-01', to: '2020-01-31'})).toContain('out in this range');
+  });
+
+  it('shows the amount in the currency the store resolved, not a fixed dollar', () => {
+    const text = summary({account: 'acc-1', ...LedgerPeriodUtils.dates('last-month')});
+    expect(text).toContain('€1,200.00');
+    expect(text).not.toContain('$');
   });
 });
 

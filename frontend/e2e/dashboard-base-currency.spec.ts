@@ -101,6 +101,9 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/dashboard/aggregated**`, route => route.fulfill(json(EUR_DASHBOARD)));
+  await page.route(`${API}/dashboard/spending-summary**`, route =>
+    route.fulfill(json({outflow: 3100, currency: 'EUR', topCategory: 'GROCERIES'}))
+  );
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: [], hasHistory: false}))
   );
@@ -161,7 +164,7 @@ test.describe('Base-currency totals (#851)', () => {
 
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
     const summary = page.getByTestId('ledger-summary');
-    await expect(summary).toContainText('€3,100.00 out this month');
+    await expect(summary).toContainText('€3,100.00 out all time');
     await expect(summary).not.toContainText('$');
   });
 });

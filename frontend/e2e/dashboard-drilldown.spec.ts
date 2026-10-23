@@ -327,6 +327,13 @@ async function mockApisWithLedger(page: Page): Promise<void> {
       body: JSON.stringify(DASHBOARD_DATA),
     })
   );
+  await page.route(`${API}/dashboard/spending-summary**`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({outflow: 2900, currency: 'USD', topCategory: 'FOOD_AND_DRINK'}),
+    })
+  );
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill({
       status: 200,
@@ -603,17 +610,25 @@ test.describe('Retired Income page', () => {
   });
 });
 
+/** The ledger's "This month" period as the chip writes it: first of the month through today (UTC). */
+function thisMonthLedgerUrl(): string {
+  const now = new Date();
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  return `/transactions?from=${day(first)}&to=${day(now)}`;
+}
+
 test.describe('Transaction ledger — Monthly Outflow stat', () => {
   test.beforeEach(async ({page}) => {
     await mockApisWithLedger(page);
   });
 
-  // The backend mock returns outflowUsd: 2900 for the current month.
+  // The spending-summary mock returns an outflow of 2900 for the period.
   // The page also has a pending debit ($500) and a transfer debit ($1,000) that
   // the backend excludes but a client-side sum would include. This verifies the
   // stat reads the server-side aggregate, not a sum over the loaded page.
   test('Monthly Outflow shows server-side aggregate, not client-side page sum', async ({page}) => {
-    await page.goto('/transactions');
+    await page.goto(thisMonthLedgerUrl());
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     // Backend says $2,900 — the stat must match this, not the $1,900 client-side sum
     // (400 grocery + 500 pending + 1000 transfer = $1,900 from debits in page).
@@ -660,7 +675,7 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
       });
     });
 
-    await page.goto('/transactions');
+    await page.goto(thisMonthLedgerUrl());
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
 
@@ -703,7 +718,7 @@ test.describe('Dashboard → Ledger spending consistency', () => {
 
     // Read the monthly outflow figure from the ledger's summary line.
     const outflowSummary = page.getByTestId('ledger-summary');
-    await expect(outflowSummary).toContainText('out this month');
+    await expect(outflowSummary).toContainText(/ out (this month|in the last 3 months|all time)/);
     const ledgerAmount = extractAmount((await outflowSummary.innerText()).trim());
 
     // Transfer pair (tx-3 debit $1,000 + tx-6 credit $1,000) is in the loaded transaction

@@ -66,6 +66,13 @@ public record FlowBreakdown(
     DateOnly? To = null);
 
 /// <summary>
+/// The outflow (USD) of one scope (an optional account over an optional day range) and the
+/// category that took the most of it. Both come from the <see cref="FlowBuckets.Spending"/>
+/// bucket, so transfers and investment routing are outside them exactly as in the dashboard.
+/// </summary>
+public record SpendingSummary(decimal OutflowUsd, string? TopCategory);
+
+/// <summary>
 /// Explains a month of the money-flow statistics transaction by transaction.
 /// </summary>
 public interface IFlowBreakdownService
@@ -99,6 +106,20 @@ public interface IFlowBreakdownService
         DateOnly to,
         int months = 6,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// The spending of <paramref name="accountId"/> (every account when null) from
+    /// <paramref name="from"/> through <paramref name="to"/> (UTC calendar days, inclusive; an
+    /// open end reaches the first day ever / today). Classification and pair detection run over
+    /// the longest dashboard history, as in <see cref="GetRangeBreakdownAsync"/>, so a transfer
+    /// pair is excluded whichever account the figure is scoped to.
+    /// </summary>
+    Task<SpendingSummary> GetSpendingSummaryAsync(
+        Guid userId,
+        Guid? accountId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken ct = default);
 }
 
 /// <inheritdoc />
@@ -113,6 +134,7 @@ public class FlowBreakdownService(
     private readonly ITransferDetectionService _transferDetection = transferDetection ?? throw new ArgumentNullException(nameof(transferDetection));
     private readonly ICounterpartyClassificationService _counterpartyClassification = counterpartyClassification ?? throw new ArgumentNullException(nameof(counterpartyClassification));
 
+    private const int HistoryMonths = 120;
     private const string CreditType = "credit";
     private const string DebitType = "debit";
 
@@ -141,6 +163,34 @@ public class FlowBreakdownService(
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var items = await BuildItemsAsync(userId, months, d => d >= start && d < end, ct);
         return new FlowBreakdown(string.Empty, items, from, to);
+    }
+
+    /// <inheritdoc />
+    public async Task<SpendingSummary> GetSpendingSummaryAsync(
+        Guid userId,
+        Guid? accountId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken ct = default)
+    {
+        var range = await GetRangeBreakdownAsync(
+            userId,
+            from ?? DateOnly.MinValue,
+            to ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            HistoryMonths,
+            ct);
+
+        var spending = range.Items
+            .Where(i => i.Bucket == FlowBuckets.Spending && (accountId is null || i.AccountId == accountId))
+            .ToList();
+
+        var topCategory = spending
+            .GroupBy(i => i.Category ?? CategoryKeys.Uncategorized)
+            .OrderByDescending(g => g.Sum(i => i.AmountUsd))
+            .Select(g => g.Key)
+            .FirstOrDefault();
+
+        return new SpendingSummary(spending.Sum(i => i.AmountUsd), topCategory);
     }
 
     private async Task<List<FlowBreakdownItem>> BuildItemsAsync(

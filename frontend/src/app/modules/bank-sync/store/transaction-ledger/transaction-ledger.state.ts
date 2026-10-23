@@ -1,12 +1,20 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
+import {type SpendingSummary} from '../../models/dashboard/spending-summary.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {type LedgerFilter} from './transaction-ledger.computed';
+
+export interface OutflowScope {
+  accountId: Nullable<string>;
+  from: Nullable<string>;
+  to: Nullable<string>;
+}
+
+export interface ScopedSpending extends OutflowScope, SpendingSummary {}
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
@@ -15,8 +23,8 @@ export interface TransactionLedgerState {
   offset: number;
   /** Epoch ms of the last successful page load; drives the offline "last synced" notice. */
   lastSyncedAt: Nullable<number>;
-  monthlyOutflowUsd: number | null;
-  monthlyOutflowCurrency: string;
+  /** The summary line's outflow and top category, read for the account and dates in `scope`. */
+  spending: Nullable<ScopedSpending>;
   /** Server-side filter: a single account, or null for all. */
   accountId: Nullable<string>;
   /** Server-side filter: credits (In), debits (Out), or null for all. */
@@ -43,8 +51,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   hasMore: false,
   offset: 0,
   lastSyncedAt: null,
-  monthlyOutflowUsd: null,
-  monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
+  spending: null,
   accountId: null,
   transactionType: null,
   categories: [],
@@ -63,8 +70,7 @@ export const LEDGER_SESSION_FIELDS = [
   'hasMore',
   'offset',
   'lastSyncedAt',
-  'monthlyOutflowUsd',
-  'monthlyOutflowCurrency',
+  'spending',
   'accounts',
   'rowsFilter',
 ] as const satisfies readonly (keyof TransactionLedgerState)[];

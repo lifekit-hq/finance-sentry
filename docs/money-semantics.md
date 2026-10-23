@@ -539,7 +539,11 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   the UTC month, **1M = rolling** (the same day last month, clamped to that month's last day —
   so it differs from MTD), YTD = 1 January UTC (month-level, via `windowMonths`). The
   Savings drill-down (`GET /dashboard/flow-breakdown?from=&to=`) takes the same days
-  (inclusive; `to` defaults to today) instead of a month.
+  (inclusive; `to` defaults to today) instead of a month. The Transactions ledger's summary
+  line (`GET /dashboard/spending-summary?accountId=&from=&to=`, all optional, open ends reach
+  the first day ever / today) reads the same Spending bucket of that breakdown, so its
+  base-currency outflow and top category exclude transfers and investment routing like the
+  tiles, for any account or date range.
 - **Bucketing**: calendar UTC month on `PostedDate ?? TransactionDate`. The trailing
   bucket is month-to-date and is returned deliberately: it feeds the dashboard's
   range-total tiles. Callers must keep it out of month-over-month comparisons

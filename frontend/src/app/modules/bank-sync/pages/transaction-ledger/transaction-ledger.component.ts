@@ -60,7 +60,12 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
-import {LEDGER_PERIOD_EMPTY_PHRASES} from './transaction-ledger.constants';
+import {
+  LEDGER_ALL_TIME_OUTFLOW_PHRASE,
+  LEDGER_CUSTOM_RANGE_OUTFLOW_PHRASE,
+  LEDGER_PERIOD_EMPTY_PHRASES,
+  LEDGER_PERIOD_OUTFLOW_PHRASES,
+} from './transaction-ledger.constants';
 
 const SKELETON_SECTIONS = 2;
 const SKELETON_ROWS_PER_SECTION = 4;
@@ -141,6 +146,17 @@ export class TransactionLedgerComponent {
     }
     const period = this.activePeriod();
     return period ? [period] : [];
+  });
+
+  /** Names the period the summary's outflow covers, so it never claims "this month" for another range. */
+  public readonly outflowPeriodPhrase = computed(() => {
+    const period = this.activePeriod();
+    if (period) {
+      return LEDGER_PERIOD_OUTFLOW_PHRASES[period];
+    }
+    return this.activeDateRangeLabel()
+      ? LEDGER_CUSTOM_RANGE_OUTFLOW_PHRASE
+      : LEDGER_ALL_TIME_OUTFLOW_PHRASE;
   });
 
   public readonly accountOptions = computed<ChipRowOption[]>(() => [

@@ -8,10 +8,11 @@ import {RouterTestingHarness} from '@angular/router/testing';
 import {ERROR_MESSAGES, provideApiBaseUrl} from '@lifekit-hq/core';
 import {patchState} from '@ngrx/signals';
 import {unprotected} from '@ngrx/signals/testing';
-import {NEVER, of, throwError} from 'rxjs';
+import {NEVER, type Observable, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
+import {type SpendingSummary} from '../../models/dashboard/spending-summary.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {type TransactionLedgerState} from './transaction-ledger.state';
 import {TransactionLedgerStore} from './transaction-ledger.store';
@@ -35,7 +36,7 @@ class ElsewhereComponent {}
 
 const service = {
   getAllTransactions: vi.fn(() => NEVER),
-  getDashboardData: vi.fn(() => NEVER),
+  getSpendingSummary: vi.fn((): Observable<SpendingSummary> => NEVER),
   getAccounts: vi.fn(() => NEVER),
 };
 
@@ -67,6 +68,8 @@ const DATE_TO = '2026-08-31';
 
 beforeEach(() => {
   service.getAllTransactions.mockClear();
+  service.getSpendingSummary.mockReset();
+  service.getSpendingSummary.mockImplementation(() => NEVER);
 });
 
 describe('TransactionLedgerStore URL → state', () => {
@@ -363,5 +366,70 @@ describe('TransactionLedgerStore revisit', () => {
 
     expect(store.accountId()).toBeNull();
     expect(store.transactions()).toHaveLength(1);
+  });
+});
+
+describe('TransactionLedgerStore spending insight', () => {
+  const SUMMARY: SpendingSummary = {outflow: 1000, currency: 'EUR', topCategory: 'FOOD_AND_DRINK'};
+
+  it('reads the outflow and top category for the account and dates on screen', async () => {
+    service.getSpendingSummary.mockReturnValue(of(SUMMARY));
+
+    const {store} = await open(`/transactions?account=acc-1&from=${DATE_FROM}&to=${DATE_TO}`);
+
+    expect(service.getSpendingSummary).toHaveBeenCalledWith({
+      accountId: 'acc-1',
+      from: DATE_FROM,
+      to: DATE_TO,
+    });
+    expect(store.outflow()).toEqual({amount: 1000, currency: 'EUR'});
+    expect(store.topCategory()).toBe('Food & drink');
+  });
+
+  it('is not narrowed by the search, category or type filters', async () => {
+    service.getSpendingSummary.mockReturnValue(of(SUMMARY));
+
+    const {store} = await open('/transactions?q=netflix&category=FOOD&type=credit');
+
+    expect(service.getSpendingSummary).toHaveBeenCalledTimes(1);
+    expect(service.getSpendingSummary).toHaveBeenCalledWith({
+      accountId: null,
+      from: null,
+      to: null,
+    });
+    expect(store.outflow()).toEqual({amount: 1000, currency: 'EUR'});
+    expect(store.topCategory()).toBe('Food & drink');
+  });
+
+  it('is unknown until the server has answered', async () => {
+    const {store} = await open('/transactions');
+
+    expect(store.outflow()).toBeNull();
+    expect(store.topCategory()).toBeNull();
+  });
+
+  it('is unknown when the server has no top category', async () => {
+    service.getSpendingSummary.mockReturnValue(of({...SUMMARY, outflow: 0, topCategory: null}));
+
+    const {store} = await open('/transactions');
+
+    expect(store.outflow()).toEqual({amount: 0, currency: 'EUR'});
+    expect(store.topCategory()).toBeNull();
+  });
+
+  it('drops the figure of another account while the new account is read', async () => {
+    service.getSpendingSummary.mockReturnValueOnce(of(SUMMARY));
+    const {store} = await open('/transactions?account=acc-1');
+    expect(store.outflow()).not.toBeNull();
+
+    patchState(unprotected(store), {accountId: 'acc-2'});
+    TestBed.tick();
+
+    expect(service.getSpendingSummary).toHaveBeenLastCalledWith({
+      accountId: 'acc-2',
+      from: null,
+      to: null,
+    });
+    expect(store.outflow()).toBeNull();
   });
 });

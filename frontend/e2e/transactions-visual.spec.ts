@@ -49,6 +49,9 @@ const LEDGER = {
   hasMore: false,
 };
 
+// What the server answers for All accounts / All time: the debits above, in the base currency.
+const SPENDING_SUMMARY = {outflow: 1551.07, currency: 'USD', topCategory: 'RENT'};
+
 describeVisualBaseline({
   name: 'transactions',
   title: 'Transaction ledger',
@@ -56,6 +59,7 @@ describeVisualBaseline({
   mocks: async page => {
     await mockGet(page, 'accounts', {accounts: [ACCOUNT]});
     await mockGet(page, 'accounts/transactions**', LEDGER);
+    await mockGet(page, 'dashboard/spending-summary**', SPENDING_SUMMARY);
     await mockGet(page, 'dashboard/aggregated**', {
       aggregatedBalance: {USD: 50000},
       totalNetWorthUsd: 50000,

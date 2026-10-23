@@ -1,13 +1,11 @@
 <cmn-page-container spacing="none" fill>
   <!-- One line is held while the figures load, so their arrival does not push the list down. -->
   <p class="mb-cmn-4 min-h-[1lh] text-cmn-sm text-text-secondary" data-testid="ledger-summary">
-    @if (store.monthlyOutflow() !== null) {
-      <span
-        >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this month</span
-      >
+    @if (store.outflow(); as outflow) {
+      <span>{{ outflow.amount | money: outflow.currency }} out {{ outflowPeriodPhrase() }}</span>
     }
     @if (store.topCategory(); as top) {
-      @if (store.monthlyOutflow() !== null) {
+      @if (store.outflow() !== null) {
         <span aria-hidden="true"> · </span>
       }
       <span>Top category: {{ top }}</span>

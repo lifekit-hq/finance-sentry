@@ -5,7 +5,7 @@ import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type AccountsResponse} from '../../models/bank-account/bank-account.model';
-import {type DashboardData} from '../../models/dashboard/dashboard.model';
+import {type SpendingSummary} from '../../models/dashboard/spending-summary.model';
 import {
   type GlobalTransactionDto,
   type TransactionType,
@@ -13,19 +13,7 @@ import {
 import {BankSyncService} from '../../services/bank-sync.service';
 import {type LedgerFilter} from './transaction-ledger.computed';
 import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
-import {PAGE_SIZE} from './transaction-ledger.state';
-
-// Mirrors the private helper in effects.ts so test data stays in sync with the runtime.
-function currentUtcMonthKey(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function prevUtcMonthKey(): string {
-  const now = new Date();
-  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
-}
+import {type OutflowScope, PAGE_SIZE} from './transaction-ledger.state';
 
 const NO_FILTER: LedgerFilter = {
   accountId: null,
@@ -59,42 +47,6 @@ const TX_RESPONSE = {
   limit: PAGE_SIZE,
   hasMore: false,
 };
-
-function buildDashboardData(currentOutflowUsd: number, priorOutflowUsd?: number): DashboardData {
-  const monthlyFlow = [
-    {
-      month: currentUtcMonthKey(),
-      currency: 'USD',
-      inflow: 4800,
-      outflow: currentOutflowUsd,
-      net: 4800 - currentOutflowUsd,
-      inflowUsd: 4800,
-      outflowUsd: currentOutflowUsd,
-      netUsd: 4800 - currentOutflowUsd,
-    },
-  ];
-  if (priorOutflowUsd !== undefined) {
-    monthlyFlow.push({
-      month: prevUtcMonthKey(),
-      currency: 'USD',
-      inflow: 5000,
-      outflow: priorOutflowUsd,
-      net: 5000 - priorOutflowUsd,
-      inflowUsd: 5000,
-      outflowUsd: priorOutflowUsd,
-      netUsd: 5000 - priorOutflowUsd,
-    });
-  }
-  return {
-    aggregatedBalance: {USD: 50_000},
-    totalNetWorthUsd: 50_000,
-    accountCount: 3,
-    accountsByType: {banking: 2, brokerage: 1},
-    monthlyFlow,
-    topCategories: [],
-    lastSyncTimestamp: null,
-  };
-}
 
 const ACCOUNTS: AccountsResponse = {
   accounts: [
@@ -159,7 +111,7 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
     setAppendSuccess: vi.fn(),
     setAppendError: vi.fn(),
     setAppendIdle: vi.fn(),
-    setMonthlyOutflowUsd: vi.fn(),
+    setSpending: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
@@ -168,7 +120,7 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
 function buildService() {
   return {
     getAllTransactions: vi.fn(),
-    getDashboardData: vi.fn(),
+    getSpendingSummary: vi.fn(),
     getAccounts: vi.fn(),
   };
 }
@@ -310,73 +262,99 @@ describe('transactionLedgerEffects', () => {
     });
   });
 
-  describe('loadSummary', () => {
-    it('sets current-month outflow and the account options', () => {
+  describe('loadAccounts', () => {
+    it('offers the user accounts as chips', () => {
       const store = buildStore();
       const service = buildService();
-      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900)));
       service.getAccounts.mockReturnValue(of(ACCOUNTS));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadAccounts());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined);
       expect(store.setAccounts).toHaveBeenCalledWith([
         {accountId: 'acc-1', label: 'Test Bank · 1234'},
       ]);
     });
 
-    it('passes the dashboard base currency along with the outflow (#851)', () => {
+    it('degrades to no accounts when the read fails', () => {
       const store = buildStore();
       const service = buildService();
-      service.getDashboardData.mockReturnValue(
-        of({...buildDashboardData(2900), baseCurrency: 'EUR'})
-      );
-      service.getAccounts.mockReturnValue(of(ACCOUNTS));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
-
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, 'EUR');
-    });
-
-    it('sums only the current-month outflowUsd and ignores past-month rows', () => {
-      // Prior month has 3 000 outflowUsd - must NOT be included.
-      const store = buildStore();
-      const service = buildService();
-      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900, 3000)));
-      service.getAccounts.mockReturnValue(of(ACCOUNTS));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
-
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined); // not 5 900
-    });
-
-    it('degrades to null outflow and no accounts when both reads fail', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getDashboardData.mockReturnValue(throwError(() => new Error('network error')));
       service.getAccounts.mockReturnValue(throwError(() => new Error('network error')));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadAccounts());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(null, undefined);
       expect(store.setAccounts).toHaveBeenCalledWith([]);
       expect(store.setError).not.toHaveBeenCalled();
     });
+  });
 
-    it('sets outflow to 0 when monthlyFlow has no entry for the current month', () => {
+  describe('watchSpendingScope', () => {
+    const MAY = {from: '2026-05-01', to: '2026-05-31'};
+    const SUMMARY: SpendingSummary = {outflow: 1000, currency: 'EUR', topCategory: 'GROCERIES'};
+
+    function run(
+      scope: ReturnType<typeof signal<OutflowScope>>,
+      service: ReturnType<typeof buildService>
+    ) {
       const store = buildStore();
-      const service = buildService();
-      service.getDashboardData.mockReturnValue(of({...buildDashboardData(2900), monthlyFlow: []}));
-      service.getAccounts.mockReturnValue(of(ACCOUNTS));
       configure(service);
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).watchSpendingScope(scope)
+      );
+      TestBed.tick();
+      return store;
+    }
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+    it('asks the server for the account and dates and stores the answer with its scope', () => {
+      const service = buildService();
+      service.getSpendingSummary.mockReturnValue(of(SUMMARY));
+      const scope = signal({accountId: 'acc-1', ...MAY});
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(0, undefined);
+      const store = run(scope, service);
+
+      expect(service.getSpendingSummary).toHaveBeenCalledWith({accountId: 'acc-1', ...MAY});
+      expect(store.setSpending).toHaveBeenCalledWith({accountId: 'acc-1', ...MAY, ...SUMMARY});
+    });
+
+    it('asks for every scope, all accounts and open dates included, and reads no rows', () => {
+      const service = buildService();
+      service.getSpendingSummary.mockReturnValue(of(SUMMARY));
+      const scope = signal({accountId: null, from: null, to: null});
+
+      run(scope, service);
+
+      expect(service.getSpendingSummary).toHaveBeenCalledWith({
+        accountId: null,
+        from: null,
+        to: null,
+      });
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+
+    it('asks again when the account or the dates change, not when they stay', () => {
+      const service = buildService();
+      service.getSpendingSummary.mockReturnValue(of(SUMMARY));
+      const scope = signal({accountId: 'acc-1', ...MAY});
+      run(scope, service);
+
+      scope.set({accountId: 'acc-1', ...MAY});
+      TestBed.tick();
+      expect(service.getSpendingSummary).toHaveBeenCalledTimes(1);
+
+      scope.set({accountId: 'acc-2', ...MAY});
+      TestBed.tick();
+      expect(service.getSpendingSummary).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves the figure unknown when the read fails', () => {
+      const service = buildService();
+      service.getSpendingSummary.mockReturnValue(throwError(() => new Error('boom')));
+      const scope = signal({accountId: 'acc-1', ...MAY});
+
+      const store = run(scope, service);
+
+      expect(store.setSpending).not.toHaveBeenCalled();
     });
   });
 

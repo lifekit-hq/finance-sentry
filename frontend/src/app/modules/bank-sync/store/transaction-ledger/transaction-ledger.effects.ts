@@ -8,7 +8,6 @@ import {
   distinctUntilChanged,
   exhaustMap,
   filter,
-  forkJoin,
   of,
   pipe,
   Subject,
@@ -18,7 +17,6 @@ import {
 } from 'rxjs';
 
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
-import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GetAllTransactionsParams,
   type GlobalTransactionDto,
@@ -27,17 +25,12 @@ import {
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {LedgerFilterUtils} from '../../utils/ledger-filter.utils';
-import {MonthKeyUtils} from '../../utils/month-key.utils';
+import {OutflowUtils} from '../../utils/outflow.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {type LedgerFilter} from './transaction-ledger.computed';
-import {PAGE_SIZE} from './transaction-ledger.state';
+import {type OutflowScope, PAGE_SIZE, type ScopedSpending} from './transaction-ledger.state';
 
 export const SEARCH_DEBOUNCE_MS = 300;
-
-function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
-  const key = MonthKeyUtils.currentUtc();
-  return monthlyFlow.filter(r => r.month === key).reduce((sum, r) => sum + r.outflowUsd, 0);
-}
 
 interface EffectsStore {
   transactions: Signal<GlobalTransactionDto[]>;
@@ -74,7 +67,7 @@ interface EffectsStore {
   setAppendSuccess: () => void;
   setAppendError: (errorCode: Nullable<string>) => void;
   setAppendIdle: () => void;
-  setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
+  setSpending: (spending: Nullable<ScopedSpending>) => void;
 }
 
 function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
@@ -163,20 +156,31 @@ export function transactionLedgerEffects(store: EffectsStore) {
     load,
     /** Re-issues the failed first page. */
     retry: load,
-    loadSummary: rxMethod<void>(
+    /** The account chips come from the accounts list; the filters alone cannot name them. */
+    loadAccounts: rxMethod<void>(
       pipe(
         switchMap(() =>
-          forkJoin({
-            dashboard$: bankSyncService.getDashboardData().pipe(catchError(() => of(null))),
-            accounts$: bankSyncService.getAccounts().pipe(catchError(() => of(null))),
-          }).pipe(
-            tap(({dashboard$, accounts$}) => {
-              store.setMonthlyOutflowUsd(
-                dashboard$ ? sumCurrentMonthOutflow(dashboard$.monthlyFlow) : null,
-                dashboard$?.baseCurrency
-              );
-              store.setAccounts(TransactionGroupUtils.toAccountOptions(accounts$?.accounts ?? []));
-            })
+          bankSyncService.getAccounts().pipe(
+            catchError(() => of(null)),
+            tap(accounts =>
+              store.setAccounts(TransactionGroupUtils.toAccountOptions(accounts?.accounts ?? []))
+            )
+          )
+        )
+      )
+    ),
+    /**
+     * Reads the summary line's outflow and top category for the account and dates on screen. The
+     * server answers in the base currency with transfers left out, so every scope is one request;
+     * the search and category filters narrow the rows, not this line.
+     */
+    watchSpendingScope: rxMethod<OutflowScope>(
+      pipe(
+        distinctUntilChanged(OutflowUtils.sameScope),
+        switchMap(scope =>
+          bankSyncService.getSpendingSummary(scope).pipe(
+            tap(summary => store.setSpending({...scope, ...summary})),
+            catchError(() => of(null))
           )
         )
       )
@@ -208,11 +212,14 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
 interface HookStore {
   filter: Signal<LedgerFilter>;
+  spendingScope: Signal<OutflowScope>;
+  watchSpendingScope: (scope: Signal<OutflowScope>) => void;
   watchFilter: (filter: Signal<LedgerFilter>) => void;
-  loadSummary: () => void;
+  loadAccounts: () => void;
 }
 
 export function transactionLedgerHooks(store: HookStore): void {
   store.watchFilter(store.filter);
-  store.loadSummary();
+  store.watchSpendingScope(store.spendingScope);
+  store.loadAccounts();
 }
