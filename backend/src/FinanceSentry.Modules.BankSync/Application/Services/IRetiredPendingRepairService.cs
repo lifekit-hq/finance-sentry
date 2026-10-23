@@ -17,7 +17,9 @@ public sealed record RetiredPendingRepairResult(
 /// <para>
 /// Eligible: a pending row soft-deleted by the reconciler (no archive reason — an account removal or retention purge
 /// stamps one) on or after 2026-07-23 11:20 UTC, the first run of that reconciler, on an active account, with
-/// no active same-day twin (same account, type, amount and day). Each is reactivated; where the provider now reports
+/// no active same-day twin (same account, type, amount and day) and no active booking the reconciler would still pair it
+/// with (same account, amount and text, posted within <see cref="PendingReconciler.SettlementWindowDays"/> of it, one
+/// booking per row). Each is reactivated; where the provider now reports
 /// it as booked (a settled candidate with the row's hash) it is also marked settled.
 /// </para>
 ///

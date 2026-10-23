@@ -100,16 +100,22 @@ public class RetiredPendingRepairService(
             return retired;
 
         var retiredAccountIds = retired.Select(t => t.AccountId).Distinct().ToList();
-        var twins = (await _db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
-                .AsNoTracking()
-                .Where(t => retiredAccountIds.Contains(t.AccountId))
-                .Select(t => new { t.AccountId, t.Amount, t.TransactionType, t.TransactionDate, t.PostedDate })
-                .ToListAsync(ct))
+        var active = await _db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking()
+            .Where(t => retiredAccountIds.Contains(t.AccountId))
+            .ToListAsync(ct);
+        var twins = active
             .Select(t => TwinKey(t.AccountId, t.Amount, t.TransactionType, t.PostedDate ?? t.TransactionDate))
             .ToHashSet();
 
+        // A row whose own settlement is still active (the reconciler's rule: same account, amount and text, posted
+        // within its settlement window, one booking per row) was retired correctly and stays retired.
+        var settled = PendingReconciler.SelectStalePending(retired.Concat(active.Where(t => !t.IsPending)), [])
+            .ToHashSet();
+
         return retired
-            .Where(t => !twins.Contains(TwinKey(t.AccountId, t.Amount, t.TransactionType, t.PostedDate ?? t.TransactionDate)))
+            .Where(t => !settled.Contains(t)
+                        && !twins.Contains(TwinKey(t.AccountId, t.Amount, t.TransactionType, t.PostedDate ?? t.TransactionDate)))
             .ToList();
     }
 

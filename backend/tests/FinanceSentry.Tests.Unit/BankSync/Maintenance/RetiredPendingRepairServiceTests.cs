@@ -214,4 +214,49 @@ public class RetiredPendingRepairServiceTests
         second.Should().Be(new RetiredPendingRepairResult(false, 0, 0, 0, 0, 0));
         (await _db.Transactions.IgnoreQueryFilters().CountAsync(t => t.IsActive)).Should().Be(2);
     }
+
+    [Fact]
+    public async Task KeepsACardHoldRetiredByItsOwnBooking_AcrossARepairASyncAndASecondRepair()
+    {
+        // A card hold P (Sep 10) retired by its booking X (posted two days later, its own hash): the reconciler was
+        // right, so the repair must not restore P, or P and X would both count until the next sync retired P again
+        // and every later run would restore it once more.
+        var account = await AccountAsync();
+        var hold = await RetiredAsync(account, "Costa", amount: -3.50m);
+        var wronglyRetired = await RetiredAsync(account, "Rent");
+        _db.Transactions.Add(new Transaction(account.Id, UserId, -3.50m, Day.AddDays(2), "Costa", "hash:costa-booked", isPending: false)
+        {
+            TransactionType = "debit",
+            PostedDate = Day.AddDays(2),
+        });
+        await _db.SaveChangesAsync();
+
+        var first = await Sut().RepairAsync(dryRun: false);
+
+        first.Should().Be(new RetiredPendingRepairResult(false, 1, 1, 0, 0, 0));
+        (await Reload(hold)).IsActive.Should().BeFalse();
+        (await Reload(wronglyRetired)).IsActive.Should().BeTrue();
+
+        await SyncReconcileAsync(account);
+        var second = await Sut().RepairAsync(dryRun: false);
+
+        second.Should().Be(new RetiredPendingRepairResult(false, 0, 0, 0, 0, 0));
+        (await Reload(hold)).IsActive.Should().BeFalse();
+        (await Reload(wronglyRetired)).IsActive.Should().BeTrue();
+    }
+
+    // The reconciliation pass a sync runs over the account (ScheduledSyncService.PersistAndReconcileAsync).
+    private async Task SyncReconcileAsync(BankAccount account)
+    {
+        var active = await _db.Transactions.Where(t => t.AccountId == account.Id).ToListAsync();
+        var retired = await _db.Transactions.IgnoreQueryFilters()
+            .Where(t => t.AccountId == account.Id && !t.IsActive && t.IsPending)
+            .ToListAsync();
+        foreach (var stale in PendingReconciler.SelectStalePending(active, [], null, retired))
+        {
+            stale.IsActive = false;
+            stale.DeletedAt = DateTime.UtcNow;
+        }
+        await _db.SaveChangesAsync();
+    }
 }
