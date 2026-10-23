@@ -559,7 +559,7 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   chain, and Monobank ingest, TrueLayer ingest and the `recategorize` backfill all run it and
   nothing else — a backfill can therefore only confirm or correct an ingest decision, never
   reverse one. The order, highest first: the runtime-editable `merchant_keywords` bridge (an
-  admin keeps the last word on a wording); the loan/installment rule above; the provider's own
+  admin keeps the last word on a wording); the loan/installment rule above; the AIB ATM cash lodgement rule (a `credit` whose description starts `*ATMLDG` is `INCOME`, the owner's call in #1239; debits and withdrawals never match); the provider's own
   category (a bank calling "To Go Sushi" *Restaurants* beats the directional prefix below);
   the directional-transfer / savings-jar description (which outranks the MCC map because
   Monobank tags jar operations with the charity MCC 8398); then the MCC map (the
