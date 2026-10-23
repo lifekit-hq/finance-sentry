@@ -18,7 +18,7 @@ describe('SessionsListComponent', () => {
   it('acts on the store input and leaves no drawer to close', () => {
     const store = makeStore();
     const fixture = TestBed.createComponent(SessionsListComponent);
-    fixture.componentRef.setInput('pageStore', store as never);
+    fixture.componentRef.setInput('pageStore', store);
     fixture.detectChanges();
     fixture.componentInstance.onSelect({id: 'c1'} as never);
     fixture.componentInstance.onConversationAction('delete', {id: 'c1'} as never);
@@ -49,7 +49,7 @@ describe('SessionsListComponent', () => {
 
   it('keeps the actions menu a labelled trigger, not a destructive button', () => {
     const fixture = TestBed.createComponent(SessionsListComponent);
-    fixture.componentRef.setInput('pageStore', makeStore() as never);
+    fixture.componentRef.setInput('pageStore', makeStore());
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('cmn-menu')).not.toBeNull();

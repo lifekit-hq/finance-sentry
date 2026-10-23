@@ -156,7 +156,7 @@ describe('authInterceptor', () => {
     expect(expireSession).toHaveBeenCalledTimes(1);
     expect(errors).toHaveLength(3);
     expect(
-      errors.every(e => (e as HttpErrorResponse).status === (HttpStatusCode.Unauthorized as number))
+      errors.every(e => (e as HttpErrorResponse).status === Number(HttpStatusCode.Unauthorized))
     ).toBe(true);
   });
 

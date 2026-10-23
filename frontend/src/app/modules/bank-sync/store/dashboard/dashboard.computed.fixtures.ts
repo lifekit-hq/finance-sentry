@@ -64,7 +64,7 @@ export function build(
     netWorthHeadline,
     cashHeadline,
     investedHeadline,
-  } as unknown as DashboardData;
+  };
 
   return {
     data: signal<Nullable<DashboardData>>(data),

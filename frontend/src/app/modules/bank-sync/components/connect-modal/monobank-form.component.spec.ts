@@ -27,7 +27,7 @@ function buildAccountsStore() {
 function buildStrategy(): ConnectStrategy {
   return {
     slug: 'monobank',
-    formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+    formComponent: class {},
     submit: vi.fn(),
   };
 }

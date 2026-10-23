@@ -100,7 +100,7 @@ describe('SettingsComponent financial independence assumptions', () => {
   it('sends the stored fractions untouched when the assumptions were not edited', () => {
     const {store, component} = create();
     const stored = {...profile, safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456};
-    store.profile.set(stored as unknown as UserProfile);
+    store.profile.set(stored);
     component.saveAssumptions();
     expect(store.saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456})
@@ -155,7 +155,7 @@ describe('SettingsComponent financial independence assumptions', () => {
   it('keeps what the user typed when the profile is edited elsewhere', () => {
     const {store, component, form} = setup();
     form.controls.safeWithdrawalRate.setValue('12');
-    store.profile.set({...profile, firstName: 'Grace'} as unknown as UserProfile);
+    store.profile.set({...profile, firstName: 'Grace'});
     expect(component.assumptionsForm()).toBe(form);
     expect(form.controls.safeWithdrawalRate.value).toBe('12');
   });
@@ -253,7 +253,7 @@ describe('SettingsComponent Save assumptions button', () => {
     const {store, fixture, saveButton} = render();
     store.profile.set(null);
     fixture.detectChanges();
-    store.profile.set({...profile, safeWithdrawalRate: 0.05} as unknown as UserProfile);
+    store.profile.set({...profile, safeWithdrawalRate: 0.05});
     fixture.detectChanges();
     expect(saveButton().disabled).toBe(false);
   });

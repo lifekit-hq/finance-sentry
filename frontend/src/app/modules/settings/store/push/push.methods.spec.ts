@@ -17,7 +17,7 @@ const laptop: PushDevice = {...phone, id: 'd-2', deviceLabel: 'Firefox on Linux'
 
 function build() {
   const state = signalState(initialPushState);
-  return {state, methods: pushMethods(state as never)};
+  return {state, methods: pushMethods(state)};
 }
 
 describe('pushMethods', () => {

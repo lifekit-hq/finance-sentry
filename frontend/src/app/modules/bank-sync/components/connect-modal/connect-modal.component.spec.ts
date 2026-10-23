@@ -1,4 +1,4 @@
-import {signal, type Type} from '@angular/core';
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it} from 'vitest';
 
@@ -17,17 +17,17 @@ class InzhurFormStub {}
 const STRATEGIES: readonly ConnectStrategy[] = [
   {
     slug: 'monobank',
-    formComponent: MonobankFormStub as Type<unknown>,
+    formComponent: MonobankFormStub,
     submit: () => null as never,
   },
-  {slug: 'binance', formComponent: BinanceFormStub as Type<unknown>, submit: () => null as never},
+  {slug: 'binance', formComponent: BinanceFormStub, submit: () => null as never},
   {
     slug: 'revolut_x',
-    formComponent: RevolutXFormStub as Type<unknown>,
+    formComponent: RevolutXFormStub,
     submit: () => null as never,
   },
-  {slug: 'ibkr', formComponent: IbkrFormStub as Type<unknown>, submit: () => null as never},
-  {slug: 'inzhur', formComponent: InzhurFormStub as Type<unknown>, submit: () => null as never},
+  {slug: 'ibkr', formComponent: IbkrFormStub, submit: () => null as never},
+  {slug: 'inzhur', formComponent: InzhurFormStub, submit: () => null as never},
 ];
 
 function buildStore(modalStep: ModalStep) {

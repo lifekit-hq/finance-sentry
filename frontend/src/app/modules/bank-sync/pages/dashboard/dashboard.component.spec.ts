@@ -489,8 +489,8 @@ describe('DashboardComponent async states', () => {
         string,
         ReturnType<typeof signal<never>>
       >;
-      store['errorMessage'].set('Failed to load dashboard data.' as never);
-      store['hasError'].set(true as never);
+      store['errorMessage'].set('Failed to load dashboard data.');
+      store['hasError'].set(true);
       TestBed.configureTestingModule({
         providers: [
           provideRouter([]),

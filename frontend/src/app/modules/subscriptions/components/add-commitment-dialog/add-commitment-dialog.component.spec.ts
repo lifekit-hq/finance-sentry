@@ -400,7 +400,7 @@ describe('AddCommitmentDialogComponent candidate list states', () => {
     const {fixture, host} = render(search, true);
     expect(host.textContent).toContain('Acme Hosting');
 
-    search.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})) as never);
+    search.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));
     fixture.debugElement.injector.get(CommitmentPickerStore).load();
     fixture.detectChanges();
 

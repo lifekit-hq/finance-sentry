@@ -26,8 +26,7 @@ export class AuthRefreshService {
         catchError((err: unknown) => {
           // A 401 from the refresh call itself already expired the session in authInterceptor.
           const alreadyExpired =
-            err instanceof HttpErrorResponse &&
-            (err.status as HttpStatusCode) === HttpStatusCode.Unauthorized;
+            err instanceof HttpErrorResponse && err.status === Number(HttpStatusCode.Unauthorized);
           if (!alreadyExpired) {
             authStore.expireSession();
           }

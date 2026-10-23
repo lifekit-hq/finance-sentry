@@ -49,7 +49,7 @@ function buildConnectStore() {
 function setup(ibkr = buildIbkrStore(), store = buildConnectStore()) {
   const strategy: ConnectStrategy = {
     slug: 'ibkr',
-    formComponent: class {} as unknown as ConnectStrategy['formComponent'],
+    formComponent: class {},
     submit: vi.fn(),
   };
   TestBed.configureTestingModule({
