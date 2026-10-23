@@ -70,6 +70,7 @@ public sealed class CoverageSentinelJob(
             .ToHashSet();
 
         var openHoles = await db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .AsNoTracking()
             .Where(h => h.To == null)
             .ToDictionaryAsync(h => h.AccountId, ct);
 
@@ -122,8 +123,7 @@ public sealed class CoverageSentinelJob(
     private async Task CloseUnwatchedHoleAsync(CoverageHole hole, DateOnly latestWeek, CancellationToken ct)
     {
         await alerts.ResolveCoverageGapAlertAsync(hole.UserId, hole.AccountId, ct);
-        hole.To = latestWeek.AddDays(6);
-        await db.SaveChangesAsync(ct);
+        await CloseHoleAsync(hole.Id, latestWeek.AddDays(6), ct);
 
         logger.LogInformation("Coverage gap on account {AccountId} closed: the account is no longer watched.", hole.AccountId);
     }
@@ -172,10 +172,20 @@ public sealed class CoverageSentinelJob(
 
         // Resolve first (idempotent): when it fails the hole stays open and tomorrow's run retries the resolve.
         await alerts.ResolveCoverageGapAlertAsync(account.UserId, account.Id, ct);
-        hole.To = recoveredFrom.AddDays(-1);
-        await db.SaveChangesAsync(ct);
+        await CloseHoleAsync(hole.Id, recoveredFrom.AddDays(-1), ct);
 
         logger.LogInformation("Coverage gap on account {AccountId} closed: daily spend flows again from {Week}.", account.Id, recoveredFrom);
+    }
+
+    /// <summary>
+    /// Closes the hole read fresh by id: the open holes are loaded untracked, so another account's failure, which clears
+    /// the change tracker, cannot drop this write.
+    /// </summary>
+    private async Task CloseHoleAsync(Guid holeId, DateOnly to, CancellationToken ct)
+    {
+        var hole = await db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync(h => h.Id == holeId, ct);
+        hole.To = to;
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Weekly spend in USD by week-start Monday; converted once here, where the account's currency is in scope.</summary>

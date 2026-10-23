@@ -269,6 +269,38 @@ public class CoverageSentinelJobTests
     }
 
     [Fact]
+    public async Task One_accounts_failure_does_not_drop_another_accounts_close()
+    {
+        var failingUser = Guid.NewGuid();
+        var failing = AddAccount(failingUser);
+        var retiredUser = Guid.NewGuid();
+        var retired = AddAccount(retiredUser);
+        Spend(failing, Start, new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc), 25m);
+        Spend(retired, Start, new DateTime(2026, 9, 6, 0, 0, 0, DateTimeKind.Utc), 25m);
+        await _db.SaveChangesAsync();
+        await Job().ExecuteAsync();
+
+        // The first account's spend is back but resolving its alert fails; the second account is retired, so its hole
+        // closes in the same run after that failure.
+        Spend(failing, new DateTime(2026, 9, 21, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc), 25m);
+        _db.SyncJobs.Add(new SyncJob(failing.Id, failingUser)
+        {
+            Status = "success", StartedAt = Today.UtcDateTime.AddDays(15), CompletedAt = Today.UtcDateTime.AddDays(15),
+        });
+        retired.Retire(Today, "closed by the bank");
+        await _db.SaveChangesAsync();
+        _time.SetUtcNow(Today.AddDays(15)); // 2026-10-07: latest complete week 09-28..10-04
+        _alerts.Setup(a => a.ResolveCoverageGapAlertAsync(failingUser, failing.Id, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("alerts down"));
+
+        await Job().ExecuteAsync();
+
+        var holes = await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().ToListAsync();
+        Assert.Null(holes.Single(h => h.AccountId == failing.Id).To);
+        Assert.Equal(new DateOnly(2026, 10, 4), holes.Single(h => h.AccountId == retired.Id).To);
+    }
+
+    [Fact]
     public async Task A_still_quiet_account_keeps_its_hole_open()
     {
         var userId = Guid.NewGuid();
