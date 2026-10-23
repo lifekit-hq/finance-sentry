@@ -64,10 +64,10 @@ async function open(page: Page, payload = ACCOUNTS): Promise<void> {
 
 async function shot(page: Page, name: string): Promise<void> {
   if (SHOTS_DIR) {
-    // The shell scrolls inside <main>, so show the bottom of the page where the section sits.
-    await page.locator('main').evaluate(el => (el.scrollTop = el.scrollHeight));
+    // The list scrolls inside cmn-page-scroll, so show the bottom of the page where the section sits.
+    await page.locator('cmn-page-scroll').evaluate(el => (el.scrollTop = el.scrollHeight));
     await page.waitForTimeout(SCROLL_SETTLE_MS);
-    await page.locator('main').evaluate(el => (el.scrollTop = el.scrollHeight));
+    await page.locator('cmn-page-scroll').evaluate(el => (el.scrollTop = el.scrollHeight));
     await page.mouse.move(0, 0);
     await page.screenshot({path: `${SHOTS_DIR}/${name}.png`});
   }
