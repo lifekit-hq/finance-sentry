@@ -64,10 +64,12 @@
         @for (group of dayGroups(); track group.dayKey) {
           <cmn-list-section [heading]="group.label" data-testid="alerts-day">
             @for (alert of group.items; track alert.id) {
+              <!-- The dismiss button's 44px ::after hit area (PHONE_HIT_AREA_CLASSES in @lifekit-hq/ui)
+                   reaches ~5px past the card, which made cmn-page-scroll scroll sideways. -->
               <div
                 [class]="alert.isResolved ? resolvedRowClass : ''"
                 [attr.data-resolved]="alert.isResolved"
-                class="relative rounded-cmn-md"
+                class="relative overflow-x-clip rounded-cmn-md"
                 data-testid="alert-row"
               >
                 <cmn-alert-item
