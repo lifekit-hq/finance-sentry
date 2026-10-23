@@ -1,5 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
+import {PENDING_AAPL} from './support/recommendation-mocks';
+
 const API = '**/api/v1';
 const DESKTOP = {width: 1440, height: 900};
 const PHONE = {width: 390, height: 844};
@@ -9,7 +11,12 @@ const TIMESTAMP = '2026-10-05T00:00:00Z';
 const SETTLE_MS = 600;
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner'], permissions: ['ai.use']},
+  user: {
+    id: 'test-user-id',
+    email: 'test@gmail.com',
+    roles: ['Owner'],
+    permissions: ['ai.use', 'users.manage'],
+  },
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
@@ -66,6 +73,133 @@ async function mockApis(page: Page, count: number): Promise<void> {
       })
     );
   });
+  await page.route(`${API}/people`, route =>
+    route.fulfill(
+      json(
+        rows(i => ({
+          id: `u-${i}`,
+          email: `person${i}@example.com`,
+          roles: ['Member'],
+          status: 'Active',
+        }))
+      )
+    )
+  );
+  await page.route(`${API}/research/watchlist`, route =>
+    route.fulfill(
+      json(
+        rows(i => ({
+          id: `w-${i}`,
+          ticker: `TCK${i}`,
+          exchange: 'NASDAQ',
+          note: 'Wait for the next print',
+          addedAt: TIMESTAMP,
+        }))
+      )
+    )
+  );
+  await page.route(`${API}/budgets/summary**`, route =>
+    route.fulfill(
+      json({
+        year: 2026,
+        month: 10,
+        items: rows(i => ({
+          id: `b-${i}`,
+          category: `CATEGORY_${i}`,
+          categoryLabel: `Category ${i}`,
+          monthlyLimit: 100,
+          spent: 40,
+          remaining: 60,
+          isOverBudget: false,
+          currency: 'USD',
+          paceRatio: 0.4,
+          projectedMonthEndSpend: 80,
+          isOffPace: false,
+        })),
+        totalLimit: count * 100,
+        totalSpent: count * 40,
+      })
+    )
+  );
+  await page.route(`${API}/subscriptions?**`, route =>
+    route.fulfill(
+      json({
+        items: rows(i => ({
+          id: `s-${i}`,
+          merchantName: `Merchant ${i}`,
+          cadence: 'monthly',
+          averageAmount: 10,
+          lastKnownAmount: 10,
+          monthlyEquivalent: 10,
+          currency: 'USD',
+          lastChargeDate: TIMESTAMP,
+          nextExpectedDate: '2026-11-05T00:00:00Z',
+          status: 'active',
+          occurrenceCount: 12,
+          kind: 'subscription',
+          termCount: null,
+          endDate: null,
+          startDate: null,
+          remainingPayments: null,
+          isManual: false,
+          isTracked: true,
+        })),
+        totalCount: count,
+        hasInsufficientHistory: false,
+      })
+    )
+  );
+  const bucket = {
+    monthly: count * 10,
+    next12Months: count * 120,
+    remainingCommitment: null,
+    activeCount: count,
+    hasUnknownSchedule: false,
+  };
+  await page.route(`${API}/subscriptions/summary`, route =>
+    route.fulfill(
+      json({
+        subscriptions: bucket,
+        installments: {...bucket, monthly: 0, next12Months: 0, activeCount: 0},
+        combined: bucket,
+        potentiallyCancelledCount: 0,
+        currency: 'USD',
+      })
+    )
+  );
+  await page.route(`${API}/research/recommendations`, route =>
+    route.fulfill(
+      json({
+        pending: rows(i => ({...PENDING_AAPL, id: `rec-${i}`, ticker: `TCK${i}`})),
+        decided: [],
+      })
+    )
+  );
+  await page.route(`${API}/research/scorecards**`, route => route.fulfill(json([])));
+  await page.route(`${API}/dashboard/flow-breakdown**`, route =>
+    route.fulfill(
+      json({
+        month: '2026-10',
+        items: rows(i => ({
+          transactionId: `f-${i}`,
+          accountId: 'acc',
+          bankName: 'Bank',
+          accountLast4: '4821',
+          currency: 'USD',
+          amount: -10,
+          amountUsd: -10,
+          date: TIMESTAMP,
+          description: `Merchant ${i}`,
+          merchantName: `Merchant ${i}`,
+          category: 'GROCERIES',
+          direction: 'out',
+          bucket: 'spending',
+          counterpartyName: null,
+          flowRole: null,
+        })),
+      })
+    )
+  );
   await page.route(`${API}/accounts/transactions**`, route =>
     route.fulfill(
       json({
@@ -110,7 +244,20 @@ function scrollers(page: Page): Promise<string[]> {
   });
 }
 
-const PAGES = ['/alerts', '/events', '/transactions'];
+// A page that keeps a form or the whole book above its list can be taller than an empty list needs,
+// so its one scroll region may legitimately scroll when the list is empty - it is never any other
+// element.
+const PAGES = [
+  {path: '/alerts'},
+  {path: '/events'},
+  {path: '/transactions'},
+  {path: '/subscriptions'},
+  {path: '/budgets'},
+  {path: '/ledger/decisions'},
+  {path: '/settings/people', tallWhenEmpty: true},
+  {path: '/watchlist', tallWhenEmpty: true},
+  {path: '/dashboard/breakdown?month=2026-10', tallWhenEmpty: true},
+];
 const VIEWPORTS = [
   {name: '1440', size: DESKTOP},
   {name: '390', size: PHONE},
@@ -120,7 +267,7 @@ for (const {name, size} of VIEWPORTS) {
   test.describe(`list pages scroll only the list (${name} wide)`, () => {
     test.use({viewport: size});
 
-    for (const path of PAGES) {
+    for (const {path, tallWhenEmpty} of PAGES) {
       test(`${path}: a long list is the one scroll container`, async ({page}) => {
         await mockApis(page, LONG_COUNT);
         await page.goto(path);
@@ -134,7 +281,8 @@ for (const {name, size} of VIEWPORTS) {
         await page.goto(path);
         await expect(page.locator('cmn-empty-state')).toBeVisible();
         await page.waitForTimeout(SETTLE_MS);
-        expect(await scrollers(page)).toEqual([]);
+        const found = await scrollers(page);
+        expect(tallWhenEmpty ? found.filter(el => el !== 'cmn-page-scroll') : found).toEqual([]);
       });
     }
   });

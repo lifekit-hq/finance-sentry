@@ -1,185 +1,193 @@
-<cmn-page-container spacing="none">
-  <div class="flex flex-col gap-cmn-5" data-testid="decisions-page">
+<cmn-page-container spacing="none" fill>
+  <div class="flex min-h-0 flex-1 flex-col gap-cmn-5" data-testid="decisions-page">
     <p class="text-cmn-sm text-text-secondary">
       Ledger proposes, you decide. Finance Sentry never trades: confirming records your decision and
       shows the order for you to place at IBKR yourself.
     </p>
 
-    <cmn-async-state
-      [status]="store.view().status"
-      [errorMessage]="store.view().errorMessage"
-      [isEmpty]="!store.hasData()"
-      [emptyMessage]="emptyCopy.message"
-      [emptySubMessage]="emptyCopy.subMessage"
-      [emptyIcon]="emptyCopy.icon"
-      (retry)="store.load()"
-      class="block"
-      errorPlacement="above"
-      retryable
-    >
-      <!-- Shaped like a pending card and the decided list, line boxes at the cards' line heights -->
-      <div skeleton class="space-y-cmn-6" data-testid="decisions-skeleton">
-        <div class="flex flex-col gap-cmn-3">
-          <div class="flex items-center" style="height: 0.9375rem">
-            <cmn-skeleton class="w-full" width="6rem" height="0.75rem" />
+    <cmn-page-scroll label="Decisions">
+      <cmn-async-state
+        [status]="store.view().status"
+        [errorMessage]="store.view().errorMessage"
+        [isEmpty]="!store.hasData()"
+        [emptyMessage]="emptyCopy.message"
+        [emptySubMessage]="emptyCopy.subMessage"
+        [emptyIcon]="emptyCopy.icon"
+        (retry)="store.load()"
+        class="block"
+        errorPlacement="above"
+        retryable
+      >
+        <!-- Shaped like a pending card and the decided list, line boxes at the cards' line heights -->
+        <div skeleton class="space-y-cmn-6" data-testid="decisions-skeleton">
+          <div class="flex flex-col gap-cmn-3">
+            <div class="flex items-center" style="height: 0.9375rem">
+              <cmn-skeleton class="w-full" width="6rem" height="0.75rem" />
+            </div>
+            @for (_ of skeletonCards; track $index) {
+              <cmn-card>
+                <div class="flex flex-col gap-cmn-4">
+                  <div class="flex flex-col gap-cmn-2">
+                    <div class="flex items-center gap-cmn-2" style="height: 1.5rem">
+                      <cmn-skeleton width="2.75rem" height="1.25rem" />
+                      <cmn-skeleton width="3.5rem" height="0.875rem" />
+                      <cmn-skeleton class="flex-1" width="70%" height="0.75rem" />
+                    </div>
+                    <div class="flex items-center" style="height: 0.9375rem">
+                      <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+                    </div>
+                  </div>
+                  <div class="flex items-center" style="height: 1.5rem">
+                    <cmn-skeleton class="w-full" width="85%" height="1rem" />
+                  </div>
+                  <div class="flex flex-col gap-cmn-1">
+                    <div class="flex items-center" style="height: 0.9375rem">
+                      <cmn-skeleton class="w-full" width="15%" height="0.75rem" />
+                    </div>
+                    @for (width of skeletonTextLines; track $index) {
+                      <div class="flex items-center" style="height: 1.3125rem">
+                        <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
+                      </div>
+                    }
+                  </div>
+                  <div class="grid gap-cmn-3 sm:grid-cols-2">
+                    @for (_ of skeletonFacts; track $index) {
+                      <div class="flex flex-col gap-cmn-1">
+                        <div class="flex items-center" style="height: 0.9375rem">
+                          <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
+                        </div>
+                        <div class="flex items-center" style="height: 1.3125rem">
+                          <cmn-skeleton class="w-full" width="70%" height="0.875rem" />
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  <div class="flex flex-col gap-cmn-2">
+                    <div class="flex items-center" style="height: 0.9375rem">
+                      <cmn-skeleton class="w-full" width="20%" height="0.75rem" />
+                    </div>
+                    @for (width of skeletonEvidenceLines; track $index) {
+                      <div class="flex items-center gap-cmn-2" style="height: 1.3125rem">
+                        <cmn-skeleton width="4rem" height="1.25rem" />
+                        <cmn-skeleton [width]="width" class="flex-1" height="0.875rem" />
+                      </div>
+                    }
+                  </div>
+                  <div class="flex justify-end gap-cmn-2">
+                    <cmn-skeleton width="5rem" height="2.75rem" />
+                    <cmn-skeleton width="6.5rem" height="2.75rem" />
+                  </div>
+                </div>
+              </cmn-card>
+            }
           </div>
-          @for (_ of skeletonCards; track $index) {
-            <cmn-card>
-              <div class="flex flex-col gap-cmn-4">
-                <div class="flex flex-col gap-cmn-2">
-                  <div class="flex items-center gap-cmn-2" style="height: 1.5rem">
-                    <cmn-skeleton width="2.75rem" height="1.25rem" />
-                    <cmn-skeleton width="3.5rem" height="0.875rem" />
-                    <cmn-skeleton class="flex-1" width="70%" height="0.75rem" />
+          <div class="flex flex-col gap-cmn-3">
+            <div class="flex items-center" style="height: 0.9375rem">
+              <cmn-skeleton class="w-full" width="7rem" height="0.75rem" />
+            </div>
+            <div
+              class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+            >
+              @for (_ of skeletonDecidedRows; track $index) {
+                <div class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
+                  <div
+                    class="flex items-center justify-between gap-cmn-2"
+                    style="height: 1.3125rem"
+                  >
+                    <cmn-skeleton class="flex-1" width="50%" height="0.875rem" />
+                    <cmn-skeleton width="4.5rem" height="0.75rem" />
                   </div>
-                  <div class="flex items-center" style="height: 0.9375rem">
-                    <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
-                  </div>
-                </div>
-                <div class="flex items-center" style="height: 1.5rem">
-                  <cmn-skeleton class="w-full" width="85%" height="1rem" />
-                </div>
-                <div class="flex flex-col gap-cmn-1">
-                  <div class="flex items-center" style="height: 0.9375rem">
-                    <cmn-skeleton class="w-full" width="15%" height="0.75rem" />
-                  </div>
-                  @for (width of skeletonTextLines; track $index) {
+                  @for (width of skeletonOutcomeLines; track $index) {
                     <div class="flex items-center" style="height: 1.3125rem">
                       <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
                     </div>
                   }
                 </div>
-                <div class="grid gap-cmn-3 sm:grid-cols-2">
-                  @for (_ of skeletonFacts; track $index) {
-                    <div class="flex flex-col gap-cmn-1">
-                      <div class="flex items-center" style="height: 0.9375rem">
-                        <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
-                      </div>
-                      <div class="flex items-center" style="height: 1.3125rem">
-                        <cmn-skeleton class="w-full" width="70%" height="0.875rem" />
-                      </div>
-                    </div>
-                  }
-                </div>
-                <div class="flex flex-col gap-cmn-2">
-                  <div class="flex items-center" style="height: 0.9375rem">
-                    <cmn-skeleton class="w-full" width="20%" height="0.75rem" />
-                  </div>
-                  @for (width of skeletonEvidenceLines; track $index) {
-                    <div class="flex items-center gap-cmn-2" style="height: 1.3125rem">
-                      <cmn-skeleton width="4rem" height="1.25rem" />
-                      <cmn-skeleton [width]="width" class="flex-1" height="0.875rem" />
-                    </div>
-                  }
-                </div>
-                <div class="flex justify-end gap-cmn-2">
-                  <cmn-skeleton width="5rem" height="2.75rem" />
-                  <cmn-skeleton width="6.5rem" height="2.75rem" />
-                </div>
-              </div>
-            </cmn-card>
+              }
+            </div>
+          </div>
+        </div>
+
+        <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-pending-heading">
+          <h2
+            id="decisions-pending-heading"
+            class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >
+            Pending ({{ store.pending().length }})
+          </h2>
+          @for (rec of store.pending(); track rec.id) {
+            <fns-recommendation-card
+              [recommendation]="rec"
+              [linkTicker]="true"
+              [scorecard]="store.scorecards()[rec.ticker] ?? null"
+              (decide)="store.decide({recommendation: rec, verdict: $event})"
+            />
+          } @empty {
+            <p class="text-cmn-sm text-text-secondary" data-testid="decisions-pending-empty">
+              Nothing is waiting on you.
+            </p>
           }
-        </div>
-        <div class="flex flex-col gap-cmn-3">
-          <div class="flex items-center" style="height: 0.9375rem">
-            <cmn-skeleton class="w-full" width="7rem" height="0.75rem" />
-          </div>
-          <div
-            class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
-          >
-            @for (_ of skeletonDecidedRows; track $index) {
-              <div class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
-                <div class="flex items-center justify-between gap-cmn-2" style="height: 1.3125rem">
-                  <cmn-skeleton class="flex-1" width="50%" height="0.875rem" />
-                  <cmn-skeleton width="4.5rem" height="0.75rem" />
-                </div>
-                @for (width of skeletonOutcomeLines; track $index) {
-                  <div class="flex items-center" style="height: 1.3125rem">
-                    <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        </div>
-      </div>
+        </section>
 
-      <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-pending-heading">
-        <h2
-          id="decisions-pending-heading"
-          class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >
-          Pending ({{ store.pending().length }})
-        </h2>
-        @for (rec of store.pending(); track rec.id) {
-          <fns-recommendation-card
-            [recommendation]="rec"
-            [linkTicker]="true"
-            [scorecard]="store.scorecards()[rec.ticker] ?? null"
-            (decide)="store.decide({recommendation: rec, verdict: $event})"
-          />
-        } @empty {
-          <p class="text-cmn-sm text-text-secondary" data-testid="decisions-pending-empty">
-            Nothing is waiting on you.
-          </p>
-        }
-      </section>
-
-      <!-- Spaced on the section, not the host: a space-y host counts the hidden status span the
+        <!-- Spaced on the section, not the host: a space-y host counts the hidden status span the
            skeleton follows and would drop the skeleton below where the content starts -->
-      <section class="mt-cmn-6 flex flex-col gap-cmn-3" aria-labelledby="decisions-decided-heading">
-        <h2
-          id="decisions-decided-heading"
-          class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+        <section
+          class="mt-cmn-6 flex flex-col gap-cmn-3"
+          aria-labelledby="decisions-decided-heading"
         >
-          Decided (30 d)
-        </h2>
-        @if (store.decided().length > 0) {
-          <ul
-            class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
-            data-testid="decisions-decided"
+          <h2
+            id="decisions-decided-heading"
+            class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
           >
-            @for (rec of store.decided(); track rec.id) {
-              <li class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
-                <div class="flex flex-wrap items-center justify-between gap-cmn-2">
-                  <div class="flex min-w-0 items-center gap-cmn-2">
-                    <cmn-tag [variant]="actionVariant[rec.action]">
-                      {{ actionLabel[rec.action] }}
-                    </cmn-tag>
-                    <a
-                      [routerLink]="[dossierRoute, rec.ticker]"
-                      class="font-semibold text-text-primary underline-offset-2 hover:underline"
-                    >
-                      {{ rec.ticker }}
-                    </a>
-                    <cmn-tag [variant]="statusVariant[rec.status]">
-                      {{ statusLabel[rec.status] }}
-                    </cmn-tag>
+            Decided (30 d)
+          </h2>
+          @if (store.decided().length > 0) {
+            <ul
+              class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+              data-testid="decisions-decided"
+            >
+              @for (rec of store.decided(); track rec.id) {
+                <li class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
+                  <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+                    <div class="flex min-w-0 items-center gap-cmn-2">
+                      <cmn-tag [variant]="actionVariant[rec.action]">
+                        {{ actionLabel[rec.action] }}
+                      </cmn-tag>
+                      <a
+                        [routerLink]="[dossierRoute, rec.ticker]"
+                        class="font-semibold text-text-primary underline-offset-2 hover:underline"
+                      >
+                        {{ rec.ticker }}
+                      </a>
+                      <cmn-tag [variant]="statusVariant[rec.status]">
+                        {{ statusLabel[rec.status] }}
+                      </cmn-tag>
+                    </div>
+                    <span class="text-cmn-xs text-text-secondary">
+                      {{ rec.decidedAt ?? rec.expiresAt | date: 'mediumDate' }}
+                    </span>
                   </div>
-                  <span class="text-cmn-xs text-text-secondary">
-                    {{ rec.decidedAt ?? rec.expiresAt | date: 'mediumDate' }}
-                  </span>
-                </div>
-                <p class="break-words text-cmn-sm text-text-secondary">
-                  {{ rec | recommendationOutcome }}
-                </p>
-                @if (rec | recommendationExcess; as excess) {
-                  @let tone = rec | recommendationExcessTone;
-                  <p
-                    [class]="tone ? toneClass[tone] : 'text-text-secondary'"
-                    class="text-cmn-sm font-medium tabular-nums"
-                    data-testid="decisions-excess"
-                  >
-                    {{ excess }}
+                  <p class="break-words text-cmn-sm text-text-secondary">
+                    {{ rec | recommendationOutcome }}
                   </p>
-                }
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="text-cmn-sm text-text-secondary">No decisions in the last 30 days.</p>
-        }
-      </section>
-    </cmn-async-state>
+                  @if (rec | recommendationExcess; as excess) {
+                    @let tone = rec | recommendationExcessTone;
+                    <p
+                      [class]="tone ? toneClass[tone] : 'text-text-secondary'"
+                      class="text-cmn-sm font-medium tabular-nums"
+                      data-testid="decisions-excess"
+                    >
+                      {{ excess }}
+                    </p>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="text-cmn-sm text-text-secondary">No decisions in the last 30 days.</p>
+          }
+        </section>
+      </cmn-async-state>
+    </cmn-page-scroll>
   </div>
 </cmn-page-container>
