@@ -38,7 +38,9 @@ test.describe('access denied', () => {
     const start = page.waitForRequest(request => request.url().includes('/auth/oidc/start'));
     await page.route(`${API}/auth/oidc/start**`, route => route.fulfill({status: 204}));
 
-    await page.getByRole('button', {name: 'Try again'}).click();
+    // A 204 never commits the navigation the click starts; without noWaitAfter the click waits on it until the
+    // test times out (Playwright 1.64).
+    await page.getByRole('button', {name: 'Try again'}).click({noWaitAfter: true});
 
     await start;
   });
