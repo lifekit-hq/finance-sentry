@@ -15,6 +15,14 @@ using Microsoft.Extensions.Logging;
 public record RecategorizationResult(int Examined, int ReResolved, int ReFetchedUpdated, int StillUncategorized);
 
 /// <summary>
+/// Narrows a pass to one category move: only rows currently filed under <paramref name="From"/> that the
+/// ladder now resolves to <paramref name="To"/> change; every other row and category is left alone and no
+/// provider re-fetch runs. A second run finds nothing left to move. <paramref name="DryRun"/> counts the
+/// rows without writing.
+/// </summary>
+public record RecategorizationScope(string From, string To, bool DryRun);
+
+/// <summary>
 /// Recategorizes a user's already-stored transactions after the category-taxonomy overhaul.
 /// Rows ingested before the overhaul carry no raw MCC/PFC signal, so they cannot be
 /// re-resolved in place — they need a provider re-fetch. Rows ingested afterwards keep the
@@ -22,7 +30,7 @@ public record RecategorizationResult(int Examined, int ReResolved, int ReFetched
 /// </summary>
 public interface ITransactionRecategorizationService
 {
-    Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default);
+    Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default, RecategorizationScope? scope = null);
 }
 
 /// <inheritdoc />
@@ -60,7 +68,7 @@ public class TransactionRecategorizationService(
     private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
     private readonly ILogger<TransactionRecategorizationService> _logger = logger;
 
-    public async Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default)
+    public async Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default, RecategorizationScope? scope = null)
     {
         var userAccounts = (await _accounts.GetByUserIdUnscopedAsync(userId, ct)).ToList();
         var userTransactions = (await _transactions.GetByUserIdUnscopedAsync(userId, ct)).ToList();
@@ -68,6 +76,9 @@ public class TransactionRecategorizationService(
         // Read once for the whole pass: the loan rule matches each row against the user's
         // active repayment plans, so a per-row lookup would be one query per transaction.
         var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
+
+        if (scope is not null)
+            return await MoveScopedAsync(userId, userTransactions, installmentPlans, scope, ct);
 
         var reResolved = ReResolveFromStoredSignal(userTransactions, installmentPlans);
         var reFetched = await ReFetchMissingSignalAsync(userAccounts, userTransactions, ct);
@@ -82,6 +93,30 @@ public class TransactionRecategorizationService(
             userId, userTransactions.Count, reResolved, reFetched, stillUncategorized);
 
         return new RecategorizationResult(userTransactions.Count, reResolved, reFetched, stillUncategorized);
+    }
+
+    private async Task<RecategorizationResult> MoveScopedAsync(
+        Guid userId, IReadOnlyList<Transaction> txns, IReadOnlyList<ActiveInstallmentPlan> installmentPlans,
+        RecategorizationScope scope, CancellationToken ct)
+    {
+        var moved = 0;
+        foreach (var t in txns.Where(t => t.MerchantCategory == scope.From))
+        {
+            if (ResolveFromRaw(t, installmentPlans) != scope.To)
+                continue;
+            moved++;
+            if (!scope.DryRun)
+                t.MerchantCategory = scope.To;
+        }
+
+        if (!scope.DryRun && moved > 0)
+            await _transactions.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Scoped recategorization {From} -> {To} for user {UserId}: {Moved} row(s) {Mode}.",
+            scope.From, scope.To, userId, moved, scope.DryRun ? "would move (dry run)" : "moved");
+
+        return new RecategorizationResult(txns.Count, moved, 0, 0);
     }
 
     /// <summary>Pass 1 — cheap in-process re-resolve for rows that already carry a raw signal.</summary>
