@@ -20,8 +20,9 @@ public static class MerchantKeywordMatcher
             .ToList();
 
     /// <summary>
-    /// Returns the category of the first (longest) keyword contained in the description,
-    /// or UNCATEGORIZED when none match. <paramref name="prepared"/> must come from
+    /// Returns the category of the first (longest) keyword contained in the description
+    /// (a keyword ending in a space must also start at a word boundary), or UNCATEGORIZED
+    /// when none match. <paramref name="prepared"/> must come from
     /// <see cref="Prepare"/> (lowercased, longest-first).
     /// </summary>
     public static string Resolve(
