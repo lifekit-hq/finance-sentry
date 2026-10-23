@@ -180,4 +180,28 @@ public class PendingReconcilerTests
 
         PendingReconciler.SelectStalePending([other, settledInPlace], [], [settledInPlace]).Should().BeEmpty();
     }
+
+    [Fact]
+    public void PostedRow_ThatAlreadyRetiredAnEarlierPending_DoesNotRetireTheNextOne()
+    {
+        // P1 was retired against the booking in an earlier sync; the booking still sits in P2's window.
+        var retired = Pending(Day, "h-1");
+        var next = Pending(Day.AddDays(1), "h-2");
+        var posted = Posted(Day.AddDays(2), "h-posted");
+
+        PendingReconciler.SelectStalePending([next, posted], [], retiredPending: [retired]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RetiredPending_WithNoPostedRowInItsWindow_ClaimsNothing()
+    {
+        // A row the old reconciler retired against last month's rent has no twin of its own, so it does not
+        // hold back the booking of the pending row that follows it.
+        var retired = Pending(Day.AddDays(-30), "h-retired");
+        var next = Pending(Day, "h-2");
+        var posted = Posted(Day.AddDays(1), "h-posted");
+
+        PendingReconciler.SelectStalePending([next, posted], [], retiredPending: [retired])
+            .Should().ContainSingle().Which.Should().BeSameAs(next);
+    }
 }

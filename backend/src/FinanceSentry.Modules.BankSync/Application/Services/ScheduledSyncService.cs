@@ -658,7 +658,7 @@ public class ScheduledSyncService(
         if (entities.Count > 0)
             await _transactions.AddRangeAsync(entities, ct);
 
-        var stale = PendingReconciler.SelectStalePending(existingRows, entities, settledInPlace);
+        var stale = PendingReconciler.SelectStalePending(existingRows, entities, settledInPlace, retiredByHash.Values);
         if (stale.Count > 0)
         {
             var now = DateTime.UtcNow;

@@ -47,10 +47,15 @@ public static class PendingReconciler
     /// Rows that were pending rows themselves and settled in place in this run. They are the settled
     /// form of a pending row, not a successor to another one, so they never retire a pending row.
     /// </param>
+    /// <param name="retiredPending">
+    /// The account's pending rows an earlier run already retired. Each keeps the posted row that retired
+    /// it, so the one-to-one claim holds across syncs: that posted row cannot retire the next pending row.
+    /// </param>
     public static IReadOnlyList<Transaction> SelectStalePending(
         IEnumerable<Transaction> existingActive,
         IEnumerable<Transaction> newlyInserted,
-        IReadOnlyCollection<Transaction>? alreadySettled = null)
+        IReadOnlyCollection<Transaction>? alreadySettled = null,
+        IEnumerable<Transaction>? retiredPending = null)
     {
         var existing = existingActive as IReadOnlyList<Transaction> ?? existingActive.ToList();
 
@@ -64,24 +69,32 @@ public static class PendingReconciler
             return [];
 
         var claimed = new HashSet<Transaction>();
-        var stale = new List<Transaction>();
 
         // Oldest pending first, each taking the earliest posted row still free in its window, so the
-        // pairing does not depend on the order the rows were read in.
-        foreach (var pending in existing.Where(t => t.IsPending).OrderBy(t => t.TransactionDate))
+        // pairing does not depend on the order the rows were read in. Retired rows go first: they
+        // already own their twin.
+        Transaction? ClaimTwin(Transaction pending)
         {
             if (!postedByKey.TryGetValue(Key(pending), out var candidates))
-                continue;
+                return null;
 
             var earliest = pending.TransactionDate.Date;
             var latest = earliest.AddDays(SettlementWindowDays);
             var twin = candidates.FirstOrDefault(p =>
                 !claimed.Contains(p) && EffectiveDate(p) >= earliest && EffectiveDate(p) <= latest);
-            if (twin is null)
-                continue;
+            if (twin is not null)
+                claimed.Add(twin);
+            return twin;
+        }
 
-            claimed.Add(twin);
-            stale.Add(pending);
+        foreach (var retired in (retiredPending ?? []).OrderBy(t => t.TransactionDate))
+            ClaimTwin(retired);
+
+        var stale = new List<Transaction>();
+        foreach (var pending in existing.Where(t => t.IsPending).OrderBy(t => t.TransactionDate))
+        {
+            if (ClaimTwin(pending) is not null)
+                stale.Add(pending);
         }
 
         return stale;

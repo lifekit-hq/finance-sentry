@@ -53,7 +53,7 @@ public class RetiredPendingRepairService(
             {
                 candidates = await _fetcher.FetchAsync(account, group.Min(t => t.TransactionDate), ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Best-effort per account: its rows stay restored and pending, and the next sync settles them.
                 _logger.LogWarning(ex, "Retired-pending repair could not read account {AccountId} ({Provider}); its rows stay pending.",

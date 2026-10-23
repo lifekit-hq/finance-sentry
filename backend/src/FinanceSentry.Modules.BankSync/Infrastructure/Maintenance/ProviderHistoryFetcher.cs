@@ -6,6 +6,7 @@ using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
+using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -100,8 +101,12 @@ public class ProviderHistoryFetcher(
 
         var accessToken = await _truelayerTokenRefresh.AcquireAccessTokenAsync(connection.Id, ct);
 
-        var (candidates, _) = await _providerFactory.Resolve("truelayer")
-            .SyncTransactionsAsync(accessToken, account.ExternalAccountId, account.Id, account.UserId, null, ct);
+        var provider = _providerFactory.Resolve("truelayer");
+        var (candidates, _) = account.ProductType == TrueLayerAdapter.CardProductType && provider is TrueLayerAdapter cardAdapter
+            ? await cardAdapter.SyncCardTransactionsAsync(
+                accessToken, account.ExternalAccountId, account.Id, account.UserId, null, ct)
+            : await provider.SyncTransactionsAsync(
+                accessToken, account.ExternalAccountId, account.Id, account.UserId, null, ct);
         return candidates;
     }
 }

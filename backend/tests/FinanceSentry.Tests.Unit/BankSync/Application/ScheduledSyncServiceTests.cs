@@ -495,37 +495,73 @@ public class ScheduledSyncServiceTests
 
     // ── #1229: a settled copy must not be retired by, or dropped for, an older identical row ───
 
-    [Fact]
-    public async Task PerformFullSyncAsync_LastMonthsPostedRent_DoesNotRetireThisMonthsPendingRent()
+    // Backs the repository mocks with one row list the way the database does: the active read returns
+    // active rows, the retired read returns soft-deleted pending rows, and every row's hash stays taken.
+    private static void BackRepositoryByRows(Harness h, List<Transaction> rows)
     {
-        // Month 1's rent is posted; month 2's identical rent appears pending, then settles the same day.
-        // The old reconciler matched on amount + text alone, so month 1's row retired month 2's pending row
-        // and its settled copy (same hash) was then dropped as a duplicate: the payment vanished.
+        h.TxRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(() => rows.Where(t => t.IsActive).ToList());
+        h.TxRepo.Setup(r => r.GetRetiredPendingByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(() => rows.Where(t => !t.IsActive && t.IsPending).ToList());
+        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(() => rows.Select(t => t.UniqueHash).ToList());
+        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
+             .Returns([]);
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_LastMonthsPostedRent_DoesNotLoseThisMonthsRentAcrossTwoSyncs()
+    {
+        // Month 1's rent is posted; month 2's identical rent is pending when the first sync runs and its
+        // settled copy arrives in the second. The old reconciler let month 1's row retire the pending row in
+        // the first sync, and the settled copy (same hash) was then dropped as a duplicate in the second:
+        // the payment vanished.
         var h = BuildSut();
 
         var month1 = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
         var month2 = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
         var posted1 = new Transaction(h.Account.Id, UserId, -900m, month1, "Rent", "rent_m1", isPending: false) { PostedDate = month1 };
         var pending2 = new Transaction(h.Account.Id, UserId, -900m, month2, "Rent", "rent_m2", isPending: true);
-        h.TxRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-              .ReturnsAsync([posted1, pending2]);
-        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-              .ReturnsAsync(["rent_m1", "rent_m2"]);
+        BackRepositoryByRows(h, [posted1, pending2]);
+
+        SetupProviderCandidates(h, []);
+        (await h.Sut.PerformFullSyncAsync(h.Account.Id)).Success.Should().BeTrue();
+        pending2.IsActive.Should().BeTrue("last month's rent is not this month's settlement");
 
         var settled = new TransactionCandidate(
             h.Account.Id, UserId, -900m, month2, month2, "Rent", IsPending: false, "debit", null, null);
         SetupProviderCandidates(h, [settled]);
         h.Dedup.Setup(d => d.ComputeHash(h.Account.Id, -900m, It.IsAny<DateTime>(), "Rent")).Returns("rent_m2");
-        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
-             .Returns([]);
+        (await h.Sut.PerformFullSyncAsync(h.Account.Id)).Success.Should().BeTrue();
 
-        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
-
-        result.Success.Should().BeTrue();
-        pending2.IsActive.Should().BeTrue("last month's rent is not this month's settlement");
-        pending2.IsPending.Should().BeFalse("the same-hash settled copy settles the row in place");
+        pending2.IsActive.Should().BeTrue();
+        pending2.DeletedAt.Should().BeNull();
+        pending2.IsPending.Should().BeFalse("the settled copy settles the row");
         pending2.PostedDate.Should().Be(month2);
         posted1.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_OnePostedRowRetiresOnlyOnePendingRowAcrossSyncs()
+    {
+        // Two identical card holds (Oct 1, Oct 2) and one booking (Oct 3). The first sync retires the older
+        // hold against it; the second must not let the same booking retire the newer hold as well.
+        var h = BuildSut();
+
+        var oct = (int day) => new DateTime(2026, 10, day, 0, 0, 0, DateTimeKind.Utc);
+        var p1 = new Transaction(h.Account.Id, UserId, -3.50m, oct(1), "Costa", "costa_1", isPending: true);
+        var p2 = new Transaction(h.Account.Id, UserId, -3.50m, oct(2), "Costa", "costa_2", isPending: true);
+        var x1 = new Transaction(h.Account.Id, UserId, -3.50m, oct(3), "Costa", "costa_x1", isPending: false) { PostedDate = oct(3) };
+        BackRepositoryByRows(h, [p1, p2, x1]);
+        SetupProviderCandidates(h, []);
+
+        (await h.Sut.PerformFullSyncAsync(h.Account.Id)).Success.Should().BeTrue();
+        p1.IsActive.Should().BeFalse("the booking settles the older hold");
+        p2.IsActive.Should().BeTrue();
+
+        (await h.Sut.PerformFullSyncAsync(h.Account.Id)).Success.Should().BeTrue();
+        p2.IsActive.Should().BeTrue("the booking already belongs to the older hold");
+        p2.IsPending.Should().BeTrue();
     }
 
     [Fact]
