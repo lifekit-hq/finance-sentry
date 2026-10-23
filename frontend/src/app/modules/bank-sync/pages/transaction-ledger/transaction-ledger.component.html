@@ -58,98 +58,100 @@
     }}</cmn-alert>
   }
 
-  <cmn-async-state
-    [status]="view().status"
-    [errorMessage]="view().errorMessage"
-    [isEmpty]="store.transactions().length === 0"
-    [emptySubMessage]="
-      store.hasActiveFilter() || appliedFilters().length > 0
-        ? 'Nothing matches the search and filters you\'ve set.'
-        : 'Connect an account to see your transaction history.'
-    "
-    [showDelay]="showDelay"
-    [minDisplay]="minDisplay"
-    crossfade
-    class="flex min-h-0 flex-1 flex-col"
-    errorPlacement="above"
-    keepContent
-  >
-    <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
-      >Retry</cmn-button
+  <cmn-page-scroll label="Transactions">
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [isEmpty]="store.transactions().length === 0"
+      [emptySubMessage]="
+        store.hasActiveFilter() || appliedFilters().length > 0
+          ? 'Nothing matches the search and filters you\'ve set.'
+          : 'Connect an account to see your transaction history.'
+      "
+      [showDelay]="showDelay"
+      [minDisplay]="minDisplay"
+      crossfade
+      class="flex flex-1 flex-col"
+      errorPlacement="above"
+      keepContent
     >
-    <div skeleton class="space-y-cmn-4" data-testid="ledger-skeleton">
-      @for (_ of skeletonSections; track $index) {
-        <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
-      }
-    </div>
-    <div empty class="flex min-h-0 flex-1 items-center justify-center">
-      @if (store.hasActiveFilter() || appliedFilters().length > 0) {
-        <cmn-empty-state
-          [message]="emptyTitle()"
-          [actionLabel]="canWidenPeriod() ? 'Show last 3 months' : null"
-          (action)="selectPeriod('3m')"
-          (secondaryAction)="clearAllFilters()"
-          subMessage="Nothing matches the search and filters you've set."
-          icon="SearchX"
-          secondaryLabel="Clear filters"
-        />
-      } @else {
-        <cmn-empty-state
-          message="No transactions found"
-          subMessage="Connect an account to see your transaction history."
-        />
-      }
-    </div>
-    <lk-infinite-list
-      [hasMore]="store.hasMore()"
-      [loading]="store.isAppendLoading()"
-      [failed]="store.hasAppendError()"
-      (lk-infinite-list-load-more)="store.loadMore()"
-      (lk-infinite-list-retry)="store.loadMore()"
-      class="block md:min-h-0 md:flex-1 md:overflow-auto"
-      end-label="No more transactions"
-      error-label="Couldn't load more transactions."
-      data-testid="ledger-list"
-    >
-      @for (group of dayGroups(); track group.dayKey) {
-        <cmn-list-section [heading]="group.label" class="mb-cmn-4">
-          @for (t of group.items; track t.transactionId) {
-            <div class="relative" data-testid="ledger-row">
-              <cmn-list-item-row
-                [label]="t.description"
-                [sublabel]="
-                  t.bankName +
-                  (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
-                  (t.isPending ? ' · Pending' : '')
-                "
-                [dimmed]="t.isPending"
-              >
-                <cmn-institution-avatar
-                  [name]="t.bankName"
-                  [logoUrl]="t.bankName | institutionLogo"
-                  size="sm"
-                  avatar
-                />
-                <span
-                  [class]="t | transactionAmountClass"
-                  class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
-                  amount
+      <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
+        >Retry</cmn-button
+      >
+      <div skeleton class="space-y-cmn-4" data-testid="ledger-skeleton">
+        @for (_ of skeletonSections; track $index) {
+          <cmn-skeleton [count]="skeletonRowsPerSection" shape="section" />
+        }
+      </div>
+      <div empty class="flex min-h-0 flex-1 items-center justify-center">
+        @if (store.hasActiveFilter() || appliedFilters().length > 0) {
+          <cmn-empty-state
+            [message]="emptyTitle()"
+            [actionLabel]="canWidenPeriod() ? 'Show last 3 months' : null"
+            (action)="selectPeriod('3m')"
+            (secondaryAction)="clearAllFilters()"
+            subMessage="Nothing matches the search and filters you've set."
+            icon="SearchX"
+            secondaryLabel="Clear filters"
+          />
+        } @else {
+          <cmn-empty-state
+            message="No transactions found"
+            subMessage="Connect an account to see your transaction history."
+          />
+        }
+      </div>
+      <lk-infinite-list
+        [hasMore]="store.hasMore()"
+        [loading]="store.isAppendLoading()"
+        [failed]="store.hasAppendError()"
+        (lk-infinite-list-load-more)="store.loadMore()"
+        (lk-infinite-list-retry)="store.loadMore()"
+        class="block"
+        end-label="No more transactions"
+        error-label="Couldn't load more transactions."
+        data-testid="ledger-list"
+      >
+        @for (group of dayGroups(); track group.dayKey) {
+          <cmn-list-section [heading]="group.label" class="mb-cmn-4">
+            @for (t of group.items; track t.transactionId) {
+              <div class="relative" data-testid="ledger-row">
+                <cmn-list-item-row
+                  [label]="t.description"
+                  [sublabel]="
+                    t.bankName +
+                    (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
+                    (t.isPending ? ' · Pending' : '')
+                  "
+                  [dimmed]="t.isPending"
                 >
-                  {{ t | transactionAmount }}
-                </span>
-              </cmn-list-item-row>
-              <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
-              <button
-                [attr.aria-label]="t.description"
-                (click)="openDrawer(t)"
-                class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                type="button"
-                data-testid="ledger-row-open"
-              ></button>
-            </div>
-          }
-        </cmn-list-section>
-      }
-    </lk-infinite-list>
-  </cmn-async-state>
+                  <cmn-institution-avatar
+                    [name]="t.bankName"
+                    [logoUrl]="t.bankName | institutionLogo"
+                    size="sm"
+                    avatar
+                  />
+                  <span
+                    [class]="t | transactionAmountClass"
+                    class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
+                    amount
+                  >
+                    {{ t | transactionAmount }}
+                  </span>
+                </cmn-list-item-row>
+                <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
+                <button
+                  [attr.aria-label]="t.description"
+                  (click)="openDrawer(t)"
+                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                  type="button"
+                  data-testid="ledger-row-open"
+                ></button>
+              </div>
+            }
+          </cmn-list-section>
+        }
+      </lk-infinite-list>
+    </cmn-async-state>
+  </cmn-page-scroll>
 </cmn-page-container>

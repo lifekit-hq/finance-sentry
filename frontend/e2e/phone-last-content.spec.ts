@@ -120,6 +120,11 @@ async function expectLastContentClearsTabBar(page: Page, selector: string): Prom
   await page.locator('cmn-app-layout main').evaluate(el => {
     el.scrollTop = el.scrollHeight;
   });
+  await page.locator('cmn-page-scroll').evaluateAll(regions => {
+    for (const region of regions) {
+      region.scrollTop = region.scrollHeight;
+    }
+  });
   const last = page.locator(selector).last();
   await last.scrollIntoViewIfNeeded();
   const tabBar = await page.locator('cmn-bottom-tab-bar nav').boundingBox();
@@ -143,7 +148,9 @@ test.describe('last content clears the tab bar (390 wide, iPhone insets)', () =>
     await page.reload();
     await expect(page.getByTestId('ledger-row')).toHaveCount(ROW_COUNT);
 
-    await page.locator('main').evaluate(main => main.scrollTo({top: main.scrollHeight}));
+    await page
+      .locator('cmn-page-scroll')
+      .evaluate(region => region.scrollTo({top: region.scrollHeight}));
     await expect(page.getByTestId('ledger-row')).toHaveCount(ROW_COUNT * 2);
     await expectLastContentClearsTabBar(page, '[data-testid="ledger-list"]');
   });

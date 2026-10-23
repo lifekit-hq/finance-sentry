@@ -16,6 +16,7 @@ import {
   EmptyStateComponent,
   type Nullable,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   TabGroupComponent,
   TagComponent,
@@ -50,6 +51,7 @@ const SKELETON_ROWS = 4;
   selector: 'fns-events',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     AlertComponent,
     AsyncStateComponent,
     DatePipe,

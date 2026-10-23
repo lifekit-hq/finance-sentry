@@ -22,6 +22,7 @@ import {
   ListSectionComponent,
   type LucideIconName,
   PageContainerComponent,
+  PageScrollComponent,
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
@@ -49,6 +50,7 @@ const ALERT_FILTER_CHIP_ID = 'filter';
   selector: 'fns-alerts',
   imports: [
     PageContainerComponent,
+    PageScrollComponent,
     AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,
