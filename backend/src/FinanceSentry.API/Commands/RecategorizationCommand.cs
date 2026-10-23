@@ -49,7 +49,7 @@ public static class RecategorizationCommand
         Console.WriteLine("[recategorize] done.");
     }
 
-    private static RecategorizationScope? ParseScope(string[] args)
+    public static RecategorizationScope? ParseScope(string[] args)
     {
         var from = ArgValue(args, "--from");
         var to = ArgValue(args, "--to");
