@@ -79,26 +79,16 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/accounts`, route => route.fulfill(json([])));
 }
 
-// Elements whose right edge sits past the viewport, plus any scroll container that scrolls sideways.
+// Every container that scrolls sideways: the document, or a scroller in the page content.
 function overflowing(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const width = document.documentElement.clientWidth;
-    const found: string[] = [];
-    for (const el of document.querySelectorAll('main *, cmn-page-scroll, cmn-page-scroll *')) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.right > width + 1) {
-        found.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)}`);
-      }
-    }
-    for (const el of document.querySelectorAll('*')) {
-      if (
-        /(auto|scroll)/.test(getComputedStyle(el).overflowX) &&
-        el.scrollWidth > el.clientWidth + 1
-      ) {
-        found.push(`scrollX:${el.tagName.toLowerCase()}`);
-      }
-    }
-    return found;
+    const root = document.documentElement;
+    const scrollers = [...document.querySelectorAll('main *, cmn-page-scroll, cmn-page-scroll *')]
+      .filter(el => /(auto|scroll)/.test(getComputedStyle(el).overflowX))
+      .concat(root);
+    return scrollers
+      .filter(el => el.scrollWidth > el.clientWidth + 1)
+      .map(el => `${el.tagName.toLowerCase()}: ${el.scrollWidth} > ${el.clientWidth}`);
   });
 }
 
@@ -114,8 +104,12 @@ async function topEdgePaintsBackground(page: Page): Promise<boolean> {
   });
   return page.evaluate(
     async ({png, tolerance}) => {
+      const context = (width: number, height: number) =>
+        new OffscreenCanvas(width, height).getContext('2d', {
+          willReadFrequently: true,
+        }) as OffscreenCanvasRenderingContext2D;
       const toRgba = (css: string): number[] => {
-        const ctx = new OffscreenCanvas(1, 1).getContext('2d', {willReadFrequently: true})!;
+        const ctx = context(1, 1);
         ctx.fillStyle = css;
         ctx.fillRect(0, 0, 1, 1);
         return [...ctx.getImageData(0, 0, 1, 1).data];
@@ -128,13 +122,12 @@ async function topEdgePaintsBackground(page: Page): Promise<boolean> {
         toRgba(getComputedStyle(heading).backgroundColor),
         toRgba(getComputedStyle(document.documentElement).getPropertyValue('--color-surface-bg')),
       ];
-      const blob = await (await fetch(`data:image/png;base64,${png}`)).blob();
-      const bitmap = await createImageBitmap(blob);
-      const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d', {
-        willReadFrequently: true,
-      })!;
-      ctx.drawImage(bitmap, 0, 0);
-      const {data} = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+      const image = new Image();
+      image.src = `data:image/png;base64,${png}`;
+      await image.decode();
+      const ctx = context(image.naturalWidth, image.naturalHeight);
+      ctx.drawImage(image, 0, 0);
+      const {data} = ctx.getImageData(0, 0, image.naturalWidth, image.naturalHeight);
       for (let i = 0; i < data.length; i += 4) {
         const matches = allowed.some(rgba =>
           [0, 1, 2].every(c => Math.abs(data[i + c] - rgba[c]) <= tolerance)
