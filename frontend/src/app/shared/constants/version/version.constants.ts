@@ -1,1 +1,1 @@
-export const APP_VERSION = '1.16.0'; // x-release-please-version
+export const APP_VERSION = '1.17.0'; // x-release-please-version
