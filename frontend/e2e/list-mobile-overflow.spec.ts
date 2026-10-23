@@ -5,6 +5,9 @@ const PHONE_WIDTHS = [375, 390];
 const PHONE_HEIGHT = 844;
 const ROWS = 30;
 const SETTLE_MS = 600;
+const PHONE_DEVICE_SCALE = 3;
+const EDGE_STRIP_PX = 2;
+const COLOR_TOLERANCE = 2;
 const TIMESTAMP = '2026-10-05T00:00:00Z';
 
 const AUTH_RESPONSE = {
@@ -99,23 +102,61 @@ function overflowing(page: Page): Promise<string[]> {
   });
 }
 
-// What paints on the scroller's first pixel rows: the sticky day heading, not a row scrolling under it.
-function topEdgeIsHeading(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const scroller = document.querySelector('cmn-page-scroll');
-    if (!scroller) {
-      return false;
-    }
-    const {top, left, width} = scroller.getBoundingClientRect();
-    return [0.5, 1.5, 3].every(offset =>
-      document.elementFromPoint(left + width / 2, top + offset)?.closest('cmn-list-section h2')
-    );
+// Samples the painted top edge of the page scroller: every pixel must be the sticky heading's own
+// background or the page background, never a row scrolling under the heading.
+async function topEdgePaintsBackground(page: Page): Promise<boolean> {
+  const box = await page.locator('cmn-page-scroll').boundingBox();
+  if (!box) {
+    return false;
+  }
+  const strip = await page.screenshot({
+    clip: {x: box.x, y: box.y, width: box.width, height: EDGE_STRIP_PX},
   });
+  return page.evaluate(
+    async ({png, tolerance}) => {
+      const toRgba = (css: string): number[] => {
+        const ctx = new OffscreenCanvas(1, 1).getContext('2d', {willReadFrequently: true})!;
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data];
+      };
+      const heading = document.querySelector('cmn-page-scroll cmn-list-section h2');
+      if (!heading) {
+        return false;
+      }
+      const allowed = [
+        toRgba(getComputedStyle(heading).backgroundColor),
+        toRgba(getComputedStyle(document.documentElement).getPropertyValue('--color-surface-bg')),
+      ];
+      const blob = await (await fetch(`data:image/png;base64,${png}`)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d', {
+        willReadFrequently: true,
+      })!;
+      ctx.drawImage(bitmap, 0, 0);
+      const {data} = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+      for (let i = 0; i < data.length; i += 4) {
+        const matches = allowed.some(rgba =>
+          [0, 1, 2].every(c => Math.abs(data[i + c] - rgba[c]) <= tolerance)
+        );
+        if (!matches) {
+          return false;
+        }
+      }
+      return true;
+    },
+    {png: strip.toString('base64'), tolerance: COLOR_TOLERANCE}
+  );
 }
 
 for (const width of PHONE_WIDTHS) {
   test.describe(`mobile list overflow (${width} wide)`, () => {
-    test.use({viewport: {width, height: PHONE_HEIGHT}});
+    test.use({
+      viewport: {width, height: PHONE_HEIGHT},
+      deviceScaleFactor: PHONE_DEVICE_SCALE,
+      hasTouch: true,
+      isMobile: true,
+    });
 
     for (const {path, rows} of [
       {path: '/alerts', rows: 'alert-row'},
@@ -138,7 +179,7 @@ for (const width of PHONE_WIDTHS) {
         await page.waitForTimeout(SETTLE_MS);
 
         expect(await overflowing(page)).toEqual([]);
-        expect(await topEdgeIsHeading(page)).toBe(true);
+        expect(await topEdgePaintsBackground(page)).toBe(true);
       });
     }
   });
