@@ -57,8 +57,9 @@ USER root
 # tiff is pinned to the CVE-2026-4775 fix (4.7.2-r0) so a stale cached upgrade layer cannot ship 4.7.1-r0;
 # the build fails loudly if the Alpine repo does not carry it yet. Drop the pin once the base image has it.
 # libexpat is pinned the same way to the CVE-2026-77214 fix (2.9.0-r0): the cached upgrade layer kept 2.8.5-r0.
+# brotli-libs likewise to the CVE-2026-111497 fix (1.2.1-r0): the cached upgrade layer kept 1.2.0-r1.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache 'tiff>=4.7.2-r0' 'libexpat>=2.9.0-r0'
+    && apk add --no-cache 'tiff>=4.7.2-r0' 'libexpat>=2.9.0-r0' 'brotli-libs>=1.2.1-r0'
 
 # Platform contract (guardrail 1, spec 048), applied to the image's own nginx.conf:
 #   - load the njs module (ships with nginx-unprivileged:alpine) for the /metrics handler —
