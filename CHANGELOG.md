@@ -5,6 +5,63 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.17.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.16.0...v1.17.0) (2026-10-26)
+
+
+### Features
+
+* **bank-sync:** add coverage sentinel for accounts whose spend goes quiet ([#1244](https://github.com/lifekit-hq/finance-sentry/issues/1244)) ([15a5631](https://github.com/lifekit-hq/finance-sentry/commit/15a56313d7a509fb574e9d51cd8004233885c802))
+* **bank-sync:** classify AIB ATM cash lodgements as income ([#1246](https://github.com/lifekit-hq/finance-sentry/issues/1246)) ([62f5a2e](https://github.com/lifekit-hq/finance-sentry/commit/62f5a2e5f68615d28656adbd0a6043ee4a88395b))
+* **bank-sync:** rework Home around why net worth moved and where it is ([#1191](https://github.com/lifekit-hq/finance-sentry/issues/1191)) ([5cd99db](https://github.com/lifekit-hq/finance-sentry/commit/5cd99dbe797190186aafaa9d11c038d836149c90))
+* **bank-sync:** show the net-worth bridge waterfall on Home ([#1174](https://github.com/lifekit-hq/finance-sentry/issues/1174)) ([344fc59](https://github.com/lifekit-hq/finance-sentry/commit/344fc59a0c567fc5be873e63d2fcc04a25b8f80a))
+* **brokerage-sync:** move IBKR Flex from shadow to active connection-health alerting ([#1167](https://github.com/lifekit-hq/finance-sentry/issues/1167)) ([73346bb](https://github.com/lifekit-hq/finance-sentry/commit/73346bba356ef17fc05cc664d43a02373d446628))
+* **companion:** add a ledger correction log with MCP record and list tools ([#1176](https://github.com/lifekit-hq/finance-sentry/issues/1176)) ([2730678](https://github.com/lifekit-hq/finance-sentry/commit/27306780ec1f5a466e7618aa479c627fc8489548))
+* **frontend:** adopt [@lifekit-hq](https://github.com/lifekit-hq) 4.0.0 and swap Home's donut for cmn-allocation-bar ([#1193](https://github.com/lifekit-hq/finance-sentry/issues/1193)) ([f2ae82c](https://github.com/lifekit-hq/finance-sentry/commit/f2ae82cde860dfce6a67d6c8f2f3d19447487bbc))
+* **frontend:** retire the Investments tab; Accounts carries every position ([#1166](https://github.com/lifekit-hq/finance-sentry/issues/1166)) ([c054715](https://github.com/lifekit-hq/finance-sentry/commit/c0547150e1e484ebbaee8c4f13dd6c65d3541b3f))
+* **holdings:** add Home Investments card, drop hero invested-change line ([#1165](https://github.com/lifekit-hq/finance-sentry/issues/1165)) ([0e3ae09](https://github.com/lifekit-hq/finance-sentry/commit/0e3ae09b4a4f5fc1c0a25b8a7ce102a3225efe90))
+* **holdings:** fold contributed-vs-growth and growth-of-10,000 into one performance card ([#1236](https://github.com/lifekit-hq/finance-sentry/issues/1236)) ([6473d73](https://github.com/lifekit-hq/finance-sentry/commit/6473d7396a6746a3b6864a5de284523c52ddc243))
+* **holdings:** show current and average price per unit for every holding ([#1207](https://github.com/lifekit-hq/finance-sentry/issues/1207)) ([4171993](https://github.com/lifekit-hq/finance-sentry/commit/41719937170249a26851c16791ca523f29e658c6))
+* **ledger:** fit the chat to the screen with no outer scroll and a keyboard-aware pinned composer ([#1220](https://github.com/lifekit-hq/finance-sentry/issues/1220)) ([#1224](https://github.com/lifekit-hq/finance-sentry/issues/1224)) ([e450f50](https://github.com/lifekit-hq/finance-sentry/commit/e450f505d28b6782c43f09853864cb454eb30082))
+* **mcp:** refuse Research writes to service tokens (Ledger proposes, owner decides) ([#1164](https://github.com/lifekit-hq/finance-sentry/issues/1164)) ([d62cc14](https://github.com/lifekit-hq/finance-sentry/commit/d62cc140a135df724e569ba265c57146b4c46e76))
+* **wealth:** add monthly-income lens to the dashboard hero ([#1173](https://github.com/lifekit-hq/finance-sentry/issues/1173)) ([4958b1b](https://github.com/lifekit-hq/finance-sentry/commit/4958b1bff07b18bc463ce33c80657916b6038ebd))
+* **wealth:** one projection-assumptions engine (M10/C8) for the 12-month and FIRE projections ([#1172](https://github.com/lifekit-hq/finance-sentry/issues/1172)) ([b6775d8](https://github.com/lifekit-hq/finance-sentry/commit/b6775d85e0b743ae6558a93efe0c8cd3e1e17b5b))
+* **wealth:** wire the net-worth bridge (M5) behind GET /net-worth/bridge ([#1171](https://github.com/lifekit-hq/finance-sentry/issues/1171)) ([3f67d9a](https://github.com/lifekit-hq/finance-sentry/commit/3f67d9a741297d6a3660883469373c80caa20b42))
+
+
+### Bug Fixes
+
+* **alerts:** stop mobile horizontal overflow and close the sticky day-header gap ([#1254](https://github.com/lifekit-hq/finance-sentry/issues/1254)) ([8265171](https://github.com/lifekit-hq/finance-sentry/commit/82651712d6ad5864b11c1b43bf38f0a67b28ce40))
+* **bank-sync:** add scoped recategorize move to re-sort ESKY rows from rent and utilities to travel ([#1240](https://github.com/lifekit-hq/finance-sentry/issues/1240)) ([99aa720](https://github.com/lifekit-hq/finance-sentry/commit/99aa720ac148bb9756ae958635b41c23c2813ced))
+* **bank-sync:** categorise travel-agency merchants as travel, not rent and utilities ([#1237](https://github.com/lifekit-hq/finance-sentry/issues/1237)) ([62bd37c](https://github.com/lifekit-hq/finance-sentry/commit/62bd37cb76d2098fc3b92b2d9d1c2eb5c58e163c))
+* **bank-sync:** converge live MCC rows 4214/4215/4225/5832 to the code mapping ([#1162](https://github.com/lifekit-hq/finance-sentry/issues/1162)) ([fee5781](https://github.com/lifekit-hq/finance-sentry/commit/fee5781cad969df5056fb8604e607fc3167a4b8d))
+* **bank-sync:** make the ledger insight line follow the selected period and account ([#1256](https://github.com/lifekit-hq/finance-sentry/issues/1256)) ([7d35069](https://github.com/lifekit-hq/finance-sentry/commit/7d35069ff6dc184e10e83c7cb737a6a26285e625))
+* **bank-sync:** reconcile pending rows by date and add repair for retired ones ([#1242](https://github.com/lifekit-hq/finance-sentry/issues/1242)) ([66ed2a8](https://github.com/lifekit-hq/finance-sentry/commit/66ed2a837a9ade39ad3ff77ad166d6f6c1829890))
+* **bank-sync:** treat Ukrainian card transfers as non-merchants in subscription detection ([#1179](https://github.com/lifekit-hq/finance-sentry/issues/1179)) ([3e7d917](https://github.com/lifekit-hq/finance-sentry/commit/3e7d917386c2a433fd9cea453d42dc155b9d26c5))
+* **e2e:** disambiguate the live smoke's period locator ([#1208](https://github.com/lifekit-hq/finance-sentry/issues/1208)) ([#1209](https://github.com/lifekit-hq/finance-sentry/issues/1209)) ([083882d](https://github.com/lifekit-hq/finance-sentry/commit/083882dc6df1c5fb0cb1c5d36b3b3aa4b4bbe410))
+* **e2e:** match the live smoke's Spent/Income tiles as links ([#1213](https://github.com/lifekit-hq/finance-sentry/issues/1213)) ([#1214](https://github.com/lifekit-hq/finance-sentry/issues/1214)) ([8a69f84](https://github.com/lifekit-hq/finance-sentry/commit/8a69f849a60d6f523ed0f8f435ac31244fb7d368))
+* **events:** drop the fired card's duplicate second title ([#1232](https://github.com/lifekit-hq/finance-sentry/issues/1232)) ([d905434](https://github.com/lifekit-hq/finance-sentry/commit/d9054342f8fa42b39496098ab132313c9759ef6b))
+* **frontend:** compose the asset dossier skeleton from cmn-skeleton presets ([#1233](https://github.com/lifekit-hq/finance-sentry/issues/1233)) ([b368ce8](https://github.com/lifekit-hq/finance-sentry/commit/b368ce82975d7ac93d2ff3b2fc95313c24bc498f))
+* **frontend:** make the list the only scroll container on list pages ([#1243](https://github.com/lifekit-hq/finance-sentry/issues/1243)) ([01b55c0](https://github.com/lifekit-hq/finance-sentry/commit/01b55c082111a45ba8f91e3ade85d3e41e6cbef8))
+* **frontend:** pin brotli-libs to the CVE-2026-111497 fix in the prod image ([#1260](https://github.com/lifekit-hq/finance-sentry/issues/1260)) ([53a5b9a](https://github.com/lifekit-hq/finance-sentry/commit/53a5b9a1da8a638ce3b75b263bf1cafe339d4bb0))
+* **gateway:** drop dead gateway duties and give auth session reads their own API limit ([#1177](https://github.com/lifekit-hq/finance-sentry/issues/1177)) ([f555c2d](https://github.com/lifekit-hq/finance-sentry/commit/f555c2d092201ac088996687028063af11fc59a8))
+* **mcp:** carry no bare aggregate unrealized P&L when the cost basis is partial ([#1211](https://github.com/lifekit-hq/finance-sentry/issues/1211)) ([ef910c8](https://github.com/lifekit-hq/finance-sentry/commit/ef910c882f440bca2fbe80068fb6ef19acbd1856)), closes [#982](https://github.com/lifekit-hq/finance-sentry/issues/982)
+
+
+### Refactoring
+
+* **config:** bind provider configuration through validated Options ([#1181](https://github.com/lifekit-hq/finance-sentry/issues/1181)) ([8a40274](https://github.com/lifekit-hq/finance-sentry/commit/8a4027408e9de2aea8e389f6b63732878a6fbd3d))
+* **config:** bind remaining raw configuration reads through validated Options ([#1185](https://github.com/lifekit-hq/finance-sentry/issues/1185)) ([6ea928e](https://github.com/lifekit-hq/finance-sentry/commit/6ea928e079d74a2108ad4711d49f577d57d85ba3))
+* **frontend:** bring the Watchlist page up to the shared design system ([#1223](https://github.com/lifekit-hq/finance-sentry/issues/1223)) ([adc9fa9](https://github.com/lifekit-hq/finance-sentry/commit/adc9fa9fe808d609cab5f75f476ed275517f4cb6))
+* **frontend:** move remaining stores onto withAsyncStatus and retire global Nullable/AsyncStatus ([#1182](https://github.com/lifekit-hq/finance-sentry/issues/1182)) ([cd166ef](https://github.com/lifekit-hq/finance-sentry/commit/cd166ef222025b9c3f75601b1964f8e1bc7d9b1e))
+* **frontend:** replace raw navigation buttons with router links for no-raw-controls ([#1197](https://github.com/lifekit-hq/finance-sentry/issues/1197)) ([5cc8f45](https://github.com/lifekit-hq/finance-sentry/commit/5cc8f4563661f67720083490e6cc3c75e9185784)), closes [#1196](https://github.com/lifekit-hq/finance-sentry/issues/1196)
+* **observability:** drop the API's own Loki and file log sinks ([#1183](https://github.com/lifekit-hq/finance-sentry/issues/1183)) ([c82a4a9](https://github.com/lifekit-hq/finance-sentry/commit/c82a4a9d02b9a7bc8ee9964aba572aa3be4b1be7)), closes [#938](https://github.com/lifekit-hq/finance-sentry/issues/938)
+* **ui:** use the clickable list row for holding, breakdown and session rows ([#1216](https://github.com/lifekit-hq/finance-sentry/issues/1216)) ([14c05b9](https://github.com/lifekit-hq/finance-sentry/commit/14c05b97cb401a5762db9b6858b6cef1077a2e08))
+
+
+### Documentation
+
+* **ledger:** route OpenClaw build asks through Kit's relay instead of GitHub issues ([#1170](https://github.com/lifekit-hq/finance-sentry/issues/1170)) ([ba3e670](https://github.com/lifekit-hq/finance-sentry/commit/ba3e670c49d6de963afb5dd3490c37190a286a15))
+
 ## [1.16.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.15.0...v1.16.0) (2026-10-19)
 
 
