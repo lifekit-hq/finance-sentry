@@ -143,7 +143,7 @@ test.describe('Transaction ledger — filter sheet', () => {
     );
   });
 
-  test('at 390px: search + filter button, the period and account chip rows, then rows, with no sideways scroll', async ({
+  test('at 390px: search + filter button, then rows, with period and account in the sheet, with no sideways scroll', async ({
     page,
   }) => {
     const json = (body: unknown) => ({
@@ -186,13 +186,12 @@ test.describe('Transaction ledger — filter sheet', () => {
       (await locator.boundingBox())?.y ?? Number.NaN;
     const search = await y(page.getByRole('searchbox', {name: 'Search transactions'}));
     const button = await y(page.getByRole('button', {name: 'Filters', exact: true}));
-    const periods = await y(page.getByRole('group', {name: 'Period filter'}));
-    const accounts = await y(page.getByRole('group', {name: 'Account filter'}));
+    // The period and account rows live in the sheet now, not on the page.
+    await expect(page.getByRole('group', {name: 'Period filter'})).toHaveCount(0);
+    await expect(page.getByRole('group', {name: 'Account filter'})).toHaveCount(0);
     const row = await y(page.getByTestId('ledger-row'));
     expect(Math.abs(search - button)).toBeLessThan(20);
-    expect(periods).toBeGreaterThan(search);
-    expect(accounts).toBeGreaterThan(periods);
-    expect(row).toBeGreaterThan(accounts);
+    expect(row).toBeGreaterThan(search);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
@@ -206,8 +205,16 @@ test.describe('Transaction ledger — filter sheet', () => {
       (await locator.boundingBox())?.x ?? Number.NaN;
     const header = await x(page.getByRole('heading', {name: 'Filters'}));
     expect(await x(page.getByTestId('sheet-period-this-month'))).toBeGreaterThanOrEqual(header);
+    expect(await x(page.getByTestId('account-a1'))).toBeGreaterThanOrEqual(header);
     expect(await x(page.getByRole('button', {name: 'Show results'}))).toBeGreaterThanOrEqual(
       header
     );
+
+    // Account applies on Show results, shows as an applied chip and counts in the badge.
+    await page.getByTestId('account-a2').click();
+    await expect(page).not.toHaveURL(/account=/);
+    await page.getByRole('button', {name: 'Show results'}).click();
+    await expect(page).toHaveURL(/account=a2/);
+    await expect(page.getByRole('button', {name: /^Remove Account:/})).toBeVisible();
   });
 });

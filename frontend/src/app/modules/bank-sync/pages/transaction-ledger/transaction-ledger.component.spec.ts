@@ -86,12 +86,7 @@ function setup(
   return {chip, navigate, root, store, fixture, drawerOpen};
 }
 
-type ChipRowElement = HTMLElement & {selected: string[]};
 type DismissibleChipElement = HTMLElement & {label: string};
-
-function pressChip(row: HTMLElement, value: string): void {
-  row.dispatchEvent(new CustomEvent('lk-chip-row-change', {detail: {selected: [value], value}}));
-}
 
 function appliedChips(root: HTMLElement): DismissibleChipElement[] {
   return Array.from(root.querySelectorAll<DismissibleChipElement>('lk-dismissible-chip'));
@@ -126,16 +121,18 @@ describe('TransactionLedgerComponent filter sheet', () => {
       to: '2026-08-31',
       type: 'credit',
       categories: ['FOOD'],
+      accountId: null,
     });
   });
 
-  it('writes the applied Period + Type + Category to the URL and keeps account and search', () => {
+  it('writes the applied Period + Type + Category + Account to the URL and keeps search', () => {
     const {navigate, fixture} = setup(null, {account: 'a1', q: 'x'});
     fixture.componentInstance.applySelection({
       from: '2026-08-01',
       to: '2026-08-12',
       type: 'debit',
       categories: ['FOOD', 'FAMILY_SUPPORT'],
+      accountId: null,
     });
     expect(navigate).toHaveBeenCalledWith([], {
       queryParams: {
@@ -143,44 +140,10 @@ describe('TransactionLedgerComponent filter sheet', () => {
         to: '2026-08-12',
         type: 'debit',
         category: ['FOOD', 'FAMILY_SUPPORT'],
+        account: null,
       },
       queryParamsHandling: 'merge',
     });
-  });
-});
-
-describe('TransactionLedgerComponent period chips', () => {
-  it('writes the picked period dates to the URL and keeps the other params', () => {
-    const {chip, navigate} = setup('debit', {account: 'a1'});
-    pressChip(chip('period-chips'), 'last-month');
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: LedgerPeriodUtils.dates('last-month'),
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('selects "All time" when no date filter is set', () => {
-    const {chip} = setup(null);
-    expect((chip('period-chips') as ChipRowElement).selected).toEqual(['all']);
-  });
-
-  it('drops the date filter and keeps the other params when "All time" is picked', () => {
-    const {chip, navigate} = setup('debit', {...LedgerPeriodUtils.dates('3m')});
-    pressChip(chip('period-chips'), 'all');
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {from: null, to: null, type: 'debit', category: null},
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('selects the chip whose dates are in the URL', () => {
-    const {chip} = setup(null, {...LedgerPeriodUtils.dates('3m')});
-    expect((chip('period-chips') as ChipRowElement).selected).toEqual(['3m']);
-  });
-
-  it('selects no period chip for a custom range', () => {
-    const {chip} = setup(null, {from: '2020-01-01', to: '2020-01-31'});
-    expect((chip('period-chips') as ChipRowElement).selected).toEqual([]);
   });
 });
 
@@ -243,6 +206,7 @@ describe('TransactionLedgerComponent applied filter chips', () => {
         to: '2026-08-31',
         type: 'credit',
         category: ['FAMILY_SUPPORT'],
+        account: null,
       },
       queryParamsHandling: 'merge',
     });
@@ -268,14 +232,14 @@ describe('TransactionLedgerComponent applied filter chips', () => {
     expect(appliedChips(root).map(c => c.label)).toEqual(['Period: Last month']);
   });
 
-  it('Clear drops every sheet filter and leaves account and search alone', () => {
+  it('Clear drops every sheet filter, account included, and leaves search alone', () => {
     const {root, navigate} = setup('debit', {account: 'a1', category: 'FOOD', from: '2026-06-01'});
     const clear = Array.from(
       root.querySelectorAll<HTMLButtonElement>('cmn-filter-bar button')
     ).find(b => b.textContent?.trim() === 'Clear');
     clear?.click();
     expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {from: null, to: null, type: null, category: null},
+      queryParams: {from: null, to: null, type: null, category: null, account: null},
       queryParamsHandling: 'merge',
     });
   });
@@ -287,45 +251,51 @@ describe('TransactionLedgerComponent applied filter chips', () => {
 });
 
 describe('TransactionLedgerComponent account filter', () => {
-  it('selects an account through the URL, pushing a history entry', () => {
-    const {navigate, store, fixture, chip} = setup(null);
-    store.accounts.set([
-      {accountId: 'a1', label: 'Monzo'},
-      {accountId: 'a2', label: 'AIB'},
-    ] as never);
-    fixture.detectChanges();
+  const TWO_ACCOUNTS = [
+    {accountId: 'a1', label: 'Monzo'},
+    {accountId: 'a2', label: 'AIB'},
+  ] as never;
 
-    pressChip(chip('account-chips'), 'a2');
-
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {account: 'a2'},
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('clears the account filter from "All accounts"', () => {
-    const {navigate, store, fixture, chip} = setup(null, {account: 'a1'});
-    store.accounts.set([
-      {accountId: 'a1', label: 'Monzo'},
-      {accountId: 'a2', label: 'AIB'},
-    ] as never);
-    fixture.detectChanges();
-    const row = chip('account-chips') as ChipRowElement;
-    expect(row.selected).toEqual(['a1']);
-
-    pressChip(row, 'all');
-
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {account: null},
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('hides the account row with a single account', () => {
+  it('no longer renders the period or account chip rows on the page', () => {
     const {store, fixture, root} = setup(null);
-    store.accounts.set([{accountId: 'a1', label: 'Monzo'}] as never);
+    store.accounts.set(TWO_ACCOUNTS);
     fixture.detectChanges();
+    expect(root.querySelector('[data-testid="period-chips"]')).toBeNull();
     expect(root.querySelector('[data-testid="account-chips"]')).toBeNull();
+  });
+
+  it('seeds the sheet with the account in the store', () => {
+    const {fixture} = setup(null, {account: 'a1'});
+    expect(fixture.componentInstance.activeSelection().accountId).toBe('a1');
+  });
+
+  it('shows the account as a removable applied chip and counts it in the badge', () => {
+    const {store, fixture, root, navigate} = setup(null, {account: 'a2'});
+    store.accounts.set(TWO_ACCOUNTS);
+    fixture.detectChanges();
+    expect(appliedChips(root).map(c => c.label)).toEqual(['Account: AIB']);
+    expect(root.querySelector('cmn-badge')?.textContent).toContain('1');
+
+    appliedChip(root, 'Account: AIB').dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      queryParams: expect.objectContaining({account: null}),
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('writes the applied account to the URL with the other sheet filters', () => {
+    const {navigate, fixture} = setup(null, {q: 'x'});
+    fixture.componentInstance.applySelection({
+      from: null,
+      to: null,
+      type: null,
+      categories: [],
+      accountId: 'a2',
+    });
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {from: null, to: null, type: null, category: null, account: 'a2'},
+      queryParamsHandling: 'merge',
+    });
   });
 });
 

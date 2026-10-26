@@ -87,7 +87,7 @@ test.describe('Router view transitions', () => {
 
   test.beforeEach(async ({page}) => mockApis(page));
 
-  test('a tab change crossfades; a period chip does not, and the next tap lands', async ({
+  test('a tab change crossfades; a filter change does not, and the next tap lands', async ({
     page,
   }) => {
     await page.goto('/transactions');
@@ -107,15 +107,16 @@ test.describe('Router view transitions', () => {
       .tap();
     await expect(page.getByText('Synthetic row')).toBeVisible();
 
-    const chips = page.getByRole('group', {name: 'Period filter'});
     const afterTabs = await transitions(page);
-    await chips.getByRole('button', {name: 'This month'}).tap();
+    const applyPeriod = async (id: string) => {
+      await page.getByRole('button', {name: 'Filters', exact: true}).tap();
+      await page.getByTestId(id).tap();
+      await page.getByRole('button', {name: 'Show results'}).tap();
+    };
+    await applyPeriod('sheet-period-this-month');
     await expect(page).toHaveURL(/from=/);
-    await chips.getByRole('button', {name: 'Last month'}).tap();
-    await expect(chips.getByRole('button', {name: 'Last month'})).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await applyPeriod('sheet-period-last-month');
+    await expect(page.getByRole('button', {name: 'Remove Period: Last month'})).toBeVisible();
     expect(await transitions(page)).toBe(afterTabs);
   });
 
