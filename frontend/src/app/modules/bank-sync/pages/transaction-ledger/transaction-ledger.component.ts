@@ -183,11 +183,11 @@ export class TransactionLedgerComponent {
       });
     }
     const accountId = this.store.accountId();
-    if (accountId) {
-      const account = this.store.accounts().find(a => a.accountId === accountId);
+    const account = accountId ? this.store.accounts().find(a => a.accountId === accountId) : null;
+    if (account) {
       filters.push({
         id: 'account',
-        label: `Account: ${account?.label ?? 'Unknown'}`,
+        label: `Account: ${account.label}`,
         remove: () => this.applySelection({...this.activeSelection(), accountId: null}),
       });
     }

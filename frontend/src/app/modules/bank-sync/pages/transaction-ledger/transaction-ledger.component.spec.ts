@@ -283,6 +283,15 @@ describe('TransactionLedgerComponent account filter', () => {
     });
   });
 
+  it('holds the account chip until the account resolves instead of labelling it Unknown', () => {
+    const {store, fixture, root} = setup(null, {account: 'a2'});
+    expect(appliedChips(root)).toEqual([]);
+
+    store.accounts.set(TWO_ACCOUNTS);
+    fixture.detectChanges();
+    expect(appliedChips(root).map(c => c.label)).toEqual(['Account: AIB']);
+  });
+
   it('writes the applied account to the URL with the other sheet filters', () => {
     const {navigate, fixture} = setup(null, {q: 'x'});
     fixture.componentInstance.applySelection({
