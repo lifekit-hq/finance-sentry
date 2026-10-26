@@ -52,7 +52,7 @@
     "@lifekit-hq/tokens": "^4.2.0",
     "@lifekit-hq/ui": "^4.2.0",
     "@ngrx/signals": "^22.0.1",
-    "chart.js": "^4.5.1",
+    "chart.js": "^4.6.1",
     "deep-chat": "^2.5.1",
     "lit": "^3.3.3",
     "lucide-angular": "^1.0.0",
