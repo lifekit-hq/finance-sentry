@@ -8,6 +8,7 @@ export interface TransactionFilterSelection {
   to: Nullable<string>;
   type: Nullable<TransactionType>;
   categories: string[];
+  accountId: Nullable<string>;
 }
 
 export const EMPTY_TRANSACTION_FILTER: TransactionFilterSelection = {
@@ -15,6 +16,7 @@ export const EMPTY_TRANSACTION_FILTER: TransactionFilterSelection = {
   to: null,
   type: null,
   categories: [],
+  accountId: null,
 };
 
 /** An applied filter shown as a removable chip under the search. */

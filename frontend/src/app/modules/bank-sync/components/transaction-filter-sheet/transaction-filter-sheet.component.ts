@@ -22,7 +22,10 @@ import {
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
 import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
-import {type TransactionType} from '../../models/transaction/transaction.model';
+import {
+  type TransactionAccountOption,
+  type TransactionType,
+} from '../../models/transaction/transaction.model';
 import {
   EMPTY_TRANSACTION_FILTER,
   type TransactionFilterSelection,
@@ -30,7 +33,7 @@ import {
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 
 /**
- * Body of the ledger's filter sheet (Period / Type / Category), rendered by `cmn-filter-bar`. It
+ * Body of the ledger's filter sheet (Period / Type / Category / Account), rendered by `cmn-filter-bar`. It
  * edits a draft copy of `initial` and emits it on "Show results"; closing the sheet any other way
  * drops it.
  */
@@ -42,6 +45,8 @@ import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 })
 export class TransactionFilterSheetComponent implements OnInit {
   public readonly initial = input.required<TransactionFilterSelection>();
+  /** Accounts the Account section offers; it is hidden unless there is more than one. */
+  public readonly accounts = input<TransactionAccountOption[]>([]);
   public readonly applied = output<TransactionFilterSelection>();
 
   public readonly categoryStore = inject(CategoryStore);
@@ -91,6 +96,10 @@ export class TransactionFilterSheetComponent implements OnInit {
 
   public selectType(type: Nullable<TransactionType>): void {
     this.draft.update(d => ({...d, type}));
+  }
+
+  public selectAccount(accountId: Nullable<string>): void {
+    this.draft.update(d => ({...d, accountId}));
   }
 
   public toggleCategory(key: string): void {

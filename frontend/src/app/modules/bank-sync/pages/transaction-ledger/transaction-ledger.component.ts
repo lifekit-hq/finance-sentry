@@ -7,7 +7,6 @@ import {
   linkedSignal,
 } from '@angular/core';
 import {Router} from '@angular/router';
-import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   ASYNC_STATE_MIN_DISPLAY_MS,
@@ -36,15 +35,7 @@ import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {TransactionFilterSheetComponent} from '../../components/transaction-filter-sheet/transaction-filter-sheet.component';
-import {
-  ALL_ACCOUNTS_LABEL,
-  ALL_ACCOUNTS_VALUE,
-} from '../../constants/account-filter/account-filter.constants';
-import {
-  ALL_PERIODS_LABEL,
-  ALL_PERIODS_VALUE,
-  LEDGER_PERIODS,
-} from '../../constants/ledger-period/ledger-period.constants';
+import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
 import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
@@ -117,11 +108,6 @@ export class TransactionLedgerComponent {
    */
   public readonly query = linkedSignal(() => this.store.search());
 
-  public readonly periodOptions: ChipRowOption[] = [
-    {value: ALL_PERIODS_VALUE, label: ALL_PERIODS_LABEL},
-    ...LEDGER_PERIODS.map(p => ({value: p.id, label: p.label})),
-  ];
-
   public readonly view = computed(() =>
     AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
@@ -140,14 +126,6 @@ export class TransactionLedgerComponent {
     LedgerPeriodUtils.match(this.store.from(), this.store.to())
   );
 
-  public readonly selectedPeriod = computed(() => {
-    if (!this.activeDateRangeLabel()) {
-      return [ALL_PERIODS_VALUE];
-    }
-    const period = this.activePeriod();
-    return period ? [period] : [];
-  });
-
   /** Names the period the summary's outflow covers, so it never claims "this month" for another range. */
   public readonly outflowPeriodPhrase = computed(() => {
     const period = this.activePeriod();
@@ -158,13 +136,6 @@ export class TransactionLedgerComponent {
       ? LEDGER_CUSTOM_RANGE_OUTFLOW_PHRASE
       : LEDGER_ALL_TIME_OUTFLOW_PHRASE;
   });
-
-  public readonly accountOptions = computed<ChipRowOption[]>(() => [
-    {value: ALL_ACCOUNTS_VALUE, label: ALL_ACCOUNTS_LABEL},
-    ...this.store.accounts().map(a => ({value: a.accountId, label: a.label})),
-  ]);
-
-  public readonly selectedAccount = computed(() => [this.store.accountId() ?? ALL_ACCOUNTS_VALUE]);
 
   public readonly activeDateRangeLabel = computed(() => {
     const from = this.store.from();
@@ -181,6 +152,7 @@ export class TransactionLedgerComponent {
     to: this.store.to(),
     type: this.store.transactionType(),
     categories: this.store.categories(),
+    accountId: this.store.accountId(),
   }));
 
   public readonly appliedFilters = computed<AppliedTransactionFilter[]>(() => {
@@ -210,10 +182,19 @@ export class TransactionLedgerComponent {
         remove: () => this.removeCategory(key),
       });
     }
+    const accountId = this.store.accountId();
+    const account = accountId ? this.store.accounts().find(a => a.accountId === accountId) : null;
+    if (account) {
+      filters.push({
+        id: 'account',
+        label: `Account: ${account.label}`,
+        remove: () => this.applySelection({...this.activeSelection(), accountId: null}),
+      });
+    }
     return filters;
   });
 
-  /** Badge on the filter button: one per period, type and category in play. */
+  /** Badge on the filter button: one per period, type, category and account in play. */
   public readonly activeFilterCount = computed(() => this.appliedFilters().length);
 
   /** Names the account and period in play so an empty list says what it is empty of. */
@@ -253,27 +234,6 @@ export class TransactionLedgerComponent {
     });
   }
 
-  public selectAccount(accountId: Nullable<string>): void {
-    void this.router.navigate([], {
-      queryParams: {account: accountId},
-      queryParamsHandling: 'merge',
-    });
-  }
-
-  public onAccountChange(event: Event): void {
-    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
-    this.selectAccount(value === ALL_ACCOUNTS_VALUE ? null : value);
-  }
-
-  public onPeriodChange(event: Event): void {
-    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
-    if (value === ALL_PERIODS_VALUE) {
-      this.clearDateRange();
-      return;
-    }
-    this.selectPeriod(value as LedgerPeriod);
-  }
-
   /** An applied-filter chip was dismissed: drop that one filter. */
   public removeFilter(id: string): void {
     this.appliedFilters()
@@ -285,7 +245,7 @@ export class TransactionLedgerComponent {
     this.applySelection(EMPTY_TRANSACTION_FILTER);
   }
 
-  /** The empty state's way out: drops the account and search too, which the filter sheet does not own. */
+  /** The empty state's way out: drops the search too, which the filter sheet does not own. */
   public clearAllFilters(): void {
     void this.router.navigate([], {
       queryParams: {account: null, q: null, from: null, to: null, type: null, category: null},
@@ -315,7 +275,7 @@ export class TransactionLedgerComponent {
     this.applySelection({...this.activeSelection(), type});
   }
 
-  /** Writes the sheet filters to the URL; the account and search params are left as they are. */
+  /** Writes the sheet filters to the URL; the search param is left as it is. */
   public applySelection(selection: TransactionFilterSelection): void {
     void this.router.navigate([], {
       queryParams: {
@@ -323,6 +283,7 @@ export class TransactionLedgerComponent {
         to: selection.to,
         type: selection.type,
         category: selection.categories.length > 0 ? selection.categories : null,
+        account: selection.accountId,
       },
       queryParamsHandling: 'merge',
     });

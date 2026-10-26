@@ -23,32 +23,14 @@
     searchLabel="Search transactions"
     data-testid="ledger-filter-bar"
   >
-    <lk-chip-row
-      [options]="periodOptions"
-      [selected]="selectedPeriod()"
-      (lk-chip-row-change)="onPeriodChange($event)"
-      cmnFilterBarQuick
-      label="Period filter"
-      data-testid="period-chips"
-    />
     <ng-template let-close="close" cmnFilterBarSheet>
       <fns-transaction-filter-sheet
         [initial]="activeSelection()"
+        [accounts]="store.accounts()"
         (applied)="applySelection($event); close()"
       />
     </ng-template>
   </cmn-filter-bar>
-
-  @if (store.accounts().length > 1) {
-    <lk-chip-row
-      [options]="accountOptions()"
-      [selected]="selectedAccount()"
-      (lk-chip-row-change)="onAccountChange($event)"
-      class="mb-cmn-4"
-      label="Account filter"
-      data-testid="account-chips"
-    />
-  }
 
   @if (view().offlineNotice; as notice) {
     <cmn-alert variant="info" class="mb-cmn-4 block" data-testid="offline-notice">{{

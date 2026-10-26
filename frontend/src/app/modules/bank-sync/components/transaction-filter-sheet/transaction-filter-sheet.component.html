@@ -81,6 +81,35 @@
     </section>
   }
 
+  @if (accounts().length > 1) {
+    <section class="flex flex-col gap-cmn-2" aria-labelledby="filter-account-heading">
+      <h3
+        id="filter-account-heading"
+        class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+      >
+        Account
+      </h3>
+      <div class="flex flex-wrap gap-cmn-2" role="group" aria-labelledby="filter-account-heading">
+        <cmn-chip
+          [selected]="!draft().accountId"
+          (clicked)="selectAccount(null)"
+          data-testid="account-all"
+        >
+          All accounts
+        </cmn-chip>
+        @for (account of accounts(); track account.accountId) {
+          <cmn-chip
+            [selected]="draft().accountId === account.accountId"
+            [attr.data-testid]="'account-' + account.accountId"
+            (clicked)="selectAccount(account.accountId)"
+          >
+            {{ account.label }}
+          </cmn-chip>
+        }
+      </div>
+    </section>
+  }
+
   <cmn-button
     [disabled]="rangeInverted()"
     (clicked)="apply()"
