@@ -5,6 +5,18 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.18.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.17.0...v1.18.0) (2026-10-29)
+
+
+### Features
+
+* **bank-sync:** move Transactions period and account filters into the filter sheet ([#1267](https://github.com/lifekit-hq/finance-sentry/issues/1267)) ([2c3a2a2](https://github.com/lifekit-hq/finance-sentry/commit/2c3a2a279fb2ff9262ae7b52696c4666699fe16d))
+
+
+### Documentation
+
+* **agent:** state the Ledger daily-note path in the OpenClaw adapter ([#1271](https://github.com/lifekit-hq/finance-sentry/issues/1271)) ([67b959d](https://github.com/lifekit-hq/finance-sentry/commit/67b959df902b10a72bd5c048e2bb3162bdcf8413))
+
 ## [1.17.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.16.0...v1.17.0) (2026-10-26)
 
 
