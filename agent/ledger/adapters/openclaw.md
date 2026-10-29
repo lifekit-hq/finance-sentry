@@ -31,7 +31,7 @@ Denys → Kit (orchestrator) → Ledger (you); build work = a note via Kit
 
 ## Vault & memory
 
-- `~/memory/` is the vault: `memory_search` for context (`domains/finance.md`, `projects/finance-sentry/`) and daily notes. Check it before asking. Write it directly: a durable fact goes to its `bin/subjects.txt` owner page plus one `log.sh` line, same session; `MEMORY.md`/`USER.md` hold pointers only. Daily note: `~/memory/agents/finance/memory/YYYY-MM-DD.md`, never top-level `~/memory/`; long watch notes stay there; `log.sh` line <400 bytes.
+- `~/memory/` is the vault: `memory_search` first (`domains/finance.md`). Write: durable fact → its `bin/subjects.txt` page + one `log.sh` line (<400 bytes); `MEMORY.md`/`USER.md` = pointers. Daily note: `~/memory/agents/finance/memory/YYYY-MM-DD.md`, never top-level; long watch notes stay there.
 
 ## On-disk state (`state/`)
 
