@@ -108,7 +108,8 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         alert.ReferenceLabel.Should().Be("ACN");
         alert.Message.Should().Be("ACN reports earnings on 2026-10-01.");
 
-        var outcome = await CaptureDeliverAndJudgeAsync(alert, "ACN Q4 FY26 print: in line, no thesis impact.");
+        var outcome = await CaptureDeliverAndJudgeAsync(
+            alert, "ACN Q4 FY26 print: in line, no thesis impact.", EventDisposition.HeldForDigest, "earnings-ahead rides the digest");
 
         outcome.Kind.Should().Be(nameof(CompanionEventKind.EarningsAhead));
         outcome.Subject.Should().Be("ACN");
@@ -172,7 +173,8 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     /// event, the agent delivers it and records a notified verdict, and the day's outcome reads it back.
     /// </summary>
     private async Task<DailyEventOutcomeDto> CaptureDeliverAndJudgeAsync(
-        Alert alert, string verdict)
+        Alert alert, string verdict, EventDisposition capturedAs = EventDisposition.Pending,
+        string because = "the default Scan mode queues look-ahead events for the agent")
     {
         await using var alerts = AlertsContext();
         await using var companion = CompanionContext();
@@ -196,7 +198,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
         var dedupKey = _policy.AlertDedupKey(alert.Id);
         var evt = await agentCompanion.Events.AsNoTracking().SingleAsync(e => e.DedupKey == dedupKey);
-        evt.Disposition.Should().Be(EventDisposition.Pending, "the default Scan mode queues look-ahead events for the agent");
+        evt.Disposition.Should().Be(capturedAs, because);
 
         (await new AcknowledgeCompanionEventsCommandHandler(outbox)
             .Handle(new AcknowledgeCompanionEventsCommand(_userId, [evt.Id]), default)).Should().Be(1);
