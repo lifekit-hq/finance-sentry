@@ -18,6 +18,16 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
     // Only a source that has not synced successfully for a full day is worth a proactive wake.
     public TimeSpan SyncFailureEscalationAge { get; } = TimeSpan.FromHours(24);
 
+    // Kinds that never earn their own agent wake: they ride the digest (Quiet still silences them). Measured as
+    // low-value pushes (nearly every wake ended with no message); Opportunity and the rest keep the mode rule.
+    private static readonly IReadOnlySet<CompanionEventKind> DigestOnlyKinds = new HashSet<CompanionEventKind>
+    {
+        CompanionEventKind.AnalystAction,
+        CompanionEventKind.EarningsAhead,
+        CompanionEventKind.FamilyStatement,
+        CompanionEventKind.FireBrief,
+    };
+
     // Alert type strings are the cross-module contract value carried on each alert (Alerts module).
     public CompanionEventKind? ClassifyAlert(string alertType) => alertType switch
     {
@@ -74,7 +84,8 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
 
         // A Dormant connection is told once, in the digest; Quiet keeps it silent like any other digest line.
         // A retired account is told once, in the digest, the same way.
-        if (kind is CompanionEventKind.ConnectionDormant or CompanionEventKind.AccountRetired)
+        if (kind is CompanionEventKind.ConnectionDormant or CompanionEventKind.AccountRetired
+            || DigestOnlyKinds.Contains(kind))
             return mode == NotificationMode.Quiet ? EventDisposition.SuppressedByMode : EventDisposition.HeldForDigest;
 
         // Operational failures must reach the operator even under a quiet mode — surface instead of

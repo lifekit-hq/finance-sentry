@@ -39,12 +39,31 @@ public sealed class DispositionTests
     [Theory]
     [InlineData(CompanionEventKind.ThesisBreak)]
     [InlineData(CompanionEventKind.LowBalance)]
-    [InlineData(CompanionEventKind.AnalystAction)]
+    [InlineData(CompanionEventKind.Opportunity)]
     public void Other_kinds_keep_the_mode_disposition_regardless_of_staleness(CompanionEventKind kind)
     {
         _policy.DispositionFor(NotificationMode.Realtime, kind).Should().Be(EventDisposition.Pending);
         _policy.DispositionFor(NotificationMode.Realtime, kind, TimeSpan.FromHours(1)).Should().Be(EventDisposition.Pending);
     }
+
+    [Theory]
+    [InlineData(CompanionEventKind.AnalystAction)]
+    [InlineData(CompanionEventKind.EarningsAhead)]
+    [InlineData(CompanionEventKind.FamilyStatement)]
+    [InlineData(CompanionEventKind.FireBrief)]
+    public void Digest_only_kinds_are_held_for_the_digest_in_every_waking_mode(CompanionEventKind kind)
+    {
+        foreach (var mode in new[] { NotificationMode.Digest, NotificationMode.Scan, NotificationMode.Realtime })
+            _policy.DispositionFor(mode, kind).Should().Be(EventDisposition.HeldForDigest);
+    }
+
+    [Theory]
+    [InlineData(CompanionEventKind.AnalystAction)]
+    [InlineData(CompanionEventKind.EarningsAhead)]
+    [InlineData(CompanionEventKind.FamilyStatement)]
+    [InlineData(CompanionEventKind.FireBrief)]
+    public void Digest_only_kinds_stay_silent_under_quiet(CompanionEventKind kind)
+        => _policy.DispositionFor(NotificationMode.Quiet, kind).Should().Be(EventDisposition.SuppressedByMode);
 
     [Fact]
     public void Operational_failure_still_breaks_through_quiet()
