@@ -117,6 +117,7 @@ describe('FlowBreakdownComponent whole book', () => {
       book?.querySelector('[data-testid="breakdown-outlook"] fns-monthly-income-lens')
     ).not.toBeNull();
     expect(book?.querySelector('fns-fire-tile')).not.toBeNull();
+    expect(book?.querySelector('fns-payday-transfer-tile')).not.toBeNull();
     expect(book?.compareDocumentPosition(filter as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });

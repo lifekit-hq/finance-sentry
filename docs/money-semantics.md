@@ -1568,3 +1568,25 @@ month" with "Your $Y net worth drawn at R% a year, the safe withdrawal rate your
 uses. In today's money. Hypothetical, not a guarantee." beneath it (`fns-monthly-income-lens`), plus a
 stale-data note while `hasStaleSleeves` is set. `WealthController` converts the net worth and the income to the
 profile base currency (§3); the rate is not converted. No headline record yet (finance-framework §3.6).
+
+## 12. Payday transfer (#1272)
+
+A transfer-sizing figure, not a wealth measure: the EUR to send so a Monobank card's amount owed plus a fixed monthly
+outflow is covered once converted to UAH at the bank (`PaydayTransferCalculator`, BankSync; `GET /api/v1/payday-transfer`,
+shown on the flow-breakdown page as `fns-payday-transfer-tile`). It adds no measure to the finance framework.
+
+- **Amount owed.** The sum, over the user's live Monobank credit accounts in UAH, of the stored `CurrentBalance`
+  (positive = debt, §2), each floored at zero: a card in credit owes nothing and does not offset another. It is the
+  figure the Monobank sync already stores; nothing is fetched for it.
+- **Fixed monthly outflow.** A per-user setting (`payday_transfer_settings`, default 15,000 UAH), never hard-coded in
+  the arithmetic. It is the user's figure, not derived from transactions.
+- **Rate.** Monobank's public `/bank/currency`, pair EUR (978) to UAH (980), field `rateBuy`: the bank buys the EUR from
+  the person, which is what the conversion inside Monobank uses. Not `rateSell`, not a mid-market rate. The answer is
+  cached five minutes and the last answer is served when a refresh fails; the tile prints the rate with the bank's own
+  publication time, so a stale rate is visible as such. With no rate at all the UAH side still shows and the EUR side is
+  empty.
+- **Arithmetic.** `total = owed + outflow` (UAH); `exact = round(total / rateBuy, 2)` (EUR, to cents first so a
+  sub-cent remainder never bumps the suggestion a whole step); `suggested = ceil(exact / step) * step`;
+  `cushion = suggested - exact`. The step is a per-user setting (default 50 EUR). The margin is the rounding step, not
+  an add-on.
+- **Out of scope.** Reminders, automatic transfers, other cards, and any Home placement.

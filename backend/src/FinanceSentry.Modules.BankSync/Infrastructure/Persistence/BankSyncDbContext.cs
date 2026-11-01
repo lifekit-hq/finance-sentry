@@ -31,6 +31,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     public DbSet<CounterpartyRule> CounterpartyRules { get; set; } = null!;
     public DbSet<CommittedMerchantPin> CommittedMerchantPins { get; set; } = null!;
     public DbSet<CoverageHole> CoverageHoles { get; set; } = null!;
+    public DbSet<PaydayTransferSettings> PaydayTransferSettings { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -182,6 +183,12 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         // One open hole per account: the sentinel's daily re-run must never stack a second one.
         chb.HasIndex(h => h.AccountId).IsUnique().HasFilter("\"To\" IS NULL")
            .HasDatabaseName("idx_coverage_hole_open_account_unique");
+
+        var ptb = modelBuilder.Entity<PaydayTransferSettings>();
+        ptb.ToTable("payday_transfer_settings");
+        ptb.HasKey(p => p.Id);
+        ptb.Property(p => p.UserId).IsRequired();
+        ptb.HasIndex(p => p.UserId).IsUnique().HasDatabaseName("idx_payday_transfer_settings_user_unique");
 
         var sjb = modelBuilder.Entity<SyncJob>();
         sjb.HasKey(sj => sj.Id);

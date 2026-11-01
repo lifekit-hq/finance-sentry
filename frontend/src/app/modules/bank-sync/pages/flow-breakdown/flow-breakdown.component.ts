@@ -31,6 +31,7 @@ import {FireTileComponent} from '../../components/fire-tile/fire-tile.component'
 import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
 import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
+import {PaydayTransferTileComponent} from '../../components/payday-transfer-tile/payday-transfer-tile.component';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {
   ALL_ACCOUNTS_LABEL,
@@ -56,6 +57,7 @@ const DRAWER_WIDTH = '480px';
     DecimalPipe,
     EmptyStateComponent,
     FireTileComponent,
+    PaydayTransferTileComponent,
     ListItemRowComponent,
     MonthStepperComponent,
     MerchantCategoryPipe,
