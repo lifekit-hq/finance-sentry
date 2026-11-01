@@ -81,6 +81,22 @@ public class MonobankEurRateSourceTests
     }
 
     [Fact]
+    public async Task Does_not_hit_the_endpoint_again_within_the_ttl_after_a_failed_first_fetch()
+    {
+        _handler.Respond(HttpStatusCode.TooManyRequests, "{}");
+        var source = Source();
+
+        (await source.GetAsync()).Should().BeNull();
+        (await source.GetAsync()).Should().BeNull();
+        _handler.Calls.Should().Be(1, "the endpoint allows one call a minute, so a failure backs off for the TTL");
+
+        _clock.Advance(MonobankEurRateSource.CacheTtl + TimeSpan.FromSeconds(1));
+        _handler.Respond(HttpStatusCode.OK, Body);
+        (await source.GetAsync())!.RateBuy.Should().Be(50.00m);
+        _handler.Calls.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Returns_null_when_the_pair_or_its_buy_rate_is_missing()
     {
         _handler.Respond(HttpStatusCode.OK, """[{"currencyCodeA":978,"currencyCodeB":980,"date":1793000100,"rateCross":50.5}]""");

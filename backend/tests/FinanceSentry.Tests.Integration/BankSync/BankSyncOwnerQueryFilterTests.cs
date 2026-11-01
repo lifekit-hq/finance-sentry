@@ -131,6 +131,40 @@ public sealed class BankSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Payday_transfer_settings_upsert_keeps_one_row_per_person_and_each_person_reads_only_their_own()
+    {
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new PaydayTransferSettingsRepository(asA);
+            (await repo.GetAsync(_userA)).Should().BeNull("a person who never saved has no row");
+            await repo.UpsertAsync(_userA, 20000m, 100m);
+        }
+
+        await using (var asA = CreateContext(_userA))
+            await new PaydayTransferSettingsRepository(asA).UpsertAsync(_userA, 25000m, 50m);
+
+        await using (var asB = CreateContext(_userB))
+        {
+            var repo = new PaydayTransferSettingsRepository(asB);
+            (await repo.GetAsync(_userA)).Should().BeNull("naming another person does not lift the owner scope");
+            (await repo.GetAsync(_userB)).Should().BeNull("B never saved, so B reads the defaults, not A's values");
+            await repo.UpsertAsync(_userB, 5000m, 10m);
+        }
+
+        await using var read = CreateContext();
+        var stored = await read.PaydayTransferSettings.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(s => s.UserId == _userA || s.UserId == _userB).ToListAsync();
+        stored.Should().HaveCount(2, "the second save by A updates A's row instead of adding one");
+        stored.Single(s => s.UserId == _userA).Should().Match<PaydayTransferSettings>(
+            s => s.FixedOutflowUah == 25000m && s.RoundingStepEur == 50m);
+        stored.Single(s => s.UserId == _userB).Should().Match<PaydayTransferSettings>(
+            s => s.FixedOutflowUah == 5000m && s.RoundingStepEur == 10m);
+
+        (await new PaydayTransferSettingsRepository(read).GetAsync(_userA)).Should().BeNull(
+            "no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
     public async Task Counterparty_reader_with_no_person_reads_the_users_rows_and_the_shared_ones_only()
     {
         var shared = new Counterparty { UserId = Guid.Empty, Name = "Shared", FlowRole = FlowRoles.FamilySupport };

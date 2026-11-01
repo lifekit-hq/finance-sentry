@@ -34,7 +34,7 @@ public sealed class MonobankEurRateSource(
         try
         {
             var now = timeProvider.GetUtcNow();
-            if (_cached is not null && now - _fetchedAt < CacheTtl) return _cached;
+            if (now - _fetchedAt < CacheTtl) return _cached;
 
             // Stamped before the call: a failing endpoint is retried after one TTL, not on every request.
             _fetchedAt = now;
