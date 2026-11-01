@@ -97,6 +97,21 @@ public class MonobankEurRateSourceTests
     }
 
     [Fact]
+    public async Task A_caller_cancelled_fetch_neither_backs_off_nor_swallows_the_cancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        _handler.CancelOnNextCall = cts;
+        var source = Source();
+
+        var act = () => source.GetAsync(cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+
+        _handler.Respond(HttpStatusCode.OK, Body);
+        (await source.GetAsync())!.RateBuy.Should().Be(50.00m);
+        _handler.Calls.Should().Be(2, "the abandoned request says nothing about the endpoint, so the next one fetches");
+    }
+
+    [Fact]
     public async Task Returns_null_when_the_pair_or_its_buy_rate_is_missing()
     {
         _handler.Respond(HttpStatusCode.OK, """[{"currencyCodeA":978,"currencyCodeB":980,"date":1793000100,"rateCross":50.5}]""");
@@ -113,12 +128,21 @@ public class MonobankEurRateSourceTests
 
         public string? LastPath { get; private set; }
 
+        public CancellationTokenSource? CancelOnNextCall { get; set; }
+
         public void Respond(HttpStatusCode status, string body) => (_status, _body) = (status, body);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
             LastPath = request.RequestUri!.AbsolutePath;
+            if (CancelOnNextCall is { } cts)
+            {
+                CancelOnNextCall = null;
+                cts.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             return Task.FromResult(new HttpResponseMessage(_status)
             {
                 Content = new StringContent(_body, Encoding.UTF8, "application/json"),

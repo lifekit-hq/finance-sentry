@@ -36,18 +36,20 @@ public sealed class MonobankEurRateSource(
             var now = timeProvider.GetUtcNow();
             if (now - _fetchedAt < CacheTtl) return _cached;
 
-            // Stamped before the call: a failing endpoint is retried after one TTL, not on every request.
-            _fetchedAt = now;
             try
             {
                 var fetched = await FetchAsync(cancellationToken);
                 if (fetched is not null) _cached = fetched;
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested
+                                       && ex is HttpRequestException or TaskCanceledException or JsonException)
             {
                 logger.LogWarning(ex, "Monobank currency endpoint unavailable; using the last known EUR rate if any.");
             }
 
+            // Stamped once the endpoint has answered or failed (not when the caller gave up): a failing endpoint is
+            // retried after one TTL, not on every request.
+            _fetchedAt = now;
             return _cached;
         }
         finally
