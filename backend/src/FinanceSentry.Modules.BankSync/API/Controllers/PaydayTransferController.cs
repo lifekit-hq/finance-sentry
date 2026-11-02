@@ -35,5 +35,5 @@ public class PaydayTransferController(
 }
 
 public record UpdatePaydayTransferSettingsRequest(
-    [property: Range(0, (double)PaydayTransferDefaults.MaxAmount)] decimal FixedOutflowUah,
-    [property: Range(0.01, (double)PaydayTransferDefaults.MaxAmount)] decimal RoundingStepEur);
+    [Range(0, (double)PaydayTransferDefaults.MaxAmount)] decimal FixedOutflowUah,
+    [Range(0.01, (double)PaydayTransferDefaults.MaxAmount)] decimal RoundingStepEur);

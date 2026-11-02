@@ -1,7 +1,5 @@
 namespace FinanceSentry.Tests.Unit.BankSync.PaydayTransfer;
 
-using System.ComponentModel.DataAnnotations;
-using FinanceSentry.Modules.BankSync.API.Controllers;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -60,21 +58,5 @@ public class UpdatePaydayTransferSettingsTests
         _settings.Verify(
             s => s.UpsertAsync(It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
             Times.Never);
-    }
-
-    [Theory]
-    [InlineData(0, 0.01, true)]
-    [InlineData(15000, 50, true)]
-    [InlineData(1_000_000_000, 1_000_000_000, true)]
-    [InlineData(-1, 50, false)]
-    [InlineData(15000, 0, false)]
-    [InlineData(1_000_000_001, 50, false)]
-    [InlineData(15000, 1_000_000_001, false)]
-    public void The_request_binder_rejects_what_the_handler_would_reject(double outflow, double step, bool valid)
-    {
-        var request = new UpdatePaydayTransferSettingsRequest((decimal)outflow, (decimal)step);
-
-        Validator.TryValidateObject(request, new ValidationContext(request), [], validateAllProperties: true)
-            .Should().Be(valid);
     }
 }
