@@ -1,0 +1,135 @@
+@if (store.visible()) {
+  @if (store.transfer(); as t) {
+    <cmn-card data-testid="payday-transfer-tile">
+      <div class="space-y-cmn-3">
+        <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+          <span
+            class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+          >
+            Payday transfer
+          </span>
+          @if (!store.editing()) {
+            <cmn-button (clicked)="edit()" data-testid="payday-edit" size="sm" variant="secondary"
+              >Adjust</cmn-button
+            >
+          }
+        </div>
+
+        @if (t.suggestedEur !== null) {
+          <p
+            class="font-headline text-cmn-lg font-semibold text-text-primary"
+            data-testid="payday-headline"
+          >
+            Transfer {{ t.suggestedEur | money: 'EUR' }}
+          </p>
+        } @else {
+          <cmn-alert variant="warning" data-testid="payday-no-rate"
+            >Monobank's EUR rate is unavailable right now, so the euro amount can't be worked out.
+            The hryvnia total below still holds.</cmn-alert
+          >
+        }
+
+        <dl class="space-y-cmn-1 text-cmn-sm" data-testid="payday-breakdown">
+          <div class="flex justify-between gap-cmn-3">
+            <dt class="text-text-secondary">Card amount owed</dt>
+            <dd class="tabular-nums text-text-primary" data-testid="payday-owed">
+              {{ t.owedUah | money: 'UAH' }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-cmn-3">
+            <dt class="text-text-secondary">Fixed monthly outflow</dt>
+            <dd class="tabular-nums text-text-primary" data-testid="payday-outflow">
+              {{ t.fixedOutflowUah | money: 'UAH' }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-cmn-3">
+            <dt class="text-text-secondary">Total to cover</dt>
+            <dd class="tabular-nums text-text-primary" data-testid="payday-total">
+              {{ t.totalUah | money: 'UAH' }}
+            </dd>
+          </div>
+          @if (t.rate; as rate) {
+            <div class="flex justify-between gap-cmn-3">
+              <dt class="text-text-secondary">EUR buy rate</dt>
+              <dd class="tabular-nums text-text-primary" data-testid="payday-rate">
+                {{ rate.rateBuy | number: rateFormat }}
+                <span class="text-text-secondary"
+                  >· {{ rate.source }}, {{ rate.publishedAt | date: 'medium' }}</span
+                >
+              </dd>
+            </div>
+            <div class="flex justify-between gap-cmn-3">
+              <dt class="text-text-secondary">Exact amount</dt>
+              <dd class="tabular-nums text-text-primary" data-testid="payday-exact">
+                {{ t.exactEur | money: 'EUR' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-cmn-3">
+              <dt class="text-text-secondary">
+                Suggested transfer (rounded up to {{ t.roundingStepEur | money: 'EUR' }})
+              </dt>
+              <dd class="tabular-nums text-text-primary" data-testid="payday-suggested">
+                {{ t.suggestedEur | money: 'EUR' }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-cmn-3">
+              <dt class="text-text-secondary">Cushion</dt>
+              <dd class="tabular-nums text-text-primary" data-testid="payday-cushion">
+                {{ t.cushionEur | money: 'EUR' }}
+              </dd>
+            </div>
+          }
+        </dl>
+
+        @if (store.editing()) {
+          <form
+            [formGroup]="form"
+            (ngSubmit)="save()"
+            class="space-y-cmn-3"
+            data-testid="payday-form"
+          >
+            <cmn-form-field
+              [control]="form.controls.fixedOutflowUah"
+              [errorMessage]="form.controls.fixedOutflowUah.invalid ? outflowError : ''"
+              fieldId="payday-outflow"
+              label="Fixed monthly outflow (UAH)"
+            >
+              <cmn-input
+                [formControl]="form.controls.fixedOutflowUah"
+                id="payday-outflow"
+                inputmode="decimal"
+                type="text"
+              />
+            </cmn-form-field>
+            <cmn-form-field
+              [control]="form.controls.roundingStepEur"
+              [errorMessage]="form.controls.roundingStepEur.invalid ? stepError : ''"
+              fieldId="payday-step"
+              label="Round the transfer up to a multiple of (EUR)"
+            >
+              <cmn-input
+                [formControl]="form.controls.roundingStepEur"
+                id="payday-step"
+                inputmode="decimal"
+                type="text"
+              />
+            </cmn-form-field>
+            @if (store.hasSaveError()) {
+              <cmn-alert variant="error">{{ store.saveErrorMessage() }}</cmn-alert>
+            }
+            <div class="flex gap-cmn-2">
+              <cmn-button
+                [disabled]="form.invalid || store.isSaveLoading()"
+                data-testid="payday-save"
+                type="submit"
+                variant="primary"
+                >Save</cmn-button
+              >
+              <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+            </div>
+          </form>
+        }
+      </div>
+    </cmn-card>
+  }
+}

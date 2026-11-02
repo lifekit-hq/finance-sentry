@@ -443,6 +443,38 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     b.ToTable("MonobankCredentials", "bank_sync");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.PaydayTransferSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FixedOutflowUah")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("numeric(15,2)");
+
+                    b.Property<decimal>("RoundingStepEur")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("numeric(15,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_payday_transfer_settings_user_unique");
+
+                    b.ToTable("payday_transfer_settings", "bank_sync");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.SyncJob", b =>
                 {
                     b.Property<Guid>("Id")

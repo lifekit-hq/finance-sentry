@@ -245,6 +245,16 @@ public static class BankSyncModule
         services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();
         services.AddScoped<ICommittedMerchantPinRepository, CommittedMerchantPinRepository>();
 
+        services.AddScoped<IPaydayTransferSettingsRepository, PaydayTransferSettingsRepository>();
+        // The public currency endpoint needs no token and gets no retry pipeline: Monobank's 429 backoff (up to minutes)
+        // would hang a page load; the source caches and serves the last rate instead.
+        services.AddHttpClient(MonobankEurRateSource.HttpClientName, (sp, client) =>
+        {
+            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<MonobankOptions>>().Value.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        services.AddSingleton<IEurUahRateSource, MonobankEurRateSource>();
+
         services.AddScoped<IBankingAccountsReader, BankingAccountsReader>();
         services.AddScoped<IAccountScopeChangeReader, BankAccountScopeChangeReader>();
         services.AddScoped<IBankingTransactionReader, BankingTransactionReader>();
