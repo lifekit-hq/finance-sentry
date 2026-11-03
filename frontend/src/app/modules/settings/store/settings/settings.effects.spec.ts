@@ -5,6 +5,7 @@ import {type Nullable, ToastService} from '@lifekit-hq/ui';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {DownloadUtils} from '../../../../shared/utils/download.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
@@ -20,11 +21,13 @@ const PROFILE = {
 } as unknown as UserProfile;
 const SAVE_FAILED = 'Failed to save profile.';
 const CLOSE_FAILED = 'Could not close the account.';
+const EXPORT_FAILED = 'Could not prepare your data download.';
 const CAN_CLOSE: AccountClosureOptions = {canClose: true, reason: null, graceDays: 30};
 
 function buildStore() {
   const errorMessage = signal('');
   const closureError = signal('');
+  const exportError = signal('');
   const profile = signal<Nullable<UserProfile>>(PROFILE);
   const closureOptions = signal<Nullable<AccountClosureOptions>>(CAN_CLOSE);
   return {
@@ -49,19 +52,27 @@ function buildStore() {
     setClosureSuccess: vi.fn(),
     setClosureError: vi.fn(() => closureError.set(CLOSE_FAILED)),
     closureErrorMessage: () => closureError(),
+    setExportLoading: vi.fn(),
+    setExportSuccess: vi.fn(),
+    setExportError: vi.fn(() => exportError.set(EXPORT_FAILED)),
+    exportErrorMessage: () => exportError(),
   };
 }
 
 describe('settingsEffects', () => {
   let service: {getProfile: ReturnType<typeof vi.fn>; updateProfile: ReturnType<typeof vi.fn>};
   let toast: {show: ReturnType<typeof vi.fn>};
-  let account: {getClosureOptions: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>};
+  let account: {
+    getClosureOptions: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+    exportData: ReturnType<typeof vi.fn>;
+  };
   let auth: {setProfileName: ReturnType<typeof vi.fn>; logout: ReturnType<typeof vi.fn>};
 
   beforeEach(() => {
     service = {getProfile: vi.fn(), updateProfile: vi.fn()};
     toast = {show: vi.fn()};
-    account = {getClosureOptions: vi.fn(), close: vi.fn()};
+    account = {getClosureOptions: vi.fn(), close: vi.fn(), exportData: vi.fn()};
     auth = {setProfileName: vi.fn(), logout: vi.fn()};
     TestBed.configureTestingModule({
       providers: [
@@ -257,6 +268,42 @@ describe('settingsEffects', () => {
       expect(store.setClosureError).toHaveBeenCalledWith('LAST_OWNER_CANNOT_CLOSE');
       expect(toast.show).toHaveBeenCalledWith(CLOSE_FAILED, 'error');
       expect(auth.logout).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exportData', () => {
+    it('saves the downloaded file under the day and toasts when it is ready', () => {
+      const store = buildStore();
+      const blob = new Blob(['{}'], {type: 'application/json'});
+      account.exportData.mockReturnValue(of(blob));
+      const save = vi.spyOn(DownloadUtils, 'saveBlob').mockImplementation(() => undefined);
+
+      effects(store).exportData();
+
+      expect(store.setExportLoading).toHaveBeenCalled();
+      expect(save).toHaveBeenCalledWith(
+        blob,
+        expect.stringMatching(/^finance-sentry-export-\d{4}-\d{2}-\d{2}\.json$/)
+      );
+      expect(store.setExportSuccess).toHaveBeenCalled();
+      expect(toast.show).toHaveBeenCalledWith('Your data download is ready', 'success');
+      save.mockRestore();
+    });
+
+    it('saves nothing and toasts the failure when the server refuses', () => {
+      const store = buildStore();
+      account.exportData.mockReturnValue(
+        throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'BOOM'}}))
+      );
+      const save = vi.spyOn(DownloadUtils, 'saveBlob').mockImplementation(() => undefined);
+
+      effects(store).exportData();
+
+      expect(store.setExportError).toHaveBeenCalledWith('BOOM');
+      expect(toast.show).toHaveBeenCalledWith(EXPORT_FAILED, 'error');
+      expect(save).not.toHaveBeenCalled();
+      expect(store.setExportSuccess).not.toHaveBeenCalled();
+      save.mockRestore();
     });
   });
 

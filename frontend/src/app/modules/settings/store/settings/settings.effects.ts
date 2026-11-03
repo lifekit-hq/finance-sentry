@@ -4,6 +4,7 @@ import {type Nullable, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, concatMap, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
+import {DownloadUtils} from '../../../../shared/utils/download.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
@@ -29,6 +30,10 @@ interface EffectsStore {
   setClosureSuccess: () => void;
   setClosureError: (errorCode: Nullable<string>) => void;
   closureErrorMessage: () => string;
+  setExportLoading: () => void;
+  setExportSuccess: () => void;
+  setExportError: (errorCode: Nullable<string>) => void;
+  exportErrorMessage: () => string;
 }
 
 interface ProfileWrite {
@@ -137,10 +142,32 @@ export function settingsEffects(store: EffectsStore) {
     )
   );
 
+  // The server streams one JSON document of the signed-in person's own rows; the browser saves it as a file.
+  const exportData = rxMethod<void>(
+    pipe(
+      tap(() => store.setExportLoading()),
+      exhaustMap(() =>
+        accountService.exportData().pipe(
+          tap(blob => {
+            DownloadUtils.saveBlob(blob, DownloadUtils.exportFileName(new Date()));
+            store.setExportSuccess();
+            toast.show('Your data download is ready', 'success');
+          }),
+          catchError(err => {
+            store.setExportError(extractErrorCode(err));
+            toast.show(store.exportErrorMessage(), 'error');
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
   return {
     load,
     loadClosureOptions,
     closeAccount,
+    exportData,
     applyChange(change: Partial<UpdateProfileRequest>): void {
       write({change, confirm: false});
     },

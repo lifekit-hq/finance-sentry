@@ -69,3 +69,14 @@ describe('LoginComponent sign-in methods', () => {
     expect(root.querySelector('cmn-button')).toBeNull();
   });
 });
+
+describe('LoginComponent legal links', () => {
+  it('links the privacy notice and the terms, which are readable before signing in', () => {
+    const {root} = setup('success', {oidc: true});
+
+    expect(root.querySelector('[data-testid="privacy-link"]')?.getAttribute('href')).toBe(
+      '/privacy'
+    );
+    expect(root.querySelector('[data-testid="terms-link"]')?.getAttribute('href')).toBe('/terms');
+  });
+});

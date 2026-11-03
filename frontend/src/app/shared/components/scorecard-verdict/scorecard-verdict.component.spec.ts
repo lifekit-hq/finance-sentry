@@ -1,6 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it} from 'vitest';
 
+import {NOT_ADVICE_NOTICE} from '../../constants/legal/legal.constants';
 import {VERDICT_STRUCTURE_BASIS_NOTE} from '../../constants/scorecard/scorecard.constants';
 import {ScorecardFixtures} from '../../models/scorecard/scorecard.fixtures';
 import {type ScorecardDto} from '../../models/scorecard/scorecard.model';
@@ -25,6 +26,12 @@ describe('ScorecardVerdictComponent', () => {
     expect(text(host, 'verdict-word')).toBe('AVOID');
     expect(host.textContent).toContain('Rules v1');
     expect(text(host, 'verdict-fired-rule')).toBe('Rule extended_and_rich.');
+  });
+
+  it('says beside the word that it is information, not advice', () => {
+    const host = render(ScorecardFixtures.scorecard());
+
+    expect(text(host, 'verdict-not-advice')).toBe(NOT_ADVICE_NOTICE);
   });
 
   it('keeps the drill-down closed until the owner opens it', () => {

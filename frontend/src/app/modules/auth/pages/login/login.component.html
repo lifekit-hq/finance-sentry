@@ -49,5 +49,14 @@
     <p class="text-center text-cmn-sm text-text-secondary">
       Access is by invitation. Ask the account owner for access.
     </p>
+    <p class="mt-cmn-4 text-center text-cmn-xs text-text-secondary" data-testid="legal-links">
+      <a [routerLink]="privacyRoute" class="underline underline-offset-2" data-testid="privacy-link"
+        >Privacy notice</a
+      >
+      ·
+      <a [routerLink]="termsRoute" class="underline underline-offset-2" data-testid="terms-link"
+        >Terms</a
+      >
+    </p>
   </div>
 </div>

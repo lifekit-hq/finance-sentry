@@ -46,21 +46,26 @@ public static class OwnedRowEraser
         where TContext : DbContext
         => services.AddScoped<IUserDataEraser>(sp => new ContextEraser<TContext>(sp.GetRequiredService<TContext>(), module));
 
-    private static Task<int> EraseEntityAsync<TEntity>(DbContext db, Guid userId, CancellationToken ct)
+    /// <summary>
+    /// <c>x => x.UserId == userId</c>, built on the concrete type so EF sees a plain column comparison; the id is a
+    /// captured variable, so EF sends it as a parameter. The one definition of "this person's row" the eraser and the
+    /// data export share.
+    /// </summary>
+    internal static Expression<Func<TEntity, bool>> OwnedBy<TEntity>(Guid userId)
         where TEntity : class
     {
-        // x => x.UserId == userId, built on the concrete type so EF sees a plain column comparison; the id is a
-        // captured variable, so EF sends it as a parameter.
         Expression<Func<Guid>> person = () => userId;
         var entity = Expression.Parameter(typeof(TEntity), "x");
-        var owned = Expression.Lambda<Func<TEntity, bool>>(
+        return Expression.Lambda<Func<TEntity, bool>>(
             Expression.Equal(Expression.Property(entity, nameof(IUserOwned.UserId)), person.Body),
             entity);
-
-        // Every filter off, not only the Owner one: a soft-deleted row (an archived transaction, a removed account) is
-        // still the person's data. The predicate above is the only scope.
-        return db.Set<TEntity>().IgnoreQueryFilters().Where(owned).ExecuteDeleteAsync(ct);
     }
+
+    private static Task<int> EraseEntityAsync<TEntity>(DbContext db, Guid userId, CancellationToken ct)
+        where TEntity : class
+        // Every filter off, not only the Owner one: a soft-deleted row (an archived transaction, a removed account) is
+        // still the person's data. The predicate is the only scope.
+        => db.Set<TEntity>().IgnoreQueryFilters().Where(OwnedBy<TEntity>(userId)).ExecuteDeleteAsync(ct);
 
     private sealed class ContextEraser<TContext>(TContext db, string module) : IUserDataEraser
         where TContext : DbContext

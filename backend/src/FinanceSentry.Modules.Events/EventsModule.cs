@@ -33,6 +33,7 @@ public static class EventsModule
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
         services.AddOwnedRowEraser<EventsDbContext>("Events");
+        services.AddOwnedRowExporter<EventsDbContext>("Events");
 
         services.AddScoped<IEventVerdictRepository, EventVerdictRepository>();
 

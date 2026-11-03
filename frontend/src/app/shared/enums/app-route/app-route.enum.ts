@@ -3,6 +3,8 @@ export enum AppRoute {
   Login = '/login',
   AccessDenied = '/access-denied',
   McpConnect = '/mcp/connect',
+  Privacy = '/privacy',
+  Terms = '/terms',
   Accounts = '/accounts',
   AccountsList = '/accounts/list',
   Dashboard = '/dashboard',

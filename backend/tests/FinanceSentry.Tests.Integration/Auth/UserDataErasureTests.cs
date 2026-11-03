@@ -258,16 +258,16 @@ public sealed class UserDataErasureTests : IAsyncLifetime
 
     private static string Describe(object?[] key) => $"({string.Join(", ", key)})";
 
-    private sealed record Column(string Name, string Type, bool NotNull, bool HasDefault, char Category);
+    internal sealed record Column(string Name, string Type, bool NotNull, bool HasDefault, char Category);
 
-    private sealed record ForeignKey(string Column, string Parent, string ParentColumn);
+    internal sealed record ForeignKey(string Column, string Parent, string ParentColumn);
 
-    private sealed record Table(string Name, IReadOnlyList<Column> Columns, IReadOnlyList<string> PrimaryKey, IReadOnlyList<ForeignKey> ForeignKeys)
+    internal sealed record Table(string Name, IReadOnlyList<Column> Columns, IReadOnlyList<string> PrimaryKey, IReadOnlyList<ForeignKey> ForeignKeys)
     {
         public Column? PersonColumn => Columns.FirstOrDefault(c => c.Name == "UserId");
     }
 
-    private sealed class Schema(IReadOnlyDictionary<string, Table> tables)
+    internal sealed class Schema(IReadOnlyDictionary<string, Table> tables)
     {
         public IReadOnlyDictionary<string, Table> Tables => tables;
 
@@ -366,7 +366,7 @@ public sealed class UserDataErasureTests : IAsyncLifetime
         }
     }
 
-    private sealed record SeedResult(
+    internal sealed record SeedResult(
         IReadOnlyDictionary<(string Table, string Owner), List<object?[]>> Rows, IReadOnlyList<string> Unseedable);
 
     /// <summary>
@@ -375,7 +375,7 @@ public sealed class UserDataErasureTests : IAsyncLifetime
     /// (roles, categories) takes any existing row. Columns with a default are left to it; other nullable columns
     /// are null; required ones get a type-shaped placeholder.
     /// </summary>
-    private static class Seeder
+    internal static class Seeder
     {
         private const string UsersTable = "auth.\"AspNetUsers\"";
 

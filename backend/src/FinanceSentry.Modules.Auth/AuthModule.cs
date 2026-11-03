@@ -45,6 +45,8 @@ public static class AuthModule
         services.AddUpdatedAtStamping();
         services.AddDbContext<AuthDbContext>((sp, o) => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
         services.AddScoped<IUserDataEraser, AuthUserDataEraser>();
+        services.AddScoped<IUserDataExporter, AuthUserDataExporter>();
+        services.AddScoped<AccountDataExportWriter>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<AccountPurgeJob>();
         services.AddSingleton<IJobRegistrar, JobRegistrar>();

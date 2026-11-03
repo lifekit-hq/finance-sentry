@@ -1,6 +1,7 @@
 import {ChangeDetectionStrategy, Component, computed, input} from '@angular/core';
 import {TagComponent} from '@lifekit-hq/ui';
 
+import {NOT_ADVICE_NOTICE} from '../../constants/legal/legal.constants';
 import {
   VERDICT_CONDITION_MET_CLASS,
   VERDICT_CONDITION_UNMET_CLASS,
@@ -26,6 +27,7 @@ import {ScorecardUtils} from '../../utils/scorecard.utils';
 export class ScorecardVerdictComponent {
   public readonly scorecard = input.required<ScorecardDto>();
 
+  public readonly notAdvice = NOT_ADVICE_NOTICE;
   public readonly wordLabel = VERDICT_WORD_LABEL;
   public readonly wordVariant = VERDICT_WORD_VARIANT;
   public readonly basisNote = VERDICT_STRUCTURE_BASIS_NOTE;

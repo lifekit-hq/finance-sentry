@@ -25,6 +25,8 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
     private const string OpsAdmin = "ops-admin";
     private const string ServiceToken = "service-token";
     private const string Disconnect = "disconnect";
+    private const string Scorecard = "scorecard";
+    private const string Decisions = "decisions";
 
     /// <summary>Feature, permission it needs, and the request that reaches it.</summary>
     private static readonly Dictionary<string, (string Permission, HttpMethod Method, string Path)> Features = new()
@@ -34,6 +36,9 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
         [OpsAdmin] = (Permissions.OpsAdmin, HttpMethod.Post, "/api/v1/wealth/admin/backfill-net-worth-history"),
         [ServiceToken] = (Permissions.McpService, HttpMethod.Post, "/api/v1/auth/mcp/service-token"),
         [Disconnect] = (Permissions.ConnectionsManage, HttpMethod.Delete, "/api/v1/crypto/binance/disconnect"),
+        // Verdicts (a scorecard's BUY/AVOID word, the Ledger's queued calls) stay the owner's: a Member never reads one.
+        [Scorecard] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/scorecards/AAPL"),
+        [Decisions] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/recommendations"),
     };
 
     public static TheoryData<string> AllFeatures() => [.. Features.Keys];

@@ -48,6 +48,7 @@ public static class BudgetsModule
         services.AddDbContext<BudgetsDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
         services.AddOwnedRowEraser<BudgetsDbContext>("Budgets");
+        services.AddOwnedRowExporter<BudgetsDbContext>("Budgets");
 
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<ICategoryNormalizationService, CategoryNormalizationService>();
