@@ -1,9 +1,19 @@
 import {DOCUMENT} from '@angular/common';
 import {afterNextRender, inject, Injector, type Signal} from '@angular/core';
-import {ActivatedRoute} from '@angular/router';
+import {ActivatedRoute, type ParamMap} from '@angular/router';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, exhaustMap, filter, pipe, switchMap, tap} from 'rxjs';
+import {
+  catchError,
+  distinctUntilChanged,
+  EMPTY,
+  exhaustMap,
+  filter,
+  map,
+  pipe,
+  switchMap,
+  tap,
+} from 'rxjs';
 
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
 import {
@@ -25,6 +35,7 @@ import {DossierService} from '../services/dossier.service';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
 
 interface StoreMethods {
+  resetForSymbol(): void;
   setDossierLoading(): void;
   setDossierSuccess(): void;
   setDossier(dossier: AssetDossierDto): void;
@@ -59,6 +70,7 @@ export function dossierEffects(store: StoreMethods) {
   const document = inject(DOCUMENT);
   const injector = inject(Injector);
   const decisionSheet = inject(DecisionSheetService);
+  const authStore = inject(AuthStore);
 
   // An alert deep-links to a card (`/assets/NVDA#analyst-coverage`); the card only exists once the
   // dossier has loaded, so the router's own fragment handling has nothing to land on. Scroll after
@@ -241,7 +253,18 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
+  // A symbol change in place (palette search from one dossier to another) reuses this component, so
+  // the previous symbol's content is dropped before the new one loads.
+  const openSymbol = (symbol: string): void => {
+    store.resetForSymbol();
+    loadDossier(symbol);
+    if (authStore.canUseAi()) {
+      loadLedgerRead(symbol);
+    }
+  };
+
   return {
+    openSymbol,
     loadDossier,
     decideRecommendation,
     loadLedgerRead,
@@ -255,17 +278,18 @@ export function dossierEffects(store: StoreMethods) {
 
 export function dossierHooks(store: ReturnType<typeof dossierEffects>) {
   const route = inject(ActivatedRoute);
-  const authStore = inject(AuthStore);
+
+  // Follows the route's paramMap, not its snapshot, so the page tracks the symbol after init too.
+  const followSymbol = rxMethod<ParamMap>(
+    pipe(
+      map(params => params.get(ASSET_DOSSIER_SYMBOL_PARAM) ?? ''),
+      filter(symbol => symbol !== ''),
+      distinctUntilChanged(),
+      tap(symbol => store.openSymbol(symbol))
+    )
+  );
 
   return {
-    onInit: () => {
-      const symbol = route.snapshot.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM) ?? '';
-      if (symbol) {
-        store.loadDossier(symbol);
-        if (authStore.canUseAi()) {
-          store.loadLedgerRead(symbol);
-        }
-      }
-    },
+    onInit: () => followSymbol(route.paramMap),
   };
 }

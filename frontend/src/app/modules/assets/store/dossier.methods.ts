@@ -1,5 +1,5 @@
 import {type Nullable} from '@lifekit-hq/ui';
-import {patchState, type WritableStateSource} from '@ngrx/signals';
+import {getState, patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {
@@ -10,10 +10,15 @@ import {
   type DossierQuoteDto,
   type DossierUserTargetDto,
 } from '../models/dossier/dossier.model';
-import {type DossierState} from './dossier.state';
+import {type DossierState, initialDossierState} from './dossier.state';
 
 export function dossierMethods(store: WritableStateSource<DossierState>) {
   return {
+    // Drops everything read for the previous symbol so a symbol change in place never shows old
+    // content under the new header. The chart range is the reader's choice, not the symbol's.
+    resetForSymbol(): void {
+      patchState(store, {...initialDossierState, chartRange: getState(store).chartRange});
+    },
     setDossier(dossier: AssetDossierDto): void {
       patchState(store, {dossier});
     },
