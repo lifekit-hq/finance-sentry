@@ -278,7 +278,7 @@ public class CounterpartyClassificationService(
     }
 
     // A currency-scoped rule is more specific than a generic one, so it wins regardless of
-    // counterparty ordering: «Від: Людмила Сичова» on a EUR account matches the EUR-scoped
+    // counterparty ordering: «Від: Оксана Лисенко» on a EUR account matches the EUR-scoped
     // self-routing counterparty even though the generic family rule matches the text too.
     // Within a specificity tier, the first counterparty whose any rule matches wins.
     private static Counterparty? FindCounterparty(

@@ -27,8 +27,8 @@
   - Creates `counterparties` table
   - Creates `counterparty_rules` table
   - Inserts FAMILY_SUPPORT into `categories`
-  - Seeds Людмила Сичова (rules: "Людмила Сичова", "мама") with `UserId = Guid.Empty`
-  - Seeds Єлизавета Морозова (rules: "Єлизавета Морозова", "Ліза") with `UserId = Guid.Empty`
+  - Seeds Оксана Лисенко (rules: "Оксана Лисенко", "мама") with `UserId = Guid.Empty`
+  - Seeds Марія Коваль (rules: "Марія Коваль", "Марічка") with `UserId = Guid.Empty`
 - [x] Update `BankSyncDbContextModelSnapshot.cs` to include new entities
 
 ### BankSync application

@@ -259,3 +259,7 @@ Replace `/absolute/path/to/finance-sentry` with the real path on your machine. M
 For HTTP/SSE transport (networked or multi-client deployments), set `MCP_TRANSPORT=http` and optionally `MCP_HTTP_PORT=5100`. Copy `.env.example` to `.env` and adjust the values before starting the server.
 
 See [docs/mcp.md](docs/mcp.md) for the full tool catalogue — input parameters, return schemas, and real-vs-stub status for each tool.
+
+## License & Security
+
+MIT — see [LICENSE](LICENSE). Third-party notices: [backend/THIRD-PARTY-NOTICES.txt](backend/THIRD-PARTY-NOTICES.txt). To report a vulnerability, see [.github/SECURITY.md](.github/SECURITY.md).

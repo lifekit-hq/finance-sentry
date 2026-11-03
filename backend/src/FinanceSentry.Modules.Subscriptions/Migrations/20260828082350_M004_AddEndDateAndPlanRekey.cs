@@ -51,7 +51,7 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                 """
                 UPDATE public.detected_subscriptions
                 SET "Kind" = 'installment', "MerchantNameDisplay" = 'Іпотека', "EndDate" = DATE '2036-05-01'
-                WHERE "IsManual" = false AND "Kind" = 'subscription' AND "MerchantNameNormalized" = '516936';
+                WHERE "IsManual" = false AND "Kind" = 'subscription' AND "MerchantNameNormalized" = '400000';
                 """);
 
             // Hand-inserted manual rows whose merchants the detector can now find on its

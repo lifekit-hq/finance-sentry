@@ -19,17 +19,17 @@ public class SettlementDescriptionNormalizerTests
     public void StripsTheSettlementStamp()
     {
         SettlementDescriptionNormalizer
-            .Normalize("*MOBI DENYS SYCHOV IE26090266947650 TxnDate: 02Sep2026 *MOBI DENYS SYCHOV")
-            .Should().Be("*mobi denys sychov ie26090266947650 *mobi denys sychov");
+            .Normalize("*MOBI ALEX MORGAN IE26000000000001 TxnDate: 02Sep2026 *MOBI ALEX MORGAN")
+            .Should().Be("*mobi alex morgan ie26000000000001 *mobi alex morgan");
     }
 
     [Fact]
     public void PendingAndPostedFormsOfOneMovementNormalizeAlike()
     {
         var pending = SettlementDescriptionNormalizer
-            .Normalize("Denys Sychov IE26082062813884 Sent from Revolut");
+            .Normalize("Alex Morgan IE26000000000002 Sent from Revolut");
         var posted = SettlementDescriptionNormalizer
-            .Normalize("DENYS SYCHOV IE26082062813884 TxnDate: 20Aug2026 Sent from Revolut");
+            .Normalize("ALEX MORGAN IE26000000000002 TxnDate: 20Aug2026 Sent from Revolut");
 
         posted.Should().Be(pending);
     }
@@ -64,7 +64,7 @@ public class SettlementDescriptionNormalizerTests
     public void KeepsDistinctMerchantsDistinct()
     {
         var a = SettlementDescriptionNormalizer.Normalize("*MOBI TOP-UP 0857860057 TxnDate: 20Aug2026");
-        var b = SettlementDescriptionNormalizer.Normalize("DENYS SYCHOV IE26082062813884 Sent from Revolut");
+        var b = SettlementDescriptionNormalizer.Normalize("ALEX MORGAN IE26000000000002 Sent from Revolut");
 
         a.Should().NotBe(b);
     }

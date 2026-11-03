@@ -8,9 +8,9 @@ using System.Text.RegularExpressions;
 ///
 /// <para>
 /// AIB rewrites the description on settlement: the pending feed sends
-/// <c>*MOBI DENYS SYCHOV IE26090266947650 *MOBI DENYS SYCHOV</c> and the booked feed sends the
+/// <c>*MOBI ALEX MORGAN IE26000000000001 *MOBI ALEX MORGAN</c> and the booked feed sends the
 /// same line with a settlement date spliced in —
-/// <c>*MOBI DENYS SYCHOV IE26090266947650 TxnDate: 02Sep2026 *MOBI DENYS SYCHOV</c>. Because
+/// <c>*MOBI ALEX MORGAN IE26000000000001 TxnDate: 02Sep2026 *MOBI ALEX MORGAN</c>. Because
 /// <see cref="PendingReconciler"/> keys on the description, the two never matched: the pending
 /// row was never retired and the posted row landed beside it, double-counting the payment in
 /// every outflow figure derived from it.

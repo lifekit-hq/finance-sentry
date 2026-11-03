@@ -35,7 +35,7 @@ Content-Type: application/json
       "bankName": "Monobank",
       "accountType": "checking",
       "accountNumberLast4": "1234",
-      "ownerName": "Denys Sychov",
+      "ownerName": "Alex Morgan",
       "currency": "UAH",
       "currentBalance": 15234.50,
       "syncStatus": "pending",

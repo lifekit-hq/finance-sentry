@@ -11,7 +11,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     /// Data-only migration: widens the seeded counterparty rules to the wordings that
     /// actually appear on statements. The M011/M012 patterns only matched the Monobank
     /// (Cyrillic) renderings, so the same people and venues went unmatched on the
-    /// TrueLayer side: Revolut writes "Liudmyla Sychova" / "To Yelyzaveta M" in Latin
+    /// TrueLayer side: Revolut writes "Oksana Lysenko" / "To Mariia M" in Latin
     /// script, and a Revolut X funding leg ("EUR → Revolut X") matched no investment
     /// rule at all. Unmatched legs fall through to transfer-category exclusion (or plain
     /// spending, for Revolut X), which is exactly the asymmetry that overstated the
@@ -22,7 +22,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     public partial class M013_CounterpartyRuleCoverage : Migration
     {
         private static readonly Guid LyudmilaId = new("11111111-0000-0000-0000-000000000001");
-        private static readonly Guid YelyzavetaId = new("11111111-0000-0000-0000-000000000002");
+        private static readonly Guid MariiaId = new("11111111-0000-0000-0000-000000000002");
         private static readonly Guid InvestmentRoutingId = new("11111111-0000-0000-0000-000000000003");
         private static readonly DateTime SeededAt = new(2026, 9, 5, 0, 0, 0, DateTimeKind.Utc);
 
@@ -45,20 +45,20 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 values: new object[,]
                 {
                     // Latin transliterations used by Revolut/AIB statement lines. Matching is
-                    // case-insensitive substring, so "To Yelyzaveta M" and standalone
-                    // "Liudmyla Sychova" both hit.
+                    // case-insensitive substring, so "To Mariia M" and standalone
+                    // "Oksana Lysenko" both hit.
                     {
                         RuleIds[0],
                         LyudmilaId,
                         "description_contains",
-                        "Liudmyla Sychova",
+                        "Oksana Lysenko",
                         SeededAt
                     },
                     {
                         RuleIds[1],
-                        YelyzavetaId,
+                        MariiaId,
                         "description_contains",
-                        "Yelyzaveta",
+                        "Mariia",
                         SeededAt
                     },
                     // Revolut X is a funding leg to a crypto venue, same role as Binance/IBKR:

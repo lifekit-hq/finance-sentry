@@ -1,76 +1,52 @@
 # Database Backup & Recovery
 
-## Backup Schedule
+Backups are run by the API itself (Retention module, Hangfire). They are off unless configured: with no
+`Backup:` settings the jobs log a warning and do nothing, so local and dev setups are safe.
 
-| Type | Frequency | Retention | Tool |
-|------|-----------|-----------|------|
-| Full | Daily 02:00 UTC | 30 days | pg_dump |
-| WAL  | Continuous | 7 days | PostgreSQL WAL archiving |
-| Weekly snapshot | Sunday 03:00 UTC | 12 weeks | pg_dump + S3 |
+## What runs
 
-## Automated Backup (pg_dump)
+| Job (Hangfire id) | Schedule | What it does |
+|---|---|---|
+| `db-backup` | daily at `Backup:BackupHourUtc` (default 02:00 UTC) | `pg_dump -Fc` of the app database, encrypted with `age` to `Backup:AgeRecipient`, uploaded to S3-compatible storage under `daily/` (or `weekly/` on `Backup:WeeklyOn`, default Sunday). Then prunes to `RetainDaily` (default 30) and `RetainWeekly` (default 8) newest artifacts. |
+| `db-restore-verify` | weekly | Downloads the newest artifact, decrypts it with `Backup:AgeIdentity`, `pg_restore`s it into a scratch database and runs sanity checks there; the live database is never touched. |
 
-```bash
-pg_dump -Fc \
-  -h $DB_HOST -U $DB_USER -d finance_sentry \
-  -f /backups/finance_sentry_$(date +%Y%m%d_%H%M%S).dump
-```
+Artifacts are named like `daily/2026-08-06T02-00-00Z.dump.age`. `pg_dump`, `pg_restore` and `age` must be on the API container's `PATH`.
 
-Encrypt before uploading:
+## Configuration
 
-```bash
-openssl enc -aes-256-cbc -pbkdf2 \
-  -in finance_sentry.dump \
-  -out finance_sentry.dump.enc \
-  -pass env:BACKUP_ENCRYPTION_KEY
-```
+Bound from the `Backup:` section (environment variables `BACKUP_*` in the reference deployment, see `docker/`):
 
-## Point-In-Time Recovery
+| Setting | Purpose |
+|---|---|
+| `Backup:R2Endpoint`, `R2Bucket`, `R2AccessKey`, `R2SecretKey` | S3-compatible target (Cloudflare R2 in the reference deployment; any S3 API works) |
+| `Backup:AgeRecipient` | age **public** key the dumps are encrypted to (required for backups to run) |
+| `Backup:AgeIdentity` | age **secret** key; only the restore-verify job needs it. Keep a copy off the host: without it a backup cannot be read. |
 
-1. Stop the application (`docker-compose stop api`)
-2. Restore the nearest full backup:
+Backups run only when the endpoint, bucket, both keys and the recipient are all set.
+
+## Restoring
+
+1. Stop the API (`docker compose stop api`).
+2. Download the artifact you want from the bucket and decrypt it:
    ```bash
-   pg_restore -Fc -d finance_sentry_restored finance_sentry_YYYYMMDD.dump
+   age -d -i age-identity.txt -o finance_sentry.dump daily/<artifact>.dump.age
    ```
-3. Apply WAL logs up to the target timestamp:
+3. Restore into an empty database:
+   ```bash
+   pg_restore --no-owner -d finance_sentry_restored finance_sentry.dump
    ```
-   restore_command = 'aws s3 cp s3://finance-sentry-wal/%f %p'
-   recovery_target_time = '2026-03-28 15:30:00+00'
-   ```
-4. Verify row counts and spot-check recent transactions.
-5. Restart the application.
+4. Point the API at it, start it (pending migrations apply on boot) and spot-check recent transactions.
 
-## Encryption Key Backup
+There is no WAL archiving or point-in-time recovery: the restore point is the artifact's timestamp.
 
-The AES-256-GCM master key (`Deduplication:MasterKeyBase64`) must be backed up separately from the database:
+## Encryption keys
 
-- Store in AWS Secrets Manager or HashiCorp Vault.
-- Key rotation: generate a new key, re-encrypt all `encrypted_credentials` rows, update the secret. Never delete the old key version until all rows are migrated.
-- **Never commit keys to git.**
+Provider credentials are encrypted in the application (AES-256-GCM, `Encryption:Keys:<version>` with
+`Encryption:CurrentKeyVersion`). The dump contains the ciphertext only, so **back the keys up separately from the
+database**; a restored database without them cannot decrypt stored credentials. To rotate, add the new key version,
+bump `CurrentKeyVersion`, and keep every old version until all rows are re-encrypted. Never commit keys.
 
-## Recovery Testing
+## Erasure
 
-Run a full restore drill monthly:
-
-1. Restore latest backup to a staging environment.
-2. Run `dotnet test` against the restored DB.
-3. Verify `encrypted_credentials` decrypt without errors.
-4. Document the drill result in the ops runbook.
-
-## GDPR — User Data Deletion
-
-To delete all data for a user (right-to-erasure request):
-
-```sql
--- Soft-delete all accounts (cascades to transactions via EF OnDelete)
-UPDATE bank_accounts SET is_active = false, deleted_at = now()
-WHERE user_id = '<user-uuid>';
-
--- Remove encrypted credentials
-DELETE FROM encrypted_credentials
-WHERE account_id IN (
-    SELECT id FROM bank_accounts WHERE user_id = '<user-uuid>'
-);
-```
-
-Confirm no plaintext PII remains in logs before closing the ticket.
+Do not delete rows by hand. Account closure (Settings → Danger zone) starts a grace period and the `account-purge`
+job then runs every module's data eraser; see `docs/OPERATIONS_RUNBOOK.md` §12. Deleted data remains in backups until they age out under the retention above.

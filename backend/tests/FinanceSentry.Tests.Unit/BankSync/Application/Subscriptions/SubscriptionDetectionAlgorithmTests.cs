@@ -526,15 +526,15 @@ public class SubscriptionDetectionAlgorithmTests
     {
         var txs = new[]
         {
-            Tx("516936******4992", 14060.96m, 2026, 6, 11, "UAH"),
-            Tx("516936******4992", 14060.96m, 2026, 7, 11, "UAH"),
-            Tx("516936******4992", 14060.96m, 2026, 8, 11, "UAH"),
+            Tx("400000******0002", 14060.96m, 2026, 6, 11, "UAH"),
+            Tx("400000******0002", 14060.96m, 2026, 7, 11, "UAH"),
+            Tx("400000******0002", 14060.96m, 2026, 8, 11, "UAH"),
         };
 
         var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Kind.Should().Be(SubscriptionKinds.Installment);
-        result.MerchantNameNormalized.Should().Be("516936");
+        result.MerchantNameNormalized.Should().Be("400000");
     }
 
     [Fact]
@@ -605,8 +605,8 @@ public class SubscriptionDetectionAlgorithmTests
     }
 
     [Theory]
-    [InlineData("516936******4992", true)]
-    [InlineData("516936", true)]
+    [InlineData("400000******0002", true)]
+    [InlineData("400000", true)]
     [InlineData("545708******2195", true)]
     [InlineData("ТОВ Алло", false)]
     [InlineData("Netcup", false)]

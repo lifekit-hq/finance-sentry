@@ -317,7 +317,7 @@ public class TransactionRecategorizationServiceTests
         // #553: the mortgage carries the wire-transfer MCC 4829, so re-resolving by MCC alone
         // re-buries it in TRANSFER_OUT. The active installment plan is what rescues it, and the
         // recategorization path is the backfill for history ingested before the rule existed.
-        const string mortgageDescription = "516936******4992";
+        const string mortgageDescription = "400000******0002";
         const decimal mortgageAmount = 14060.96m;
         var accountId = Guid.NewGuid();
         var tx = new Transaction(accountId, UserId, mortgageAmount, DateTime.UtcNow, mortgageDescription, "h-mortgage")

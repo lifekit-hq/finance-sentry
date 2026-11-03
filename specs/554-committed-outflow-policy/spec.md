@@ -23,7 +23,7 @@ carry no merchant-recurrence signature it can see:
 | outflow | today | why the detector misses it |
 |---|---|---|
 | rent `To Mario Scalas` 1,275 EUR/mo, `RENT_AND_UTILITIES` | discretionary | same payee, same amount, but never promoted to a `DetectedSubscription` |
-| family support (`мама`, `Ліза ❤️`, `Liudmyla Sychova`) | a counterparty expense since #429 | counterparty-classified, so it never reaches the per-debit matcher at all |
+| family support (`мама`, `Марічка ❤️`, `Oksana Lysenko`) | a counterparty expense since #429 | counterparty-classified, so it never reaches the per-debit matcher at all |
 | utilities, one-off `LOAN_PAYMENTS` rows | discretionary | categorized correctly by #553, but the category was never a committed signal |
 
 Widening this is explicitly "a separate ticket, not a silent workaround" (issue #538).

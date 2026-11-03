@@ -1,6 +1,7 @@
 {
   "name": "finance-sentry",
   "version": "1.18.0",
+  "license": "MIT",
   "scripts": {
     "ng": "ng",
     "whats-new": "node scripts/build-whats-new.mjs",

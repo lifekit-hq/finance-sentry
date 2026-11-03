@@ -39,7 +39,7 @@ public sealed class PersonaComposerTests
         prompt.Should().Contain("Finance Sentry web app");
 
         // User profile.
-        prompt.Should().Contain("Denys Sychov");
+        prompt.Should().Contain("Denys");
     }
 
     [Fact]

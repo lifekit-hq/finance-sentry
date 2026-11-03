@@ -25,7 +25,7 @@ public class CounterpartyRule : Entity
     /// Optional account-currency filter (ISO code, e.g. "EUR"). When set, the rule matches
     /// only transactions on accounts in that currency — and a currency-scoped match beats a
     /// generic one for the same transaction. This is what lets the same statement wording
-    /// mean two different things: «Від: Людмила Сичова» in UAH is rent (income), in EUR it
+    /// mean two different things: «Від: Оксана Лисенко» in UAH is rent (income), in EUR it
     /// is the user's own money coming back from a routing hop.
     /// </summary>
     public string? Currency { get; set; }

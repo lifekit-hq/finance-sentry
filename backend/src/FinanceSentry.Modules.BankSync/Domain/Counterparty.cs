@@ -15,7 +15,7 @@ public class Counterparty : Entity, IUserOwned
     /// </summary>
     public Guid UserId { get; set; }
 
-    /// <summary>Display name shown in analytics (e.g. "Людмила Сичова (Мама)").</summary>
+    /// <summary>Display name shown in analytics (e.g. "Оксана Лисенко (Мама)").</summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>

@@ -17,7 +17,7 @@ public class LoanRepaymentClassifierTests
     private const int WireTransferMcc = 4829;
 
     /// <summary>The mortgage as Monobank renders it: a bare masked card number, no wording.</summary>
-    private const string MortgageDescription = "516936******4992";
+    private const string MortgageDescription = "400000******0002";
     private const decimal MortgageAmount = 14060.96m;
 
     private static readonly IReadOnlyList<ActiveInstallmentPlan> NoPlans = [];
@@ -67,9 +67,9 @@ public class LoanRepaymentClassifierTests
 
     [Theory]
     [InlineData("Переказ на картку", 5000.00)]
-    [InlineData("Ліза ❤️", 3000.00)]
+    [InlineData("Марічка ❤️", 3000.00)]
     [InlineData("мама", 2000.00)]
-    [InlineData("Liudmyla Sychova", 1000.00)]
+    [InlineData("Oksana Lysenko", 1000.00)]
     [InlineData("Поповнення «Поточний»", 700.00)]
     public void GenuineTransferDebits_AreNotClaimed(string description, double amount)
     {
@@ -135,12 +135,12 @@ public class LoanRepaymentClassifierTests
     [Fact]
     public void SmallTransferToADifferentCardOnTheSameBin_IsNotClaimed()
     {
-        // MerchantNameNormalizer strips the trailing group, so 516936******4992 and
-        // 516936******1111 both key as "516936" — every monobank card shares the mortgage's
+        // MerchantNameNormalizer strips the trailing group, so 400000******0002 and
+        // 400000******1111 both key as "400000" — every monobank card shares the mortgage's
         // key. Only the amount tells a ₴200 transfer to a friend apart from the mortgage.
         var plans = PlanFor(MortgageDescription, MortgageAmount);
 
-        Classify("516936******1111", 200m, plans: plans).Should().BeNull();
+        Classify("400000******1111", 200m, plans: plans).Should().BeNull();
     }
 
     [Fact]

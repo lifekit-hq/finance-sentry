@@ -253,7 +253,7 @@ public class GetFamilyClearingStatementQueryTests
 
     [Theory]
     [InlineData("Від: ANNA K rent", "Anna K", "Anna K")]
-    [InlineData("Від: Людмила Сичова", "Людмила Сичова (Мама)", null)]
+    [InlineData("Від: Оксана Лисенко", "Оксана Лисенко (Мама)", null)]
     public async Task Handle_LedgerSearch_IsTheName_OnlyWhenAMatchRuleSpellsIt(
         string rulePattern, string name, string? expected)
     {

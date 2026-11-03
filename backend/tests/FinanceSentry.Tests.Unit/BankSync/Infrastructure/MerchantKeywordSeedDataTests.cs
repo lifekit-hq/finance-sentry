@@ -87,7 +87,7 @@ public class MerchantKeywordSeedDataTests
     }
 
     [Theory]
-    [InlineData("To Denys Sychov")]
+    [InlineData("To Alex Morgan")]
     [InlineData("")]
     [InlineData(null)]
     public void Resolve_UnknownOrEmpty_IsUncategorized(string? description)

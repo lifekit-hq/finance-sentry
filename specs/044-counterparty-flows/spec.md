@@ -11,7 +11,7 @@
 ## Context
 
 The family clearing-house card (white card 3840) routes ~₴18k/mo rent from
-Mom (Людмила Сичова) and ~₴10–15k/mo support payments to her. Both sides are
+Mom (Оксана Лисенко) and ~₴10–15k/mo support payments to her. Both sides are
 currently classified as TRANSFER, so rent is invisible income and support
 payments are invisible spending. The savings rate reads ~40% against an honest
 ~25–30%.
@@ -35,12 +35,12 @@ matches exactly the expected transaction IDs and misses unrelated ones.
 
 **Acceptance Scenarios**:
 
-1. **Given** counterparty "Людмила Сичова" with description pattern "Людмила Сичова",
-   **When** a credit transaction whose Description contains "Людмила Сичова" is processed,
+1. **Given** counterparty "Оксана Лисенко" with description pattern "Оксана Лисенко",
+   **When** a credit transaction whose Description contains "Оксана Лисенко" is processed,
    **Then** it is returned in `MatchedTransactionIds`.
 
-2. **Given** counterparty "Єлизавета Морозова" with pattern "Ліза",
-   **When** a debit transaction whose Description contains "Ліза ❤️" is processed,
+2. **Given** counterparty "Марія Коваль" with pattern "Марічка",
+   **When** a debit transaction whose Description contains "Марічка ❤️" is processed,
    **Then** it is matched (case-insensitive substring).
 
 3. **Given** a transaction whose Description contains none of the known patterns,
@@ -130,7 +130,7 @@ and the "supported family" bucket matches the backend's FAMILY_SUPPORT total.
 
 - **FR-001**: System MUST store counterparty definitions with one or more match rules per counterparty.
 - **FR-002**: A match rule MUST support two match types: `description_contains` and `merchant_name_contains` (case-insensitive substring).
-- **FR-003**: System MUST ship default counterparties (Людмила Сичова, Єлизавета Морозова) applying to all users (UserId = Guid.Empty sentinel).
+- **FR-003**: System MUST ship default counterparties (Оксана Лисенко, Марія Коваль) applying to all users (UserId = Guid.Empty sentinel).
 - **FR-004**: Counterparty movement MUST be aggregated per counterparty per calendar month
   and per DIRECTION. The two directions MUST NOT be netted against each other.
 - **FR-005**: Gross credits MUST feed into monthlyFlow inflow (INCOME); gross debits MUST feed
