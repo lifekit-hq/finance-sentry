@@ -596,6 +596,12 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   `TRANSFER_IN` (Monobank books incoming «Від: …» transfers under MCC 4829 as credits). A rung resolving
   to `UNCATEGORIZED` has not claimed the row, so the ladder continues past it; when no rung
   claims it the result is null, which keeps a backfilled row eligible for a provider re-fetch.
+  The statement wording these rules match (the AIB `*ATMLDG` lodgement marker, the directional
+  transfer prefixes, the installment markers and prefixes, the words that name no merchant such as
+  Ukrainian «переказ») is rows of the `bank_sync.detection_phrases` table (kind, phrase, provider,
+  locale, optional MCC / category condition), seeded from `DetectionPhraseSeedData` and read through
+  `IDetectionPhraseProvider`; a wording is added or changed by editing a row, and an edit takes
+  effect on the next API restart, like `merchant_keywords`.
   Before the ladder was shared, the three paths disagreed: the backfill re-buried savings jars
   as charity spend and re-claimed admin keyword overrides on any MCC-bearing row, and TrueLayer
   ingest never consulted the loan rule at all.
