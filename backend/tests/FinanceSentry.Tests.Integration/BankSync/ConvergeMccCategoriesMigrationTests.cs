@@ -39,9 +39,11 @@ public sealed class ConvergeMccCategoriesMigrationTests : IAsyncLifetime
         var userId = Guid.NewGuid();
         await using var db = CreateContext();
         var migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync(BeforeMigration);
-
+        // The seeder fills every seeded table, so it runs on the fully migrated schema (as at startup) and the
+        // schema is then rolled back to just before M028; the seeded MCC rows survive the rollback.
+        await migrator.MigrateAsync();
         CategorySeeder.Seed(db);
+        await migrator.MigrateAsync(BeforeMigration);
         // 4215 was hand-edited, so it must survive; the other three and 5832 are the stale live rows.
         await db.MccCategories.Where(m => new[] { 4214, 4225, 5832 }.Contains(m.Mcc))
             .ExecuteUpdateAsync(s => s.SetProperty(m => m.CategoryKey, CategoryKeys.Uncategorized));
