@@ -92,7 +92,7 @@ export function dossierEffects(store: StoreMethods) {
   };
 
   // Every per-symbol request ends when the symbol changes, so a late response never lands under the new header.
-  const symbolChanged = new Subject<void>();
+  const symbolChanged$ = new Subject<void>();
 
   // Runs once the dossier says the symbol is a listed equity; a failed quote never breaks the page.
   const loadQuote = rxMethod<string>(
@@ -100,7 +100,6 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setQuoteLoading()),
       switchMap(symbol =>
         dossierService.getQuotes(symbol).pipe(
-          takeUntil(symbolChanged),
           tap(quotes => {
             store.setQuote(DossierQuoteUtils.toMajorUnits(quotes[0] ?? null));
             store.setQuoteSuccess();
@@ -109,7 +108,8 @@ export function dossierEffects(store: StoreMethods) {
             store.clearQuote();
             store.setQuoteError(null);
             return EMPTY;
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -121,14 +121,14 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setChartLoading()),
       switchMap(({symbol, range}) =>
         dossierService.getChart(symbol, range).pipe(
-          takeUntil(symbolChanged),
           tap(chart => {
             store.setChart(chart);
             store.setChartSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setChartError(code),
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -148,14 +148,14 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setTargetLoading()),
       switchMap(({symbol, targetPrice, currency}) =>
         dossierService.setTarget(symbol, {targetPrice, currency}).pipe(
-          takeUntil(symbolChanged),
           tap(target => {
             store.setUserTarget(target);
             store.setTargetSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setTargetError(code),
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -177,14 +177,14 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setTargetLoading()),
       switchMap(symbol =>
         dossierService.clearTarget(symbol).pipe(
-          takeUntil(symbolChanged),
           tap(() => {
             store.setUserTarget(null);
             store.setTargetSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setTargetError(code),
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -225,14 +225,14 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setLedgerReadLoading()),
       switchMap(symbol =>
         dossierService.getLedgerRead(symbol).pipe(
-          takeUntil(symbolChanged),
           tap(read => {
             store.setLedgerRead(read);
             store.setLedgerReadSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setLedgerReadError(code),
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -243,14 +243,14 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setLedgerReadLoading()),
       switchMap(({symbol, force}) =>
         dossierService.generateLedgerRead(symbol, force).pipe(
-          takeUntil(symbolChanged),
           tap(read => {
             store.setLedgerRead(read);
             store.setLedgerReadSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setLedgerReadError(code),
-          })
+          }),
+          takeUntil(symbolChanged$)
         )
       )
     )
@@ -263,7 +263,7 @@ export function dossierEffects(store: StoreMethods) {
   }>(
     pipe(
       exhaustMap(({recommendation, verdict}) =>
-        decisionSheet.open(recommendation, verdict).pipe(takeUntil(symbolChanged))
+        decisionSheet.open(recommendation, verdict).pipe(takeUntil(symbolChanged$))
       ),
       filter((decided): decided is RecommendationDto => decided !== undefined),
       tap(decided => store.applyRecommendationDecision(decided))
@@ -273,7 +273,7 @@ export function dossierEffects(store: StoreMethods) {
   // A symbol change in place (palette search from one dossier to another) reuses this component, so
   // the previous symbol's content is dropped before the new one loads.
   const openSymbol = (symbol: string): void => {
-    symbolChanged.next();
+    symbolChanged$.next();
     store.resetForSymbol();
     store.setLedgerReadIdle();
     store.setQuoteIdle();
