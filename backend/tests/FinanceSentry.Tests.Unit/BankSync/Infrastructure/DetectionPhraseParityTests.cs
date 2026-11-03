@@ -24,7 +24,7 @@ public class DetectionPhraseParityTests
         "Платіж Pandora", "Платіж", "Платіж  Pandora", "платіж pandora", "  Платіж Pandora ",
         "Оплата частинами Rozetka", "Покупка частинами Foxtrot", "Купівля у розстрочку Comfy",
         "Розстрочка Allo", "Installment plan Apple", "INSTALLMENT 3/12", "- monomarket", "MONOMARKET",
-        "Переказ на картку", "переказ", "Переказ на картку 5375****1234", "516936******4992",
+        "Переказ на картку", "переказ", "Переказ на картку 5375****1234", "400000******0002",
         "To Mario Scalas", "to someone", "  To Someone", "To", "Tobacco Shop", "Tommy Hilfiger",
         "From Instant Access Savings", "FROM savings", "Fromage Cheese Co", "From",
         "Payment from Andrea Di Florio", "payment from x", "Payment fromage",

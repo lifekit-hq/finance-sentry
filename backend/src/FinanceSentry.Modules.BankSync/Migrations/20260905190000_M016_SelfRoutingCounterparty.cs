@@ -11,7 +11,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     /// Adds an optional account-currency filter to counterparty rules and seeds the
     /// self-routing counterparty for the monthly Revolut → mom → Monobank EUR hop (#580).
     /// The same statement wording means two different things depending on the account
-    /// currency: «Від: Людмила Сичова» in UAH is rent (income), in EUR it is the user's own
+    /// currency: «Від: Оксана Лисенко» in UAH is rent (income), in EUR it is the user's own
     /// money coming back mid-route — pair detection cannot see the legs as a pair because
     /// the Latin and Cyrillic statements share no words.
     /// </summary>
@@ -60,7 +60,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         RuleIds[0],
                         RoutingId,
                         "description_contains",
-                        "Від: Людмила Сичова",
+                        "Від: Оксана Лисенко",
                         "EUR",
                         SeededAt
                     },
@@ -68,7 +68,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         RuleIds[1],
                         RoutingId,
                         "description_contains",
-                        "Liudmyla Sychova",
+                        "Oksana Lysenko",
                         "EUR",
                         SeededAt
                     }

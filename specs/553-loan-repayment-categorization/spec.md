@@ -22,10 +22,10 @@ Production evidence (Jun–Aug 2026):
 
 | debit | mcc | category today | should be |
 |---|---|---|---|
-| `516936******4992` ₴14,060.96/mo (the `Іпотека` plan in `detected_subscriptions`, active, 2024-05 → 2036-05) | 4829 | TRANSFER_OUT | LOAN_PAYMENTS |
+| `400000******0002` ₴14,060.96/mo (the `Іпотека` plan in `detected_subscriptions`, active, 2024-05 → 2036-05) | 4829 | TRANSFER_OUT | LOAN_PAYMENTS |
 | `Платіж FOXTROT- monomarket` ₴144.95, `Платіж Fopi- monomarket` ₴649.95, `Платіж ТОВ Алло - monomarket` ₴2,999.95 | 4829 | TRANSFER_OUT | LOAN_PAYMENTS |
 | `Щомісячний платіж telemart - monomarket` ₴6,499.85 | (other) | LOAN_PAYMENTS | LOAN_PAYMENTS ✓ |
-| `Переказ на картку`, `Ліза ❤️`, `мама`, `Liudmyla Sychova` | 4829 / — | TRANSFER_OUT | TRANSFER_OUT ✓ |
+| `Переказ на картку`, `Марічка ❤️`, `мама`, `Oksana Lysenko` | 4829 / — | TRANSFER_OUT | TRANSFER_OUT ✓ |
 
 ### What #581/#582 already fixed, and what it did not
 
@@ -34,7 +34,7 @@ Monobank ingest path, and migration `M015_RepairInstallmentCategories` repaired 
 whose *description* carries a Ukrainian installment wording («погашення», «щомісячний платіж»,
 `monomarket`, `Платіж Pandora`). That covers the monomarket rows above.
 
-It does **not** cover the mortgage. `516936******4992` is a masked card number — it carries no
+It does **not** cover the mortgage. `400000******0002` is a masked card number — it carries no
 wording a keyword could match, and no keyword ever will without also claiming every genuine
 card-to-card transfer. The mortgage is only recognisable through the thing that already knows
 it is a repayment obligation: `SubscriptionDetectionJob` stores it as an **`installment`-kind**
@@ -61,13 +61,13 @@ in one place in the categorization chain, never in a consumer.
 
 1. **Given** a debit `Платіж ТОВ Алло - monomarket` with MCC 4829, **When** it is categorized,
    **Then** its category is `LOAN_PAYMENTS`, not `TRANSFER_OUT`.
-2. **Given** a debit `516936******4992` with MCC 4829 and an active `installment`-kind
+2. **Given** a debit `400000******0002` with MCC 4829 and an active `installment`-kind
    `DetectedSubscription` stored under that key for about that amount, **When** it is
    categorized, **Then** its category is `LOAN_PAYMENTS`.
-3. **Given** a debit `Переказ на картку` / `Ліза ❤️` / `Поповнення «Поточний»` with MCC 4829 and
+3. **Given** a debit `Переказ на картку` / `Марічка ❤️` / `Поповнення «Поточний»` with MCC 4829 and
    no matching active installment plan, **When** it is categorized, **Then** it stays
    `TRANSFER_OUT`.
-3b. **Given** a ₴200 debit to `516936******1111` — a *different* card on the same BIN as the
+3b. **Given** a ₴200 debit to `400000******1111` — a *different* card on the same BIN as the
    mortgage, and therefore carrying the *same* stored plan key, since
    `MerchantNameNormalizer` strips the trailing group — **When** it is categorized, **Then** it
    stays `TRANSFER_OUT`, because its amount is nowhere near the plan's.

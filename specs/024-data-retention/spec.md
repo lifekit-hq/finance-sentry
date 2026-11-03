@@ -103,4 +103,4 @@ As the user of the app, my long-term history (net worth over years, market bars)
 - [DECISION] Backups and retention ship as one feature: automated deletion without proven restore capability is unacceptable for financial data.
 - [DECISION] Policy registry lives in the repository (reviewable, versioned), not in database configuration.
 - [OUT OF SCOPE] Point-in-time recovery / WAL archiving — nightly snapshots are sufficient for a single-user system; revisit if RPO needs shrink.
-- [OUT OF SCOPE] User-facing data export (GDPR-style) — separate concern, already partially covered by docs/DATA_EXPORT_GUIDE.md.
+- [OUT OF SCOPE] User-facing data export (GDPR-style) — separate concern, tracked in docs/DATA_EXPORT_GUIDE.md (planned, not implemented).

@@ -925,7 +925,7 @@ public class MoneyFlowStatisticsTests
         // entirely — hiding the largest fixed commitment in the book. Categorized
         // LOAN_PAYMENTS they are spending, and their commitment keys make them committed.
         // The genuine card-to-card transfer on the same MCC must still be excluded.
-        const string mortgageDescription = "516936******4992";
+        const string mortgageDescription = "400000******0002";
         const decimal mortgageAmount = 14060.96m;
         var (account, accountId) = MakeAccount("UAH");
         var date = new DateTime(2026, 4, 12, 0, 0, 0, DateTimeKind.Utc);
@@ -1009,7 +1009,7 @@ public class MoneyFlowStatisticsTests
                 description: "Rent June", category: CategoryKeys.RentAndUtilities),
             MakeTx(eurAccountId, shopEur, "debit", date, merchantName: "Zara",
                 description: "ZARA MILANO", category: CategoryKeys.GeneralMerchandise),
-            MakeTx(uahAccountId, mortgage, "debit", date, description: "516936******4992",
+            MakeTx(uahAccountId, mortgage, "debit", date, description: "400000******0002",
                 mcc: 4829, category: CategoryKeys.LoanPayments),
             MakeTx(uahAccountId, installment, "debit", date,
                 description: "Платіж ТОВ Алло - monomarket", mcc: 4829,

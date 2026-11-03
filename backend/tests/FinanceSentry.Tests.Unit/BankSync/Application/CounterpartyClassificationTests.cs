@@ -83,10 +83,10 @@ public class CounterpartyClassificationTests
     [Fact]
     public async Task Classify_DescriptionContains_MatchesCreditTransaction()
     {
-        var cp = MakeCounterparty("Людмила Сичова", ("description_contains", "Людмила Сичова"));
+        var cp = MakeCounterparty("Оксана Лисенко", ("description_contains", "Оксана Лисенко"));
         var sut = BuildSut(cp);
 
-        var credit = MakeTx(18000m, "credit", "Від: Людмила Сичова");
+        var credit = MakeTx(18000m, "credit", "Від: Оксана Лисенко");
         var result = await sut.ClassifyAsync(UserId, [credit], UahAccount);
 
         result.MatchedTransactionIds.Should().Contain(credit.Id);
@@ -101,10 +101,10 @@ public class CounterpartyClassificationTests
     [Fact]
     public async Task Classify_MerchantNameContains_MatchesDebitTransaction()
     {
-        var cp = MakeCounterparty("Ліза", ("merchant_name_contains", "Єлизавета"));
+        var cp = MakeCounterparty("Марічка", ("merchant_name_contains", "Марія"));
         var sut = BuildSut(cp);
 
-        var debit = MakeTx(5000m, "debit", "card transfer", merchantName: "Єлизавета Морозова");
+        var debit = MakeTx(5000m, "debit", "card transfer", merchantName: "Марія Коваль");
         var result = await sut.ClassifyAsync(UserId, [debit], UsdAccount);
 
         result.MatchedTransactionIds.Should().Contain(debit.Id);
@@ -196,19 +196,19 @@ public class CounterpartyClassificationTests
     public async Task Classify_MultipleCounterpartiesSameMonth_EachBucketsSeparately()
     {
         var mama = MakeCounterparty("Мама", ("description_contains", "мама"));
-        var liza = MakeCounterparty("Ліза", ("description_contains", "Ліза"));
+        var liza = MakeCounterparty("Марічка", ("description_contains", "Марічка"));
         var sut = BuildSut(mama, liza);
 
         var month = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
         var mamaCredit = MakeTx(5000m, "credit", "від мама", date: month.AddDays(1));
-        var lizaDebit = MakeTx(3000m, "debit", "Ліза допомога", date: month.AddDays(2));
+        var lizaDebit = MakeTx(3000m, "debit", "Марічка допомога", date: month.AddDays(2));
 
         var result = await sut.ClassifyAsync(UserId, [mamaCredit, lizaDebit], UsdAccount);
 
         result.MatchedTransactionIds.Should().BeEquivalentTo([mamaCredit.Id, lizaDebit.Id]);
         result.MonthlyFlows.Should().HaveCount(2);
         result.MonthlyFlows.Should().ContainSingle(f => f.CounterpartyName == "Мама" && f.InflowUsd == 5000m);
-        result.MonthlyFlows.Should().ContainSingle(f => f.CounterpartyName == "Ліза" && f.OutflowUsd == 3000m);
+        result.MonthlyFlows.Should().ContainSingle(f => f.CounterpartyName == "Марічка" && f.OutflowUsd == 3000m);
     }
 
     // ── T044-08: Multi-month window produces per-month results ────────────────
@@ -264,7 +264,7 @@ public class CounterpartyClassificationTests
         var cp = MakeCounterparty("Мама", ("description_contains", "МАМА"));
         var sut = BuildSut(cp);
 
-        var tx = MakeTx(1000m, "credit", "від мама сичова");
+        var tx = MakeTx(1000m, "credit", "від мама лисенко");
         var result = await sut.ClassifyAsync(UserId, [tx], UsdAccount);
 
         result.MatchedTransactionIds.Should().Contain(tx.Id);
@@ -328,14 +328,14 @@ public class CounterpartyClassificationTests
     public async Task Classify_RerunOverSameInput_ProducesIdenticalOrderedFlows()
     {
         var mama = MakeCounterparty("Мама", ("description_contains", "мама"));
-        var liza = MakeCounterparty("Ліза", ("description_contains", "Ліза"));
+        var liza = MakeCounterparty("Марічка", ("description_contains", "Марічка"));
         var sut = BuildSut(mama, liza);
 
         var july = new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc);
         var august = new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc);
         var batch = new List<Transaction>
         {
-            MakeTx(3000m, "debit", "Ліза допомога", date: august),
+            MakeTx(3000m, "debit", "Марічка допомога", date: august),
             MakeTx(18000m, "credit", "від мама", date: august),
             MakeTx(8000m, "debit", "мама липень", date: july),
         };
@@ -450,22 +450,22 @@ public class CounterpartyClassificationTests
     [Fact]
     public async Task Classify_CurrencyScopedRule_BeatsGenericRuleForTheSameText()
     {
-        // «Від: Людмила Сичова» on a EUR account is the user's own money mid-route; the same
+        // «Від: Оксана Лисенко» on a EUR account is the user's own money mid-route; the same
         // wording on a UAH account is rent. The EUR-scoped self-routing rule must win on the
         // EUR account even though the generic family rule matches the text too.
-        var family = MakeCounterparty("Мама", ("description_contains", "Людмила Сичова"));
+        var family = MakeCounterparty("Мама", ("description_contains", "Оксана Лисенко"));
         var routing = MakeCounterparty("Routing via mom (EUR)", FlowRoles.SelfRouting);
         routing.Rules.Add(new CounterpartyRule
         {
             CounterpartyId = routing.Id,
             MatchType = "description_contains",
-            Pattern = "Від: Людмила Сичова",
+            Pattern = "Від: Оксана Лисенко",
             Currency = "EUR",
         });
 
         // Family listed FIRST — ordering must not decide; specificity must.
         var sut = BuildSut(family, routing);
-        var eurCredit = MakeTx(1200m, "credit", "Від: Людмила Сичова");
+        var eurCredit = MakeTx(1200m, "credit", "Від: Оксана Лисенко");
         var eurAccount = new Dictionary<Guid, string> { [AccountId] = "EUR" };
 
         var result = await sut.ClassifyAsync(UserId, [eurCredit], eurAccount);
@@ -479,18 +479,18 @@ public class CounterpartyClassificationTests
     {
         // The UAH rent keeps matching the generic family rule when the EUR-scoped routing
         // rule exists — the scope must never leak across currencies.
-        var family = MakeCounterparty("Мама", ("description_contains", "Людмила Сичова"));
+        var family = MakeCounterparty("Мама", ("description_contains", "Оксана Лисенко"));
         var routing = MakeCounterparty("Routing via mom (EUR)", FlowRoles.SelfRouting);
         routing.Rules.Add(new CounterpartyRule
         {
             CounterpartyId = routing.Id,
             MatchType = "description_contains",
-            Pattern = "Від: Людмила Сичова",
+            Pattern = "Від: Оксана Лисенко",
             Currency = "EUR",
         });
 
         var sut = BuildSut(routing, family);
-        var uahRent = MakeTx(18000m, "credit", "Від: Людмила Сичова");
+        var uahRent = MakeTx(18000m, "credit", "Від: Оксана Лисенко");
 
         var result = await sut.ClassifyAsync(UserId, [uahRent], UahAccount);
 

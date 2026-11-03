@@ -16,7 +16,7 @@ public class DetectedSubscriptionTests
         var charge = lastCharge ?? new DateOnly(2026, 8, 11);
         return DetectedSubscription.Create(
             "user-1",
-            "516936",
+            "400000",
             display,
             "monthly",
             amount,
@@ -66,7 +66,7 @@ public class DetectedSubscriptionTests
         mortgage.Status.Should().Be(SubscriptionStatus.Active);
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m, "UAH",
+            "400000******0002", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2036, 5, 11), new DateOnly(2036, 6, 11),
             13, 100, null, SubscriptionKinds.Installment);
 
@@ -79,7 +79,7 @@ public class DetectedSubscriptionTests
         var mortgage = CreateInstallment(display: "Іпотека");
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m, "UAH",
+            "400000******0002", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2026, 9, 11), new DateOnly(2026, 10, 11),
             4, 100, null, SubscriptionKinds.Installment);
 

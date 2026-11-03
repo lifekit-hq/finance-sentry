@@ -196,7 +196,7 @@ public class TransferDetectionTests
 
         var debit = MakeTx(eurAccount, 500m, "debit", date, description: "To UAH account");
         var credit = MakeTx(uahAccount, ConvertedAmount(500m, "EUR", "UAH"), "credit", date,
-            description: "Від: Денис Сичов", category: CategoryKeys.TransferIn);
+            description: "Від: Олекса Морган", category: CategoryKeys.TransferIn);
 
         var currencies = new Dictionary<Guid, string> { [eurAccount] = "EUR", [uahAccount] = "UAH" };
 
@@ -218,7 +218,7 @@ public class TransferDetectionTests
         var mirrored = ConvertedAmount(500m, "EUR", "UAH");
         var debit = MakeTx(eurAccount, 500m, "debit", date, category: CategoryKeys.TransferOut);
         var credit = MakeTx(uahAccount, Math.Round(mirrored * 1.03m, 2), "credit", date,
-            description: "Від: Денис Сичов");
+            description: "Від: Олекса Морган");
 
         var currencies = new Dictionary<Guid, string> { [eurAccount] = "EUR", [uahAccount] = "UAH" };
 
@@ -239,7 +239,7 @@ public class TransferDetectionTests
         var mirrored = ConvertedAmount(500m, "EUR", "UAH");
         var debit = MakeTx(eurAccount, 500m, "debit", date, category: CategoryKeys.TransferOut);
         var credit = MakeTx(uahAccount, Math.Round(mirrored * 1.10m, 2), "credit", date,
-            description: "Від: Денис Сичов");
+            description: "Від: Олекса Морган");
 
         var currencies = new Dictionary<Guid, string> { [eurAccount] = "EUR", [uahAccount] = "UAH" };
 

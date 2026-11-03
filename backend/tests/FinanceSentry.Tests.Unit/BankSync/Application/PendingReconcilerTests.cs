@@ -94,8 +94,8 @@ public class PendingReconcilerTests
         // AIB rewrites the description when the transaction settles: the booked feed carries a
         // "TxnDate:" stamp the pending feed never sent, and uppercases the name. Before the
         // descriptions were normalized the twin was missed and the payment counted twice.
-        var pending = Tx(239m, "*MOBI Denys Sychov IE26090266947650 *MOBI Denys Sychov", pending: true, "h-pending");
-        var posted = Tx(239m, "*MOBI DENYS SYCHOV IE26090266947650 TxnDate: 02Sep2026 *MOBI DENYS SYCHOV", pending: false, "h-posted");
+        var pending = Tx(239m, "*MOBI Alex Morgan IE26000000000001 *MOBI Alex Morgan", pending: true, "h-pending");
+        var posted = Tx(239m, "*MOBI ALEX MORGAN IE26000000000001 TxnDate: 02Sep2026 *MOBI ALEX MORGAN", pending: false, "h-posted");
 
         var stale = PendingReconciler.SelectStalePending([pending, posted], []);
 
@@ -107,7 +107,7 @@ public class PendingReconcilerTests
     {
         // Stripping the stamp must not merge two genuinely different payments: same account,
         // same amount, different merchant.
-        var pending = Tx(20m, "DENYS SYCHOV IE26082062813884 Sent from Revolut", pending: true, "h-pending");
+        var pending = Tx(20m, "ALEX MORGAN IE26000000000002 Sent from Revolut", pending: true, "h-pending");
         var posted = Tx(20m, "*MOBI TOP-UP 0857860057 TxnDate: 20Aug2026", pending: false, "h-posted");
 
         var stale = PendingReconciler.SelectStalePending([pending, posted], []);

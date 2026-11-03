@@ -15,8 +15,8 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     public partial class M011_CounterpartyFlows : Migration
     {
         // Well-known GUIDs for default counterparties (UserId = Guid.Empty = system defaults).
-        private static readonly Guid LyudmilaId = new("11111111-0000-0000-0000-000000000001");
-        private static readonly Guid YelyzavetaId = new("11111111-0000-0000-0000-000000000002");
+        private static readonly Guid FamilyMemberId = new("11111111-0000-0000-0000-000000000001");
+        private static readonly Guid MariiaId = new("11111111-0000-0000-0000-000000000002");
 
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -100,16 +100,16 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 values: new object[,]
                 {
                     {
-                        LyudmilaId,
+                        FamilyMemberId,
                         Guid.Empty,
-                        "Людмила Сичова (Мама)",
+                        "Оксана Лисенко (Мама)",
                         "family_support",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     },
                     {
-                        YelyzavetaId,
+                        MariiaId,
                         Guid.Empty,
-                        "Єлизавета Морозова (Ліза)",
+                        "Марія Коваль (Марічка)",
                         "family_support",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     }
@@ -123,34 +123,34 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 columnTypes: ["uuid", "uuid", "character varying(50)", "character varying(255)", "timestamp with time zone"],
                 values: new object[,]
                 {
-                    // Людмила Сичова — matches description "Людмила Сичова" or "мама"
+                    // Оксана Лисенко — matches description "Оксана Лисенко" or "мама"
                     {
                         new Guid("22222222-0000-0000-0000-000000000001"),
-                        LyudmilaId,
+                        FamilyMemberId,
                         "description_contains",
-                        "Людмила Сичова",
+                        "Оксана Лисенко",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     },
                     {
                         new Guid("22222222-0000-0000-0000-000000000002"),
-                        LyudmilaId,
+                        FamilyMemberId,
                         "description_contains",
                         "мама",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     },
-                    // Єлизавета Морозова — matches description "Єлизавета Морозова" or "Ліза"
+                    // Марія Коваль — matches description "Марія Коваль" or "Марічка"
                     {
                         new Guid("22222222-0000-0000-0000-000000000003"),
-                        YelyzavetaId,
+                        MariiaId,
                         "description_contains",
-                        "Єлизавета Морозова",
+                        "Марія Коваль",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     },
                     {
                         new Guid("22222222-0000-0000-0000-000000000004"),
-                        YelyzavetaId,
+                        MariiaId,
                         "description_contains",
-                        "Ліза",
+                        "Марічка",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     }
                 });

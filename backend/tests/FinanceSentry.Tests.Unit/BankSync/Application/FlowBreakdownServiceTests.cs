@@ -88,7 +88,7 @@ public class FlowBreakdownServiceTests
         var (account, accountId) = MakeAccount("USD");
         var rent = MakeTx(accountId, 430m, "credit", InMonth, "From Mom");
         var support = MakeTx(accountId, 300m, "debit", InMonth, "To Mom");
-        var mortgage = MakeTx(accountId, 315m, "debit", InMonth, "To 516936");
+        var mortgage = MakeTx(accountId, 315m, "debit", InMonth, "To 400000");
         var invested = MakeTx(accountId, 800m, "debit", InMonth, "To IBKR");
         var withdrawn = MakeTx(accountId, 100m, "credit", InMonth, "From IBKR");
 
@@ -116,8 +116,8 @@ public class FlowBreakdownServiceTests
     public async Task SelfRoutingLegs_LandInExcludedRouting_BothDirections()
     {
         var (account, accountId) = MakeAccount("EUR");
-        var outLeg = MakeTx(accountId, 1200m, "debit", InMonth, "Liudmyla Sychova");
-        var backLeg = MakeTx(accountId, 1200m, "credit", InMonth, "Від: Людмила Сичова");
+        var outLeg = MakeTx(accountId, 1200m, "debit", InMonth, "Oksana Lysenko");
+        var backLeg = MakeTx(accountId, 1200m, "credit", InMonth, "Від: Оксана Лисенко");
 
         var classification = WithMatches(
             (outLeg.Id, "Routing via mom (EUR)", FlowRoles.SelfRouting),
@@ -136,7 +136,7 @@ public class FlowBreakdownServiceTests
     {
         var (account, accountId) = MakeAccount("USD");
         var repayment = MakeTx(accountId, 720m, "credit", InMonth, "Card top-up", CategoryKeysTransferIn());
-        var claimed = MakeTx(accountId, 315m, "debit", InMonth, "To 516936", "TRANSFER_OUT");
+        var claimed = MakeTx(accountId, 315m, "debit", InMonth, "To 400000", "TRANSFER_OUT");
 
         var classification = WithMatches((claimed.Id, "Mortgage", FlowRoles.Household));
 

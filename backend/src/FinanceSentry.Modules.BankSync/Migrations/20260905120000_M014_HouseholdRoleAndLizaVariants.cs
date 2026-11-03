@@ -12,15 +12,15 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     /// monthly savings against the bank statements (issue #573). The recurring mortgage
     /// payment goes card-to-card, so Monobank's MCC lands it as TRANSFER_OUT and it
     /// vanished from outflow — a new "household" counterparty catches it by the target
-    /// card mask. And transfers to Yelyzaveta appear under transliteration variants
-    /// ("Yelysaveta", "Єлизавета М.") that the seeded patterns missed, so real support
+    /// card mask. And transfers to Mariia appear under transliteration variants
+    /// ("Mariya", "Марія К.") that the seeded patterns missed, so real support
     /// was excluded as a transfer.
     /// </summary>
     [DbContext(typeof(BankSyncDbContext))]
     [Migration("20260905120000_M014_HouseholdRoleAndLizaVariants")]
     public partial class M014_HouseholdRoleAndLizaVariants : Migration
     {
-        private static readonly Guid YelyzavetaId = new("11111111-0000-0000-0000-000000000002");
+        private static readonly Guid MariiaId = new("11111111-0000-0000-0000-000000000002");
         private static readonly Guid MortgageId = new("11111111-0000-0000-0000-000000000004");
         private static readonly DateTime SeededAt = new(2026, 9, 5, 12, 0, 0, DateTimeKind.Utc);
 
@@ -48,20 +48,20 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 columnTypes: ["uuid", "uuid", "character varying(50)", "character varying(255)", "timestamp with time zone"],
                 values: new object[,]
                 {
-                    // Latin statement lines spell her with an "s" ("Yelysaveta Morozova"),
-                    // Monobank sometimes abbreviates to "Єлизавета М." — cover both stems.
+                    // Latin statement lines spell her with a "y" ("Mariya Koval"),
+                    // Monobank sometimes abbreviates to "Марія К." — cover both stems.
                     {
                         RuleIds[0],
-                        YelyzavetaId,
+                        MariiaId,
                         "description_contains",
-                        "Yelysaveta",
+                        "Mariya",
                         SeededAt
                     },
                     {
                         RuleIds[1],
-                        YelyzavetaId,
+                        MariiaId,
                         "description_contains",
-                        "Єлизавета",
+                        "Марія",
                         SeededAt
                     },
                     // The mortgage leaves as a card-to-card payment; the masked target card
@@ -70,7 +70,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                         RuleIds[2],
                         MortgageId,
                         "description_contains",
-                        "516936******4992",
+                        "400000******0002",
                         SeededAt
                     }
                 });

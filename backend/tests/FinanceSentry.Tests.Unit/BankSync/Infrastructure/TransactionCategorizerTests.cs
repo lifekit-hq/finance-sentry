@@ -118,7 +118,7 @@ public class TransactionCategorizerTests
     [Fact]
     public void LoanRule_ReachesTheMortgageThroughAnActivePlan()
     {
-        const string maskedPan = "516936******4992";
+        const string maskedPan = "400000******0002";
         const decimal monthly = 14060.96m;
         var plan = new ActiveInstallmentPlan(
             CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, maskedPan, monthly, 4829), monthly);
@@ -192,7 +192,7 @@ public class TransactionCategorizerTests
     {
         // Null, not UNCATEGORIZED: the backfill needs to tell "no rule matched" from a stored
         // miss, so the row stays eligible for a provider re-fetch.
-        Categorize("Ліза ❤️").Should().BeNull();
+        Categorize("Марічка ❤️").Should().BeNull();
     }
 
     [Fact]

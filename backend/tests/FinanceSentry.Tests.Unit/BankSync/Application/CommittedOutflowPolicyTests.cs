@@ -99,7 +99,7 @@ public class CommittedOutflowPolicyTests
     {
         // A repayment #553 categorized at the source but the detector never grouped into a plan
         // (a first instalment, or one whose amount drifted out of its plan's band).
-        var repayment = Debit(14060.96m, "516936******4992",
+        var repayment = Debit(14060.96m, "400000******0002",
             category: CategoryKeys.LoanPayments, mcc: 4829);
 
         Rules().IsCommitted(repayment).Should().BeTrue();

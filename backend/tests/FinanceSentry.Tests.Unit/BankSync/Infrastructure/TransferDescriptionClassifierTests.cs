@@ -10,7 +10,7 @@ public class TransferDescriptionClassifierTests
 {
     [Theory]
     [InlineData("To Mario Scalas", CategoryKeys.TransferOut)]
-    [InlineData("To Denys Sychov", CategoryKeys.TransferOut)]
+    [InlineData("To Alex Morgan", CategoryKeys.TransferOut)]
     [InlineData("To Interactive Brokers LLC", CategoryKeys.TransferOut)]
     [InlineData("To Instant Access Savings", CategoryKeys.TransferOut)]
     [InlineData("From Instant Access Savings", CategoryKeys.TransferIn)]

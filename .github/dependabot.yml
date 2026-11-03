@@ -48,6 +48,10 @@ updates:
       day: monday
       time: "06:00"
     open-pull-requests-limit: 5
+    # FluentAssertions 8+ is commercially licensed (Xceed); stay on the Apache-2.0 7.x line.
+    ignore:
+      - dependency-name: "FluentAssertions"
+        versions: [">=8.0.0"]
     groups:
       nuget-serilog-family:
         patterns:

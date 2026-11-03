@@ -12,15 +12,15 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     /// retires the direction-blind merchant keyword that used to classify one of its legs.
     ///
     /// <para>
-    /// The hop shows as <c>*MOBI DENYS SYCHOV IE…</c> on the AIB side and
-    /// <c>Payment from Denys Sychov</c> on the Revolut side. Pair detection cannot see them as a
+    /// The hop shows as <c>*MOBI ALEX MORGAN IE…</c> on the AIB side and
+    /// <c>Payment from Alex Morgan</c> on the Revolut side. Pair detection cannot see them as a
     /// pair — the statements share no words beyond the name and the legs settle on different
     /// days — so the Revolut credit read as INCOME and inflated both gross income and the
     /// savings rate, month after month.
     /// </para>
     ///
     /// <para>
-    /// The keyword <c>denys sychov ie</c> → <c>TRANSFER_IN</c> was the earlier hand-made patch
+    /// The keyword <c>alex morgan ie</c> → <c>TRANSFER_IN</c> was the earlier hand-made patch
     /// for the inbound leg. The keyword bridge is the top rung of the categorization ladder and
     /// carries no direction, so it stamped TRANSFER_IN on the OUTBOUND leg too — an outgoing
     /// debit filed as an incoming transfer. The counterparty layer classifies per direction and
@@ -36,7 +36,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
         private static readonly Guid RuleId = new("22222222-0000-0000-0000-000000000020");
         private static readonly DateTime SeededAt = new(2026, 9, 9, 18, 0, 0, DateTimeKind.Utc);
 
-        private const string SupersededKeyword = "denys sychov ie";
+        private const string SupersededKeyword = "alex morgan ie";
 
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -53,11 +53,11 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 table: "counterparty_rules",
                 columns: ["Id", "CounterpartyId", "MatchType", "Pattern", "Currency", "CreatedAt"],
                 columnTypes: ["uuid", "uuid", "character varying(50)", "character varying(255)", "character varying(3)", "timestamp with time zone"],
-                // One rule covers both legs: the AIB debit ("*MOBI DENYS SYCHOV IE…", "DENYS
-                // SYCHOV IE… Sent from Revolut") and the Revolut credit ("Payment from Denys
-                // Sychov"). EUR-scoped like the mom-routing rules (#580), so a Cyrillic UAH
+                // One rule covers both legs: the AIB debit ("*MOBI ALEX MORGAN IE…", "ALEX
+                // MORGAN IE… Sent from Revolut") and the Revolut credit ("Payment from Alex
+                // Morgan"). EUR-scoped like the mom-routing rules (#580), so a Cyrillic UAH
                 // statement carrying the same name keeps matching the family rules instead.
-                values: new object[] { RuleId, OwnAccountsId, "description_contains", "Denys Sychov", "EUR", SeededAt });
+                values: new object[] { RuleId, OwnAccountsId, "description_contains", "Alex Morgan", "EUR", SeededAt });
 
             migrationBuilder.DeleteData(
                 schema: "bank_sync",

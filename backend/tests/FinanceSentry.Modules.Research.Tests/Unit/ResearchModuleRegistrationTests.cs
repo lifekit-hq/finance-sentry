@@ -47,6 +47,44 @@ public sealed class ResearchModuleRegistrationTests
             "the trends service no-ops via IsConfigured, so the DI graph stays stable without a key");
     }
 
+    [Fact]
+    public void Sec_edgar_user_agent_defaults_to_the_project_url_without_an_email_address()
+    {
+        var userAgent = SecEdgarUserAgent([]);
+
+        userAgent.Should().Be("FinanceSentry/1.0 (contact: https://github.com/lifekit-hq/finance-sentry)");
+        userAgent.Should().NotContain("@");
+    }
+
+    [Fact]
+    public void Sec_edgar_user_agent_carries_the_configured_contact()
+    {
+        var userAgent = SecEdgarUserAgent(new Dictionary<string, string?>
+        {
+            ["SecEdgar:Contact"] = "ops@example.org",
+        });
+
+        userAgent.Should().Be("FinanceSentry/1.0 (contact: ops@example.org)");
+    }
+
+    [Fact]
+    public void Sec_edgar_user_agent_falls_back_to_the_default_when_the_contact_is_blank()
+    {
+        var userAgent = SecEdgarUserAgent(new Dictionary<string, string?>
+        {
+            ["SecEdgar:Contact"] = "",
+        });
+
+        userAgent.Should().Be("FinanceSentry/1.0 (contact: https://github.com/lifekit-hq/finance-sentry)");
+    }
+
+    private static string SecEdgarUserAgent(Dictionary<string, string?> settings)
+    {
+        using var provider = BuildServices(settings).BuildServiceProvider();
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(SecEdgarService.HttpClientName);
+        return client.DefaultRequestHeaders.UserAgent.ToString();
+    }
+
     private static ServiceCollection BuildServices(Dictionary<string, string?> settings)
     {
         settings["ConnectionStrings:Default"] = "Host=localhost;Database=test;Username=t;Password=t";

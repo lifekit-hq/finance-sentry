@@ -17,7 +17,7 @@ using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 /// («Погашення наступного платежу …», "- monomarket", «Платіж &lt;merchant&gt;» on MCC 4829);</item>
 /// <item>failing that, a match against one of the user's ACTIVE <c>installment</c>-kind plans —
 /// same key AND an amount that fits the plan. This is the only way to reach a mortgage, whose
-/// description is a masked card number («516936******4992») carrying no wording any keyword
+/// description is a masked card number («400000******0002») carrying no wording any keyword
 /// could match. The detector already labels such a plan <c>installment</c> (see
 /// <see cref="SubscriptionDetectionAlgorithm.DetectSubscriptions"/>), so the categorizer trusts that label
 /// rather than re-deriving a masked-PAN heuristic that would also claim one-off card-to-card
@@ -38,7 +38,7 @@ public static class LoanRepaymentClassifier
     // rejects anything with a coefficient of variation above 0.10 — so a debit far off that
     // amount is not a repayment of it. The band is load-bearing, not a nicety: a masked-card
     // plan's key is only the card's leading digits (MerchantNameNormalizer strips the trailing
-    // group, so «516936******4992» keys as "516936"), which every card issued on the same BIN
+    // group, so «400000******0002» keys as "400000"), which every card issued on the same BIN
     // shares. Without the amount test a ₴200 transfer to a friend's card would be booked as a
     // mortgage payment.
     //

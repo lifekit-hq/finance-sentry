@@ -3,7 +3,7 @@ namespace FinanceSentry.Core.Utils;
 using System.Text.RegularExpressions;
 
 /// <summary>
-/// Recognizes masked card numbers ("516936******4992") and bare digit runs that banks
+/// Recognizes masked card numbers ("400000******0002") and bare digit runs that banks
 /// emit as the "merchant" of a card-to-card transfer. A recurring charge to such a
 /// counterparty is a repayment obligation (loan/mortgage), not a service subscription,
 /// and a masked PAN must never overwrite a human-readable display name.

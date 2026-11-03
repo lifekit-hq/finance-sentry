@@ -72,7 +72,7 @@ public class MonobankStatementContractTests
           {
             "id": "mortgage0001=",
             "time": 1554466347,
-            "description": "516936******4992",
+            "description": "400000******0002",
             "mcc": 4829,
             "hold": false,
             "amount": -1406096,
@@ -115,7 +115,7 @@ public class MonobankStatementContractTests
         // The mortgage is only reachable through its detected plan — its description carries
         // no wording, so the keyword bridge cannot see it.
         var mortgagePlan = new ActiveInstallmentPlan(
-            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "516936******4992", 14060.96m, 4829), 14060.96m);
+            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "400000******0002", 14060.96m, 4829), 14060.96m);
         var adapter = new MonobankAdapter(
             handler.BuildClient(), StubCategoryResolver.Categorizer,
             new StubActiveSubscriptionsReader(mortgagePlan));

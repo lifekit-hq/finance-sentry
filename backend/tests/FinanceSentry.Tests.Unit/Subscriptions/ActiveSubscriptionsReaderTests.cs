@@ -84,13 +84,13 @@ public class ActiveSubscriptionsReaderTests
         // debit — Netflix, a monthly transfer to a person — a loan repayment.
         var (reader, _) = MakeSut(
             Make("netflix", "Netflix"),
-            Make("ліза", "Ліза"),
-            Make("516936", "Іпотека", SubscriptionKinds.Installment),
+            Make("марічка", "Марічка"),
+            Make("400000", "Іпотека", SubscriptionKinds.Installment),
             Make("installment:allo:2340", "Алло", SubscriptionKinds.Installment));
 
         var plans = await reader.GetActiveInstallmentPlansAsync(UserId);
 
-        plans.Select(p => p.Key).Should().BeEquivalentTo(["516936", "installment:allo:2340"]);
+        plans.Select(p => p.Key).Should().BeEquivalentTo(["400000", "installment:allo:2340"]);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class ActiveSubscriptionsReaderTests
     {
         // Masked-card keys collide across every card on one BIN, so the amount is the only
         // thing that tells the mortgage apart from a small transfer.
-        var (reader, _) = MakeSut(Make("516936", "Іпотека", SubscriptionKinds.Installment));
+        var (reader, _) = MakeSut(Make("400000", "Іпотека", SubscriptionKinds.Installment));
 
         var plans = await reader.GetActiveInstallmentPlansAsync(UserId);
 

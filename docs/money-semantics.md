@@ -577,7 +577,7 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   an ACTIVE `installment`-kind `DetectedSubscription` **whose expected amount the debit is
   within 15% of** — the only way to reach a mortgage, whose description is a bare masked card
   number. The amount test is load-bearing, not a nicety: `MerchantNameNormalizer` strips the
-  trailing group, so `516936******4992` keys as `516936` and every card issued on that BIN
+  trailing group, so `400000******0002` keys as `400000` and every card issued on that BIN
   shares the key; without it a ₴200 transfer to a friend's card would book as a mortgage
   payment. Credits are never claimed, and a `subscription`-kind commitment (Netflix, a
   recurring transfer to a person) is never claimed, so genuine transfers on MCC 4829 stay
@@ -651,15 +651,15 @@ one and a transfer in the other.
   | `self_routing` | nothing — the user's own money mid-hop (e.g. Revolut → mom → Monobank, whose legs share no statement words so pair detection can't see them) | nothing |
 
   Rules can carry an optional account-currency filter, and a currency-scoped match beats a
-  generic one — «Від: Людмила Сичова» in UAH is rent (`family_support` income), in EUR it is
+  generic one — «Від: Оксана Лисенко» in UAH is rent (`family_support` income), in EUR it is
   the same wording on a routing hop (`self_routing`, excluded).
 
   `self_routing` also covers the user's **own** EUR accounts (`Own accounts (EUR)`, M019): an
-  AIB → Revolut hop reads `*MOBI DENYS SYCHOV IE…` on one statement and `Payment from Denys
-  Sychov` on the other. The legs share nothing pair detection can key on and settle on
+  AIB → Revolut hop reads `*MOBI ALEX MORGAN IE…` on one statement and `Payment from Alex
+  Morgan` on the other. The legs share nothing pair detection can key on and settle on
   different days, so the credit read as INCOME and inflated gross income and the savings rate
   every month it happened. Counterparty classification is per direction, so one rule retires
-  both legs; the direction-blind `denys sychov ie` → `TRANSFER_IN` keyword that used to patch
+  both legs; the direction-blind `alex morgan ie` → `TRANSFER_IN` keyword that used to patch
   the inbound leg (and mislabelled the outbound one) is dropped in the same migration.
 
   Known gap: `household` outbound joins outflow but no spending *category* — top-categories
