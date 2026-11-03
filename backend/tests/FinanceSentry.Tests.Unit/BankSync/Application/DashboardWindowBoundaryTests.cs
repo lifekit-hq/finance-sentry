@@ -7,6 +7,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// The dashboard's day-level windows (1W, MTD) through the real flow, category and
@@ -67,7 +68,7 @@ public class DashboardWindowBoundaryTests
                         .ReturnsAsync(counterparties.ToList());
 
         var policy = new Mock<ICommittedOutflowPolicy>();
-        policy.Setup(p => p.LoadForUserAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(new CommittedOutflowRules { ActiveCommitmentKeys = new HashSet<string>(), PinnedMerchantKeys = new HashSet<string>() });
+        policy.Setup(p => p.LoadForUserAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(new CommittedOutflowRules { ActiveCommitmentKeys = new HashSet<string>(), PinnedMerchantKeys = new HashSet<string>(), Phrases = DetectionPhraseSet.Seed });
 
         var aggregation = new Mock<IAggregationService>();
         aggregation.Setup(s => s.GetAggregatedBalanceAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);

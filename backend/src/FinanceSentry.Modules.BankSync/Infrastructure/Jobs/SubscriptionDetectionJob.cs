@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public sealed class SubscriptionDetectionJob(
     BankSyncDbContext db,
     IClosedAccountsReader closedAccounts,
     ISubscriptionDetectionResultService resultService,
+    IDetectionPhraseProvider detectionPhrases,
     ILogger<SubscriptionDetectionJob> logger)
 {
     // How far back a charge can be and still be evidence. Bounds the algorithm's reach: two prior
@@ -47,6 +49,9 @@ public sealed class SubscriptionDetectionJob(
                     t.TransactionDate, t.MerchantCategory, t.Mcc, a.Currency))
             .ToListAsync(ct);
 
+        // One snapshot for the whole pass, so every user is judged by the same vocabulary.
+        var phrases = detectionPhrases.Current;
+
         foreach (var userGroup in transactions.GroupBy(t => t.UserId))
         {
             var userId = userGroup.Key.ToString();
@@ -54,20 +59,20 @@ public sealed class SubscriptionDetectionJob(
             try
             {
                 var txs = userGroup.ToList();
-                var installmentTxs = txs.Where(t => InstallmentPlanRecognizer.IsInstallmentTransaction(t.Description, t.Mcc)).ToList();
-                var regularTxs = txs.Where(t => !InstallmentPlanRecognizer.IsInstallmentTransaction(t.Description, t.Mcc)).ToList();
+                var installmentTxs = txs.Where(t => InstallmentPlanRecognizer.IsInstallmentTransaction(phrases, t.Description, t.Mcc)).ToList();
+                var regularTxs = txs.Where(t => !InstallmentPlanRecognizer.IsInstallmentTransaction(phrases, t.Description, t.Mcc)).ToList();
 
                 var results = new List<DetectedSubscriptionData>();
-                results.AddRange(SubscriptionDetectionAlgorithm.DetectSubscriptions(regularTxs));
-                results.AddRange(SubscriptionDetectionAlgorithm.DetectInstallments(installmentTxs));
+                results.AddRange(SubscriptionDetectionAlgorithm.DetectSubscriptions(phrases, regularTxs));
+                results.AddRange(SubscriptionDetectionAlgorithm.DetectInstallments(phrases, installmentTxs));
 
                 // Every charge filed under the key a picked transaction would resolve to, so a
                 // commitment the user added by hand follows its transactions like a detected one.
                 var charges = txs
                     .SelectMany(t => new[]
                         {
-                            CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc),
-                            InstallmentCommitmentKey.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc),
+                            CommitmentKeyResolver.Resolve(phrases, t.MerchantName, t.Description, t.Amount, t.Mcc),
+                            InstallmentCommitmentKey.Resolve(phrases, t.MerchantName, t.Description, t.Amount, t.Mcc),
                         }
                         .Distinct()
                         .Select(key => new CommitmentCharge(

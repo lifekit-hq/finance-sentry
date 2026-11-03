@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// <see cref="SubscriptionDetectionJob"/> runs as a background job with no person in scope, so it must
@@ -53,7 +54,7 @@ public class SubscriptionDetectionJobTests
         SeedMonthlyCharges(db, userB, "Spotify");
         await db.SaveChangesAsync();
 
-        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, FixedDetectionPhraseProvider.Seed, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
         _results.Verify(r => r.UpsertDetectedSubscriptionsAsync(
@@ -86,10 +87,10 @@ public class SubscriptionDetectionJobTests
         }
         await db.SaveChangesAsync();
 
-        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, FixedDetectionPhraseProvider.Seed, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
-        var merchantKey = CommitmentKeyResolver.Resolve("Acme Hosting", "ACME HOSTING", 16.19m, null);
+        var merchantKey = CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, "Acme Hosting", "ACME HOSTING", 16.19m, null);
         var installmentKey = InstallmentPlanRecognizer.PlanKey(merchantKey, 16.19m);
         _results.Verify(r => r.TrackManualCommitmentsAsync(
             user.ToString(),
@@ -112,7 +113,7 @@ public class SubscriptionDetectionJobTests
         await db.SaveChangesAsync();
 
         await new SubscriptionDetectionJob(
-                db, new StubClosedAccountsReader(closedUser), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+                db, new StubClosedAccountsReader(closedUser), _results.Object, FixedDetectionPhraseProvider.Seed, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
         _results.Verify(r => r.UpsertDetectedSubscriptionsAsync(

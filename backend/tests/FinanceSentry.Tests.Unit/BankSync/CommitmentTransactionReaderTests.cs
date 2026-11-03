@@ -6,6 +6,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// A picked transaction is read as the latest charge under its key and the number of charges made
@@ -36,7 +37,7 @@ public class CommitmentTransactionReaderTests
         var transactions = new Mock<ITransactionRepository>();
         transactions.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(picked);
         transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(all);
-        return new CommitmentTransactionReader(accounts.Object, transactions.Object);
+        return new CommitmentTransactionReader(accounts.Object, transactions.Object, FixedDetectionPhraseProvider.Seed);
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public class CommitmentTransactionReaderTests
         transactions.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(picked);
         transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([picked, latest]);
 
-        var result = await new CommitmentTransactionReader(accounts.Object, transactions.Object)
+        var result = await new CommitmentTransactionReader(accounts.Object, transactions.Object, FixedDetectionPhraseProvider.Seed)
             .FindAsync(UserId, Guid.NewGuid());
 
         result!.Currency.Should().Be("USD");

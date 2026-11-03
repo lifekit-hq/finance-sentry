@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// End-to-end cover for 044/US1: a merchant's raw charge series is run through the real
@@ -49,7 +50,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
             NoCurrentUser.Instance);
 
-        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, charges).ToList();
         var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -212,7 +213,7 @@ public class PriceHikeSentinelPipelineTests
             Charge(10.99m, 2026, 5, 15, "GBP"),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(beforeMove).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, beforeMove).ToList());
 
         SubscriptionDetectionAlgorithm.TxRow[] afterMove =
         [
@@ -220,7 +221,7 @@ public class PriceHikeSentinelPipelineTests
             Charge(13.49m, 2026, 6, 15), Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(afterMove).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, afterMove).ToList());
 
         var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
             .Should().ContainSingle().Subject;
@@ -262,7 +263,7 @@ public class PriceHikeSentinelPipelineTests
             NoCurrentUser.Instance);
 
         var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
-        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, charges).ToList();
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -293,14 +294,14 @@ public class PriceHikeSentinelPipelineTests
             Charge(10.99m, 2026, 5, 15), Charge(13.49m, 2026, 6, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(midHike).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, midHike).ToList());
 
         SubscriptionDetectionAlgorithm.TxRow[] settled =
         [
             .. midHike, Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(settled).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, settled).ToList());
 
         var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
             .Should().ContainSingle().Subject;

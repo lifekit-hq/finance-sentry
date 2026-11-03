@@ -2,17 +2,27 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Services;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 public class CommitmentTransactionReader(
     IBankAccountRepository accounts,
-    ITransactionRepository transactions) : ICommitmentTransactionReader
+    ITransactionRepository transactions,
+    IDetectionPhraseProvider detectionPhrases) : ICommitmentTransactionReader
 {
     public Task<CommitmentTransaction?> FindAsync(Guid userId, Guid transactionId, CancellationToken ct = default) =>
-        ReadAsync(userId, transactionId, CommitmentKeyResolver.Resolve, ct);
+        ReadAsync(userId, transactionId, KeyOf(CommitmentKeyResolver.Resolve), ct);
 
     public Task<CommitmentTransaction?> FindInstallmentAsync(Guid userId, Guid transactionId, CancellationToken ct = default) =>
-        ReadAsync(userId, transactionId, InstallmentCommitmentKey.Resolve, ct);
+        ReadAsync(userId, transactionId, KeyOf(InstallmentCommitmentKey.Resolve), ct);
+
+    // Binds the current phrase snapshot, so every transaction of one read is keyed by the same vocabulary.
+    private Func<string?, string?, decimal, int?, string> KeyOf(
+        Func<DetectionPhraseSet, string?, string?, decimal, int?, string> resolve)
+    {
+        var phrases = detectionPhrases.Current;
+        return (merchantName, description, amount, mcc) => resolve(phrases, merchantName, description, amount, mcc);
+    }
 
     private async Task<CommitmentTransaction?> ReadAsync(
         Guid userId, Guid transactionId, Func<string?, string?, decimal, int?, string> keyOf, CancellationToken ct)

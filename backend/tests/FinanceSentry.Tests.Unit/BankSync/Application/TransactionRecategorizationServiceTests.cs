@@ -14,6 +14,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 public class TransactionRecategorizationServiceTests
 {
@@ -47,7 +48,7 @@ public class TransactionRecategorizationServiceTests
             _accounts.Object, _transactions.Object, _encryption.Object,
             _dedup.Object, _providerFactory.Object, _monobankCredentials.Object,
             _monobankAdapter.Object, _truelayerConnections.Object, _truelayerTokenRefresh.Object,
-            new TransactionCategorizer(_resolver.Object), new TrueLayerCategoryMapper(),
+            new TransactionCategorizer(_resolver.Object, FixedDetectionPhraseProvider.Seed), new TrueLayerCategoryMapper(),
             _activeSubscriptions,
             new Mock<ILogger<TransactionRecategorizationService>>().Object);
     }
@@ -326,7 +327,7 @@ public class TransactionRecategorizationServiceTests
             MerchantCategory = CategoryKeys.TransferOut,
         };
         _activeSubscriptions = new StubActiveSubscriptionsReader(new ActiveInstallmentPlan(
-            CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
+            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, mortgageDescription, mortgageAmount, 4829),
             mortgageAmount));
         _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);

@@ -4,6 +4,7 @@ using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 public class CashLodgementClassifierTests
 {
@@ -13,7 +14,7 @@ public class CashLodgementClassifierTests
     [InlineData("  *atmldg Capel St")]
     public void Resolve_LodgementCredit_IsIncome(string description)
     {
-        CashLodgementClassifier.Resolve(description, "credit").Should().Be(CategoryKeys.Income);
+        CashLodgementClassifier.Resolve(DetectionPhraseSet.Seed, description, "credit").Should().Be(CategoryKeys.Income);
     }
 
     [Theory]
@@ -28,6 +29,6 @@ public class CashLodgementClassifierTests
     [InlineData(null, "credit")]
     public void Resolve_NotALodgementCredit_ReturnsNull(string? description, string? transactionType)
     {
-        CashLodgementClassifier.Resolve(description, transactionType).Should().BeNull();
+        CashLodgementClassifier.Resolve(DetectionPhraseSet.Seed, description, transactionType).Should().BeNull();
     }
 }

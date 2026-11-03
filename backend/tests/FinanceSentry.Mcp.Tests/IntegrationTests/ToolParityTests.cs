@@ -38,6 +38,7 @@ using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Services;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.Subscriptions.Domain;
@@ -239,6 +240,7 @@ public sealed class ToolParityTests
         services.AddScoped<ICounterpartyRepository, CounterpartyRepository>();
         services.AddScoped<ICommittedMerchantPinRepository, CommittedMerchantPinRepository>();
         services.AddScoped<IActiveSubscriptionsReader, FinanceSentry.Modules.Subscriptions.Application.Services.ActiveSubscriptionsReader>();
+        services.AddSingleton<IDetectionPhraseProvider>(FixedDetectionPhraseProvider.Seed);
         services.AddScoped<ICommittedOutflowPolicy, CommittedOutflowPolicy>();
         services.AddScoped<ITransferDetectionService, TransferDetectionService>();
         services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();

@@ -6,6 +6,7 @@ using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
@@ -176,6 +177,7 @@ public static class BankSyncModule
             sp => new TransactionDeduplicationService(sp.GetRequiredService<IOptions<DeduplicationOptions>>().Value.MasterKeyBase64));
 
         services.AddSingleton<ICategoryResolver, CategoryResolver>();
+        services.AddSingleton<IDetectionPhraseProvider, DetectionPhraseProvider>();
         // Stateless over the singleton resolver — the per-user installment plans are a call
         // argument, never cached here.
         services.AddSingleton<ITransactionCategorizer, TransactionCategorizer>();

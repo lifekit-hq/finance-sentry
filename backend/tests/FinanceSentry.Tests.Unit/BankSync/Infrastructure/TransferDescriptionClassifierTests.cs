@@ -4,6 +4,7 @@ using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 public class TransferDescriptionClassifierTests
 {
@@ -24,7 +25,7 @@ public class TransferDescriptionClassifierTests
     [InlineData("З банки «Поточний RUSORIZ»", CategoryKeys.TransferIn)]
     public void Resolve_DirectionalPrefix_ClassifiesTransfer(string description, string expected)
     {
-        TransferDescriptionClassifier.Resolve(description).Should().Be(expected);
+        TransferDescriptionClassifier.Resolve(DetectionPhraseSet.Seed, description).Should().Be(expected);
     }
 
     [Theory]
@@ -36,12 +37,12 @@ public class TransferDescriptionClassifierTests
     [InlineData(null)]
     public void Resolve_NonTransfer_ReturnsNull(string? description)
     {
-        TransferDescriptionClassifier.Resolve(description).Should().BeNull();
+        TransferDescriptionClassifier.Resolve(DetectionPhraseSet.Seed, description).Should().BeNull();
     }
 
     [Fact]
     public void Resolve_LeadingWhitespace_IsTrimmedBeforeMatching()
     {
-        TransferDescriptionClassifier.Resolve("   To Someone").Should().Be(CategoryKeys.TransferOut);
+        TransferDescriptionClassifier.Resolve(DetectionPhraseSet.Seed, "   To Someone").Should().Be(CategoryKeys.TransferOut);
     }
 }

@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
@@ -88,6 +89,9 @@ public sealed class CommittedOutflowRules
     /// <summary>Rule (d)'s set: the merchant keys the user pinned as committed.</summary>
     public required IReadOnlySet<string> PinnedMerchantKeys { get; init; }
 
+    /// <summary>The detection vocabulary rule (a) keys a debit with; the same snapshot the detector keyed the stored rows by.</summary>
+    public required DetectionPhraseSet Phrases { get; init; }
+
     /// <summary>
     /// Rules (a), (b) and (d) for a single debit. The caller has already established that the
     /// transaction is in <c>Outflow</c> — this decides only which side of the partition it
@@ -102,7 +106,7 @@ public sealed class CommittedOutflowRules
             return true;
 
         var commitmentKey = CommitmentKeyResolver.Resolve(
-            debit.MerchantName, debit.Description, debit.Amount, debit.Mcc);
+            Phrases, debit.MerchantName, debit.Description, debit.Amount, debit.Mcc);
 
         if (ActiveCommitmentKeys.Contains(commitmentKey))
             return true;
@@ -155,7 +159,8 @@ public interface ICommittedOutflowPolicy
 /// <inheritdoc />
 public class CommittedOutflowPolicy(
     IActiveSubscriptionsReader activeSubscriptions,
-    ICommittedMerchantPinRepository pins) : ICommittedOutflowPolicy
+    ICommittedMerchantPinRepository pins,
+    IDetectionPhraseProvider detectionPhrases) : ICommittedOutflowPolicy
 {
     private readonly IActiveSubscriptionsReader _activeSubscriptions =
         activeSubscriptions ?? throw new ArgumentNullException(nameof(activeSubscriptions));
@@ -185,6 +190,7 @@ public class CommittedOutflowPolicy(
         {
             ActiveCommitmentKeys = activeCommitmentKeys,
             PinnedMerchantKeys = pinnedKeys,
+            Phrases = detectionPhrases.Current,
         };
     }
 }

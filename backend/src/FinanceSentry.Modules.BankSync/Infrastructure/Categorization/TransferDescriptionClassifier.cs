@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
+using FinanceSentry.Modules.BankSync.Domain;
 
 /// <summary>
 /// Classifies bank-transfer and income transactions from their description prefix, for providers
@@ -23,37 +25,36 @@ using FinanceSentry.Core.Domain;
 /// </summary>
 public static class TransferDescriptionClassifier
 {
-    // Checked before IncomingPrefixes: an external "Payment from <party>" is income, not an
-    // internal transfer, so it stays in cash-flow instead of being excluded like a bare "From".
-    private static readonly string[] IncomePrefixes = ["Payment from "];
-    private static readonly string[] OutgoingPrefixes = ["To ", "Поповнення "];
-    private static readonly string[] IncomingPrefixes = ["From ", "З банки "];
+    // The prefixes are the detection_phrases rows of the income_prefix, transfer_in_prefix and
+    // transfer_out_prefix kinds. Income is checked before the incoming transfers: an external
+    // "Payment from <party>" is income, not an internal transfer, so it stays in cash-flow instead
+    // of being excluded like a bare "From".
 
     /// <summary>
     /// Returns <see cref="CategoryKeys.Income"/> for an external incoming payment,
     /// <see cref="CategoryKeys.TransferOut"/> / <see cref="CategoryKeys.TransferIn"/> for a
     /// directional internal-transfer description, or <c>null</c> when it is neither.
     /// </summary>
-    public static string? Resolve(string? description)
+    public static string? Resolve(DetectionPhraseSet phrases, string? description)
     {
         if (string.IsNullOrWhiteSpace(description))
             return null;
 
         var d = description.TrimStart();
 
-        foreach (var prefix in IncomePrefixes)
+        foreach (var prefix in phrases.Phrases(DetectionPhraseKinds.IncomePrefix))
         {
             if (d.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 return CategoryKeys.Income;
         }
 
-        foreach (var prefix in IncomingPrefixes)
+        foreach (var prefix in phrases.Phrases(DetectionPhraseKinds.TransferInPrefix))
         {
             if (d.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 return CategoryKeys.TransferIn;
         }
 
-        foreach (var prefix in OutgoingPrefixes)
+        foreach (var prefix in phrases.Phrases(DetectionPhraseKinds.TransferOutPrefix))
         {
             if (d.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 return CategoryKeys.TransferOut;

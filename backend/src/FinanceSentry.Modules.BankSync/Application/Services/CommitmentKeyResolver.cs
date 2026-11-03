@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
+
 /// <summary>
 /// Maps a transaction to the key of the detected commitment it would belong to, so callers can
 /// ask "is this outflow one of the user's active commitments?" by set membership.
@@ -20,7 +22,7 @@ public static class CommitmentKeyResolver
     /// is not an installment repayment falls back to its normalized merchant key, which is what
     /// the recurring-service detector would have grouped it under.
     /// </summary>
-    public static string Resolve(string? merchantName, string? description, decimal amount, int? mcc) =>
-        InstallmentPlanRecognizer.PlanKeyForTransaction(description, amount, mcc)
+    public static string Resolve(DetectionPhraseSet phrases, string? merchantName, string? description, decimal amount, int? mcc) =>
+        InstallmentPlanRecognizer.PlanKeyForTransaction(phrases, description, amount, mcc)
         ?? MerchantNameNormalizer.NormalizeDetectionKey(merchantName, description);
 }

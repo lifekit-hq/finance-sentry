@@ -7,6 +7,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Unit tests for GetFamilyClearingStatementQueryHandler (issue #434, Ship 2). The handler reads
@@ -361,6 +362,7 @@ public class GetFamilyClearingStatementQueryTests
             {
                 ActiveCommitmentKeys = new HashSet<string>(StringComparer.Ordinal),
                 PinnedMerchantKeys = new HashSet<string>(StringComparer.Ordinal),
+                Phrases = DetectionPhraseSet.Seed,
             });
         return mock.Object;
     }
