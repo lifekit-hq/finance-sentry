@@ -242,9 +242,13 @@ describe('DossierStore', () => {
     store.setTargetDraft('200');
     store.saveTarget();
     expect(store.targetStatus()).toBe('loading');
+    service.generateLedgerRead.mockReturnValue(NEVER);
+    store.generateLedgerRead({symbol: 'AAPL', force: true});
+    expect(store.ledgerReadStatus()).toBe('loading');
 
+    // No AI access, so the new symbol starts no ledger read of its own and the status stays observable.
+    canUseAi = false;
     service.getDossier.mockReturnValue(NEVER);
-    service.getLedgerRead.mockReturnValue(NEVER);
     params.next(convertToParamMap({symbol: 'ZZZZ'}));
     TestBed.tick();
 
