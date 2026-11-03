@@ -254,6 +254,24 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Sleeve_value_history_is_read_for_the_named_user_only_and_strictly_before_the_date()
+    {
+        await SeedAsync(NewSnapshot(_userA, Today.AddDays(-1), crypto: 500m), NewSnapshot(_userB, Today.AddDays(-1)));
+
+        await using var asNoOne = CreateContext();
+        var repo = new NetWorthSnapshotRepository(asNoOne);
+
+        (await repo.SleeveHeldValueBeforeUnscopedAsync(_userA, "crypto", Today)).Should().BeTrue();
+        (await repo.SleeveHeldValueBeforeUnscopedAsync(_userA, "brokerage", Today)).Should().BeTrue();
+        (await repo.SleeveHeldValueBeforeUnscopedAsync(_userA, "crypto", Today.AddDays(-1))).Should().BeFalse(
+            "the day itself is not before the day");
+        (await repo.SleeveHeldValueBeforeUnscopedAsync(_userB, "crypto", Today)).Should().BeFalse(
+            "a zero column is no recorded value, and another person's rows are not read");
+        await repo.Invoking(r => r.SleeveHeldValueBeforeUnscopedAsync(_userA, "manual", Today))
+            .Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [DockerRequiredFact]
     public async Task Snapshot_job_with_no_person_carries_forward_and_refreshes_the_days_row()
     {
         await SeedAsync(NewSnapshot(_userA, Today.AddDays(-1), crypto: 500m));

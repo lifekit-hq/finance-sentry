@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Infrastructure.Persistence.Repositories;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -97,6 +98,19 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
             .OrderByDescending(s => s.SnapshotDate)
             .ThenByDescending(s => s.TakenAt)
             .FirstOrDefaultAsync(ct);
+
+    public Task<bool> SleeveHeldValueBeforeUnscopedAsync(Guid userId, string sleeveId, DateOnly date, CancellationToken ct = default)
+    {
+        var rows = _db.NetWorthSnapshots.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(s => s.UserId == userId && s.SnapshotDate < date);
+        return sleeveId switch
+        {
+            WealthSourceIds.Banking => rows.AnyAsync(s => s.BankingTotal != 0m, ct),
+            WealthSourceIds.Brokerage => rows.AnyAsync(s => s.BrokerageTotal != 0m, ct),
+            WealthSourceIds.Crypto => rows.AnyAsync(s => s.CryptoTotal != 0m, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(sleeveId), sleeveId, "Not a snapshot sleeve."),
+        };
+    }
 
     public Task<NetWorthSnapshot?> GetLatestByUserIdAsync(Guid userId, CancellationToken ct = default)
         => LatestByUserId(_db.NetWorthSnapshots, userId, ct);

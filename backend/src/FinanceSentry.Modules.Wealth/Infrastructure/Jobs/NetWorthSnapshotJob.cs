@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Wealth.Application.Services;
 using Hangfire;
 using Microsoft.Extensions.Logging;
 
@@ -12,9 +13,11 @@ public class NetWorthSnapshotJob(
     IBrokerageHoldingsReader brokerageReader,
     INetWorthSnapshotService snapshotService,
     IBookFiguresService bookFigures,
-    ILogger<NetWorthSnapshotJob>? logger = null)
+    ILogger<NetWorthSnapshotJob>? logger = null,
+    IBrokeragePriceHistoryReader? priceHistory = null)
 {
     private readonly ILogger<NetWorthSnapshotJob>? _logger = logger;
+    private readonly IBrokeragePriceHistoryReader? _priceHistory = priceHistory;
     private readonly IBankingTotalsReader _bankingTotals = bankingTotals ?? throw new ArgumentNullException(nameof(bankingTotals));
     private readonly ICryptoHoldingsReader _cryptoReader = cryptoReader ?? throw new ArgumentNullException(nameof(cryptoReader));
     private readonly IBrokerageHoldingsReader _brokerageReader = brokerageReader ?? throw new ArgumentNullException(nameof(brokerageReader));
@@ -82,6 +85,21 @@ public class NetWorthSnapshotJob(
             && brokerageHoldings.Count > 0
             && brokerageHoldings.Max(h => h.SyncedAt) >= now - StaleWindow;
 
+        // A feed that replays its last quote leaves the figure looking measured. The sleeve is then flagged stale
+        // (its figure is still recorded): a liquid symbol priced the same on two weekdays is not a live quote.
+        var frozenQuoteSleeves = new List<string>();
+        if (brokerageFresh && _priceHistory is not null)
+        {
+            var prices = await _priceHistory.GetDailyPricesAsync(userId, snapshotDate.AddDays(-FrozenQuoteDetector.LookbackDays), ct);
+            if (FrozenQuoteDetector.HasFrozenLiquidQuote(brokerageHoldings, prices, snapshotDate))
+            {
+                frozenQuoteSleeves.Add(BrokerageSourceId);
+                _logger?.LogWarning(
+                    "Net worth snapshot for user {UserId} on {SnapshotDate}: a liquid brokerage quote is unchanged since the previous weekday; the sleeve is flagged stale",
+                    userId, snapshotDate);
+            }
+        }
+
         // The invested part of each sleeve comes from the canonical book figures, so the stored cash is the
         // dashboard's "cash" for the same moment. A stale source would make the split partial, so it is
         // withheld (null), as the dashboard hides its sub-line.
@@ -109,6 +127,7 @@ public class NetWorthSnapshotJob(
             BankingFresh: bankingFresh, BrokerageFresh: brokerageFresh, CryptoFresh: cryptoFresh,
             BrokerageInvested: brokerageInvested, CryptoInvested: cryptoInvested,
             FxStatus: fxStatus,
-            Sources: book.Sources), ct);
+            Sources: book.Sources,
+            FrozenQuoteSleeves: frozenQuoteSleeves), ct);
     }
 }

@@ -293,4 +293,209 @@ public class NetWorthSnapshotServiceTests
         snapshot.CashTotal.Should().BeNull();
         snapshot.CryptoInvested.Should().BeNull();
     }
+
+    // G1: a zero that was itself carried forward is not carried forward again.
+
+    private static NetWorthSnapshot CarriedZeroBrokerage() => new()
+    {
+        Id = Guid.NewGuid(),
+        UserId = UserId,
+        SnapshotDate = SnapshotDate.AddDays(-1),
+        BankingTotal = 1000m,
+        BrokerageTotal = 0m,
+        CryptoTotal = 250m,
+        TotalNetWorth = 1250m,
+        StaleSleeves = "brokerage",
+    };
+
+    private static void SleeveHeldValueEarlier(Mock<INetWorthSnapshotRepository> repo, string sleeve, bool held)
+        => repo.Setup(r => r.SleeveHeldValueBeforeUnscopedAsync(UserId, sleeve, SnapshotDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(held);
+
+    private static NetWorthSnapshotData BrokerageUnreadable(decimal brokerage = 0m)
+        => new(SnapshotDate, BankingTotal: 1000m, BrokerageTotal: brokerage, CryptoTotal: 250m, BrokerageFresh: false);
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheCarriedValueIsItselfACarriedZero_LeavesTheDayUnavailable()
+    {
+        var (repo, captured) = SetupUpsertCapture(CarriedZeroBrokerage());
+        SleeveHeldValueEarlier(repo, "brokerage", held: true);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, BrokerageUnreadable(), CancellationToken.None);
+
+        captured().Should().BeNull();
+        repo.Verify(r => r.UpsertAsync(It.IsAny<NetWorthSnapshot>(), It.IsAny<CancellationToken>()), Times.Never);
+        repo.Verify(
+            r => r.UpsertWithSourcesAsync(
+                It.IsAny<NetWorthSnapshot>(), It.IsAny<IReadOnlyList<NetWorthSnapshotSource>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheCarriedZeroIsFlaggedOnlyByThePerSourceRows_LeavesTheDayUnavailable()
+    {
+        var previous = CarriedZeroBrokerage();
+        var (repo, captured) = SetupUpsertCapture(previous);
+        SleeveHeldValueEarlier(repo, "brokerage", held: true);
+        repo.Setup(r => r.GetSourcesUnscopedAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new NetWorthSnapshotSource
+            {
+                SourceId = "brokerage", Kind = EconomyKind.Brokerage, Total = null,
+                Health = SourceHealth.Unavailable, Reasons = [SourceReasons.StaleSource],
+            }]);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, BrokerageUnreadable(), CancellationToken.None);
+
+        captured().Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheSleeveWasNeverConnected_StillCarriesItsZeroForward()
+    {
+        // A user with no broker has a zero sleeve that is "carried" every day; that is not a failed read.
+        var (repo, captured) = SetupUpsertCapture(CarriedZeroBrokerage());
+        SleeveHeldValueEarlier(repo, "brokerage", held: false);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, BrokerageUnreadable(), CancellationToken.None);
+
+        captured()!.BrokerageTotal.Should().Be(0m);
+        captured()!.StaleSleeves.Should().Be("brokerage");
+        captured()!.TotalNetWorth.Should().Be(1250m);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenThePreviousZeroWasMeasured_CarriesItForwardAsBefore()
+    {
+        var previous = CarriedZeroBrokerage();
+        var measuredZero = new NetWorthSnapshot
+        {
+            Id = previous.Id, UserId = UserId, SnapshotDate = previous.SnapshotDate,
+            BankingTotal = 1000m, BrokerageTotal = 0m, CryptoTotal = 250m, TotalNetWorth = 1250m, StaleSleeves = null,
+        };
+        var (repo, captured) = SetupUpsertCapture(measuredZero);
+        SleeveHeldValueEarlier(repo, "brokerage", held: true);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, BrokerageUnreadable(), CancellationToken.None);
+
+        captured()!.BrokerageTotal.Should().Be(0m);
+        captured()!.StaleSleeves.Should().Be("brokerage");
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheSleeveReadsAgainAfterACarriedZero_WritesTheMeasuredFigure()
+    {
+        var (repo, captured) = SetupUpsertCapture(CarriedZeroBrokerage());
+        SleeveHeldValueEarlier(repo, "brokerage", held: true);
+        var data = new NetWorthSnapshotData(SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 4000m, CryptoTotal: 250m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        captured()!.BrokerageTotal.Should().Be(4000m);
+        captured()!.StaleSleeves.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheSleeveReadsAZeroAfterACarriedZero_RecordsTheMeasuredZero()
+    {
+        var (repo, captured) = SetupUpsertCapture(CarriedZeroBrokerage());
+        SleeveHeldValueEarlier(repo, "brokerage", held: true);
+        var data = new NetWorthSnapshotData(SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 0m, CryptoTotal: 250m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        captured()!.BrokerageTotal.Should().Be(0m);
+        captured()!.StaleSleeves.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenAnotherSleeveCarriesAZeroAfterACarriedZero_LeavesTheDayUnavailable()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            Id = Guid.NewGuid(), UserId = UserId, SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 0m, BrokerageTotal = 500m, CryptoTotal = 250m, TotalNetWorth = 750m, StaleSleeves = "banking",
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        SleeveHeldValueEarlier(repo, "banking", held: true);
+        var data = new NetWorthSnapshotData(SnapshotDate, BankingTotal: 0m, BrokerageTotal: 500m, CryptoTotal: 250m, BankingFresh: false);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        captured().Should().BeNull();
+    }
+
+    // G2: quotes that have stopped moving flag the sleeve stale but keep the measured figure.
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheBrokerageQuotesAreFrozen_RecordsTheMeasuredFigureFlaggedStale()
+    {
+        var previous = new NetWorthSnapshot { BankingTotal = 1000m, BrokerageTotal = 480m, CryptoTotal = 250m };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 250m,
+            BrokerageInvested: 400m, CryptoInvested: 0m, FrozenQuoteSleeves: ["brokerage"]);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.BrokerageTotal.Should().Be(500m, "the positions are what the broker reported; only the quotes are in doubt");
+        snapshot.StaleSleeves.Should().Be("brokerage");
+        snapshot.BrokerageInvested.Should().Be(400m, "the measured split is kept, not replaced by the previous row's");
+        snapshot.TotalNetWorth.Should().Be(1750m);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenTheBrokerageQuotesAreFrozen_MarksItsSourceRowDegradedAsStale()
+    {
+        var (repo, _) = SetupUpsertCapture(previous: new NetWorthSnapshot { BankingTotal = 1000m, BrokerageTotal = 480m, CryptoTotal = 250m });
+        IReadOnlyList<NetWorthSnapshotSource>? rows = null;
+        repo.Setup(r => r.UpsertWithSourcesAsync(
+                It.IsAny<NetWorthSnapshot>(), It.IsAny<IReadOnlyList<NetWorthSnapshotSource>>(), It.IsAny<CancellationToken>()))
+            .Callback<NetWorthSnapshot, IReadOnlyList<NetWorthSnapshotSource>, CancellationToken>((_, r, _) => rows = r)
+            .Returns(Task.CompletedTask);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 250m,
+            Sources:
+            [
+                new("banking", EconomyKind.Bank, new WealthSourceReading(1000m, [])),
+                new("brokerage", EconomyKind.Brokerage, new WealthSourceReading(500m, [])),
+                new("crypto", EconomyKind.CryptoVenue, new WealthSourceReading(250m, [])),
+            ],
+            FrozenQuoteSleeves: ["brokerage"]);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var brokerage = rows!.Single(r => r.SourceId == "brokerage");
+        brokerage.Total.Should().Be(500m);
+        brokerage.Health.Should().Be(SourceHealth.Degraded);
+        brokerage.Reasons.Should().Contain(SourceReasons.StaleSource);
+        rows!.Where(r => r.SourceId != "brokerage").Should().OnlyContain(r => r.Health == SourceHealth.Complete);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WhenAFrozenSleeveIsAlsoCarried_ListsItOnce()
+    {
+        var previous = new NetWorthSnapshot { BankingTotal = 1000m, BrokerageTotal = 480m, CryptoTotal = 250m };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 250m,
+            BrokerageFresh: false, FrozenQuoteSleeves: ["brokerage"]);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        captured()!.StaleSleeves.Should().Be("brokerage");
+        captured()!.BrokerageTotal.Should().Be(480m);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_IgnoresAFrozenFlagForAnUnknownSleeve()
+    {
+        var (repo, captured) = SetupUpsertCapture(previous: null);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 250m, FrozenQuoteSleeves: ["manual"]);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        captured()!.StaleSleeves.Should().BeNull();
+    }
 }

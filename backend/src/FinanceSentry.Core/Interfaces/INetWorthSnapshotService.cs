@@ -25,6 +25,10 @@ public interface INetWorthSnapshotService
 /// no per-source figures and the day's existing per-source rows are left as they are; an empty list replaces
 /// them with none.
 /// </param>
+/// <param name="FrozenQuoteSleeves">
+/// Sleeve ids whose liquid quotes stopped moving between weekday syncs (see <c>FrozenQuoteDetector</c>). The figure
+/// is still recorded as measured, but the sleeve is flagged stale on the row so the history does not read it as real.
+/// </param>
 public record NetWorthSnapshotData(
     DateOnly SnapshotDate,
     decimal BankingTotal,
@@ -37,4 +41,5 @@ public record NetWorthSnapshotData(
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null,
     FxStatus FxStatus = FxStatus.Exact,
-    IReadOnlyList<BookSourceReading>? Sources = null);
+    IReadOnlyList<BookSourceReading>? Sources = null,
+    IReadOnlyCollection<string>? FrozenQuoteSleeves = null);

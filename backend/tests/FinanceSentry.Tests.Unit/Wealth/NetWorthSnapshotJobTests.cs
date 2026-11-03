@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Unit.Wealth;
 
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 using FluentAssertions;
 using Moq;
@@ -303,5 +304,80 @@ public class NetWorthSnapshotJobTests
         captured!.CryptoFresh.Should().BeFalse("a source that did not read has no live figure to record");
         captured.BrokerageFresh.Should().BeTrue();
         captured.Sources!.Single(r => r.SourceId == "crypto").Reading.Should().BeNull();
+    }
+
+    // G2 wiring: the job asks the price history whether a liquid quote has frozen.
+
+    // 2027-03-01 is a Monday; the previous weekday is 2027-02-26.
+    private static readonly DateOnly Monday = new(2027, 3, 1);
+    private static readonly DateOnly PreviousFriday = new(2027, 2, 26);
+
+    private static async Task<NetWorthSnapshotData?> CaptureOnMondayAsync(IBrokeragePriceHistoryReader? priceHistory)
+    {
+        NetWorthSnapshotData? captured = null;
+        var snapshotServiceMock = new Mock<INetWorthSnapshotService>();
+        snapshotServiceMock
+            .Setup(s => s.PersistSnapshotAsync(UserId, It.IsAny<NetWorthSnapshotData>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, NetWorthSnapshotData, CancellationToken>((_, data, _) => captured = data)
+            .Returns(Task.CompletedTask);
+
+        // One AAPL position of 10 shares worth 1000: 100 a share.
+        var sut = new NetWorthSnapshotJob(
+            BankingMock(total: 2000m).Object,
+            CryptoMock(usdValue: 500m).Object,
+            BrokerageMock(usdValue: 1000m).Object,
+            snapshotServiceMock.Object,
+            BookStub(),
+            logger: null,
+            priceHistory: priceHistory);
+
+        await sut.CaptureForUserAsync(UserId, Monday);
+        return captured;
+    }
+
+    private static IBrokeragePriceHistoryReader PriceHistory(decimal fridayPrice)
+    {
+        var mock = new Mock<IBrokeragePriceHistoryReader>();
+        mock.Setup(r => r.GetDailyPricesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new DailySymbolPrice("AAPL", PreviousFriday, fridayPrice)]);
+        return mock.Object;
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_WhenALiquidQuoteIsUnchangedSinceThePreviousWeekday_FlagsTheBrokerageSleeve()
+    {
+        var captured = await CaptureOnMondayAsync(PriceHistory(fridayPrice: 100m));
+
+        captured!.FrozenQuoteSleeves.Should().Equal("brokerage");
+        captured.BrokerageTotal.Should().Be(1000m, "the figure is still the measured one");
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_WhenTheQuoteMoved_FlagsNothing()
+    {
+        var captured = await CaptureOnMondayAsync(PriceHistory(fridayPrice: 98m));
+
+        captured!.FrozenQuoteSleeves.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_WithoutAPriceHistory_FlagsNothing()
+    {
+        var captured = await CaptureOnMondayAsync(priceHistory: null);
+
+        captured!.FrozenQuoteSleeves.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_AsksForTheLookbackWindowBeforeTheSnapshotDate()
+    {
+        var history = new Mock<IBrokeragePriceHistoryReader>();
+        history.Setup(r => r.GetDailyPricesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        await CaptureOnMondayAsync(history.Object);
+
+        history.Verify(
+            r => r.GetDailyPricesAsync(UserId, Monday.AddDays(-FrozenQuoteDetector.LookbackDays), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
