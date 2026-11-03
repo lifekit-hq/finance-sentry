@@ -373,6 +373,15 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
 
 - Convert **once, at the reader/query boundary**, via `CurrencyConverter.ToUsd(amount,
   currency)` — never sum native amounts across accounts (UAH + EUR is not USD).
+- **Net-worth snapshot guards** (`NetWorthSnapshotService`, `FrozenQuoteDetector`): a sleeve that cannot be trusted
+  this run is carried forward from the previous row and flagged stale. (1) A carried **zero** is never carried again:
+  when the previous row is itself a stale zero for a sleeve that has recorded value on an earlier day, no row is
+  written for the day (it stays unavailable in the history) until the sleeve reads again; a sleeve that never held
+  value (a broker never connected) keeps carrying its zero. (2) A brokerage sleeve whose **liquid** quote is priced
+  the same per share as at its latest capture on an earlier weekday (Risk `holding_snapshots`, compared on weekdays
+  only) keeps its measured figure but is flagged stale. Cash, REIT and bond rows and the Inzhur platform are never
+  judged, and neither is a symbol that was already flat on a quarter or more of its earlier weekday moves (thin ETFs);
+  a holding with fewer than eight earlier moves counts as liquid. The day after a market holiday can read as frozen.
 - Every DTO crossing an aggregation boundary carries a `…Usd` field; aggregations sum only
   that field.
 - **Presentation currency (#851).** Aggregation stays USD. The dashboard (`GET dashboard/aggregated`),

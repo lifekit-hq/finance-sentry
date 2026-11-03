@@ -4,8 +4,9 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
-public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : INetWorthSnapshotService
+public class NetWorthSnapshotService(INetWorthSnapshotRepository repository, ILogger<NetWorthSnapshotService>? logger = null) : INetWorthSnapshotService
 {
     private readonly INetWorthSnapshotRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
@@ -18,7 +19,7 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         // the latest snapshot BEFORE the target date — same-day refreshes must not carry
         // forward from themselves.
         var previous = await _repository.GetLatestBeforeUnscopedAsync(userId, data.SnapshotDate, ct);
-        var stale = new List<string>();
+        var carried = new List<string>();
 
         // A sleeve whose source failed to read has nothing to record and, with no earlier snapshot, nothing to
         // carry forward: fail the run (the job retries) instead of persisting it as $0 over a correct figure.
@@ -27,9 +28,33 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             throw new InvalidOperationException(
                 $"Wealth source '{failed.SourceId}' could not be read and there is no earlier snapshot to carry its sleeve forward from.");
 
-        var banking = ResolveSleeve("banking", data.BankingTotal, data.BankingFresh, previous?.BankingTotal, stale);
-        var brokerage = ResolveSleeve("brokerage", data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, stale);
-        var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);
+        // A carried zero must not be carried again: a zero that was itself carried forward for a sleeve that has held
+        // value is a failed read, and repeating it would draw the failure as a real collapse for as long as it lasts.
+        // The day is left without a snapshot rather than given a number, and the next trustworthy read writes it.
+        foreach (var (name, fresh, isFresh, previousValue) in new[]
+        {
+            (WealthSourceIds.Banking, data.BankingTotal, data.BankingFresh, previous?.BankingTotal),
+            (WealthSourceIds.Brokerage, data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal),
+            (WealthSourceIds.Crypto, data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal),
+        })
+        {
+            if (previous is not null && await WouldRepeatCarriedZeroAsync(userId, data.SnapshotDate, previous, name, fresh, isFresh, previousValue, ct))
+            {
+                logger?.LogWarning(
+                    "Net worth snapshot for user {UserId} on {SnapshotDate} left unavailable: the {Sleeve} sleeve cannot be read and its previous figure is itself a carried zero",
+                    userId, data.SnapshotDate, name);
+                return;
+            }
+        }
+
+        var banking = ResolveSleeve(WealthSourceIds.Banking, data.BankingTotal, data.BankingFresh, previous?.BankingTotal, carried);
+        var brokerage = ResolveSleeve(WealthSourceIds.Brokerage, data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, carried);
+        var crypto = ResolveSleeve(WealthSourceIds.Crypto, data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, carried);
+
+        // A sleeve whose live quotes have stopped moving keeps its measured figure (the positions are what the broker
+        // reports) but is flagged stale beside the carried ones, so the history does not read it as real movement.
+        var stale = new List<string>(carried);
+        stale.AddRange((data.FrozenQuoteSleeves ?? []).Where(name => WealthSourceIds.Sleeves.Contains(name) && !stale.Contains(name)));
 
         // The total is every registered source's resolved figure: the three sleeves above, plus each other source
         // as it read this run - or, when its read failed, as its own previous per-source row counted it.
@@ -38,12 +63,12 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var otherTotal = otherSources.Sum(s => s.Reading?.TotalValueUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Total ?? 0m);
         var otherCash = otherSources.Sum(s => s.Reading?.CashUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Cash ?? 0m);
         var total = banking + brokerage + crypto + otherTotal;
-        var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, stale.Contains("brokerage"));
-        var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
+        var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, carried.Contains(WealthSourceIds.Brokerage));
+        var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, carried.Contains(WealthSourceIds.Crypto));
         var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
 
         var fxStatus = data.FxStatus;
-        if ((stale.Count > 0 || carriedSources.Count > 0) && previous is not null)
+        if ((carried.Count > 0 || carriedSources.Count > 0) && previous is not null)
             fxStatus = fxStatus.Worst(previous.FxStatus ?? (previous.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact));
 
         var snapshot = new NetWorthSnapshot
@@ -180,22 +205,42 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
     }
 
     /// <summary>
+    /// True when the sleeve would have to be carried forward and what it would carry is a zero that was itself carried
+    /// (the previous row flags the sleeve stale at $0) for a sleeve that has recorded value before. A sleeve that has
+    /// never held anything - a broker never connected - legitimately carries its zero and is not affected.
+    /// </summary>
+    private async Task<bool> WouldRepeatCarriedZeroAsync(
+        Guid userId, DateOnly date, NetWorthSnapshot previous, string name,
+        decimal freshValue, bool isFresh, decimal? previousValue, CancellationToken ct)
+    {
+        if (previousValue != 0m || !NeedsCarryForward(freshValue, isFresh, previousValue))
+            return false;
+
+        var rows = await _repository.GetSourcesUnscopedAsync(userId, [previous.Id], ct);
+        if (!SnapshotSources.Of(previous, rows).IsStale(name))
+            return false;
+
+        return await _repository.SleeveHeldValueBeforeUnscopedAsync(userId, name, date, ct);
+    }
+
+    private static bool NeedsCarryForward(decimal freshValue, bool isFresh, decimal? previousValue)
+        => !isFresh || (freshValue == 0m && previousValue is > 0m);
+
+    /// <summary>
     /// Returns the value to record for a sleeve. Uses the fresh value when the feed is
     /// trustworthy; otherwise carries forward the previous snapshot's value (and flags the
     /// sleeve as stale). Treats a drop to exactly $0 when we previously held value as a
     /// failed sync rather than a genuine liquidation.
     /// </summary>
-    private static decimal ResolveSleeve(string name, decimal freshValue, bool isFresh, decimal? previousValue, List<string> stale)
+    private static decimal ResolveSleeve(string name, decimal freshValue, bool isFresh, decimal? previousValue, List<string> carried)
     {
-        var looksLikeFailedSync = freshValue == 0m && previousValue is > 0m;
-
-        if (isFresh && !looksLikeFailedSync)
+        if (!NeedsCarryForward(freshValue, isFresh, previousValue))
             return freshValue;
 
         if (previousValue is null)
             return freshValue; // no history to fall back on — best effort with what we have
 
-        stale.Add(name);
+        carried.Add(name);
         return previousValue.Value;
     }
 

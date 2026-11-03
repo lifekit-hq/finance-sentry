@@ -28,6 +28,14 @@ public interface INetWorthSnapshotRepository
     /// <summary>Latest snapshot strictly before <paramref name="date"/> — the carry-forward baseline.
     /// Opts out of the Owner query filter.</summary>
     Task<NetWorthSnapshot?> GetLatestBeforeUnscopedAsync(Guid userId, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>
+    /// Whether any snapshot strictly before <paramref name="date"/> recorded a non-zero figure for the sleeve
+    /// (<c>banking</c>, <c>brokerage</c> or <c>crypto</c>): a sleeve that has held value is not an empty one, so a
+    /// zero carried forward for it is a failed read rather than a connection that was never made. Opts out of the
+    /// Owner query filter.
+    /// </summary>
+    Task<bool> SleeveHeldValueBeforeUnscopedAsync(Guid userId, string sleeveId, DateOnly date, CancellationToken ct = default);
     Task<IReadOnlyList<NetWorthSnapshot>> GetByUserIdAsync(Guid userId, DateOnly? from, DateOnly? to, CancellationToken ct = default);
 
     /// <summary>The user's snapshots in the range, for the cross-module brokerage history reader.
