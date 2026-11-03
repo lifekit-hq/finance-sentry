@@ -1031,6 +1031,21 @@ are closed periods.
   clean), keeps M005's correction. A row is restored only while it still holds exactly what M005 left; one changed
   since is left alone. Idempotent; the backup table is kept. Down re-applies M005's recorded removal to exactly
   the rows the same rule selects.
+- **July 2026 history repair** (verb `repair-net-worth-history [--apply] [--user <guid>]`,
+  `scripts/repair-net-worth-history.sh`; `NetWorthHistoryRepairService` over `JulyNetWorthHistoryRepairPlan`,
+  one-off, the Owner's rows only): rewrites the 61 stored days 2026-07-01..2026-08-30. Banking: before #531
+  (2026-08-31) the Monobank 90,000 UAH credit limit was counted as own funds, so every day takes it off at that
+  day's NBU rate (about $2,005-2,027). Brokerage: on 07-02, 07-03, 07-11 and 07-14..07-20 the sleeve was $0 or a
+  frozen quote, so it takes positions × prior close (the day's total lands on the plan's `ProposedTotal`; the part of
+  the change the credit limit does not explain moves the brokerage sleeve), `stale_sleeves` gains `brokerage`,
+  `is_approximate` is true, `fx_status` is at least `TodayRate`, and the brokerage per-source row (when the day has
+  rows) is `ESTIMATED` with `ESTIMATED_VALUE` + `STALE_SOURCE` + `FX_TODAY_RATE`. `cash_total` moves with banking
+  and `brokerage_invested` with the brokerage move; a null split stays null. A row is matched on the total it held
+  when the plan was written: already at the proposed total is skipped (idempotent), anything else - or a missing day
+  - makes apply refuse with nothing changed. Default is a dry run that prints every day old against new and writes
+  nothing; `--apply` copies the originals (and their per-source rows) into `net_worth_snapshots_backup_july_2026` /
+  `net_worth_snapshot_sources_backup_july_2026` first, in the same transaction as the rewrite, and never re-backs-up a
+  row, so the backup keeps the originals.
 - **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
   has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
   Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
