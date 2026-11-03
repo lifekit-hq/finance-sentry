@@ -146,6 +146,12 @@ if (args.Length > 0 && args[0] == RepairRetiredPendingCommand.Verb)
     return;
 }
 
+if (args.Length > 0 && args[0] == RepairNetWorthHistoryCommand.Verb)
+{
+    await RepairNetWorthHistoryCommand.RunAsync(app.Services, args);
+    return;
+}
+
 if (args.Length > 0 && args[0] == SubscriptionDetectionCommand.Verb)
 {
     await SubscriptionDetectionCommand.RunAsync(app.Services, args);
