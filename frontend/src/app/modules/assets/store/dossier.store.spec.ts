@@ -234,6 +234,45 @@ describe('DossierStore', () => {
     expect(store.ledgerRead()).toBeNull();
   });
 
+  it('returns the per-symbol request statuses to idle when the symbol changes mid-request', () => {
+    const store = inject();
+    TestBed.tick();
+    service.setTarget.mockReturnValue(NEVER);
+    store.openTargetEditor();
+    store.setTargetDraft('200');
+    store.saveTarget();
+    expect(store.targetStatus()).toBe('loading');
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+
+    expect(store.targetStatus()).toBe('idle');
+    expect(store.quoteStatus()).toBe('idle');
+    expect(store.chartStatus()).toBe('idle');
+    expect(store.ledgerReadStatus()).toBe('idle');
+  });
+
+  it('drops a decision still open on the old symbol when the symbol changes', () => {
+    const pending = mkRecommendation();
+    const decided = mkRecommendation({status: 'Rejected', decisionNote: 'Still a core holding.'});
+    service.getDossier.mockReturnValue(of({...DOSSIER, pendingRecommendation: pending}));
+    const decision = new Subject<RecommendationDto>();
+    sheet.open.mockReturnValue(decision);
+    const store = inject();
+    TestBed.tick();
+    store.decideRecommendation({recommendation: pending, verdict: 'reject'});
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+    decision.next(decided);
+
+    expect(store.decidedRecommendation()).toBeNull();
+  });
+
   it('does not reload when the route re-emits the same symbol', () => {
     inject();
     TestBed.tick();

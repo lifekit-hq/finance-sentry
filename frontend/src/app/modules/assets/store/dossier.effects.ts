@@ -46,19 +46,23 @@ interface StoreMethods {
   setLedgerReadSuccess(): void;
   setLedgerRead(ledgerRead: AssetLedgerReadDto): void;
   setLedgerReadError(errorCode: Nullable<string>): void;
+  setLedgerReadIdle(): void;
   setQuoteLoading(): void;
   setQuoteSuccess(): void;
   setQuote(quote: Nullable<DossierQuoteDto>): void;
   setQuoteError(errorCode: Nullable<string>): void;
+  setQuoteIdle(): void;
   clearQuote(): void;
   setChartLoading(): void;
   setChartSuccess(): void;
   setChart(chart: AssetChartDto): void;
   setChartError(errorCode: Nullable<string>): void;
+  setChartIdle(): void;
   setChartRange(range: ChartRangeId): void;
   setTargetLoading(): void;
   setTargetSuccess(): void;
   setTargetError(errorCode: Nullable<string>): void;
+  setTargetIdle(): void;
   setUserTarget(target: Nullable<DossierUserTargetDto>): void;
   applyRecommendationDecision(decided: RecommendationDto): void;
   dossier: Signal<Nullable<AssetDossierDto>>;
@@ -258,7 +262,9 @@ export function dossierEffects(store: StoreMethods) {
     verdict: RecommendationVerdict;
   }>(
     pipe(
-      exhaustMap(({recommendation, verdict}) => decisionSheet.open(recommendation, verdict)),
+      exhaustMap(({recommendation, verdict}) =>
+        decisionSheet.open(recommendation, verdict).pipe(takeUntil(symbolChanged))
+      ),
       filter((decided): decided is RecommendationDto => decided !== undefined),
       tap(decided => store.applyRecommendationDecision(decided))
     )
@@ -269,6 +275,10 @@ export function dossierEffects(store: StoreMethods) {
   const openSymbol = (symbol: string): void => {
     symbolChanged.next();
     store.resetForSymbol();
+    store.setLedgerReadIdle();
+    store.setQuoteIdle();
+    store.setChartIdle();
+    store.setTargetIdle();
     loadDossier(symbol);
     if (authStore.canUseAi()) {
       loadLedgerRead(symbol);
