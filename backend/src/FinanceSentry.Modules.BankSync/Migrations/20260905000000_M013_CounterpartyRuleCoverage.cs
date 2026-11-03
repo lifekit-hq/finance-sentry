@@ -21,7 +21,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     [Migration("20260905000000_M013_CounterpartyRuleCoverage")]
     public partial class M013_CounterpartyRuleCoverage : Migration
     {
-        private static readonly Guid LyudmilaId = new("11111111-0000-0000-0000-000000000001");
+        private static readonly Guid FamilyMemberId = new("11111111-0000-0000-0000-000000000001");
         private static readonly Guid MariiaId = new("11111111-0000-0000-0000-000000000002");
         private static readonly Guid InvestmentRoutingId = new("11111111-0000-0000-0000-000000000003");
         private static readonly DateTime SeededAt = new(2026, 9, 5, 0, 0, 0, DateTimeKind.Utc);
@@ -49,7 +49,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     // "Oksana Lysenko" both hit.
                     {
                         RuleIds[0],
-                        LyudmilaId,
+                        FamilyMemberId,
                         "description_contains",
                         "Oksana Lysenko",
                         SeededAt

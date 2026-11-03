@@ -53,8 +53,8 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 table: "counterparty_rules",
                 columns: ["Id", "CounterpartyId", "MatchType", "Pattern", "Currency", "CreatedAt"],
                 columnTypes: ["uuid", "uuid", "character varying(50)", "character varying(255)", "character varying(3)", "timestamp with time zone"],
-                // One rule covers both legs: the AIB debit ("*MOBI ALEX MORGAN IE…", "DENYS
-                // MORGAN IE… Sent from Revolut") and the Revolut credit ("Payment from Denys
+                // One rule covers both legs: the AIB debit ("*MOBI ALEX MORGAN IE…", "ALEX
+                // MORGAN IE… Sent from Revolut") and the Revolut credit ("Payment from Alex
                 // Morgan"). EUR-scoped like the mom-routing rules (#580), so a Cyrillic UAH
                 // statement carrying the same name keeps matching the family rules instead.
                 values: new object[] { RuleId, OwnAccountsId, "description_contains", "Alex Morgan", "EUR", SeededAt });

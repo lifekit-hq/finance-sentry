@@ -15,7 +15,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
     public partial class M011_CounterpartyFlows : Migration
     {
         // Well-known GUIDs for default counterparties (UserId = Guid.Empty = system defaults).
-        private static readonly Guid LyudmilaId = new("11111111-0000-0000-0000-000000000001");
+        private static readonly Guid FamilyMemberId = new("11111111-0000-0000-0000-000000000001");
         private static readonly Guid MariiaId = new("11111111-0000-0000-0000-000000000002");
 
         /// <inheritdoc />
@@ -100,7 +100,7 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                 values: new object[,]
                 {
                     {
-                        LyudmilaId,
+                        FamilyMemberId,
                         Guid.Empty,
                         "Оксана Лисенко (Мама)",
                         "family_support",
@@ -126,14 +126,14 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     // Оксана Лисенко — matches description "Оксана Лисенко" or "мама"
                     {
                         new Guid("22222222-0000-0000-0000-000000000001"),
-                        LyudmilaId,
+                        FamilyMemberId,
                         "description_contains",
                         "Оксана Лисенко",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)
                     },
                     {
                         new Guid("22222222-0000-0000-0000-000000000002"),
-                        LyudmilaId,
+                        FamilyMemberId,
                         "description_contains",
                         "мама",
                         new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc)

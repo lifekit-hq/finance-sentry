@@ -655,7 +655,7 @@ one and a transfer in the other.
   the same wording on a routing hop (`self_routing`, excluded).
 
   `self_routing` also covers the user's **own** EUR accounts (`Own accounts (EUR)`, M019): an
-  AIB → Revolut hop reads `*MOBI ALEX MORGAN IE…` on one statement and `Payment from Denys
+  AIB → Revolut hop reads `*MOBI ALEX MORGAN IE…` on one statement and `Payment from Alex
   Morgan` on the other. The legs share nothing pair detection can key on and settle on
   different days, so the credit read as INCOME and inflated gross income and the savings rate
   every month it happened. Counterparty classification is per direction, so one rule retires

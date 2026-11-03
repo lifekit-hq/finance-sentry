@@ -46,6 +46,7 @@ services:
       TrueLayer__FrontendRedirectBase: http://localhost:4200
       TrueLayer__CallbackPath: /api/v1/accounts/truelayer/callback
       AnalystSources__Finnhub__ApiKey: ${FINNHUB_API_KEY:-}
+      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:-}
       # FRED yield-curve source (feature 021 market regime). Empty = rates axis silent.
       Regime__Fred__ApiKey: ${FRED_API_KEY:-}
       # In-app finance agent / browser Ledger (feature 040). Empty = agent disabled (keyless-graceful).

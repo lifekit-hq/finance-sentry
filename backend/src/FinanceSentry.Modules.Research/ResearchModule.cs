@@ -340,10 +340,16 @@ public static class ResearchModule
         // SEC EDGAR (filings + XBRL fundamentals). SEC policy REQUIRES a descriptive User-Agent
         // with contact info and permits gzip; a generic UA gets throttled/blocked.
         var secTimeout = TimeSpan.FromSeconds(15);
+        var secContact = config.GetSection(SecEdgarOptions.SectionName).Get<SecEdgarOptions>()?.Contact;
+        if (string.IsNullOrWhiteSpace(secContact))
+        {
+            secContact = SecEdgarOptions.DefaultContact;
+        }
+
         services.AddHttpClient(SecEdgarService.HttpClientName, client =>
         {
             client.Timeout = secTimeout;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0 (contact: payar3282@gmail.com)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"FinanceSentry/1.0 (contact: {secContact})");
             client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate");
         })
             .AddProviderResilience(secTimeout)

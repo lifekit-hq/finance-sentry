@@ -98,6 +98,7 @@ services:
       TrueLayer__FrontendRedirectBase: ${TRUELAYER_FRONTEND_REDIRECT_BASE:?set TRUELAYER_FRONTEND_REDIRECT_BASE to the frontend origin}
       TrueLayer__CallbackPath: /api/v1/accounts/truelayer/callback
       AnalystSources__Finnhub__ApiKey: ${FINNHUB_API_KEY:-}
+      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:-}
       Regime__Fred__ApiKey: ${FRED_API_KEY:-}
       # In-app finance agent / browser Ledger (feature 040). Empty = agent disabled (keyless-graceful).
       Agent__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
