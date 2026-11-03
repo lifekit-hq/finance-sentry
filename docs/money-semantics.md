@@ -621,6 +621,13 @@ one and a transfer in the other.
 
 - A transaction belongs to a counterparty when a seeded rule matches its description or
   merchant name (case-insensitive substring). First counterparty whose rule matches wins.
+- **Counterparties are per user.** `CounterpartyRepository.GetForUserAsync` reads the user's own
+  rows plus system defaults (`UserId = Guid.Empty`, applied to everyone). Only the generic
+  investment-routing default (M012) is a system default; the family, household and own-name
+  counterparties (M011, M014, M016, M019) are one person's data, so migration M030 re-keys them
+  to the single Owner account (nothing changes when there is not exactly one Owner; the original
+  rows are kept in `bank_sync.counterparties_rekey_backup`). A new person-specific counterparty
+  is a row for that user, never a system default.
 - Matched transactions leave the normal pass entirely: they are excluded before
   transfer pair-matching, so they cannot be double-excluded or double-counted.
 - **Classification is per DIRECTION, gross — there is no netting between the two
