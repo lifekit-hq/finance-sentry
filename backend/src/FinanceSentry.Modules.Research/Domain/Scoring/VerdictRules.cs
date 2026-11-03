@@ -73,12 +73,33 @@ public static class VerdictRules
                 $"Adjusted structure at least {options.BuyStructureAtLeast} with no fundamentals score: capped at BUY.",
                 Compare(VerdictAxis.Structure, VerdictOperator.AtLeast, inputs.StructureScore, options.BuyStructureAtLeast),
                 Missing(VerdictAxis.Fundamentals, inputs.FundamentalsScore)),
-            Rule(Otherwise, VerdictWord.Wait,
-                "No earlier rule matched."),
+            Rule(Otherwise, VerdictWord.Wait, OtherwiseDescription(inputs, options)),
         };
 
         var fired = rules.First(r => r.Matched);
         return new Verdict(fired.Word, options.RulesVersion, fired.Id, rules);
+    }
+
+    /// <summary>
+    /// The catch-all's reason: names the BUY bars the read missed, with the value it read, so a WAIT that no
+    /// earlier rule claimed still says why. The word is unchanged.
+    /// </summary>
+    private static string OtherwiseDescription(VerdictInputs inputs, VerdictOptions options)
+    {
+        var missed = new List<string>();
+        if (inputs.StructureScore is { } structure && structure < options.BuyStructureAtLeast)
+        {
+            missed.Add($"adjusted structure {structure} is below the BUY bar of {options.BuyStructureAtLeast}");
+        }
+
+        if (inputs.FundamentalsScore is { } fundamentals && fundamentals < options.BuyFundamentalsAtLeast)
+        {
+            missed.Add($"fundamentals {fundamentals} are below the BUY bar of {options.BuyFundamentalsAtLeast}");
+        }
+
+        return missed.Count == 0
+            ? "No earlier rule matched."
+            : $"No earlier rule matched: {string.Join(" and ", missed)}.";
     }
 
     private static VerdictRuleOutcome Rule(string id, VerdictWord word, string description, params VerdictCondition[] conditions) =>

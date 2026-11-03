@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Aggregate dossier for one symbol: reads all per-ticker data sources in turn (they share one
@@ -33,7 +34,8 @@ public sealed class GetAssetDossierQueryHandler(
     IAssetPriceTargetRepository priceTargets,
     IRecommendationRepository recommendations,
     PositionReturnsReader returnsReader,
-    ScorecardReader scorecards)
+    ScorecardReader scorecards,
+    ILogger<GetAssetDossierQueryHandler> logger)
     : IQueryHandler<GetAssetDossierQuery, AssetDossierResult>
 {
     private const int NewsLimit = 10;
@@ -54,16 +56,16 @@ public sealed class GetAssetDossierQueryHandler(
         // Read the sources one after another: the theses, valuation, analyst and news handlers share this
         // request's one scoped ResearchDbContext, which allows a single operation at a time. Each read is wrapped
         // so one failure cannot 500 the rest.
-        var book = await Safe(() => bookFigures.ReadAsync(userId, ct));
-        var allTheses = await Safe(() => theses.Handle(new GetThesesQuery(userId), ct));
-        var valuationResult = await Safe(() => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
-        var newsResult = await Safe(() => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
-        var earningsResult = await Safe(() => earnings.Handle(
+        var book = await Safe("book figures", () => bookFigures.ReadAsync(userId, ct));
+        var allTheses = await Safe("theses", () => theses.Handle(new GetThesesQuery(userId), ct));
+        var valuationResult = await Safe("valuation", () => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
+        var newsResult = await Safe("news", () => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
+        var earningsResult = await Safe("earnings calendar", () => earnings.Handle(
             new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), EarningsEventType.Earnings), ct));
-        var signalResult = await Safe(() => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
-        var capFraction = await Safe(() => positionCap.GetMaxPositionWeightAsync(userId, ct));
-        var userTarget = await Safe(() => priceTargets.GetAsync(userId, symbol, ct));
-        var pending = await Safe(() => recommendations.FindPendingAsync(userId, symbol, ct));
+        var signalResult = await Safe("signals", () => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
+        var capFraction = await Safe("position cap", () => positionCap.GetMaxPositionWeightAsync(userId, ct));
+        var userTarget = await Safe("price target", () => priceTargets.GetAsync(userId, symbol, ct));
+        var pending = await Safe("pending recommendation", () => recommendations.FindPendingAsync(userId, symbol, ct));
 
         var bookPosition = book?.Positions.FirstOrDefault(
             p => p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
@@ -80,22 +82,22 @@ public sealed class GetAssetDossierQueryHandler(
 
         var analystResult = isCrypto
             ? null
-            : await Safe(() => analystActions.Handle(
+            : await Safe("analyst actions", () => analystActions.Handle(
                 new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
 
-        var yearHistory = await Safe(() => priceHistory.GetAsync(
+        var yearHistory = await Safe("price history", () => priceHistory.GetAsync(
             DossierTickers.ToChartTicker(symbol, bookPosition?.AssetClass), ChartRange.OneYear, ct)) ?? PriceHistory.Empty;
-        var benchmarkHistory = await Safe(() => priceHistory.GetAsync(DossierTickers.Benchmark, ChartRange.OneYear, ct))
+        var benchmarkHistory = await Safe("benchmark history", () => priceHistory.GetAsync(DossierTickers.Benchmark, ChartRange.OneYear, ct))
             ?? PriceHistory.Empty;
         var facts = isCrypto
             ? null
-            : (await Safe(() => fundamentals.GetFundamentalsAsync(symbol, FundamentalFactsPerConcept, ct)))?.Facts;
+            : (await Safe("fundamentals", () => fundamentals.GetFundamentalsAsync(symbol, FundamentalFactsPerConcept, ct)))?.Facts;
 
         // The verdict reads the valuation and fundamentals already fetched above (spec 726 US2).
         var scorecardValuation = isCrypto
             ? ScorecardValuationAxis.NotApplicableAxis
             : ScorecardValuationAxis.From(valuationResult);
-        var scorecard = await Safe(() => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct));
+        var scorecard = await Safe("scorecard", () => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct));
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 
@@ -174,7 +176,7 @@ public sealed class GetAssetDossierQueryHandler(
             }
         }
 
-        var reading = await Safe(() => returnsReader.ReadAsync(userId, pos, ct));
+        var reading = await Safe("position returns", () => returnsReader.ReadAsync(userId, pos, ct));
 
         return new DossierPositionSection(
             Provider: pos.Provider,
@@ -299,15 +301,19 @@ public sealed class GetAssetDossierQueryHandler(
             Coverage: result.Coverage);
     }
 
-    /// <summary>Executes <paramref name="fn"/>, returning null on any exception.</summary>
-    private static async Task<T?> Safe<T>(Func<Task<T>> fn)
+    /// <summary>
+    /// Executes <paramref name="fn"/>, returning null on any exception after logging a warning that names the
+    /// failed <paramref name="section"/>: a section that comes back empty must be traceable to its cause.
+    /// </summary>
+    private async Task<T?> Safe<T>(string section, Func<Task<T>> fn)
     {
         try
         {
             return await fn();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Asset dossier section {Section} failed and was left empty", section);
             return default;
         }
     }

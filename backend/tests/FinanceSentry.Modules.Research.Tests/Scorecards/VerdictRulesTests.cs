@@ -99,6 +99,19 @@ public sealed class VerdictRulesTests
         verdict.Rules.Single(r => r.Id == VerdictRules.Otherwise).Conditions.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(39, 78, "adjusted structure 39 is below the BUY bar of 50")]
+    [InlineData(60, 40, "fundamentals 40 are below the BUY bar of 50")]
+    [InlineData(45, 35, "adjusted structure 45 is below the BUY bar of 50 and fundamentals 35 are below the BUY bar of 50")]
+    public void Evaluate_Otherwise_NamesTheBarsMissedWithTheirValues(int structure, int fundamentals, string expected)
+    {
+        var verdict = VerdictRules.Evaluate(Inputs(structure, fundamentals, CrowdingClass.Normal, false, null), Options);
+
+        verdict.FiredRuleId.Should().Be(VerdictRules.Otherwise);
+        verdict.Word.Should().Be(VerdictWord.Wait);
+        verdict.Rules.Single(r => r.Id == VerdictRules.Otherwise).Description.Should().Contain(expected);
+    }
+
     [Fact]
     public void Evaluate_IsDeterministic()
     {

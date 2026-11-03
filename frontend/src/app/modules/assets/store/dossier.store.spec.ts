@@ -1,8 +1,8 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, convertToParamMap} from '@angular/router';
+import {ActivatedRoute, convertToParamMap, type ParamMap} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {NEVER, of, throwError} from 'rxjs';
+import {BehaviorSubject, NEVER, of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
@@ -164,6 +164,7 @@ describe('DossierStore', () => {
     clearTarget: ReturnType<typeof vi.fn>;
   };
   let canUseAi: boolean;
+  let params: BehaviorSubject<ParamMap>;
   let sheet: {open: ReturnType<typeof vi.fn>};
 
   function inject(): InstanceType<typeof DossierStore> {
@@ -174,7 +175,7 @@ describe('DossierStore', () => {
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
         {
           provide: ActivatedRoute,
-          useValue: {snapshot: {paramMap: convertToParamMap({symbol: 'AAPL'}), fragment: null}},
+          useValue: {paramMap: params, snapshot: {fragment: null}},
         },
         {provide: AuthStore, useValue: {canUseAi: () => canUseAi}},
         {provide: DecisionSheetService, useValue: sheet},
@@ -185,6 +186,7 @@ describe('DossierStore', () => {
 
   beforeEach(() => {
     canUseAi = true;
+    params = new BehaviorSubject(convertToParamMap({symbol: 'AAPL'}));
     sheet = {open: vi.fn().mockReturnValue(of(undefined))};
     service = {
       getDossier: vi.fn().mockReturnValue(of(DOSSIER)),
@@ -195,6 +197,93 @@ describe('DossierStore', () => {
       setTarget: vi.fn().mockReturnValue(of(TARGET)),
       clearTarget: vi.fn().mockReturnValue(of(undefined)),
     };
+  });
+
+  it('drops the old symbol and loads the new one when the route symbol changes in place', () => {
+    const store = inject();
+    TestBed.tick();
+    expect(store.dossier()?.symbol).toBe('AAPL');
+    expect(store.ledgerRead()).toEqual(READ);
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+
+    expect(service.getDossier).toHaveBeenLastCalledWith('ZZZZ');
+    expect(service.getLedgerRead).toHaveBeenLastCalledWith('ZZZZ');
+    expect(store.dossier()).toBeNull();
+    expect(store.ledgerRead()).toBeNull();
+    expect(store.quote()).toBeNull();
+    expect(store.chart()).toBeNull();
+  });
+
+  it('drops a ledger read still being generated for the old symbol when the symbol changes', () => {
+    const store = inject();
+    TestBed.tick();
+    const pending = new Subject<AssetLedgerReadDto>();
+    service.generateLedgerRead.mockReturnValue(pending);
+    store.generateLedgerRead({symbol: 'AAPL', force: true});
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+    pending.next(READ);
+
+    expect(store.ledgerRead()).toBeNull();
+  });
+
+  it('returns the per-symbol request statuses to idle when the symbol changes mid-request', () => {
+    const store = inject();
+    TestBed.tick();
+    service.setTarget.mockReturnValue(NEVER);
+    store.openTargetEditor();
+    store.setTargetDraft('200');
+    store.saveTarget();
+    expect(store.targetStatus()).toBe('loading');
+    service.generateLedgerRead.mockReturnValue(NEVER);
+    store.generateLedgerRead({symbol: 'AAPL', force: true});
+    expect(store.ledgerReadStatus()).toBe('loading');
+
+    // No AI access, so the new symbol starts no ledger read of its own and the status stays observable.
+    canUseAi = false;
+    service.getDossier.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+
+    expect(store.targetStatus()).toBe('idle');
+    expect(store.quoteStatus()).toBe('idle');
+    expect(store.chartStatus()).toBe('idle');
+    expect(store.ledgerReadStatus()).toBe('idle');
+  });
+
+  it('drops a decision still open on the old symbol when the symbol changes', () => {
+    const pending = mkRecommendation();
+    const decided = mkRecommendation({status: 'Rejected', decisionNote: 'Still a core holding.'});
+    service.getDossier.mockReturnValue(of({...DOSSIER, pendingRecommendation: pending}));
+    const decision = new Subject<RecommendationDto>();
+    sheet.open.mockReturnValue(decision);
+    const store = inject();
+    TestBed.tick();
+    store.decideRecommendation({recommendation: pending, verdict: 'reject'});
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+    decision.next(decided);
+
+    expect(store.decidedRecommendation()).toBeNull();
+  });
+
+  it('does not reload when the route re-emits the same symbol', () => {
+    inject();
+    TestBed.tick();
+    params.next(convertToParamMap({symbol: 'AAPL'}));
+    TestBed.tick();
+
+    expect(service.getDossier).toHaveBeenCalledTimes(1);
   });
 
   it('is loading until the dossier arrives', () => {
