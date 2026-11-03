@@ -2,7 +2,7 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, type ParamMap} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {BehaviorSubject, NEVER, of, throwError} from 'rxjs';
+import {BehaviorSubject, NEVER, of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
@@ -216,6 +216,22 @@ describe('DossierStore', () => {
     expect(store.ledgerRead()).toBeNull();
     expect(store.quote()).toBeNull();
     expect(store.chart()).toBeNull();
+  });
+
+  it('drops a ledger read still being generated for the old symbol when the symbol changes', () => {
+    const store = inject();
+    TestBed.tick();
+    const pending = new Subject<AssetLedgerReadDto>();
+    service.generateLedgerRead.mockReturnValue(pending);
+    store.generateLedgerRead({symbol: 'AAPL', force: true});
+
+    service.getDossier.mockReturnValue(NEVER);
+    service.getLedgerRead.mockReturnValue(NEVER);
+    params.next(convertToParamMap({symbol: 'ZZZZ'}));
+    TestBed.tick();
+    pending.next(READ);
+
+    expect(store.ledgerRead()).toBeNull();
   });
 
   it('does not reload when the route re-emits the same symbol', () => {
