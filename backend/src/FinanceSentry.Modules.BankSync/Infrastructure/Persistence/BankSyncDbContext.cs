@@ -27,6 +27,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     public DbSet<Category> Categories { get; set; } = null!;
     public DbSet<MccCategory> MccCategories { get; set; } = null!;
     public DbSet<MerchantKeyword> MerchantKeywords { get; set; } = null!;
+    public DbSet<DetectionPhrase> DetectionPhrases { get; set; } = null!;
     public DbSet<Counterparty> Counterparties { get; set; } = null!;
     public DbSet<CounterpartyRule> CounterpartyRules { get; set; } = null!;
     public DbSet<CommittedMerchantPin> CommittedMerchantPins { get; set; } = null!;
@@ -144,6 +145,16 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         mkb.HasIndex(mk => mk.Keyword).IsUnique().HasDatabaseName("idx_merchant_keyword_keyword_unique");
         mkb.HasIndex(mk => mk.CategoryKey).HasDatabaseName("idx_merchant_keyword_category_key");
         mkb.HasOne<Category>().WithMany().HasForeignKey(mk => mk.CategoryKey).OnDelete(DeleteBehavior.Restrict);
+
+        var dpb = modelBuilder.Entity<DetectionPhrase>();
+        dpb.ToTable("detection_phrases");
+        dpb.HasKey(dp => dp.Id);
+        dpb.Property(dp => dp.Kind).IsRequired().HasMaxLength(50);
+        dpb.Property(dp => dp.Phrase).IsRequired().HasMaxLength(100);
+        dpb.Property(dp => dp.Provider).HasMaxLength(50);
+        dpb.Property(dp => dp.Locale).HasMaxLength(10);
+        dpb.Property(dp => dp.CategoryCondition).HasMaxLength(100);
+        dpb.HasIndex(dp => new { dp.Kind, dp.Phrase }).IsUnique().HasDatabaseName("idx_detection_phrase_kind_phrase_unique");
 
         var cpb = modelBuilder.Entity<Counterparty>();
         cpb.ToTable("counterparties");

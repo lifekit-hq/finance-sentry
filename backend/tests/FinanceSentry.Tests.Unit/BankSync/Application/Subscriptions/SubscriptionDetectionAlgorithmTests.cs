@@ -5,6 +5,7 @@ using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 public class SubscriptionDetectionAlgorithmTests
 {
@@ -18,7 +19,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("cash advance")]
     public void UnidentifiableMerchant_IsFiltered(string normalized)
     {
-        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(normalized).Should().BeTrue();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(DetectionPhraseSet.Seed, normalized).Should().BeTrue();
     }
 
     [Theory]
@@ -27,7 +28,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("adobe creative cloud")]
     public void IdentifiableMerchant_IsNotFiltered(string normalized)
     {
-        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(normalized).Should().BeFalse();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(DetectionPhraseSet.Seed, normalized).Should().BeFalse();
     }
 
     [Theory]
@@ -38,7 +39,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("Installment payment 3/6")]
     public void InstallmentDescription_IsDetected(string description)
     {
-        InstallmentPlanRecognizer.IsInstallmentDescription(description).Should().BeTrue();
+        InstallmentPlanRecognizer.IsInstallmentDescription(DetectionPhraseSet.Seed, description).Should().BeTrue();
     }
 
     [Theory]
@@ -49,7 +50,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("")]
     public void NonInstallmentDescription_IsNotDetected(string? description)
     {
-        InstallmentPlanRecognizer.IsInstallmentDescription(description).Should().BeFalse();
+        InstallmentPlanRecognizer.IsInstallmentDescription(DetectionPhraseSet.Seed, description).Should().BeFalse();
     }
 
     [Fact]
@@ -82,7 +83,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("Spotify", 5815, false)]
     public void IsInstallmentTransaction_ClassifiesByDescriptionAndMcc(string desc, int? mcc, bool expected)
     {
-        InstallmentPlanRecognizer.IsInstallmentTransaction(desc, mcc).Should().Be(expected);
+        InstallmentPlanRecognizer.IsInstallmentTransaction(DetectionPhraseSet.Seed, desc, mcc).Should().Be(expected);
     }
 
     [Theory]
@@ -94,7 +95,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("Повне погашення RozetkaPay", "RozetkaPay")]
     public void ExtractInstallmentMerchant_RecoversMerchant(string desc, string expected)
     {
-        InstallmentPlanRecognizer.ExtractMerchant(desc).Should().Be(expected);
+        InstallmentPlanRecognizer.ExtractMerchant(DetectionPhraseSet.Seed, desc).Should().Be(expected);
     }
 
     [Theory]
@@ -102,7 +103,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("Погашення наступного платежу RozetkaPay", false)]
     public void IsInstallmentPayoff_DetectsFullPayoff(string desc, bool expected)
     {
-        InstallmentPlanRecognizer.IsInstallmentPayoff(desc).Should().Be(expected);
+        InstallmentPlanRecognizer.IsInstallmentPayoff(DetectionPhraseSet.Seed, desc).Should().Be(expected);
     }
 
     [Fact]
@@ -210,7 +211,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Spotify", 9.99m, 2026, 8, 5),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("spotify");
     }
@@ -230,7 +231,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Anthropic* Claude Sub", 110.70m, 2026, 8, 24),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("claude");
         result.Kind.Should().Be(SubscriptionKinds.Subscription);
@@ -253,7 +254,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 8, 15),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Cadence.Should().Be("monthly");
         result.OccurrenceCount.Should().Be(5);
@@ -276,7 +277,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 8, 15),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.OccurrenceCount.Should().Be(3);
         result.PreviousAmount.Should().BeNull();
@@ -298,7 +299,7 @@ public class SubscriptionDetectionAlgorithmTests
         };
 
         // Two EUR charges are all the evidence left, which is under the occurrence gate.
-        SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().BeEmpty();
+        SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().BeEmpty();
     }
 
     [Fact]
@@ -317,7 +318,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Spotify", 13.49m, 2026, 7, 5),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(3);
@@ -380,7 +381,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 12.99m, 2026, 7, 20, currency: "USD"),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(4);
@@ -401,7 +402,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 7, 15),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(4);
@@ -424,7 +425,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Anthropic* Claude Sub", 110.70m, 2026, 8, 24),
         };
 
-        SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().BeEmpty();
+        SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().BeEmpty();
     }
 
     [Fact]
@@ -513,7 +514,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("*MOBI TOP-UP 0857860057", 20.00m, 2026, 7, 22),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("mobile top-up 0057");
         result.MerchantNameDisplay.Should().Be("Mobile top-up 0057");
@@ -530,7 +531,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("516936******4992", 14060.96m, 2026, 8, 11, "UAH"),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.Kind.Should().Be(SubscriptionKinds.Installment);
         result.MerchantNameNormalized.Should().Be("516936");
@@ -549,7 +550,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Платіж ТОВ Алло - monomarket", 2999.95m, 2026, 8, 22, "UAH"),
         };
 
-        var results = SubscriptionDetectionAlgorithm.DetectInstallments(txs).ToList();
+        var results = SubscriptionDetectionAlgorithm.DetectInstallments(DetectionPhraseSet.Seed, txs).ToList();
 
         results.Should().HaveCount(2);
         var oldPlan = results.Single(r => r.MerchantNameNormalized == "installment:тов алло:2340");
@@ -568,7 +569,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Щомісячний платіж telemart - monomarket", 6499.85m, 2026, 7, 1, "UAH"),
         };
 
-        var result = SubscriptionDetectionAlgorithm.DetectInstallments(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectInstallments(DetectionPhraseSet.Seed, txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("installment:telemart:6500");
         result.OccurrenceCount.Should().Be(2);
@@ -588,7 +589,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Погашення наступного платежу RozetkaPay", 1371.89m, 2026, 6, 1, "UAH"),
         };
 
-        var results = SubscriptionDetectionAlgorithm.DetectInstallments(txs).ToList();
+        var results = SubscriptionDetectionAlgorithm.DetectInstallments(DetectionPhraseSet.Seed, txs).ToList();
 
         results.Should().HaveCount(2);
         results.Single(r => r.MerchantNameNormalized == "installment:rozetkapay:800")
@@ -600,7 +601,7 @@ public class SubscriptionDetectionAlgorithmTests
     [Fact]
     public void MobileTopUpKey_IsIdentifiable_DespiteTopUpBlocklist()
     {
-        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant("mobile top-up 0057").Should().BeFalse();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(DetectionPhraseSet.Seed, "mobile top-up 0057").Should().BeFalse();
     }
 
     [Theory]

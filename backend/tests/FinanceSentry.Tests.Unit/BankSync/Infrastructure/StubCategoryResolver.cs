@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Test double mirroring <c>CategoryResolver</c> semantics without a database: canonical keys
@@ -16,7 +17,7 @@ internal sealed class StubCategoryResolver : ICategoryResolver
     /// The REAL ordered ladder over this stub's reference data, so adapter and service tests run
     /// the production rule order rather than a second copy of it that could drift.
     /// </summary>
-    public static readonly ITransactionCategorizer Categorizer = new TransactionCategorizer(Instance);
+    public static readonly ITransactionCategorizer Categorizer = new TransactionCategorizer(Instance, FixedDetectionPhraseProvider.Seed);
 
     public string ResolveMcc(int? mcc)
         => mcc is null ? CategoryKeys.Uncategorized : MccRangeClassifier.Classify(mcc.Value);

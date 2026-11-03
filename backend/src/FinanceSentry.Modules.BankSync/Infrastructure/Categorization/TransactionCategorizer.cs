@@ -4,11 +4,15 @@ using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <inheritdoc />
-public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) : ITransactionCategorizer
+public sealed class TransactionCategorizer(
+    ICategoryResolver categoryResolver,
+    IDetectionPhraseProvider detectionPhrases) : ITransactionCategorizer
 {
     private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly IDetectionPhraseProvider _detectionPhrases = detectionPhrases;
 
     /// <inheritdoc />
     /// <remarks>
@@ -45,13 +49,15 @@ public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) :
         ArgumentNullException.ThrowIfNull(signals);
         ArgumentNullException.ThrowIfNull(activeInstallmentPlans);
 
+        var phrases = _detectionPhrases.Current;
+
         return _categoryResolver.TryResolveKeyword(signals.Description)
             ?? LoanRepaymentClassifier.Resolve(
-                signals.TransactionType, signals.MerchantName, signals.Description,
+                phrases, signals.TransactionType, signals.MerchantName, signals.Description,
                 signals.Amount, signals.Mcc, activeInstallmentPlans)
-            ?? CashLodgementClassifier.Resolve(signals.Description, signals.TransactionType)
+            ?? CashLodgementClassifier.Resolve(phrases, signals.Description, signals.TransactionType)
             ?? Claimed(_categoryResolver.ResolveCanonicalKey(signals.ProviderCategory))
-            ?? TransferDescriptionClassifier.Resolve(signals.Description)
+            ?? TransferDescriptionClassifier.Resolve(phrases, signals.Description)
             ?? DirectionAware(Claimed(_categoryResolver.ResolveMcc(signals.Mcc)), signals.TransactionType);
     }
 

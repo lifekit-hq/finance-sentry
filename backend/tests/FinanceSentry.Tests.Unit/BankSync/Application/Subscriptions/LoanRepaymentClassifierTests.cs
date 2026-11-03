@@ -5,6 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Pins both sides of the MCC-4829 split (#553): Monobank books loan and installment
@@ -26,7 +27,7 @@ public class LoanRepaymentClassifierTests
         string? transactionType = "debit", string? merchantName = null,
         IReadOnlyList<ActiveInstallmentPlan>? plans = null)
         => LoanRepaymentClassifier.Resolve(
-            transactionType, merchantName, description, amount, mcc, plans ?? NoPlans);
+            DetectionPhraseSet.Seed, transactionType, merchantName, description, amount, mcc, plans ?? NoPlans);
 
     // ── Repayments recognised from the description alone ──────────────────────
 
@@ -116,7 +117,7 @@ public class LoanRepaymentClassifierTests
                 CategoryKeys.TransferOut, WireTransferMcc, "UAH"))
             .ToList();
 
-        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(rows).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(DetectionPhraseSet.Seed, rows).ToList();
 
         detected.Should().ContainSingle()
             .Which.Kind.Should().Be(SubscriptionKinds.Installment);
@@ -155,5 +156,5 @@ public class LoanRepaymentClassifierTests
 
     private static IReadOnlyList<ActiveInstallmentPlan> PlanFor(string description, decimal amount)
         => [new ActiveInstallmentPlan(
-            CommitmentKeyResolver.Resolve(null, description, amount, WireTransferMcc), amount)];
+            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, description, amount, WireTransferMcc), amount)];
 }

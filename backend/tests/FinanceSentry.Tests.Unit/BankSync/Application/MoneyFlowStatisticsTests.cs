@@ -8,6 +8,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Unit tests for MoneyFlowStatisticsService (T413).
@@ -82,6 +83,7 @@ public class MoneyFlowStatisticsTests
             {
                 ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
                 PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+                Phrases = DetectionPhraseSet.Seed,
             });
         return mock.Object;
     }
@@ -941,7 +943,7 @@ public class MoneyFlowStatisticsTests
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
             CommittedPolicy(
-                CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
+                CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, mortgageDescription, mortgageAmount, 4829),
                 "installment:тов алло:3000"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);

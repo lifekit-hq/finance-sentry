@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 
 using System.Reflection;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 
@@ -9,6 +10,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 ///   • <c>categories</c>     — from <see cref="CategorySeedData"/> (Plaid PFC primaries).
 ///   • <c>mcc_categories</c> — from the embedded greggles/mcc-codes dataset,
 ///                             category assigned via <see cref="MccRangeClassifier"/>.
+///   • <c>merchant_keywords</c> / <c>detection_phrases</c> — from their seed data.
 ///
 /// Only missing rows are inserted, so runtime edits to either table are never clobbered.
 /// </summary>
@@ -21,6 +23,31 @@ public static class CategorySeeder
         SeedCategories(db);
         SeedMccCategories(db);
         SeedMerchantKeywords(db);
+        SeedDetectionPhrases(db);
+    }
+
+    private static void SeedDetectionPhrases(BankSyncDbContext db)
+    {
+        var existing = db.DetectionPhrases.Select(p => new { p.Kind, p.Phrase }).AsEnumerable()
+            .Select(p => (p.Kind, p.Phrase)).ToHashSet();
+        var toAdd = DetectionPhraseSeedData.Entries
+            .Where(e => !existing.Contains((e.Kind, e.Phrase)))
+            .Select(e => new DetectionPhrase
+            {
+                Kind = e.Kind,
+                Phrase = e.Phrase,
+                Provider = e.Provider,
+                Locale = e.Locale,
+                MccCondition = e.MccCondition,
+                CategoryCondition = e.CategoryCondition,
+            })
+            .ToList();
+
+        if (toAdd.Count == 0)
+            return;
+
+        db.DetectionPhrases.AddRange(toAdd);
+        db.SaveChanges();
     }
 
     private static void SeedMerchantKeywords(BankSyncDbContext db)

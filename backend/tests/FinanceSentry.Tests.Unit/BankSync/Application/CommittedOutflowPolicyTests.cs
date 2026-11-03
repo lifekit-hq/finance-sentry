@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// The committed/discretionary definition in isolation (spec 554). Fixtures are shaped like
@@ -39,6 +40,7 @@ public class CommittedOutflowPolicyTests
         {
             ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
             PinnedMerchantKeys = NoPins,
+            Phrases = DetectionPhraseSet.Seed,
         };
 
     private static CommittedOutflowRules RulesWithPins(params string[] pinnedMerchantKeys) =>
@@ -46,6 +48,7 @@ public class CommittedOutflowPolicyTests
         {
             ActiveCommitmentKeys = NoPins,
             PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+            Phrases = DetectionPhraseSet.Seed,
         };
 
     private static IReadOnlySet<string> NoPins => new HashSet<string>(StringComparer.Ordinal);
@@ -266,7 +269,7 @@ public class CommittedOutflowPolicyTests
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
 
-        var rules = await new CommittedOutflowPolicy(subscriptions.Object, pins.Object)
+        var rules = await new CommittedOutflowPolicy(subscriptions.Object, pins.Object, FixedDetectionPhraseProvider.Seed)
             .LoadForUserAsync(UserId);
         for (var i = 0; i < 3; i++)
             rules.IsCommitted(Debit(10m + i, "СІЛЬПО"));
@@ -320,7 +323,7 @@ public class CommittedOutflowPolicyTests
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
 
-        var rules = await new CommittedOutflowPolicy(reader, pins.Object).LoadForUserAsync(UserId);
+        var rules = await new CommittedOutflowPolicy(reader, pins.Object, FixedDetectionPhraseProvider.Seed).LoadForUserAsync(UserId);
 
         rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeTrue();
     }
@@ -340,7 +343,7 @@ public class CommittedOutflowPolicyTests
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
 
-        var rules = await new CommittedOutflowPolicy(reader, pins.Object).LoadForUserAsync(UserId);
+        var rules = await new CommittedOutflowPolicy(reader, pins.Object, FixedDetectionPhraseProvider.Seed).LoadForUserAsync(UserId);
 
         rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeFalse();
     }
@@ -358,6 +361,6 @@ public class CommittedOutflowPolicyTests
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(pinnedKeys.ToHashSet(StringComparer.Ordinal));
 
-        return new CommittedOutflowPolicy(subscriptions.Object, pins.Object);
+        return new CommittedOutflowPolicy(subscriptions.Object, pins.Object, FixedDetectionPhraseProvider.Seed);
     }
 }

@@ -6,6 +6,7 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Pins the ORDER of the one shared categorization ladder. Every rung is proved to beat the rung
@@ -120,7 +121,7 @@ public class TransactionCategorizerTests
         const string maskedPan = "516936******4992";
         const decimal monthly = 14060.96m;
         var plan = new ActiveInstallmentPlan(
-            CommitmentKeyResolver.Resolve(null, maskedPan, monthly, 4829), monthly);
+            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, maskedPan, monthly, 4829), monthly);
 
         Categorize(maskedPan, mcc: 4829, amount: monthly, plans: [plan])
             .Should().Be(CategoryKeys.LoanPayments);

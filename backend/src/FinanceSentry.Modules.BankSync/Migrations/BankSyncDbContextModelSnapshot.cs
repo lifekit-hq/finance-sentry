@@ -344,6 +344,48 @@ namespace FinanceSentry.Modules.BankSync.Migrations
                     b.ToTable("coverage_holes", "bank_sync");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.DetectionPhrase", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CategoryCondition")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int?>("MccCondition")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "Phrase")
+                        .IsUnique()
+                        .HasDatabaseName("idx_detection_phrase_kind_phrase_unique");
+
+                    b.ToTable("detection_phrases", "bank_sync");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.MccCategory", b =>
                 {
                     b.Property<int>("Mcc")

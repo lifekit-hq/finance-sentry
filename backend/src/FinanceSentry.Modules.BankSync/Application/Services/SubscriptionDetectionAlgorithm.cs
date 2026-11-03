@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
+using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Core.Utils;
 
 /// <summary>
@@ -35,19 +37,6 @@ public static class SubscriptionDetectionAlgorithm
     // together rather than tuning one of them.
     private const int MinBaselineCharges = 2;
 
-    private static readonly string[] UnidentifiableNormalizedNames =
-    [
-        "unknown",
-        "transfer",
-        "top-up",
-        "topup",
-        "recharge",
-        "withdrawal",
-        "atm",
-        "cash",
-        "переказ",
-    ];
-
     /// <summary>One charge as the algorithm needs it: the transaction plus its account's currency.</summary>
     public sealed record TxRow(
         Guid UserId, string? MerchantName, string? Description, decimal Amount,
@@ -69,7 +58,7 @@ public static class SubscriptionDetectionAlgorithm
     // MinOccurrences charges. A recurring transfer to a masked card number is a
     // loan/mortgage repayment, not a service — it's emitted as an installment so it stays
     // out of the spend summary.
-    public static IEnumerable<DetectedSubscriptionData> DetectSubscriptions(IReadOnlyList<TxRow> transactions)
+    public static IEnumerable<DetectedSubscriptionData> DetectSubscriptions(DetectionPhraseSet phrases, IReadOnlyList<TxRow> transactions)
     {
         var results = new List<DetectedSubscriptionData>();
         var byMerchant = transactions.GroupBy(NormalizeForDetection);
@@ -81,7 +70,7 @@ public static class SubscriptionDetectionAlgorithm
             var sorted = series.Current.Concat(series.Displaced).OrderBy(t => t.TransactionDate).ToList();
 
             if (sorted.Count < MinOccurrences) continue;
-            if (IsUnidentifiableMerchant(normalized)) continue;
+            if (IsUnidentifiableMerchant(phrases, normalized)) continue;
 
             var dates = sorted.Select(t => t.TransactionDate).ToList();
             var intervals = new List<int>();
@@ -268,19 +257,19 @@ public static class SubscriptionDetectionAlgorithm
     // installment. A full payoff ("Повне погашення") carries its own amount, so it's
     // matched by merchant: it completes every plan with no payments after it, while a
     // plan that keeps charging past the payoff date is a separate, still-active plan.
-    public static IEnumerable<DetectedSubscriptionData> DetectInstallments(IReadOnlyList<TxRow> transactions)
+    public static IEnumerable<DetectedSubscriptionData> DetectInstallments(DetectionPhraseSet phrases, IReadOnlyList<TxRow> transactions)
     {
         var results = new List<DetectedSubscriptionData>();
 
         var payoffDatesByMerchant = transactions
-            .Where(t => InstallmentPlanRecognizer.IsInstallmentPayoff(t.Description))
-            .GroupBy(t => InstallmentPlanRecognizer.ExtractMerchant(t.Description ?? string.Empty))
+            .Where(t => InstallmentPlanRecognizer.IsInstallmentPayoff(phrases, t.Description))
+            .GroupBy(t => InstallmentPlanRecognizer.ExtractMerchant(phrases, t.Description ?? string.Empty))
             .ToDictionary(g => g.Key, g => g.Max(t => t.TransactionDate));
 
         var byPlan = transactions
-            .Where(t => !InstallmentPlanRecognizer.IsInstallmentPayoff(t.Description))
+            .Where(t => !InstallmentPlanRecognizer.IsInstallmentPayoff(phrases, t.Description))
             .GroupBy(t => (
-                Merchant: InstallmentPlanRecognizer.ExtractMerchant(t.Description ?? string.Empty),
+                Merchant: InstallmentPlanRecognizer.ExtractMerchant(phrases, t.Description ?? string.Empty),
                 Amount: InstallmentPlanRecognizer.RoundPlanAmount(t.Amount)));
 
         foreach (var group in byPlan)
@@ -316,7 +305,7 @@ public static class SubscriptionDetectionAlgorithm
         return results;
     }
 
-    public static bool IsUnidentifiableMerchant(string normalized)
+    public static bool IsUnidentifiableMerchant(DetectionPhraseSet phrases, string normalized)
     {
         if (string.IsNullOrWhiteSpace(normalized)) return true;
 
@@ -324,7 +313,7 @@ public static class SubscriptionDetectionAlgorithm
         // deliberately identifiable despite containing "top-up".
         if (normalized.StartsWith("mobile top-up ", StringComparison.Ordinal)) return false;
 
-        foreach (var marker in UnidentifiableNormalizedNames)
+        foreach (var marker in phrases.Phrases(DetectionPhraseKinds.NotAMerchant))
         {
             if (normalized.Contains(marker, StringComparison.Ordinal)) return true;
         }

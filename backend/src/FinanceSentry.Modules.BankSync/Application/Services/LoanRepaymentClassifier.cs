@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Classifies loan and installment (розстрочка) repayments that Monobank books under the
@@ -59,6 +60,7 @@ public static class LoanRepaymentClassifier
     /// </para>
     /// </summary>
     public static string? Resolve(
+        DetectionPhraseSet phrases,
         string? transactionType,
         string? merchantName,
         string? description,
@@ -71,13 +73,13 @@ public static class LoanRepaymentClassifier
         if (string.Equals(transactionType, CreditTransactionType, StringComparison.Ordinal))
             return null;
 
-        if (InstallmentPlanRecognizer.IsInstallmentTransaction(description, mcc))
+        if (InstallmentPlanRecognizer.IsInstallmentTransaction(phrases, description, mcc))
             return CategoryKeys.LoanPayments;
 
         // Only merchant-shaped keys are reachable here — anything the recognizer could plan-key
         // already returned above — but the resolver stays the single definition of "this
         // transaction's commitment key", so the two sides cannot drift if the markers change.
-        var commitmentKey = CommitmentKeyResolver.Resolve(merchantName, description, amount, mcc);
+        var commitmentKey = CommitmentKeyResolver.Resolve(phrases, merchantName, description, amount, mcc);
         var matchesAPlan = activeInstallmentPlans.Any(plan =>
             string.Equals(plan.Key, commitmentKey, StringComparison.Ordinal)
             && AmountFitsPlan(amount, plan.ExpectedAmount));

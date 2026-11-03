@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.BankSync.Application.Subscriptions;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// The commitment key a transaction resolves to must be the key the detector stored for the
@@ -27,7 +28,7 @@ public class CommitmentKeyResolverTests
     public void Resolve_InstallmentRepayment_ReturnsThePlanKey(
         string description, double amount, int? mcc, string expected)
     {
-        CommitmentKeyResolver.Resolve(null, description, (decimal)amount, mcc)
+        CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, description, (decimal)amount, mcc)
             .Should().Be(expected);
     }
 
@@ -35,7 +36,7 @@ public class CommitmentKeyResolverTests
     public void Resolve_NonInstallment_FallsBackToTheMerchantDetectionKey()
     {
         // Same words as the MCC-gated installment path, but an ordinary purchase MCC.
-        CommitmentKeyResolver.Resolve("Netflix.com", "CARD PAYMENT 4471", 15.99m, 5815)
+        CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, "Netflix.com", "CARD PAYMENT 4471", 15.99m, 5815)
             .Should().Be(MerchantNameNormalizer.NormalizeDetectionKey("Netflix.com", "CARD PAYMENT 4471"));
     }
 
@@ -44,7 +45,7 @@ public class CommitmentKeyResolverTests
     {
         // The detector never stores a plan under a payoff's own amount — it uses payoffs only
         // to mark a plan completed. Keying one as a plan would invent a key nothing matches.
-        CommitmentKeyResolver.Resolve(null, "Повне погашення RozetkaPay", 8420m, null)
+        CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "Повне погашення RozetkaPay", 8420m, null)
             .Should().NotStartWith("installment:");
     }
 
@@ -52,7 +53,7 @@ public class CommitmentKeyResolverTests
     public void Resolve_InstallmentWithNoRecoverableMerchant_FallsBackToTheMerchantKey()
     {
         // "- monomarket" alone leaves nothing behind once the marketplace tag is stripped.
-        CommitmentKeyResolver.Resolve(null, "- monomarket", 500m, null)
+        CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "- monomarket", 500m, null)
             .Should().NotStartWith("installment:");
     }
 
@@ -60,8 +61,8 @@ public class CommitmentKeyResolverTests
     public void Resolve_AmountJitterWithinAPlan_ResolvesToOneKey()
     {
         // telemart bills ₴6,499.84 one month and ₴6,499.85 the next; both are the same plan.
-        var first = CommitmentKeyResolver.Resolve(null, "Щомісячний платіж telemart - monomarket", 6499.84m, null);
-        var second = CommitmentKeyResolver.Resolve(null, "Щомісячний платіж telemart - monomarket", 6499.85m, null);
+        var first = CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "Щомісячний платіж telemart - monomarket", 6499.84m, null);
+        var second = CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "Щомісячний платіж telemart - monomarket", 6499.85m, null);
 
         first.Should().Be(second);
     }
@@ -70,8 +71,8 @@ public class CommitmentKeyResolverTests
     public void Resolve_ConcurrentPlansAtTheSameShop_StayDistinct()
     {
         // Two Алло розстрочки run side by side; merchant-only keying would merge them.
-        var cheap = CommitmentKeyResolver.Resolve(null, "Погашення наступного платежу ТОВ Алло - monomarket", 2339.95m, null);
-        var dear = CommitmentKeyResolver.Resolve(null, "Погашення наступного платежу ТОВ Алло - monomarket", 2999.95m, null);
+        var cheap = CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "Погашення наступного платежу ТОВ Алло - monomarket", 2339.95m, null);
+        var dear = CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "Погашення наступного платежу ТОВ Алло - monomarket", 2999.95m, null);
 
         cheap.Should().NotBe(dear);
     }
@@ -91,12 +92,12 @@ public class CommitmentKeyResolverTests
             InstallmentTx("Платіж Pandora", 1200m, 1, mcc: 4829),
         };
 
-        var storedKeys = SubscriptionDetectionAlgorithm.DetectInstallments(transactions)
+        var storedKeys = SubscriptionDetectionAlgorithm.DetectInstallments(DetectionPhraseSet.Seed, transactions)
             .Select(d => d.MerchantNameNormalized)
             .ToHashSet(StringComparer.Ordinal);
 
         var resolvedKeys = transactions
-            .Select(t => CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc))
+            .Select(t => CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, t.MerchantName, t.Description, t.Amount, t.Mcc))
             .ToHashSet(StringComparer.Ordinal);
 
         storedKeys.Should().NotBeEmpty();
@@ -106,14 +107,14 @@ public class CommitmentKeyResolverTests
     [Fact]
     public void InstallmentKey_MerchantShapedCharge_IsKeyedByMerchantAndRoundedAmount()
     {
-        InstallmentCommitmentKey.Resolve("Apple Store", "APPLE STORE", 599.8m, 5732)
+        InstallmentCommitmentKey.Resolve(DetectionPhraseSet.Seed, "Apple Store", "APPLE STORE", 599.8m, 5732)
             .Should().Be("installment:apple store:600");
     }
 
     [Fact]
     public void InstallmentKey_AlreadyInstallmentShaped_IsKept()
     {
-        InstallmentCommitmentKey.Resolve(null, "Щомісячний платіж telemart - monomarket", 6499.84m, null)
+        InstallmentCommitmentKey.Resolve(DetectionPhraseSet.Seed, null, "Щомісячний платіж telemart - monomarket", 6499.84m, null)
             .Should().Be("installment:telemart:6500");
     }
 }

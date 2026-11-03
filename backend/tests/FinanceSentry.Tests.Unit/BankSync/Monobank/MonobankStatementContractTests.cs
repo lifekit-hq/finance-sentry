@@ -8,6 +8,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 using FluentAssertions;
 using Xunit;
+using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 
 /// <summary>
 /// Contract tests for Monobank GET /personal/statement/{account}/{from}/{to}
@@ -114,7 +115,7 @@ public class MonobankStatementContractTests
         // The mortgage is only reachable through its detected plan — its description carries
         // no wording, so the keyword bridge cannot see it.
         var mortgagePlan = new ActiveInstallmentPlan(
-            CommitmentKeyResolver.Resolve(null, "516936******4992", 14060.96m, 4829), 14060.96m);
+            CommitmentKeyResolver.Resolve(DetectionPhraseSet.Seed, null, "516936******4992", 14060.96m, 4829), 14060.96m);
         var adapter = new MonobankAdapter(
             handler.BuildClient(), StubCategoryResolver.Categorizer,
             new StubActiveSubscriptionsReader(mortgagePlan));
