@@ -15,8 +15,19 @@ using Microsoft.AspNetCore.Mvc;
 [ApiController]
 [Authorize(Policy = AuthPolicies.RequireAiUse)]
 [Route("research/scorecards")]
-public class ScorecardsController(IQueryHandler<GetScorecardQuery, ScorecardResult> handler) : ControllerBase
+public class ScorecardsController(
+    IQueryHandler<GetScorecardQuery, ScorecardResult> handler,
+    IQueryHandler<GetScorecardVerdictsQuery, IReadOnlyList<ScorecardVerdictSummary>> verdictsHandler) : ControllerBase
 {
+    /// <summary>
+    /// The verdict word of a comma-separated list of symbols in one call (the Accounts position chips). Same
+    /// <c>ai.use</c> gate as the single read: a caller without it gets 403, never a word.
+    /// </summary>
+    [HttpGet("verdicts")]
+    public async Task<IActionResult> GetVerdicts([FromQuery] string? symbols, CancellationToken ct) =>
+        Ok(await verdictsHandler.Handle(
+            new GetScorecardVerdictsQuery((symbols ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries)), ct));
+
     [HttpGet("{symbol}")]
     public async Task<IActionResult> Get(string symbol, CancellationToken ct) =>
         Ok(await handler.Handle(new GetScorecardQuery(symbol), ct));

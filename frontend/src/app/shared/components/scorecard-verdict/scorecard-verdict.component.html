@@ -1,14 +1,16 @@
 @let verdict = scorecard().verdict;
 <div class="flex flex-col gap-cmn-2" data-testid="scorecard-verdict">
-  <div class="flex flex-wrap items-center gap-cmn-2">
-    <cmn-tag [variant]="wordVariant[verdict.word]" data-testid="verdict-word">
-      {{ wordLabel[verdict.word] }}
-    </cmn-tag>
-    <span class="text-cmn-xs text-text-secondary">Rules v{{ verdict.rulesVersion }}</span>
-  </div>
-  <p class="text-cmn-xs text-text-secondary" data-testid="verdict-not-advice">{{ notAdvice }}</p>
-  @if (firedRule(); as fired) {
-    <p class="text-cmn-sm text-text-primary" data-testid="verdict-fired-rule">{{ fired }}</p>
+  @if (showSummary()) {
+    <div class="flex flex-wrap items-center gap-cmn-2">
+      <cmn-tag [variant]="wordVariant[verdict.word]" data-testid="verdict-word">
+        {{ wordLabel[verdict.word] }}
+      </cmn-tag>
+      <span class="text-cmn-xs text-text-secondary">Rules v{{ verdict.rulesVersion }}</span>
+    </div>
+    <p class="text-cmn-xs text-text-secondary" data-testid="verdict-not-advice">{{ notAdvice }}</p>
+    @if (firedRule(); as fired) {
+      <p class="text-cmn-sm text-text-primary" data-testid="verdict-fired-rule">{{ fired }}</p>
+    }
   }
 
   <details class="group" data-testid="verdict-why">

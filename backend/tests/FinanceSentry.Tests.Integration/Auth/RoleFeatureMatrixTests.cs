@@ -30,6 +30,7 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
     private const string ServiceToken = "service-token";
     private const string Disconnect = "disconnect";
     private const string Scorecard = "scorecard";
+    private const string ScorecardVerdicts = "scorecard-verdicts";
     private const string Decisions = "decisions";
 
     /// <summary>Feature, permission it needs, and the request that reaches it.</summary>
@@ -42,6 +43,8 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
         [Disconnect] = (Permissions.ConnectionsManage, HttpMethod.Delete, "/api/v1/crypto/binance/disconnect"),
         // Verdicts (a scorecard's BUY/AVOID word, the Ledger's queued calls) stay the owner's: a Member never reads one.
         [Scorecard] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/scorecards/AAPL"),
+        // The Accounts chips' batch read of the same words: the same gate, never a word for a Member.
+        [ScorecardVerdicts] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/scorecards/verdicts?symbols=AAPL,MSFT"),
         [Decisions] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/recommendations"),
     };
 

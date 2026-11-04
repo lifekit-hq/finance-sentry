@@ -3,9 +3,11 @@ import {TestBed} from '@angular/core/testing';
 import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {AuthStore} from '../../auth/store/auth.store';
 import {type Position} from '../models/position/position.model';
 import {PositionsService} from '../services/positions.service';
 import {QuotesService} from '../services/quotes.service';
+import {VerdictsService} from '../services/verdicts.service';
 import {holdingsEffects} from './holdings.effects';
 
 const FAKE_POSITIONS: Position[] = [];
@@ -31,6 +33,7 @@ function buildStore() {
     setHeadline: vi.fn(),
     setError: vi.fn(),
     setDayChangePct: vi.fn(),
+    setVerdicts: vi.fn(),
   };
 }
 
@@ -40,12 +43,18 @@ function buildPositions() {
 
 function configure(
   positions: ReturnType<typeof buildPositions>,
-  quotes: {getQuotes: ReturnType<typeof vi.fn>} = {getQuotes: vi.fn().mockReturnValue(of([]))}
+  quotes: {getQuotes: ReturnType<typeof vi.fn>} = {getQuotes: vi.fn().mockReturnValue(of([]))},
+  verdicts: {getVerdicts: ReturnType<typeof vi.fn>} = {
+    getVerdicts: vi.fn().mockReturnValue(of([])),
+  },
+  canUseAi = false
 ): void {
   TestBed.configureTestingModule({
     providers: [
       {provide: PositionsService, useValue: positions},
       {provide: QuotesService, useValue: quotes},
+      {provide: VerdictsService, useValue: verdicts},
+      {provide: AuthStore, useValue: {canUseAi: () => canUseAi}},
     ],
   });
 }
@@ -163,5 +172,69 @@ describe('holdingsEffects', () => {
     });
 
     expect(quotes.getQuotes).not.toHaveBeenCalled();
+  });
+
+  describe('verdict chips', () => {
+    const owned = (getVerdicts: ReturnType<typeof vi.fn>, canUseAi = true) => {
+      const store = buildStore();
+      const positions = buildPositions();
+      positions.getHoldings.mockReturnValue(
+        of({
+          positions: [
+            EQUITY,
+            {...EQUITY, provider: 'binance', symbol: 'BTC', instrumentType: null},
+          ],
+          headline: null,
+        })
+      );
+      configure(positions, undefined, {getVerdicts}, canUseAi);
+      TestBed.runInInjectionContext(() => {
+        holdingsEffects(store).loadPositions();
+      });
+      return store;
+    };
+
+    it('reads the held listed stocks in one batch and stores each word by ticker', () => {
+      const getVerdicts = vi
+        .fn()
+        .mockReturnValue(of([{symbol: 'aapl', word: 'Buy', firedRuleId: 'buy'}]));
+
+      const store = owned(getVerdicts);
+
+      expect(getVerdicts).toHaveBeenCalledExactlyOnceWith(['AAPL']);
+      expect(store.setVerdicts).toHaveBeenCalledWith({AAPL: 'Buy'});
+    });
+
+    it('never reads a verdict without ai.use', () => {
+      const getVerdicts = vi.fn().mockReturnValue(of([]));
+
+      const store = owned(getVerdicts, false);
+
+      expect(getVerdicts).not.toHaveBeenCalled();
+      expect(store.setVerdicts).not.toHaveBeenCalled();
+    });
+
+    it('keeps the positions and shows no chip when the batch read fails', () => {
+      const getVerdicts = vi.fn().mockReturnValue(throwError(() => new Error('403')));
+
+      const store = owned(getVerdicts);
+
+      expect(store.setPositions).toHaveBeenCalled();
+      expect(store.setError).not.toHaveBeenCalled();
+      expect(store.setVerdicts).not.toHaveBeenCalled();
+    });
+
+    it('skips the call when nothing is a listed stock', () => {
+      const getVerdicts = vi.fn();
+      const store = buildStore();
+      const positions = buildPositions();
+      configure(positions, undefined, {getVerdicts}, true);
+
+      TestBed.runInInjectionContext(() => {
+        holdingsEffects(store).loadPositions();
+      });
+
+      expect(getVerdicts).not.toHaveBeenCalled();
+    });
   });
 });

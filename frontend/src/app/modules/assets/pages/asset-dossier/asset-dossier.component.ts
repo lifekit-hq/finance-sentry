@@ -31,7 +31,6 @@ import {
   type TagVariant,
 } from '@lifekit-hq/ui';
 
-import {ScorecardVerdictComponent} from '../../../../shared/components/scorecard-verdict/scorecard-verdict.component';
 import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
@@ -47,6 +46,7 @@ import {AuthStore} from '../../../auth/store/auth.store';
 import {RecommendationCardComponent} from '../../../decisions/components/recommendation-card/recommendation-card.component';
 import {DECISION_RECORDED_TITLE} from '../../../decisions/constants/recommendation/recommendation.constants';
 import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation.pipe';
+import {VerdictBlockComponent} from '../../components/verdict-block/verdict-block.component';
 import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
 import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
 import {DOSSIER_SECTION_ID} from '../../constants/dossier/dossier-sections.constants';
@@ -104,7 +104,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     ProviderLabelPipe,
     RelativeTimePipe,
     RouterLink,
-    ScorecardVerdictComponent,
+    VerdictBlockComponent,
     SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,

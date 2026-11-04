@@ -1,0 +1,99 @@
+@let v = verdict();
+@let thesisStatus = status();
+<div class="grid gap-cmn-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="verdict-block">
+  <div class="flex min-w-0 flex-col gap-cmn-3">
+    <div class="flex flex-wrap items-center gap-cmn-2">
+      <cmn-tag [variant]="wordVariant[v.word]" data-testid="verdict-word">
+        {{ wordLabel[v.word] }}
+      </cmn-tag>
+      <span class="text-cmn-sm font-medium text-text-primary" data-testid="verdict-for-new-money">
+        {{ forNewMoney }}
+      </span>
+      <span class="text-cmn-xs text-text-secondary">Rules v{{ v.rulesVersion }}</span>
+    </div>
+
+    @if (held()) {
+      <p
+        class="rounded-cmn-md bg-surface-card px-cmn-3 py-cmn-2 text-cmn-sm text-text-primary"
+        data-testid="verdict-held-line"
+      >
+        {{ heldLine }}
+      </p>
+    }
+
+    @if (v.reasons.length > 0) {
+      <ul class="flex flex-col gap-cmn-2" data-testid="verdict-reasons">
+        @for (reason of v.reasons; track reason.axis) {
+          <li
+            [attr.data-status]="reason.status"
+            class="flex items-start gap-cmn-2 text-cmn-sm text-text-primary"
+            data-testid="verdict-reason"
+          >
+            <span
+              [class]="reasonMark[reason.status]"
+              class="mt-[0.4rem] h-2 w-2 shrink-0 rounded-full"
+            ></span>
+            <span class="min-w-0">
+              {{ reason.text }}
+              <span class="sr-only">: {{ reasonStatus[reason.status] }}</span>
+            </span>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (v.turnsBuyWhen; as turnsBuyWhen) {
+      <p class="text-cmn-sm text-text-primary" data-testid="verdict-turns-buy">
+        <span class="font-semibold">{{ turnsBuyPrefix }}</span> {{ turnsBuyWhen }}.
+      </p>
+    }
+  </div>
+
+  <aside
+    class="flex min-w-0 flex-col gap-cmn-2 sm:border-l sm:border-border-default sm:pl-cmn-4"
+    data-testid="verdict-thesis"
+  >
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+      Thesis and kill-switch
+    </h3>
+    <div class="flex flex-wrap items-center gap-cmn-2">
+      <cmn-tag [variant]="thesisVariant[thesisStatus.state]" data-testid="verdict-thesis-state">
+        {{ thesisStatus.thesisLabel }}
+      </cmn-tag>
+      @if (thesisStatus.killSwitchLabel; as killSwitch) {
+        <cmn-tag
+          [variant]="thesisStatus.state === 'tripped' ? 'error' : 'neutral'"
+          data-testid="verdict-kill-switch"
+        >
+          {{ killSwitch }}
+        </cmn-tag>
+      }
+    </div>
+    @if (thesisStatus.state === 'missing') {
+      <p class="text-cmn-sm text-text-secondary" data-testid="verdict-thesis-prompt">
+        {{ thesisMissingPrompt }}
+      </p>
+    } @else {
+      @if (thesisStatus.brokenReason; as reason) {
+        <p class="text-cmn-sm text-text-primary" data-testid="verdict-broken-reason">
+          {{ reason }}
+        </p>
+      }
+      @if (thesisStatus.rules.length > 0) {
+        <ul
+          class="list-disc space-y-cmn-1 pl-cmn-4 text-cmn-xs text-text-secondary"
+          data-testid="verdict-kill-rules"
+        >
+          @for (rule of thesisStatus.rules; track $index) {
+            <li>{{ rule }}</li>
+          }
+        </ul>
+      }
+    }
+  </aside>
+</div>
+
+<p class="mt-cmn-3 text-cmn-xs text-text-secondary" data-testid="verdict-not-advice">
+  {{ notAdvice }}
+</p>
+<fns-scorecard-verdict [scorecard]="scorecard()" [showSummary]="false" class="mt-cmn-2" />

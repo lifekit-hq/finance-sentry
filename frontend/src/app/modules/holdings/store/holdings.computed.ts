@@ -3,6 +3,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
+import {type VerdictWord} from '../../../shared/models/scorecard/scorecard.model';
 import {type HiddenReason} from '../../../shared/models/wealth/wealth.model';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
@@ -14,6 +15,7 @@ interface StateSignals {
   headline: Signal<Nullable<Headline>>;
   status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
+  verdictByTicker: Signal<Record<string, VerdictWord>>;
 }
 
 const WEIGHT_TO_PERCENT = 100;
@@ -41,6 +43,8 @@ export interface PositionRow {
   dayChangeUsd: Nullable<number>;
   /** Set by the API when the list tucks the row away; it still counts in totals and weights. */
   hiddenReason: Nullable<HiddenReason>;
+  /** The research verdict word for a held listed stock (owner only); null shows no chip. */
+  verdict: Nullable<VerdictWord>;
   weightPercent: number;
 }
 
@@ -83,6 +87,7 @@ export function holdingsComputed(store: StateSignals) {
     const positions = store.positions();
     const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0);
     const dayChanges = store.dayChangePctByTicker();
+    const verdicts = store.verdictByTicker();
     const groups = new Map<AssetClass, PositionRow[]>();
 
     for (const p of positions) {
@@ -107,6 +112,7 @@ export function holdingsComputed(store: StateSignals) {
         dayChangePct,
         dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
         hiddenReason: p.hiddenReason ?? null,
+        verdict: DayChangeUtils.isQuotable(p) ? (verdicts[p.symbol.toUpperCase()] ?? null) : null,
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);

@@ -5,6 +5,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it} from 'vitest';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
+import {type VerdictWord} from '../../../shared/models/scorecard/scorecard.model';
 import {type Position} from '../models/position/position.model';
 import {holdingsComputed} from './holdings.computed';
 
@@ -29,7 +30,8 @@ function build(
   positions: Position[],
   dayChangePctByTicker: Record<string, number> = {},
   status: AsyncStatus = 'idle',
-  headline: Nullable<Headline> = null
+  headline: Nullable<Headline> = null,
+  verdictByTicker: Record<string, VerdictWord> = {}
 ) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
@@ -37,6 +39,7 @@ function build(
       headline: signal(headline),
       status: signal<AsyncStatus>(status),
       dayChangePctByTicker: signal(dayChangePctByTicker),
+      verdictByTicker: signal(verdictByTicker),
     })
   );
 }
@@ -342,5 +345,27 @@ describe('holdingsComputed hidden positions', () => {
 
     expect(group.hiddenRows).toEqual([]);
     expect(group.rows.length).toBe(2);
+  });
+
+  it('carries a verdict word only on a listed stock that has one', () => {
+    const stock = {provider: 'ibkr', instrumentType: 'STK', assetClass: 'equity' as const};
+    const computed = build(
+      [
+        position({...stock, symbol: 'AAPL', currentValue: 110}),
+        position({...stock, symbol: 'MSFT', currentValue: 50}),
+        position({symbol: 'BTC', provider: 'binance', currentValue: 60}),
+      ],
+      {},
+      'idle',
+      null,
+      {AAPL: 'Wait', BTC: 'Buy'}
+    );
+
+    const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
+    const bySymbol = (s: string) => rows.find(r => r.symbol === s);
+
+    expect(bySymbol('AAPL')?.verdict).toBe('Wait');
+    expect(bySymbol('MSFT')?.verdict).toBeNull();
+    expect(bySymbol('BTC')?.verdict).toBeNull();
   });
 });

@@ -417,7 +417,12 @@
                   size="sm"
                 />
                 <span class="min-w-0">
-                  <span class="block truncate" data-testid="position-ticker">{{ row.symbol }}</span>
+                  <span class="flex items-center gap-cmn-2">
+                    <span class="truncate" data-testid="position-ticker">{{ row.symbol }}</span>
+                    @if (row.verdict; as word) {
+                      <fns-verdict-chip [word]="word" data-testid="position-verdict" />
+                    }
+                  </span>
                   <span
                     class="block truncate text-cmn-xs text-text-secondary"
                     data-testid="position-quantity"

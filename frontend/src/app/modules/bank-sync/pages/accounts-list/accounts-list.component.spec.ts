@@ -319,6 +319,7 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       dayChangePct: -1.25,
       dayChangeUsd: -15,
       hiddenReason: null,
+      verdict: null,
       weightPercent: 50,
       ...overrides,
     });
@@ -341,6 +342,22 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       expect(rows[0]?.querySelector('[data-testid="position-day-change"]')?.textContent).toContain(
         '-1.25%'
       );
+    });
+
+    it('shows a verdict chip on a row that has a word, inside the row that links to the dossier', () => {
+      const element = withFeed([row({verdict: 'Wait'})]);
+
+      const rowElement = element.querySelector('[data-testid="position-row"]');
+      expect(rowElement?.tagName.toLowerCase()).toBe('a');
+      expect(rowElement?.querySelector('[data-testid="verdict-chip"]')?.textContent?.trim()).toBe(
+        'WAIT'
+      );
+    });
+
+    it('shows no chip on a row without a word', () => {
+      const element = withFeed([row({verdict: null})]);
+
+      expect(element.querySelector('[data-testid="verdict-chip"]')).toBeNull();
     });
 
     it('shows the current and average price per unit on a position row', () => {

@@ -144,19 +144,27 @@ public sealed record ScorecardValuationAxis(
 /// The verdict word with its rules version, the rule that fired, which structure value it read
 /// (<see cref="StructureBasis"/>: <c>adjusted</c> or <c>raw</c> when there was no regime reading to
 /// adjust by), and the whole ordered rule table as evaluated (spec 726 FR-006, FR-011).
+/// <see cref="Reasons"/> and <see cref="TurnsBuyWhen"/> restate that table in words, derived from it
+/// deterministically by <see cref="VerdictReasons"/> (no model text); <see cref="TurnsBuyWhen"/> is null
+/// when the word is already BUY or better, or the name is not scored. They ride the verdict, so they
+/// reach only the callers the verdict reaches (<c>ai.use</c>).
 /// </summary>
 public sealed record VerdictDto(
     string Word,
     int RulesVersion,
     string FiredRuleId,
     string StructureBasis,
-    IReadOnlyList<VerdictRuleDto> Rules)
+    IReadOnlyList<VerdictRuleDto> Rules,
+    IReadOnlyList<VerdictReasonDto> Reasons,
+    string? TurnsBuyWhen)
 {
     public const string AdjustedBasis = "adjusted";
     public const string RawBasis = "raw";
 
-    public static VerdictDto From(Verdict verdict, string structureBasis) =>
-        new(
+    public static VerdictDto From(Verdict verdict, string structureBasis)
+    {
+        var explanation = VerdictReasons.Explain(verdict);
+        return new(
             verdict.Word.ToString(),
             verdict.RulesVersion,
             verdict.FiredRuleId,
@@ -168,8 +176,14 @@ public sealed record VerdictDto(
                 r.Matched,
                 r.Id == verdict.FiredRuleId,
                 r.Conditions.Select(c => new VerdictConditionDto(
-                    c.Axis.ToString(), c.Operator.ToString(), c.Threshold, c.Actual, c.Met)).ToList())).ToList());
+                    c.Axis.ToString(), c.Operator.ToString(), c.Threshold, c.Actual, c.Met)).ToList())).ToList(),
+            explanation.Reasons.Select(r => new VerdictReasonDto(r.Axis, r.Status.ToString(), r.Text, r.Decisive)).ToList(),
+            explanation.TurnsBuyWhen);
+    }
 }
+
+/// <summary>One fact behind the word: the axis, how it stands (<c>Pass</c>, <c>Fail</c>, <c>Missing</c>, <c>NotApplicable</c>) and the sentence with its value against the bar.</summary>
+public sealed record VerdictReasonDto(string Axis, string Status, string Text, bool Decisive);
 
 /// <summary>One rule of the table: matched when every condition is met; fired when it is the first match.</summary>
 public sealed record VerdictRuleDto(
@@ -187,3 +201,6 @@ public sealed record VerdictConditionDto(
     string? Threshold,
     string? Actual,
     bool Met);
+
+/// <summary>One symbol's verdict word and the rule that fired, for a chip. Nothing else of the scorecard crosses.</summary>
+public sealed record ScorecardVerdictSummary(string Symbol, string Word, string FiredRuleId);
