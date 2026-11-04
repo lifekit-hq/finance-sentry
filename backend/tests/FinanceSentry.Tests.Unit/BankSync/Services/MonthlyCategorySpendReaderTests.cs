@@ -30,6 +30,9 @@ public sealed class MonthlyCategorySpendReaderTests
         _commitments
             .Setup(c => c.GetActiveCommitmentsAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        _commitments
+            .Setup(c => c.GetEndedCommitmentsAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private MonthlyCategorySpendReader Reader() =>
@@ -162,6 +165,26 @@ public sealed class MonthlyCategorySpendReaderTests
         Assert.Equal("ENTERTAINMENT", placed.Line);
         Assert.Equal(32m, placed.MonthlyUsd);
         Assert.Equal(new DateOnly(2028, 1, 1), placed.EndDate);
+    }
+
+    [Fact]
+    public async Task AnEndedCommitment_IsPlacedOnItsLineSeparately_FromTheActiveOnes()
+    {
+        Add(Day(2027, 1, 5), 200m, category: "LOAN_PAYMENTS", merchant: "Old Loan");
+        Add(Day(2027, 2, 5), 30m, category: "ENTERTAINMENT", merchant: "Gym");
+        ActiveCommitment("gym", 30m);
+        _commitments
+            .Setup(c => c.GetEndedCommitmentsAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ActiveCommitment(
+                "old loan", "Old Loan", true, SubscriptionKinds.Installment, "monthly", 200m, "USD", new DateOnly(2027, 1, 1))]);
+
+        var result = await Reader().GetAsync(UserId, From, To);
+
+        Assert.Equal("ENTERTAINMENT", Assert.Single(result.Commitments).Line);
+        var ended = Assert.Single(result.EndedCommitments);
+        Assert.Equal("LOAN_PAYMENTS", ended.Line);
+        Assert.Equal(200m, ended.MonthlyUsd);
+        Assert.Equal(new DateOnly(2027, 1, 1), ended.EndDate);
     }
 
     [Fact]

@@ -35,6 +35,10 @@ public sealed record CategoryMonthSpend(string Month, string Line, decimal Spend
 /// <param name="EndDate">Final payment month, when known; the commitment stops counting after it.</param>
 public sealed record CommitmentOnLine(string Line, decimal MonthlyUsd, DateOnly? EndDate);
 
+/// <param name="EndedCommitments">
+/// Commitments that stopped (a paid-off installment, a lapsed rent), placed on their line like
+/// <paramref name="Commitments"/>: they tell a line whose commitment ended from one that never had any.
+/// </param>
 /// <param name="FirstDataDay">
 /// The day of the user's earliest transaction of any kind, or null with no history. A month before it is "no data",
 /// not a month of zero spend.
@@ -42,4 +46,5 @@ public sealed record CommitmentOnLine(string Line, decimal MonthlyUsd, DateOnly?
 public sealed record MonthlyCategorySpend(
     DateOnly? FirstDataDay,
     IReadOnlyList<CategoryMonthSpend> Months,
-    IReadOnlyList<CommitmentOnLine> Commitments);
+    IReadOnlyList<CommitmentOnLine> Commitments,
+    IReadOnlyList<CommitmentOnLine> EndedCommitments);

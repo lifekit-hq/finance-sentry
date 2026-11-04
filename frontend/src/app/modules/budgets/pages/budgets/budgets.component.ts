@@ -53,6 +53,12 @@ const PLAIN_MENU: MenuItem[] = [EDIT_ITEM, TRANSACTIONS_ITEM];
 const RESET_MENU: MenuItem[] = [EDIT_ITEM, RESET_ITEM, TRANSACTIONS_ITEM];
 const REMOVE_MENU: MenuItem[] = [EDIT_ITEM, REMOVE_ITEM, TRANSACTIONS_ITEM];
 
+const withoutTransactions = (menu: MenuItem[]): MenuItem[] =>
+  menu.filter(entry => entry !== TRANSACTIONS_ITEM);
+const PLAIN_ROLE_MENU = withoutTransactions(PLAIN_MENU);
+const RESET_ROLE_MENU = withoutTransactions(RESET_MENU);
+const REMOVE_ROLE_MENU = withoutTransactions(REMOVE_MENU);
+
 @Component({
   selector: 'fns-budgets',
   imports: [
@@ -138,11 +144,19 @@ export class BudgetsComponent {
     return this.categoryColor(category);
   }
 
+  public hasTransactions(category: string): boolean {
+    return BudgetEstimateUtils.hasTransactionCategory(category);
+  }
+
   public menuFor(item: BudgetSummaryItem): MenuItem[] {
+    const hasTransactions = this.hasTransactions(item.category);
     if (item.overrideId === null) {
-      return PLAIN_MENU;
+      return hasTransactions ? PLAIN_MENU : PLAIN_ROLE_MENU;
     }
-    return item.suggestedAmount === null ? REMOVE_MENU : RESET_MENU;
+    if (item.suggestedAmount === null) {
+      return hasTransactions ? REMOVE_MENU : REMOVE_ROLE_MENU;
+    }
+    return hasTransactions ? RESET_MENU : RESET_ROLE_MENU;
   }
 
   public onBudgetAction(action: string, item: BudgetSummaryItem): void {

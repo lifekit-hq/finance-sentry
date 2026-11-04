@@ -16,8 +16,12 @@ public sealed class BudgetEstimatorTests
     private static CategoryMonthSpend Spend(string month, string line, decimal usd) => new(month, line, usd);
 
     private static LineSuggestion Suggest(
-        string line, EstimateHistory history, CategoryMonthSpend[] rows, CommitmentOnLine[]? commitments = null)
-        => BudgetEstimator.Suggest(history, rows, commitments ?? [], Month)[line];
+        string line,
+        EstimateHistory history,
+        CategoryMonthSpend[] rows,
+        CommitmentOnLine[]? commitments = null,
+        CommitmentOnLine[]? ended = null)
+        => BudgetEstimator.Suggest(history, rows, commitments ?? [], ended ?? [], Month)[line];
 
     [Fact]
     public void Median_OfSixMonths_AveragesTheTwoMiddleOnes()
@@ -90,7 +94,7 @@ public sealed class BudgetEstimatorTests
             Spend(m, "FOOD_AND_DRINK", 100m),
         }).ToArray();
 
-        var suggestions = BudgetEstimator.Suggest(History(SixMonths), rows, [], Month);
+        var suggestions = BudgetEstimator.Suggest(History(SixMonths), rows, [], [], Month);
 
         Assert.Equal(["FOOD_AND_DRINK"], suggestions.Keys);
     }
@@ -122,15 +126,83 @@ public sealed class BudgetEstimatorTests
     }
 
     [Fact]
-    public void CommittedLine_WhoseCommitmentEndedBeforeTheMonth_FallsBackToTheMedian()
+    public void CommittedLine_WhoseCommitmentEndedBeforeTheMonth_GetsNoSuggestion_NotTheMedian()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "LOAN_PAYMENTS", 200m)).ToArray();
+        var ended = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 3, 1)) };
+
+        var suggestion = Suggest("LOAN_PAYMENTS", History(SixMonths), rows, ended);
+
+        Assert.Null(suggestion.Amount);
+        Assert.Null(suggestion.Basis);
+    }
+
+    [Fact]
+    public void CommittedLine_WhoseRentStopped_GetsNoSuggestion_NotTheMedian()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "RENT_AND_UTILITIES", 900m)).ToArray();
+        var stopped = new[] { new CommitmentOnLine("RENT_AND_UTILITIES", 900m, null) };
+
+        var suggestion = Suggest("RENT_AND_UTILITIES", History(SixMonths), rows, ended: stopped);
+
+        Assert.Null(suggestion.Amount);
+        Assert.Null(suggestion.Basis);
+    }
+
+    [Fact]
+    public void CommittedLine_WhoseInstallmentWasPaidOff_GetsNoSuggestion()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "LOAN_PAYMENTS", 200m)).ToArray();
+        var paidOff = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 3, 1)) };
+
+        var suggestion = Suggest("LOAN_PAYMENTS", History(SixMonths), rows, ended: paidOff);
+
+        Assert.Null(suggestion.Amount);
+    }
+
+    [Fact]
+    public void CommittedLine_WithANewCommitmentAfterAnEndedOne_UsesTheNewOne()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "LOAN_PAYMENTS", 200m)).ToArray();
+        var paidOff = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 3, 1)) };
+        var current = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 75m, null) };
+
+        var suggestion = Suggest("LOAN_PAYMENTS", History(SixMonths), rows, current, paidOff);
+
+        Assert.Equal(75m, suggestion.Amount);
+        Assert.Equal(EstimateBasis.Commitment, suggestion.Basis);
+    }
+
+    [Fact]
+    public void CommittedLine_ThatNeverHadACommitment_KeepsTheMedian()
     {
         var rows = SixMonths.Select(m => Spend(m, "RENT_AND_UTILITIES", 300m)).ToArray();
-        var ended = new[] { new CommitmentOnLine("RENT_AND_UTILITIES", 900m, new DateOnly(2027, 3, 1)) };
 
-        var suggestion = Suggest("RENT_AND_UTILITIES", History(SixMonths), rows, ended);
+        var suggestion = Suggest("RENT_AND_UTILITIES", History(SixMonths), rows);
 
         Assert.Equal(300m, suggestion.Amount);
         Assert.Equal(EstimateBasis.History, suggestion.Basis);
+    }
+
+    [Fact]
+    public void DiscretionaryLine_WithAnEndedSubscription_KeepsTheMedian()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "ENTERTAINMENT", 65m)).ToArray();
+        var cancelled = new[] { new CommitmentOnLine("ENTERTAINMENT", 9m, new DateOnly(2027, 2, 1)) };
+
+        var suggestion = Suggest("ENTERTAINMENT", History(SixMonths), rows, ended: cancelled);
+
+        Assert.Equal(65m, suggestion.Amount);
+        Assert.Equal(EstimateBasis.History, suggestion.Basis);
+    }
+
+    [Fact]
+    public void EndedCommitment_WhoseFinalPaymentIsThisMonth_DoesNotSuppress()
+    {
+        var rows = SixMonths.Select(m => Spend(m, "LOAN_PAYMENTS", 200m)).ToArray();
+        var finishing = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 200m, Month) };
+
+        Assert.Equal(200m, Suggest("LOAN_PAYMENTS", History(SixMonths), rows, ended: finishing).Amount);
     }
 
     [Fact]
@@ -183,7 +255,7 @@ public sealed class BudgetEstimatorTests
     {
         var commitments = new[] { new CommitmentOnLine("HOUSEHOLD", 300m, null) };
 
-        var suggestions = BudgetEstimator.Suggest(History(SixMonths), [], commitments, Month);
+        var suggestions = BudgetEstimator.Suggest(History(SixMonths), [], commitments, [], Month);
 
         Assert.Equal(300m, suggestions["HOUSEHOLD"].Amount);
     }

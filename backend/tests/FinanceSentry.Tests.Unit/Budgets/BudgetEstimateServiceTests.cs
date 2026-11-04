@@ -22,6 +22,7 @@ public sealed class BudgetEstimateServiceTests
     private readonly Mock<ICoverageHoleReader> _holes = new();
     private readonly List<CategoryMonthSpend> _rows = [];
     private readonly List<CommitmentOnLine> _commitments = [];
+    private readonly List<CommitmentOnLine> _endedCommitments = [];
     private readonly List<CoverageHoleSpan> _holeSpans = [];
     private BudgetEstimateOptions _options = new();
     private DateOnly? _firstDataDay = FirstData;
@@ -29,7 +30,7 @@ public sealed class BudgetEstimateServiceTests
     public BudgetEstimateServiceTests()
     {
         _spend.Setup(s => s.GetAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new MonthlyCategorySpend(_firstDataDay, [.. _rows], [.. _commitments]));
+            .ReturnsAsync(() => new MonthlyCategorySpend(_firstDataDay, [.. _rows], [.. _commitments], [.. _endedCommitments]));
         _holes.Setup(h => h.GetHolesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => [.. _holeSpans]);
     }
@@ -354,6 +355,58 @@ public sealed class BudgetEstimateServiceTests
         var line = Assert.Single(summary.Items);
         Assert.Equal(182m, line.Estimate);
         Assert.Equal("commitment", line.Source);
+    }
+
+    [Fact]
+    public async Task CommittedLine_WhoseInstallmentWasPaidOff_GetsNoSuggestion_NotTheMedianOfTheFinishedPayments()
+    {
+        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
+        SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+        _endedCommitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 5, 1)));
+
+        var summary = await Month(2027, 6);
+
+        Assert.Empty(summary.Items);
+        Assert.Equal(0m, summary.TotalEstimate);
+        Assert.Equal(0m, summary.ExpectedMonthEnd);
+    }
+
+    [Fact]
+    public async Task CommittedLine_WhoseRentStopped_GetsNoSuggestion()
+    {
+        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
+        SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+        _endedCommitments.Add(new CommitmentOnLine("RENT_AND_UTILITIES", 900m, null));
+
+        var summary = await Month(2027, 6);
+
+        Assert.Empty(summary.Items);
+        Assert.Equal(0m, summary.TotalEstimate);
+    }
+
+    [Fact]
+    public async Task CommittedLine_ThatNeverHadACommitment_KeepsTheMedian()
+    {
+        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
+        SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+
+        var summary = await Month(2027, 6);
+
+        var line = Assert.Single(summary.Items);
+        Assert.Equal(900m, line.Estimate);
+        Assert.Equal("history", line.Source);
+    }
+
+    [Fact]
+    public async Task EndedCommitment_DoesNotSuppressThePastMonthsOwnMedian()
+    {
+        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
+        SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+        _endedCommitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 5, 1)));
+
+        var summary = await Service().ComputeAsync(UserId, 2027, 4, new DateTime(2027, 6, 15), []);
+
+        Assert.Equal(200m, Assert.Single(summary.Items).Estimate);
     }
 
     [Fact]

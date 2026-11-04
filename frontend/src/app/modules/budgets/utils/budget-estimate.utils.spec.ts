@@ -18,14 +18,12 @@ describe('BudgetEstimateUtils', () => {
     expect(BudgetEstimateUtils.skippedNote([])).toBeNull();
   });
 
-  it('explains the months set aside for the unseen card in plain words', () => {
+  it('names the months set aside by hand without explaining them away', () => {
     const note = BudgetEstimateUtils.skippedNote([
       {month: '2026-09', reason: 'excluded'},
       {month: '2026-10', reason: 'excluded'},
     ]);
-    expect(note).toBe(
-      'September 2026 and October 2026 are left out of these estimates: that spending went through a card this app cannot see, so those months would read far too low.'
-    );
+    expect(note).toBe('September 2026 and October 2026 are left out of these estimates.');
   });
 
   it('explains a coverage gap separately and in the singular', () => {
@@ -41,6 +39,12 @@ describe('BudgetEstimateUtils', () => {
     ]);
     expect(note).toContain('October 2026 is left out of these estimates');
     expect(note).toContain('March 2027 is left out because the bank link has a gap');
+  });
+
+  it('sends only category lines to the ledger, not the counterparty-role lines', () => {
+    expect(BudgetEstimateUtils.hasTransactionCategory('FOOD_AND_DRINK')).toBe(true);
+    expect(BudgetEstimateUtils.hasTransactionCategory('HOUSEHOLD')).toBe(false);
+    expect(BudgetEstimateUtils.hasTransactionCategory('FAMILY_SUPPORT')).toBe(false);
   });
 
   it('measures the share of the estimate used', () => {

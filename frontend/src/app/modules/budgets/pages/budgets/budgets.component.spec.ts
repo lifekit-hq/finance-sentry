@@ -149,6 +149,19 @@ describe('BudgetsComponent actions', () => {
     expect(remove.map(m => m.label)).toContain('Remove my amount');
   });
 
+  it('offers no transactions view on a counterparty-role line', () => {
+    const {component} = setup();
+    for (const category of ['HOUSEHOLD', 'FAMILY_SUPPORT']) {
+      expect(component.menuFor(item({category})).map(m => m.id)).toEqual(['edit']);
+      const reset = component.menuFor(item({category, overrideId: 'o1', source: 'override'}));
+      expect(reset.map(m => m.id)).toEqual(['edit', 'reset']);
+      const remove = component.menuFor(
+        item({category, overrideId: 'o1', source: 'override', suggestedAmount: null})
+      );
+      expect(remove.map(m => m.label)).toEqual(['Edit estimate', 'Remove my amount']);
+    }
+  });
+
   it('opens the debit transactions of the category within the selected month', () => {
     const {component, router} = setup();
     component.viewTransactions('groceries');
@@ -296,8 +309,7 @@ describe('BudgetsComponent estimate copy', () => {
 });
 
 describe('BudgetsComponent months left out', () => {
-  const NOTE =
-    'September 2026 and October 2026 are left out of these estimates: that spending went through a card this app cannot see, so those months would read far too low.';
+  const NOTE = 'September 2026 and October 2026 are left out of these estimates.';
 
   it('says in plain words which months the estimates do not learn from', () => {
     const {host} = render({items: [item()], skippedNote: NOTE});
@@ -388,6 +400,17 @@ describe('BudgetsComponent async states', () => {
 
     expect(host.querySelector('a[data-testid="budget-category-link"]')?.getAttribute('href')).toBe(
       '/transactions?category=groceries&type=debit&from=2026-09-01&to=2026-09-30'
+    );
+  });
+
+  it('shows a counterparty-role line as plain text, not a link to a filter that matches nothing', () => {
+    const {host} = render({
+      items: [item({category: 'HOUSEHOLD', categoryLabel: 'Household'})],
+    });
+
+    expect(host.querySelector('a[data-testid="budget-category-link"]')).toBeNull();
+    expect(host.querySelector('[data-testid="budget-category-label"]')?.textContent).toContain(
+      'Household'
     );
   });
 });

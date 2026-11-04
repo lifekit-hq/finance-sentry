@@ -128,14 +128,23 @@
                     [style.background]="categoryColor(b.category)"
                     class="h-2.5 w-2.5 shrink-0 rounded-sm"
                   ></div>
-                  <a
-                    [routerLink]="transactionsRoute"
-                    [queryParams]="transactionsParams(b.category)"
-                    class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
-                    data-testid="budget-category-link"
-                  >
-                    {{ b.categoryLabel }}
-                  </a>
+                  @if (hasTransactions(b.category)) {
+                    <a
+                      [routerLink]="transactionsRoute"
+                      [queryParams]="transactionsParams(b.category)"
+                      class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
+                      data-testid="budget-category-link"
+                    >
+                      {{ b.categoryLabel }}
+                    </a>
+                  } @else {
+                    <span
+                      class="truncate font-label text-cmn-sm font-semibold text-text-primary"
+                      data-testid="budget-category-label"
+                    >
+                      {{ b.categoryLabel }}
+                    </span>
+                  }
                 </div>
                 <div class="flex shrink-0 items-center gap-cmn-1">
                   @if (b.isOverBudget) {

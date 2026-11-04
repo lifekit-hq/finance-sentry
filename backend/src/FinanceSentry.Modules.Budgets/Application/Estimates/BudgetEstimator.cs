@@ -32,22 +32,33 @@ public static class BudgetEstimator
     ///   <see cref="Projection.MinCompleteMonths"/> months there is no median.</item>
     ///   <item>On a committed line (<see cref="EstimateLines.IsCommitted"/>) the detected commitments replace the
     ///   median when there are any: a rent that stopped, or an installment that ended, no longer counts, and one
-    ///   whose price changed counts at the new price.</item>
+    ///   whose price changed counts at the new price. A committed line whose commitments all ended before the month
+    ///   gets no suggestion, not the median, which still holds the payments that stopped; a committed line that
+    ///   never had a commitment keeps the median.</item>
     ///   <item>On any other line the commitments are a floor: a subscription cannot cost less than it charges, but
     ///   the discretionary spend beside it stays in the median.</item>
     /// </list>
     /// </summary>
+    /// <param name="endedCommitments">Commitments that stopped, so a committed line they sat on is not left to the median.</param>
     /// <param name="month">First day of the month the estimate is for; a commitment whose end date passed before it is dropped.</param>
     public static IReadOnlyDictionary<string, LineSuggestion> Suggest(
         EstimateHistory history,
         IReadOnlyList<CategoryMonthSpend> rows,
         IReadOnlyList<CommitmentOnLine> commitments,
+        IReadOnlyList<CommitmentOnLine> endedCommitments,
         DateOnly month)
     {
         var committedByLine = commitments
             .Where(c => EstimateLines.IsEstimable(c.Line) && (c.EndDate is null || c.EndDate >= month))
             .GroupBy(c => c.Line, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.Sum(c => c.MonthlyUsd), StringComparer.Ordinal);
+
+        var endedLines = commitments
+            .Where(c => c.EndDate < month)
+            .Concat(endedCommitments.Where(c => c.EndDate is null || c.EndDate < month))
+            .Select(c => c.Line)
+            .Where(EstimateLines.IsEstimable)
+            .ToHashSet(StringComparer.Ordinal);
 
         var used = history.UsedMonths.ToHashSet(StringComparer.Ordinal);
         var spendByLineMonth = rows
@@ -69,7 +80,14 @@ public static class BudgetEstimator
                 median = Projection.Median(history.UsedMonths.Select(m => byMonth?.GetValueOrDefault(m) ?? 0m));
             }
 
-            suggestions[line] = Choose(line, median, committedByLine.GetValueOrDefault(line));
+            var committed = committedByLine.GetValueOrDefault(line);
+            if (committed == 0m && endedLines.Contains(line) && EstimateLines.IsCommitted(line))
+            {
+                suggestions[line] = new LineSuggestion(line, null, null);
+                continue;
+            }
+
+            suggestions[line] = Choose(line, median, committed);
         }
 
         return suggestions;

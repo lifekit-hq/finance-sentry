@@ -23,6 +23,10 @@ public interface IDetectedSubscriptionRepository
     Task<IReadOnlyList<DetectedSubscription>> GetActiveByUserIdUnscopedAsync(
         string userId, CancellationToken ct = default);
 
+    /// <summary>The user's commitments that stopped (a completed installment, a lapsed subscription or rent) for the cross-module reader. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<DetectedSubscription>> GetEndedByUserIdUnscopedAsync(
+        string userId, CancellationToken ct = default);
+
     /// <summary>The user's active subscriptions, tracked, for the detection job's staleness sweep. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveUnscopedAsync(
         string userId, CancellationToken ct = default);

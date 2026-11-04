@@ -2,6 +2,8 @@ namespace FinanceSentry.Core.Utils;
 
 using System.Globalization;
 using System.Text.RegularExpressions;
+using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 
 /// <summary>
 /// The one place an alert becomes a path inside the SPA: the page that shows the thing the alert is about, on the
@@ -24,6 +26,7 @@ public static partial class AlertAppPath
     public const string Dashboard = "/dashboard";
     public const string Transactions = "/transactions";
     public const string Subscriptions = "/subscriptions";
+    public const string Budgets = "/budgets";
     public const string Events = "/events";
 
     /// <summary>The element id of the dossier's Analyst Coverage card, which the dossier scrolls to when the URL carries it.</summary>
@@ -64,7 +67,7 @@ public static partial class AlertAppPath
             "SyncFailure" or "ConsentExpiring" or "FamilyStatement" or "ConnectionDormant" or "AccountRetired" or "CoverageGap" => AccountsList,
 
             "CategorySpike" => SpendIn(label, MonthStart(day), null),
-            "BudgetBreach" => SpendIn(label, MonthStart(day), MonthEnd(day)),
+            "BudgetBreach" => BreachIn(label, MonthStart(day), MonthEnd(day)),
 
             // No filtered view of one merchant's charges exists, and one conversion has no page of its own.
             "DuplicateCharge" or "UnusualSpend" => Transactions,
@@ -125,11 +128,15 @@ public static partial class AlertAppPath
             ? dossier
             : AccountsInvestments;
 
-    /// <summary>The month a budget breach happened in, for the category it is about: what was spent, not the budget.</summary>
+    /// <summary>
+    /// The month a budget breach happened in, for the category it is about: what was spent, not the budget. The
+    /// household and family-support lines are counterparty roles, not categories, so no ledger filter finds their spend
+    /// and the breach opens the Budgets page instead.
+    /// </summary>
     public static string ForBudgetBreach(string category, int year, int month)
     {
         var first = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return SpendIn(category.Trim(), MonthStart(first), MonthEnd(first));
+        return BreachIn(category.Trim(), MonthStart(first), MonthEnd(first));
     }
 
     /// <summary>The month a total-estimate alert is about: every debit of it, whatever the category.</summary>
@@ -142,6 +149,11 @@ public static partial class AlertAppPath
     private static string Asset(string symbol) => $"/assets/{Uri.EscapeDataString(symbol)}";
 
     private static bool IsSymbol(string value) => SymbolShape().IsMatch(value);
+
+    private static string BreachIn(string? line, DateTime from, DateTime to)
+        => line is SpendLines.Household or CategoryKeys.FamilySupport
+            ? Budgets
+            : SpendIn(line, from, to);
 
     private static string SpendIn(string? category, DateTime from, DateTime? to)
         => category is { Length: > 0 }

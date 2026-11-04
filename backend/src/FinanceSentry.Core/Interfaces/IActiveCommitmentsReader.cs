@@ -1,12 +1,18 @@
 namespace FinanceSentry.Core.Interfaces;
 
 /// <summary>
-/// The user's ACTIVE detected commitments in the shape an estimate needs: what each costs a month now and when it
+/// The user's detected commitments in the shape an estimate needs: what each costs a month now and when it
 /// ends. Callers include jobs with no person in scope, so every read names the user.
 /// </summary>
 public interface IActiveCommitmentsReader
 {
     Task<IReadOnlyList<ActiveCommitment>> GetActiveCommitmentsAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The user's commitments that stopped (an installment paid off, a subscription or rent that lapsed), so a caller
+    /// can tell a line whose commitment ended from one that never had any.
+    /// </summary>
+    Task<IReadOnlyList<ActiveCommitment>> GetEndedCommitmentsAsync(Guid userId, CancellationToken ct = default);
 }
 
 /// <param name="Key">

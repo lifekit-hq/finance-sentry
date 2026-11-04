@@ -1,6 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {APP_LOCALE} from '../../../shared/constants/date/date.constants';
+import {COUNTERPARTY_ROLE_LINES} from '../constants/budget/budget.constants';
 import {type SkippedEstimateMonth} from '../models/budget/budget.model';
 
 const MONTH_KEY_PARTS = 2;
@@ -23,10 +24,12 @@ export class BudgetEstimateUtils {
     return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
   }
 
-  /**
-   * One plain-words sentence per reason for the months the estimates leave out, or null when none are.
-   * Months set aside by hand are the ones whose spending moved to a card the bank link cannot see.
-   */
+  /** Whether a ledger category filter can find the line's spend (false for the counterparty-role lines). */
+  public static hasTransactionCategory(line: string): boolean {
+    return !COUNTERPARTY_ROLE_LINES.includes(line);
+  }
+
+  /** One plain-words sentence per reason for the months the estimates leave out, or null when none are. */
   public static skippedNote(skipped: SkippedEstimateMonth[]): Nullable<string> {
     const named = (reason: SkippedEstimateMonth['reason']) =>
       skipped
@@ -37,7 +40,7 @@ export class BudgetEstimateUtils {
     const excluded = named('excluded');
     if (excluded.length > 0) {
       sentences.push(
-        `${BudgetEstimateUtils.joinList(excluded)} ${excluded.length === 1 ? 'is' : 'are'} left out of these estimates: that spending went through a card this app cannot see, so ${excluded.length === 1 ? 'that month' : 'those months'} would read far too low.`
+        `${BudgetEstimateUtils.joinList(excluded)} ${excluded.length === 1 ? 'is' : 'are'} left out of these estimates.`
       );
     }
     const gaps = named('coverage-gap');

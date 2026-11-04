@@ -18,7 +18,9 @@ using FinanceSentry.Modules.BankSync.Domain;
 /// An active monthly commitment is placed on the line its latest charge landed in, found by the same key the detector
 /// stored it under (<see cref="CommitmentKeyResolver"/>). That keeps one source of truth for "where does this spend
 /// go": a mortgage paid card to card lands in the household line because its charges do, not because a stored
-/// category says otherwise. A commitment with no charge in the user's history cannot be placed and is left out.
+/// category says otherwise. A commitment with no charge in the user's history cannot be placed and is left out. A
+/// commitment that stopped (an installment paid off, a rent that lapsed) is placed the same way, so an estimate can
+/// tell its line from one that never had a commitment.
 /// </para>
 /// </summary>
 public sealed class MonthlyCategorySpendReader(
@@ -36,7 +38,7 @@ public sealed class MonthlyCategorySpendReader(
         // they have any, and a commitment is placed by charges that may be older than the window.
         var range = await breakdown.GetRangeBreakdownUnscopedAsync(userId, DateOnly.MinValue, to, HistoryMonths, ct);
         if (range.Items.Count == 0)
-            return new MonthlyCategorySpend(null, [], []);
+            return new MonthlyCategorySpend(null, [], [], []);
 
         var firstDataDay = range.Items.Min(i => DateOnly.FromDateTime(i.Date));
         var spending = range.Items.Where(i => i.Bucket == FlowBuckets.Spending).ToList();
@@ -51,14 +53,16 @@ public sealed class MonthlyCategorySpendReader(
             .ToList();
 
         return new MonthlyCategorySpend(
-            firstDataDay, months, await PlaceCommitmentsAsync(userId, spending, ct));
+            firstDataDay,
+            months,
+            Place(await commitments.GetActiveCommitmentsAsync(userId, ct), spending),
+            Place(await commitments.GetEndedCommitmentsAsync(userId, ct), spending));
     }
 
-    private async Task<IReadOnlyList<CommitmentOnLine>> PlaceCommitmentsAsync(
-        Guid userId, IReadOnlyList<FlowBreakdownItem> spending, CancellationToken ct)
+    private IReadOnlyList<CommitmentOnLine> Place(
+        IReadOnlyList<ActiveCommitment> all, IReadOnlyList<FlowBreakdownItem> spending)
     {
-        var active = await commitments.GetActiveCommitmentsAsync(userId, ct);
-        var monthly = active.Where(c => c.Cadence == SubscriptionCadences.Monthly).ToList();
+        var monthly = all.Where(c => c.Cadence == SubscriptionCadences.Monthly).ToList();
         if (monthly.Count == 0)
             return [];
 

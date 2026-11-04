@@ -30,7 +30,7 @@ public sealed class GetBudgetSummaryPaceTests
         spending.Setup(s => s.GetAsync(
                 UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonthlyCategorySpend(
-                new DateOnly(2020, 1, 1), [new CategoryMonthSpend(spendMonth, "FOOD_AND_DRINK", spent)], []));
+                new DateOnly(2020, 1, 1), [new CategoryMonthSpend(spendMonth, "FOOD_AND_DRINK", spent)], [], []));
         var holes = new Mock<ICoverageHoleReader>();
         holes.Setup(h => h.GetHolesAsync(
                 UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))

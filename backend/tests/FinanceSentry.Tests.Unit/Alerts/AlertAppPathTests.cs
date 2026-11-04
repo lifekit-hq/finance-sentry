@@ -163,6 +163,15 @@ public class AlertAppPathTests
             .Should().Be("/transactions?type=debit&category=Dining%20out&from=2026-02-01&to=2026-02-28");
 
     [Theory]
+    [InlineData("HOUSEHOLD")]
+    [InlineData("FAMILY_SUPPORT")]
+    public void A_budget_breach_on_a_counterparty_role_line_opens_the_Budgets_page_not_an_empty_ledger(string line)
+    {
+        AlertAppPath.ForBudgetBreach(line, 2026, 2).Should().Be("/budgets");
+        AlertAppPath.Resolve(AlertType.BudgetBreach, null, line, March14).Should().Be("/budgets");
+    }
+
+    [Theory]
     [InlineData("NVDA", "/assets/NVDA")]
     [InlineData("nvda", null)]
     [InlineData("", null)]

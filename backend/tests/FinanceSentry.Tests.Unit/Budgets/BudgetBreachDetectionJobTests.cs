@@ -80,7 +80,7 @@ public sealed class BudgetBreachDetectionJobTests
     private void Publish(Guid userId)
         => _spending.Setup(s => s.GetAsync(
                 userId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new MonthlyCategorySpend(_firstData, [.. _rows[userId]], []));
+            .ReturnsAsync(() => new MonthlyCategorySpend(_firstData, [.. _rows[userId]], [], []));
 
     private void SetMonthSpend(Guid userId, string category, int year, int month, decimal usdAmount)
     {

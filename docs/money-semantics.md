@@ -1661,7 +1661,9 @@ amount is only an override over one line. Nothing about the estimate is stored: 
 - **Left out, not zero.** A month is skipped (never counted as 0) when (1) it is on the exclusion list
   (`Budgets:Estimates:ExcludedMonths`; default 2026-09 and 2026-10, because card spend moved to a Revolut card the
   bank link does not expose; setting the key replaces the list, an empty list lifts it) or (2) a coverage hole
-  (section 9) overlaps it, open holes included. The page names the skipped months in plain words and why.
+  (section 9) overlaps it, open holes included. The page names the skipped months in plain words (an excluded month is "left out of these estimates", with no
+  claim about where the spending went, since the list is the same for every person; a coverage-hole month says the bank
+  link has a gap there).
 - **Estimate.** The median of the usable months per line (`Projection.Median`). Below
   `Projection.MinCompleteMonths` (3) usable months nothing is suggested from history; the page says how many months it
   has. Lines with a zero median and no spend this month are hidden; a line with spend and no estimate shows as spend.
@@ -1669,7 +1671,13 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   latest charge landed in, so a mortgage paid as a household transfer is not counted twice. On a committed line
   (loans, rent and utilities, family support, household) the commitment total replaces the median for the current and
   future months, so a loan with one payment left is estimated at what is still charged; an installment past its end
-  date drops out. On any other line it is a floor: the estimate never falls below what its commitments charge.
+  date drops out. A committed line whose commitments have all ended (a completed installment, a lapsed or
+  potentially-cancelled rent or subscription, or an active one past its end date) is suggested nothing, not the
+  median, which still holds the payments that stopped; a commitment that ends in the month shown still counts for
+  it. Ended commitments are read through `IActiveCommitmentsReader.GetEndedCommitmentsAsync` and placed like active
+  ones; a past month ignores them (it learns from its own history). A committed line that never had a commitment keeps
+  the median. On any other line the commitment is a floor: the estimate never falls below what its commitments charge,
+  and an ended one leaves its median alone.
 - **Override.** A hand edit is a `budgets` row for one line (stored in the person's base currency, as before). It
   replaces the line's estimate and the screen keeps the suggestion beside it; "Reset to suggested" deletes the row.
   An override on a line with no history still stands.
@@ -1681,3 +1689,7 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   override is the opt-in), at 90% (near limit) and 100% (exceeded) of the effective amount and on pace (day 7-21). It adds one month-level
   `BudgetBreach` alert when expected month end is at least 1.15 times the month's total estimate within the pace
   window, only for a person who has overrides and enough history (so the total is not merely their hand-set amounts).
+- **Drill-down.** `HOUSEHOLD` and `FAMILY_SUPPORT` are identified by counterparty role, not by a stored transaction
+  category, so no ledger category filter matches their spend: their cards offer no "View transactions" and the title is
+  plain text, and a breach alert on either opens the Budgets page (`AlertAppPath.ForBudgetBreach`) instead of a
+  category filter.

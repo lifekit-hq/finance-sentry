@@ -45,8 +45,13 @@ public class BudgetEstimateService(
         var history = EstimateHistory.Resolve(monthStart, currentMonth, series.FirstDataDay, options.Value, holes);
 
         // The detected set describes the commitments held now, so a past month is read from its own history instead.
+        var isPast = phase == MonthPhase.Past;
         var suggestions = BudgetEstimator.Suggest(
-            history, series.Months, phase == MonthPhase.Past ? [] : series.Commitments, monthStart);
+            history,
+            series.Months,
+            isPast ? [] : series.Commitments,
+            isPast ? [] : series.EndedCommitments,
+            monthStart);
 
         var monthKey = monthStart.ToString("yyyy-MM");
         var spentByLine = series.Months

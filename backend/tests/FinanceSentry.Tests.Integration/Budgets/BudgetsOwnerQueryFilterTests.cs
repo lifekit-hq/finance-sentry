@@ -119,7 +119,7 @@ public sealed class BudgetsOwnerQueryFilterTests : IAsyncLifetime
         spending.Setup(s => s.GetAsync(
                 It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonthlyCategorySpend(
-                new DateOnly(2020, 1, 1), [new CategoryMonthSpend($"{slot.Year:D4}-{slot.Month:D2}", "FOOD_AND_DRINK", 150m)], []));
+                new DateOnly(2020, 1, 1), [new CategoryMonthSpend($"{slot.Year:D4}-{slot.Month:D2}", "FOOD_AND_DRINK", 150m)], [], []));
         var holes = new Mock<ICoverageHoleReader>();
         holes.Setup(h => h.GetHolesAsync(
                 It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
