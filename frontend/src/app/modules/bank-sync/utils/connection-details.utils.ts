@@ -82,7 +82,7 @@ export class ConnectionDetailsUtils {
     for (const account of linked) {
       const validTo = ConnectionDetailsUtils.validTo(account.cardValidTo);
       if (validTo) {
-        rows.push({label: `Card •••• ${account.accountNumberLast4}`, value: `Valid to ${validTo}`});
+        rows.push({label: `Card •••• ${account.accountNumberLast4}`, value: `Expires ${validTo}`});
       }
     }
     return rows;
@@ -110,7 +110,7 @@ export class ConnectionDetailsUtils {
     }
     const validTo = ConnectionDetailsUtils.validTo(account.cardValidTo);
     if (validTo) {
-      rows.push({label: 'Card valid to', value: validTo});
+      rows.push({label: 'Card expires', value: validTo});
     }
     if (account.absentSince) {
       rows.push({

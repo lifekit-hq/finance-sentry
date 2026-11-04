@@ -177,7 +177,7 @@ describe('ConnectionDetailsUtils', () => {
       );
 
       expect(value(rows, 'Products')).toBe('Black, Card');
-      expect(value(rows, 'Card •••• 2222')).toBe('Valid to 01/2027');
+      expect(value(rows, 'Card •••• 2222')).toBe('Expires 01/2027');
       expect(value(rows, 'Card •••• 1111')).toBeUndefined();
     });
 
@@ -232,11 +232,11 @@ describe('ConnectionDetailsUtils', () => {
       ]);
     });
 
-    it('names the card valid-to month', () => {
+    it('names the card expiry month', () => {
       const closed = account({closedAt: '2026-10-12T12:00:00Z', cardValidTo: '2026-09'});
 
       expect(
-        value(ConnectionDetailsUtils.closedAccountRows(closed, byId([closed])), 'Card valid to')
+        value(ConnectionDetailsUtils.closedAccountRows(closed, byId([closed])), 'Card expires')
       ).toBe('09/2026');
     });
 
