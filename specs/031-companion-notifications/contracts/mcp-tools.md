@@ -33,7 +33,7 @@ Returns the effective settings (defaults if no row yet). `mode` ∈ `quiet|diges
 | Param | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | int | no | default 25, max 100 |
-| `includeHeldForDigest` | bool | no | default false; only a Digest wake sets true, and it is honoured only with `heldOverrideReason` |
+| `includeHeldForDigest` | bool | no | default false; only a Digest wake and the three-times-a-day ledger-pulse set true, and it is honoured only with `heldOverrideReason` |
 | `heldOverrideReason` | string | with `includeHeldForDigest` | why held events are pulled (the Digest wake payload supplies `"daily digest"`); logged. Without it held events stay excluded and the result carries a `note` |
 
 **Response**: events the agent has not yet delivered (disposition `Pending`/`Dispatched`, plus `HeldForDigest` when requested), newest first:
@@ -70,4 +70,4 @@ AI-permission-gated: the agent runtime serves only accounts holding `ai.use` (Ow
 
 Materiality note: `SyncFailure` is held for the digest in every mode except quiet unless the referenced bank account has had no successful sync for more than 24h (`MaterialityPolicy.SyncFailureEscalationAge`), in which case the mode disposition applies. Provider-level sync failures with no account reference are always held. That is the capture-time decision only: every delivery read (this tool, the dispatch relay, the digest) first runs the SyncFailure reconciliation — an event whose alert has since closed is expired and never returned, and a held one whose alert is still open past the escalation age is escalated to `Pending` (`data-model.md`, "SyncFailure reconciliation at delivery time").
 
-Digest-only kinds: `ConnectionDormant`, `AccountRetired`, `AnalystAction`, `EarningsAhead`, `FamilyStatement` and `FireBrief` never earn their own dispatch wake — in every mode but quiet they are `HeldForDigest` and ride the daily digest (quiet records them as `SuppressedByMode`). The held rows stay readable through `get_pending_companion_events` with `includeHeldForDigest` (`MaterialityPolicy.DigestOnlyKinds`; pinned by `DispositionTests`). `Opportunity` and the other kinds keep the plain mode rule.
+Digest-only kinds: `ConnectionDormant`, `AccountRetired`, `AnalystAction`, `EarningsAhead`, `FamilyStatement`, `FireBrief`, `MarketStructure` and `NewsCluster` never earn their own dispatch wake — in every mode but quiet they are `HeldForDigest` and ride the daily digest (quiet records them as `SuppressedByMode`); `MarketStructure` and `NewsCluster` are batched into the three-times-a-day ledger-pulse instead of one fresh agent session per signal (#1274). The held rows stay readable through `get_pending_companion_events` with `includeHeldForDigest` (`MaterialityPolicy.DigestOnlyKinds`; pinned by `DispositionTests`). `Opportunity` and the other kinds keep the plain mode rule.
