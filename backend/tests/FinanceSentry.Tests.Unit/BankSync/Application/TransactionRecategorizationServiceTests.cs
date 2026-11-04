@@ -489,4 +489,32 @@ public class TransactionRecategorizationServiceTests
         rows[0].MerchantCategory.Should().Be(CategoryKeys.RentAndUtilities);
         _transactions.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Theory]
+    [InlineData(CategoryKeys.Uncategorized)]
+    [InlineData(CategoryKeys.TransferIn)]
+    public async Task ScopedMove_FilesStoredCashLodgementCreditsAsIncome_AndIsIdempotent(string storedCategory)
+    {
+        var accountId = Guid.NewGuid();
+        Transaction Row(string description, string type) =>
+            new(accountId, UserId, 50m, DateTime.UtcNow, description, Guid.NewGuid().ToString())
+            { TransactionType = type, MerchantCategory = storedCategory };
+
+        var lodgement = Row("*ATMLDG TEST BRANCH", "credit");
+        var debit = Row("*ATMLDG TEST BRANCH", "debit");
+        var other = Row("SOME OTHER CREDIT", "credit");
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([lodgement, debit, other]);
+        var scope = new RecategorizationScope(storedCategory, CategoryKeys.Income, DryRun: false);
+
+        var first = await BuildSut().RecategorizeUserAsync(UserId, scope: scope);
+        var second = await BuildSut().RecategorizeUserAsync(UserId, scope: scope);
+
+        lodgement.MerchantCategory.Should().Be(CategoryKeys.Income);
+        debit.MerchantCategory.Should().Be(storedCategory);
+        other.MerchantCategory.Should().Be(storedCategory);
+        first.ReResolved.Should().Be(1);
+        second.ReResolved.Should().Be(0);
+    }
 }
