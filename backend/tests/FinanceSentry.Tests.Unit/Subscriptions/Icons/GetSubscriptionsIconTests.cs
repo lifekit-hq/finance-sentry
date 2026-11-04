@@ -24,6 +24,8 @@ public class GetSubscriptionsIconTests
             .ReturnsAsync(names.Select(Row).ToList());
         repo.Setup(r => r.GetActiveByUserIdAsync("user-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(names.Select(Row).ToList());
+        repo.Setup(r => r.GetLatestPriceChangesAsync("user-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, SubscriptionPriceChange>());
         var catalog = new Mock<IMerchantBrandCatalog>();
         catalog.Setup(c => c.Match(It.IsAny<string?>()))
             .Returns((string? n) => n is not null && n.Contains("Netflix", StringComparison.OrdinalIgnoreCase) ? Netflix : null);

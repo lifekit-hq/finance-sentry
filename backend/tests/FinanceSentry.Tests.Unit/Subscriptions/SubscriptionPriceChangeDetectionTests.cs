@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.Subscriptions;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
+using FinanceSentry.Modules.Subscriptions.Application.Icons;
 using FinanceSentry.Modules.Subscriptions.Application.Queries;
 using FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
@@ -57,7 +58,12 @@ public class SubscriptionPriceChangeDetectionTests : IAsyncDisposable
 
     private async Task<FinanceSentry.Modules.Subscriptions.API.Responses.SubscriptionDto> ListedAsync()
     {
-        var handler = new GetSubscriptionsQueryHandler(new InMemoryDetectedSubscriptionStore(_db));
+        // No curated merchant matches here, so the icon seams are inert; the price change is what is read.
+        var icons = new Mock<IMerchantIconService>();
+        icons.Setup(i => i.GetKnownMissingAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<string>());
+        var handler = new GetSubscriptionsQueryHandler(
+            new InMemoryDetectedSubscriptionStore(_db), Mock.Of<IMerchantBrandCatalog>(), icons.Object);
         var list = await handler.Handle(new GetSubscriptionsQuery(UserId.ToString(), false), default);
         return list.Items.Should().ContainSingle().Subject;
     }
