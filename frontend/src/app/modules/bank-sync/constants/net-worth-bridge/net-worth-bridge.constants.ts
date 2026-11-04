@@ -37,7 +37,7 @@ export const NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS = {
   investmentReturn: 'Price moves on your investments, plus dividends and interest, after fees.',
 } as const;
 
-/** Under the three lines when the bridge is not exact. */
+/** Under the two lines when the bridge is not exact. */
 export const NET_WORTH_BRIDGE_ESTIMATE_NOTE =
   'These figures are estimates: some history or exchange rates are missing or stale.';
 

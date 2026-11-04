@@ -4,8 +4,8 @@ import {API} from './support/dossier-mocks';
 import {mockHome, NET_WORTH_BRIDGE} from './support/home-mocks';
 import {json, mockGet} from './support/visual-baseline';
 
-// The net-worth bridge (finance-framework P4, M5) in two places. Home reads it as three lines under the
-// hero (you saved, markets, exchange rates) and the Change total, following the range chips; Breakdown
+// The net-worth bridge (finance-framework P4, M5) in two places. Home reads it as two lines under the
+// hero (you saved, markets) and the Change total, which also holds the currency effect, following the range chips; Breakdown
 // draws the full waterfall from the start value to the end through each line, always shows the unexplained
 // residual, and says in place when the residual is above tolerance.
 const PHONE = {width: 390, height: 1500};
@@ -66,11 +66,11 @@ test.describe('Home: why net worth moved', () => {
     const card = page.getByTestId('net-worth-why-moved');
     await expect(card.locator('h2')).toContainText('Why it moved');
     await expect(amountOf(page, 'savings')).toHaveText('+$300');
-    await expect(amountOf(page, 'investmentReturn')).toHaveText('-$230');
+    await expect(amountOf(page, 'investmentReturn')).toHaveText('-$150');
     await expect(page.getByTestId('net-worth-why-moved-fxTranslation')).toHaveCount(0);
     await expect(page.getByTestId('net-worth-why-moved-change')).toContainText('+$100');
     await expect(page.getByTestId('net-worth-why-moved-change-note')).toHaveText(
-      'Includes +$30 from accounts linked or removed, revaluations and moves not yet explained.'
+      'Includes -$50 from currency moves, accounts linked or removed, revaluations and moves not yet explained.'
     );
     await expect(page.getByTestId('net-worth-bridge')).toHaveCount(0);
 

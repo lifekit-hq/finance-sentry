@@ -229,11 +229,11 @@ and last snapshot of a window and hands them to the `NetWorthBridge` engine (3.4
 return, the residual and the tolerance flag; `GET /api/v1/net-worth/bridge?from=&to=` (`NetWorthBridgeController`,
 beside `/net-worth/history`) serves it in the person's base currency with the quality and reasons every headline
 carries. Where each line comes from, and what still lands in the residual, is money-semantics §8 (*Net-worth bridge*). The P4
-waterfall (3.7) shows it on Breakdown. Home shows it as three lines - you saved (savings), markets (investment
-return), exchange rates (FX translation) - and the Change total: revaluation, newly linked, unlinked and the
-residual fold into that total, named in one note under it when they reach 1 unit of the currency. This is
-presentation only: the stored data and the computed lines are the same, and the three lines plus the note still
-add to End − Start (money-semantics §8, *Home's three lines*).
+waterfall (3.7) shows it on Breakdown. Home shows it as two lines - you saved (savings), markets (investment
+return) - and the Change total: the currency effect (FX translation, which only Breakdown names), revaluation,
+newly linked, unlinked and the residual fold into that total, named in one note under it when they reach 1 unit
+of the currency. This is presentation only: the stored data and the computed lines are the same, and the two
+lines plus the note still add to End − Start (money-semantics §8, *Home's two lines*).
 
 ### 3.4 The ten measures
 
@@ -243,7 +243,7 @@ add to End − Start (money-semantics §8, *Home's three lines*).
 | M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetSleeveGrowthQuery`, flows from `BrokerageFlowReader`); the crypto sleeve's (flows from `CryptoFlowReader`: venue fiat legs, Binance coin deposits and withdrawals and Revolut X transfers, S2a/S2b; earn and staking rewards, airdrops as income and the dust service charge as a fee, S2c; withheld per venue while its walk is behind, G6) |
 | M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | Book vs SPY's `bookTwr` (brokerage sleeve, cash-inclusive, `BookPerformanceService`); `timeWeightedReturn` on both growth splits (`GetSleeveGrowthQuery`, the P8 timing gap) |
 | M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | Modified Dietz on both sleeves' "Contributed vs growth"; XIRR (ported from ExcelFinancialFunctions) not wired |
-| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | `GET /net-worth/bridge` (`GetNetWorthBridgeQuery` over `NetWorthBridge`); shown by the P4 waterfall on Breakdown and as three lines on Home |
+| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | `GET /net-worth/bridge` (`GetNetWorthBridgeQuery` over `NetWorthBridge`); shown by the P4 waterfall on Breakdown and as two lines on Home |
 | M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | the invested book's current drawdown (`BookDrawdownCalculator`, risk rule); engine: `RiskStatistics` (volatility, 3-year volatility, downside deviation, max drawdown), not wired |
@@ -469,7 +469,7 @@ marked. R7 builds them in the order P3, P8, P2, P4, P5, each after its measure: 
 | P1 | Value-first rows | Each row's main figure is its value; quantity and price are secondary | valuation |
 | P2 | Growth of 10,000 | What 10,000 invested at the start would be worth now, book vs benchmark | M3, M9. **Done (R7), folded into the brokerage Performance card (#1228)**: one "Book vs SPY" line of the two time-weighted returns over the longest window measured for both; the 10,000 end values are gone |
 | P3 | Contributions vs growth | "You put in X; it grew by Y" | M2. **Done (R7)**: Accounts brokerage and crypto sections (Home until #1186), a card per sleeve |
-| P4 | Bridge waterfall | Start → savings → investment return → FX → linked → end | M5. **Done (R7)**: Breakdown card (Home until #1186; Home keeps three lines, 3.3), over the window or month on screen in the base currency; the unexplained residual is always its own row, and above tolerance the card says so in place (DEGRADED, `RESIDUAL_ABOVE_TOLERANCE`); bars drawn in the app until `@lifekit-hq/ui` has a waterfall chart |
+| P4 | Bridge waterfall | Start → savings → investment return → FX → linked → end | M5. **Done (R7)**: Breakdown card (Home until #1186; Home keeps two lines, 3.3), over the window or month on screen in the base currency; the unexplained residual is always its own row, and above tolerance the card says so in place (DEGRADED, `RESIDUAL_ABOVE_TOLERANCE`); bars drawn in the app until `@lifekit-hq/ui` has a waterfall chart |
 | P5 | Monthly-income lens | A large total also shown as the monthly income it could pay | M10, C8. **Done (R7)**: Breakdown, under the twelve-month figure (the Home hero until #1186): "As income: about $X a month", the net worth at the shared safe withdrawal rate ÷ 12 (`IncomeLens`, `GET /wealth/income-lens`), its assumption in words; one figure, as the withdrawal rate is single-valued; hidden with no positive net worth |
 | P6 | 1 / 5 / 10-year table | Average annual total return per standard window, book vs benchmark | M3, long history |
 | P7 | Checklist score | A few yes/no checks per holding, drawn as a shape; ideas only, thresholds cited (C9) | cited thresholds; fits #824 |

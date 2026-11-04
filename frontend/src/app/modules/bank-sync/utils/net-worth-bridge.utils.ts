@@ -97,8 +97,9 @@ export class NetWorthBridgeUtils {
   }
 
   /**
-   * Home's two lines (you saved, markets) and the change, End − Start. Markets carries the currency
-   * effect (Breakdown names it on its own), so the two add up to the change except for the other lines; `changeNote` names the gap.
+   * Home's two lines (you saved, markets) and the change, End − Start. The change keeps every other line
+   * folded in - the currency effect (Breakdown names it on its own), revaluation, the link lines and the
+   * residual - so the two lines need not add up to it; `changeNote` names the gap.
    * Null when the bridge has no figures. Presentation only: the amounts are the bridge's own.
    */
   public static summary(bridge: NetWorthBridgeResponse): Nullable<NetWorthBridgeSummary> {
@@ -108,10 +109,8 @@ export class NetWorthBridgeUtils {
     }
     const savings = bridge.savings ?? 0;
     const investmentReturn = bridge.investmentReturn ?? 0;
-    const fxTranslation = bridge.fxTranslation ?? 0;
     const change = endValue - startValue;
-    const markets = investmentReturn + fxTranslation;
-    const other = change - savings - markets;
+    const other = change - savings - investmentReturn;
     return {
       lines: [
         {
@@ -123,7 +122,7 @@ export class NetWorthBridgeUtils {
         {
           key: 'investmentReturn',
           label: NET_WORTH_BRIDGE_SUMMARY_LABELS.investmentReturn,
-          amount: markets,
+          amount: investmentReturn,
           explanation: NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS.investmentReturn,
         },
       ],
@@ -131,7 +130,7 @@ export class NetWorthBridgeUtils {
       changeNote:
         Math.abs(other) < NET_WORTH_BRIDGE_SUMMARY_NEGLIGIBLE
           ? null
-          : `Includes ${MoneyUtils.format(other, currency, {maxFractionDigits: 0, signed: true})} from accounts linked or removed, revaluations and moves not yet explained.`,
+          : `Includes ${MoneyUtils.format(other, currency, {maxFractionDigits: 0, signed: true})} from currency moves, accounts linked or removed, revaluations and moves not yet explained.`,
       currency,
     };
   }
