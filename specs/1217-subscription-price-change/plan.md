@@ -3,7 +3,7 @@
 ## Backend (Subscriptions module)
 - `Domain/SubscriptionPriceChange` — event row (`subscription_price_changes`): `UserId` (string, as `DetectedSubscription`),
   `SubscriptionId`, `OldAmount`, `NewAmount`, `Currency`, `ChangePercent`, `ChargeDate`, `DetectedAt`. `Tolerance` (10%, `SubscriptionPriceBand.MaxRelativeVariation` in Core, shared with detection's CV gate) and
-  `TryDetect` live here.
+  `TryCreate` live here.
 - `DetectedSubscription.UpdateFromDetection` returns the change it implies (it holds the before and after state); the
   caller stores it and alerts on an increase.
 - `SubscriptionDetectionResultService` stages the change with the row update (one `SaveChanges`) and emits the alert

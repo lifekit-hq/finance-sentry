@@ -10,7 +10,7 @@ Four deterministic detectors — one Hangfire job per detector, all emitting thr
 
 ### [US1] Price hike detection (P1)
 > **Superseded by [1217](../1217-subscription-price-change/spec.md).** The daily sentinel below was replaced by an event
-> recorded where detection sees the new charge: a 2 % tolerance instead of `PriceHikeThreshold`, one alert per change
+> recorded where detection sees the new charge: a 10 % tolerance (detection's own variance band) instead of `PriceHikeThreshold`, one alert per change
 > instead of the 30-day silence, no auto-resolve. `PriceHikeDetectionJob`, `ISubscriptionHygieneSummaryReader` and the
 > `HygieneSentinels:PriceHikeThreshold` key are gone; the `PriceHike` alert type and its companion kind remain.
 
