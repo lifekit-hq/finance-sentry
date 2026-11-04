@@ -60,6 +60,7 @@ import {BrokerageGrowthComponent} from '../../../holdings/components/brokerage-g
 import {type PositionRow} from '../../../holdings/store/holdings.computed';
 import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
+import {ConnectionDetailsDialogComponent} from '../../components/connection-details-dialog/connection-details-dialog.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {ManualHoldingDialogComponent} from '../../components/manual-holding-dialog/manual-holding-dialog.component';
 import {RemoveClosedAccountDialogComponent} from '../../components/remove-closed-account-dialog/remove-closed-account-dialog.component';
@@ -71,6 +72,7 @@ import {
 } from '../../constants/manual-holding/manual-holding.constants';
 import {type ClosedAccountRow} from '../../models/account-lifecycle/account-lifecycle.model';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
+import {type ConnectionDetailsDialogData} from '../../models/connection-details/connection-details.model';
 import {
   type ManualHolding,
   type ManualHoldingDialogData,
@@ -82,11 +84,13 @@ import {PositionValuePipe} from '../../pipes/position-value.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsDisclosureUtils} from '../../utils/accounts-disclosure.utils';
+import {ConnectionDetailsUtils} from '../../utils/connection-details.utils';
 import {InstitutionNavUtils} from '../../utils/institution-nav.utils';
 import {
   CLOSED_ACCOUNT_MENU,
   CLOSED_REPLACED_ACCOUNT_MENU,
   DISCONNECT_ONLY_MENU,
+  MENU_ACTION_DETAILS,
   MENU_ACTION_DISCONNECT,
   MENU_ACTION_RECONNECT,
   MENU_ACTION_REMOVE,
@@ -407,7 +411,9 @@ export class AccountsListComponent implements OnInit {
   }
 
   public onInstitutionAction(institution: Institution, action: string): void {
-    if (action === MENU_ACTION_RECONNECT) {
+    if (action === MENU_ACTION_DETAILS) {
+      this.showInstitutionDetails(institution);
+    } else if (action === MENU_ACTION_RECONNECT) {
       this.reconnect(institution);
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
@@ -419,11 +425,46 @@ export class AccountsListComponent implements OnInit {
   }
 
   public onClosedAccountAction(row: ClosedAccountRow, action: string): void {
-    if (action === MENU_ACTION_REOPEN) {
+    if (action === MENU_ACTION_DETAILS) {
+      this.showClosedAccountDetails(row);
+    } else if (action === MENU_ACTION_REOPEN) {
       this.store.reopenAccount(row.accountId);
     } else if (action === MENU_ACTION_REMOVE) {
       this.removeClosed(row);
     }
+  }
+
+  public showInstitutionDetails(institution: Institution): void {
+    this.openDetails(
+      institution.name,
+      ConnectionDetailsUtils.institutionRows(institution, this.store.allAccounts())
+    );
+  }
+
+  public showClosedAccountDetails(row: ClosedAccountRow): void {
+    const accounts = this.store.allAccounts();
+    const account = accounts.find(candidate => candidate.accountId === row.accountId);
+    if (!account) {
+      return;
+    }
+    this.openDetails(
+      `${row.bankName} •••• ${row.last4}`,
+      ConnectionDetailsUtils.closedAccountRows(
+        account,
+        new Map(accounts.map(candidate => [candidate.accountId, candidate]))
+      )
+    );
+  }
+
+  private openDetails(title: string, rows: ConnectionDetailsDialogData['rows']): void {
+    const data: ConnectionDetailsDialogData = {rows};
+    this.dialog.open(ConnectionDetailsDialogComponent, {
+      title,
+      size: 'sm',
+      phone: 'action-sheet',
+      viewContainerRef: this.viewContainerRef,
+      data,
+    });
   }
 
   public removeClosed(row: ClosedAccountRow): void {
