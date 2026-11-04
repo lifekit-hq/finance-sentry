@@ -226,11 +226,15 @@ describe('NetWorthBridgeUtils', () => {
     });
 
     it('leaves a move under one unit out of the note', () => {
-      expect(NetWorthBridgeUtils.summary(bridge({fxTranslation: 0, endValue: 10_900.4}))?.changeNote).toBeNull();
+      expect(
+        NetWorthBridgeUtils.summary(bridge({fxTranslation: 0, endValue: 10_900.4}))?.changeNote
+      ).toBeNull();
     });
 
     it('reads a missing line as zero', () => {
-      const summary = NetWorthBridgeUtils.summary(bridge({savings: null, fxTranslation: 0, endValue: 10_300}));
+      const summary = NetWorthBridgeUtils.summary(
+        bridge({savings: null, fxTranslation: 0, endValue: 10_300})
+      );
 
       expect(summary?.lines[0].amount).toBe(0);
       expect(summary?.changeNote).toBeNull();
