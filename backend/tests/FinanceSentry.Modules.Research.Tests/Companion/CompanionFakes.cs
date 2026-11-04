@@ -293,6 +293,10 @@ internal sealed class FakeNewsRepository : INewsRepository
         string ticker, DateTimeOffset? since, int limit, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
 
+    public Task<IReadOnlyList<NewsArticle>> GetForTickerBetweenAsync(
+        string ticker, DateTimeOffset from, DateTimeOffset until, int limit, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
+
     public Task<int> InsertNewAsync(IReadOnlyCollection<NewsArticle> articles, CancellationToken ct = default)
     {
         Inserted.AddRange(articles);

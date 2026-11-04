@@ -16,7 +16,12 @@ public sealed class AssetSignalAdapter(ISubjectSignalReader signals) : IAssetSig
         string symbol, int limit, CancellationToken ct = default)
     {
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-LookbackDays));
+        return await GetSinceAsync(symbol, since, limit, ct);
+    }
 
+    public async Task<IReadOnlyList<DossierSignalItem>> GetSinceAsync(
+        string symbol, DateOnly since, int limit, CancellationToken ct = default)
+    {
         var recent = await signals.ListSinceAsync(symbol, since, ct);
 
         return recent

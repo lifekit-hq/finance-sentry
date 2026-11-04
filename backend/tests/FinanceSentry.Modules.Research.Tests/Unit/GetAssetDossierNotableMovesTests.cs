@@ -67,6 +67,38 @@ public class GetAssetDossierNotableMovesTests
     }
 
     [Fact]
+    public async Task OlderMove_OfAHeavilyCoveredTicker_StillFindsItsNews_AndSignal()
+    {
+        const int NewerThanAnyOldCap = 150;
+        var olderMove = Today.AddDays(-20);
+        var ownStory = News("ABCD gaps on guidance", olderMove, "https://news.example/older");
+        var ownSignal = Signal(olderMove, "Notable");
+        var newerNews = Enumerable.Range(0, NewerThanAnyOldCap)
+            .Select(i => News($"Later story {i}", Today.AddDays(-10 + i % 10), $"https://news.example/later/{i}"));
+        var newerSignals = Enumerable.Range(0, NewerThanAnyOldCap)
+            .Select(i => Signal(Today.AddDays(-10 + i % 10), "Info"));
+        var history = new PriceHistory("USD", [new DailyClose(olderMove.AddDays(-1), 100m), new DailyClose(olderMove, 110m)]);
+
+        var moves = (await HandleAsync(history, [ownStory, .. newerNews], [ownSignal, .. newerSignals])).NotableMoves!;
+
+        var links = moves.Moves.Should().ContainSingle().Which.Links;
+        links.Select(l => l.Url ?? l.Kind).Should().BeEquivalentTo("https://news.example/older", MoveLinkKind.Signal);
+    }
+
+    [Fact]
+    public async Task MoveOnTheFirstVisibleDay_FindsASignalFromTheDayBeforeIt()
+    {
+        var firstVisibleDay = Today.AddDays(-new NotableMoveOptions().VisibleDays);
+        var dayBefore = Signal(firstVisibleDay.AddDays(-1), "Alerted");
+        var dayBeforeNews = News("ABCD pre-announcement", firstVisibleDay.AddDays(-1), "https://news.example/edge");
+
+        var moves = (await HandleAsync(Closes(firstVisibleDay, 0.1m), [dayBeforeNews], [dayBefore])).NotableMoves!;
+
+        moves.Moves.Should().ContainSingle().Which.Links.Select(l => l.Kind)
+            .Should().BeEquivalentTo(MoveLinkKind.News, MoveLinkKind.Signal);
+    }
+
+    [Fact]
     public async Task MoveBelowTheThreshold_IsNotListed_AndTheNewsIsNotRead()
     {
         var newsHandler = new Mock<IQueryHandler<GetNewsForTickerQuery, IReadOnlyList<NewsArticleDto>>>();
@@ -153,11 +185,22 @@ public class GetAssetDossierNotableMovesTests
         var newsMock = newsHandler ?? new Mock<IQueryHandler<GetNewsForTickerQuery, IReadOnlyList<NewsArticleDto>>>();
         newsMock
             .Setup(n => n.Handle(It.IsAny<GetNewsForTickerQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(news);
+            .ReturnsAsync((GetNewsForTickerQuery q, CancellationToken _) => (IReadOnlyList<NewsArticleDto>)news
+                .Where(a => (q.Since is null || a.PublishedAt >= q.Since) && (q.Until is null || a.PublishedAt < q.Until))
+                .OrderByDescending(a => a.PublishedAt)
+                .Take(q.Limit)
+                .ToList());
         var signalReader = new Mock<IAssetSignalReader>();
         signalReader
             .Setup(s => s.GetRecentAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(signals);
+        signalReader
+            .Setup(s => s.GetSinceAsync(It.IsAny<string>(), It.IsAny<DateOnly>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, DateOnly since, int limit, CancellationToken _) => (IReadOnlyList<DossierSignalItem>)signals
+                .Where(s => DateOnly.FromDateTime(s.Timestamp.UtcDateTime) >= since)
+                .OrderByDescending(s => s.Timestamp)
+                .Take(limit)
+                .ToList());
         var priceHistory = new Mock<IPriceHistoryService>();
         priceHistory
             .Setup(p => p.GetAsync(Symbol, It.IsAny<string>(), It.IsAny<CancellationToken>()))

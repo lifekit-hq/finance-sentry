@@ -43,6 +43,7 @@ public sealed class GetAssetDossierQueryHandler(
     private const int NewsLimit = 10;
     private const int SignalLimit = 50;
     private const int MoveNewsLimit = 100;
+    private const int MoveSignalLimit = 500;
     private const int AnalystActionLimit = 20;
     private const int AnalystActionDays = 90;
     private const int EarningsDays = 90;
@@ -127,7 +128,7 @@ public sealed class GetAssetDossierQueryHandler(
             benchmarkHistory.Closes.Select(c => c.Close).ToList(),
             yearHistory.Currency);
 
-        var notableMoves = await BuildNotableMovesAsync(symbol, yearHistory, signalResult ?? [], today, ct);
+        var notableMoves = await BuildNotableMovesAsync(symbol, yearHistory, today, ct);
 
         var checks = DossierChecksBuilder.Build(BuildCheckInputs(
             isCrypto, analysts, valuationResult, facts, yearHistory, performance, position, capPercent, thesis));
@@ -157,11 +158,12 @@ public sealed class GetAssetDossierQueryHandler(
 
     /// <summary>
     /// "Why is it moving" (#1218): the days in the visible window whose return reached the threshold, each joined to
-    /// the news and Radar signals already read near it. The news is read again only when a move exists. Null when
-    /// there is no price history to measure; News and Radar are readable by every caller, so this is not gated.
+    /// the news and Radar signals near it. Both are read by date range (one news read per move, one signal read for the
+    /// whole window), and only when a move exists, so the dossier's newest-first capped lists cannot hide an older move's items.
+    /// Null when there is no price history to measure; News and Radar are readable by every caller, so this is not gated.
     /// </summary>
     private async Task<DossierNotableMoves?> BuildNotableMovesAsync(
-        string symbol, PriceHistory history, IReadOnlyList<DossierSignalItem> signals, DateOnly today, CancellationToken ct)
+        string symbol, PriceHistory history, DateOnly today, CancellationToken ct)
     {
         if (history.Closes.Count == 0)
         {
@@ -171,16 +173,28 @@ public sealed class GetAssetDossierQueryHandler(
         var options = moveOptions?.Value ?? new NotableMoveOptions();
         var closes = history.Closes.Select(c => (c.Date, c.Close)).ToList();
         var windowStart = today.AddDays(-options.VisibleDays);
-        if (NotableMoveLinker.FindMoves(closes, windowStart, options.ThresholdPct).Count == 0)
+        var moves = NotableMoveLinker.FindMoves(closes, windowStart, options.ThresholdPct);
+        if (moves.Count == 0)
         {
             return new DossierNotableMoves(options.ThresholdPct, options.WindowDays, options.VisibleDays, []);
         }
 
-        var since = new DateTimeOffset(windowStart.AddDays(-options.WindowDays).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var windowNews = await Safe("move news", () => news.Handle(new GetNewsForTickerQuery(symbol, since, MoveNewsLimit), ct)) ?? [];
+        var signalsSince = windowStart.AddDays(-options.WindowDays);
+        var windowSignals = await Safe("move signals", () => signalReader.GetSinceAsync(symbol, signalsSince, MoveSignalLimit, ct)) ?? [];
+
+        // One bounded read per move, so a heavily covered ticker's newest articles cannot crowd out an older move's.
+        var windowNews = new List<NewsArticleDto>();
+        foreach (var (day, _) in moves)
+        {
+            var rangeStart = new DateTimeOffset(day.AddDays(-options.WindowDays).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var rangeEnd = new DateTimeOffset(day.AddDays(options.WindowDays + 1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            windowNews.AddRange(
+                await Safe("move news", () => news.Handle(new GetNewsForTickerQuery(symbol, rangeStart, MoveNewsLimit, rangeEnd), ct)) ?? []);
+        }
+
         return NotableMoveLinker.Build(
-            symbol, closes, windowNews, signals, windowStart, options.ThresholdPct, options.WindowDays, options.VisibleDays,
-            options.MaxLinksPerMove);
+            symbol, closes, windowNews.DistinctBy(n => n.Id).ToList(), windowSignals, windowStart,
+            options.ThresholdPct, options.WindowDays, options.VisibleDays, options.MaxLinksPerMove);
     }
 
     private async Task<DossierPositionSection?> BuildPositionSectionAsync(

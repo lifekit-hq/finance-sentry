@@ -19,8 +19,9 @@ public sealed class NotableMoveOptions
     public int WindowDays { get; set; } = 1;
 
     /// <summary>
-    /// The dossier's visible window: moves from the last this-many days are shown. Default 30, which is also how
-    /// far back the dossier reads Radar signals, so a larger value would not find more signals.
+    /// The dossier's visible window: moves from the last this-many days are shown. Default 30. News and Radar
+    /// signals are read back to <see cref="WindowDays"/> before the window's start, so a move on its first day still
+    /// finds the items just before it.
     /// </summary>
     public int VisibleDays { get; set; } = 30;
 
