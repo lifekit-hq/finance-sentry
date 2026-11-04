@@ -1,6 +1,5 @@
 # Data Export
 
-
 A signed-in person downloads their own data from **Settings → Your data → Download my data**, which calls
 `GET /api/v1/account/export` (any signed-in person, any role). The response is one JSON file,
 `finance-sentry-export-YYYY-MM-DD.json`, streamed as it is written:
