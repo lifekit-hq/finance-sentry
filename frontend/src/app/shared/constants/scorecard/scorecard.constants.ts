@@ -73,3 +73,10 @@ export const SCORECARD_SCORE_OUT_OF = 100;
 /** The tick beside a rule condition: met, or not met (including a missing axis). */
 export const VERDICT_CONDITION_MET_CLASS = 'bg-gain';
 export const VERDICT_CONDITION_UNMET_CLASS = 'bg-border-strong';
+
+/** The label beside the word: it reads a position the owner does not yet hold (spec 726 US2). */
+export const VERDICT_FOR_NEW_MONEY = 'for new money';
+/** The fixed line on a held position: the word never drives a sale or an add. */
+export const VERDICT_HELD_LINE =
+  'You hold this. Holding follows your thesis and its kill-switch, never the word.';
+export const VERDICT_TURNS_BUY_PREFIX = 'Turns BUY when';

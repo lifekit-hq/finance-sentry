@@ -28,6 +28,19 @@ describe('ScorecardVerdictComponent', () => {
     expect(text(host, 'verdict-fired-rule')).toBe('Rule extended_and_rich.');
   });
 
+  it('drops the word row, the notice and the fired rule when the summary is turned off, keeping the drill-down', () => {
+    const fixture = TestBed.createComponent(ScorecardVerdictComponent);
+    fixture.componentRef.setInput('scorecard', ScorecardFixtures.scorecard());
+    fixture.componentRef.setInput('showSummary', false);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('[data-testid="verdict-word"]')).toBeNull();
+    expect(host.querySelector('[data-testid="verdict-not-advice"]')).toBeNull();
+    expect(host.querySelector('[data-testid="verdict-fired-rule"]')).toBeNull();
+    expect(host.querySelector('[data-testid="verdict-why"]')).not.toBeNull();
+  });
+
   it('says beside the word that it is information, not advice', () => {
     const host = render(ScorecardFixtures.scorecard());
 

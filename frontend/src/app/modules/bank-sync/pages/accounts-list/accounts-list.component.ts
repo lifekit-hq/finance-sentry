@@ -33,6 +33,7 @@ import {
 import {filter, map, pairwise, take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
+import {VerdictChipComponent} from '../../../../shared/components/verdict-chip/verdict-chip.component';
 import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
@@ -130,6 +131,7 @@ const FEED_CURRENCY = 'USD';
     SkeletonComponent,
     SyncStatusLabelPipe,
     SyncStatusVariantPipe,
+    VerdictChipComponent,
   ],
   templateUrl: './accounts-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

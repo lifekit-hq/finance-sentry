@@ -91,6 +91,34 @@ export class ScorecardFixtures {
           ]),
           ScorecardFixtures.rule('otherwise', 'Wait', true, []),
         ],
+        reasons: [
+          {
+            axis: 'Structure',
+            status: 'Pass',
+            text: 'Structure 88 clears the BUY bar of 50 and the STRONG BUY bar of 70.',
+            decisive: false,
+          },
+          {
+            axis: 'Fundamentals',
+            status: 'Pass',
+            text: 'Fundamentals 80 clear the BUY bar of 50 and the STRONG BUY bar of 70.',
+            decisive: false,
+          },
+          {
+            axis: 'Crowding',
+            status: 'Fail',
+            text: 'Crowding is Extended: STRONG BUY needs it not Extended, and Extended with a P/E above its own average is AVOID.',
+            decisive: true,
+          },
+          {
+            axis: 'Valuation',
+            status: 'Fail',
+            text: 'P/E premium to its 5-year average is +29.2%: STRONG BUY allows at most 10%.',
+            decisive: true,
+          },
+        ],
+        turnsBuyWhen:
+          'crowding is no longer Extended or the P/E premium falls to 0% or below (reads +29.2%)',
       },
       ...overrides,
     };

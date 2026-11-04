@@ -318,6 +318,22 @@
         </p>
       </cmn-card>
 
+      <!-- Research verdict (spec 726 US2): the word for new money first under the price, with its reasons and the thesis beside it. Owner only: without ai.use the API sends no scorecard. -->
+      @if (dossier.scorecard; as scorecard) {
+        <cmn-card class="block" data-testid="dossier-verdict">
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
+          <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+            A research read on structure, fundamentals, crowding and valuation. It places no trade.
+          </p>
+          <fns-verdict-block
+            [scorecard]="scorecard"
+            [held]="dossier.position !== null"
+            [thesis]="dossier.thesis"
+            class="mt-cmn-3"
+          />
+        </cmn-card>
+      }
+
       <!-- Ledger's pending proposal on this ticker (#1069): the owner decides; Finance Sentry never trades. -->
       @if (dossier.pendingRecommendation; as recommendation) {
         <fns-recommendation-card
@@ -339,17 +355,6 @@
             >
           }
         </cmn-alert>
-      }
-
-      <!-- Research verdict (spec 726 US2): four axes and a published rule table, never a combined score. -->
-      @if (dossier.scorecard; as scorecard) {
-        <cmn-card class="block" data-testid="dossier-verdict">
-          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
-          <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-            A research read on structure, fundamentals, crowding and valuation. It places no trade.
-          </p>
-          <fns-scorecard-verdict [scorecard]="scorecard" class="mt-cmn-3" />
-        </cmn-card>
       }
 
       @if (!store.hasDossierSections()) {

@@ -414,7 +414,7 @@ describe('AssetDossierComponent', () => {
     expect(byTestId('dossier-verdict')).toBeNull();
   });
 
-  it('shows the research verdict below the proposal, opening into its axes and rules', () => {
+  it('puts the research verdict first under the hero, above the proposal, opening into its axes and rules', () => {
     mockStore.dossier.set({
       ...DOSSIER,
       pendingRecommendation: mkRecommendation(),
@@ -423,15 +423,31 @@ describe('AssetDossierComponent', () => {
     fixture.detectChanges();
 
     const verdict = byTestId('dossier-verdict');
-    expect(byTestId('dossier-hero')?.nextElementSibling?.tagName.toLowerCase()).toBe(
-      'fns-recommendation-card'
-    );
+    expect(byTestId('dossier-hero')?.nextElementSibling).toBe(verdict);
+    expect(verdict?.nextElementSibling?.tagName.toLowerCase()).toBe('fns-recommendation-card');
     expect(verdict?.querySelector('[data-testid="verdict-word"]')?.textContent?.trim()).toBe(
       'AVOID'
     );
+    expect(verdict?.querySelector('[data-testid="verdict-for-new-money"]')).not.toBeNull();
+    expect(verdict?.querySelectorAll('[data-testid="verdict-reason"]').length).toBe(4);
     expect(verdict?.querySelector('[data-testid="verdict-axis-Valuation"]')).not.toBeNull();
     expect(verdict?.querySelector('[data-testid="verdict-rule-extended_and_rich"]')).not.toBeNull();
     expect(verdict?.textContent).toContain('It places no trade.');
+  });
+
+  it('hands the held flag and the thesis to the verdict block', () => {
+    const scorecard = ScorecardFixtures.scorecard({symbol: DOSSIER.symbol});
+    mockStore.dossier.set({...DOSSIER, scorecard});
+    fixture.detectChanges();
+
+    expect(byTestId('verdict-held-line')).not.toBeNull();
+    expect(byTestId('verdict-thesis-state')?.textContent?.trim()).toBe('Thesis active');
+
+    mockStore.dossier.set({...DOSSIER, scorecard, position: null, thesis: null});
+    fixture.detectChanges();
+
+    expect(byTestId('verdict-held-line')).toBeNull();
+    expect(byTestId('verdict-thesis-prompt')).not.toBeNull();
   });
 
   it('says what was recorded once the proposal is decided', () => {

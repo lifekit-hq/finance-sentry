@@ -35,6 +35,7 @@ public class GetAssetDossierVerdictGateTests
         var dossier = await HandleAsync(new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), recommendations);
 
         dossier.Scorecard.Should().NotBeNull();
+        dossier.Scorecard!.Verdict.Reasons.Should().NotBeEmpty("the reasons ride the verdict to the owner");
         dossier.PendingRecommendation.Should().NotBeNull();
         dossier.PendingRecommendation!.Ticker.Should().Be(Symbol);
     }
@@ -46,7 +47,7 @@ public class GetAssetDossierVerdictGateTests
 
         var dossier = await HandleAsync(new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: false), recommendations);
 
-        dossier.Scorecard.Should().BeNull();
+        dossier.Scorecard.Should().BeNull("the reasons and the turns-BUY line live inside the scorecard's verdict, so they go with it");
         dossier.PendingRecommendation.Should().BeNull();
         dossier.Symbol.Should().Be(Symbol);
         recommendations.Verify(

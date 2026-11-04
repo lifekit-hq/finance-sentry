@@ -26,6 +26,11 @@ import {ScorecardUtils} from '../../utils/scorecard.utils';
 })
 export class ScorecardVerdictComponent {
   public readonly scorecard = input.required<ScorecardDto>();
+  /**
+   * Show the word row, the not-advice line and the fired rule above the drill-down. The verdict block already
+   * carries its own word, reasons and notice, so it turns this off and keeps only the drill-down.
+   */
+  public readonly showSummary = input(true);
 
   public readonly notAdvice = NOT_ADVICE_NOTICE;
   public readonly wordLabel = VERDICT_WORD_LABEL;

@@ -30,12 +30,34 @@ export interface VerdictRuleDto {
   conditions: VerdictConditionDto[];
 }
 
+/** How an axis stands against the bars: clears them, falls short, has nothing to read, or the rules do not apply. */
+export type VerdictReasonStatus = 'Pass' | 'Fail' | 'Missing' | 'NotApplicable';
+
+/** One fact behind the word as a sentence, the value against the rule's bar; `decisive` when the fired rule tested the axis. */
+export interface VerdictReasonDto {
+  axis: VerdictAxis;
+  status: VerdictReasonStatus;
+  text: string;
+  decisive: boolean;
+}
+
 export interface VerdictDto {
   word: VerdictWord;
   rulesVersion: number;
   firedRuleId: string;
   structureBasis: VerdictStructureBasis;
   rules: VerdictRuleDto[];
+  /** Derived from the rule table by the backend, never written by a model. One per axis for a scored name. */
+  reasons: VerdictReasonDto[];
+  /** What has to change for the BUY rules to fire; null when already BUY or better, or not scored. */
+  turnsBuyWhen: Nullable<string>;
+}
+
+/** One symbol's verdict word from the batch read behind the Accounts chips. */
+export interface ScorecardVerdictSummary {
+  symbol: string;
+  word: VerdictWord;
+  firedRuleId: string;
 }
 
 /** Fractions stay fractions (0.12 = 12%); window keys are trading days. */
