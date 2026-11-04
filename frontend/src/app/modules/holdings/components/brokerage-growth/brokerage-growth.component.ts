@@ -13,9 +13,10 @@ import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growt
 import {BookVsSpyComponent} from '../book-vs-spy/book-vs-spy.component';
 
 /**
- * One performance panel per sleeve, as plain rows like the account rows above it: value now, contributed, growth with its money-weighted return (finance-framework M2,
- * M4), from the day the daily value history starts, and for the brokerage the book against SPY as a fourth row. While a provider has never reported a deposit the split is withheld and the card says so,
- * instead of reading every deposit as growth.
+ * One performance panel per sleeve, as plain rows like the account rows above it: value now, contributed,
+ * growth with its money-weighted return (finance-framework M2, M4), from the day the daily value history
+ * starts, and for the brokerage the book against SPY as a fourth row. While a provider has never reported a
+ * deposit the split is withheld and the panel says so, instead of reading every deposit as growth.
  */
 @Component({
   selector: 'fns-brokerage-growth',

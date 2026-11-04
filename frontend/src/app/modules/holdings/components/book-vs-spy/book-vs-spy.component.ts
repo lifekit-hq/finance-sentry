@@ -6,9 +6,10 @@ import {HeadlineBadgeComponent} from '../../../../shared/components/headline-bad
 import {BookPerformanceStore} from '../../store/book-performance/book-performance.store';
 
 /**
- * The brokerage book against SPY on one line (finance-framework P2): the book's time-weighted return (M3)
+ * The brokerage book against SPY as one row (finance-framework P2): the book's time-weighted return (M3)
  * and the benchmark's (M9) from the first day of the longest window both were measured over, so deposits and
- * withdrawals move neither. Renders nothing while no window was measured for both, and a retryable error when the request fails.
+ * withdrawals move neither. Renders nothing while no window was measured for both, and a retryable error when
+ * the request fails.
  */
 @Component({
   selector: 'fns-book-vs-spy',
