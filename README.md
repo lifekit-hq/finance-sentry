@@ -17,6 +17,24 @@ Personal finance aggregation platform — bank accounts, crypto, brokerage, budg
 - **Multi-currency dashboard** with aggregated net worth, money flow, and category breakdown
 - **AES-256-GCM encryption** for all stored credentials
 
+## Not financial advice, no warranty
+
+Finance Sentry is a personal tool that shows you information about your own money: balances, totals, scores, verdict
+words (Buy, Hold, Avoid) and AI-written text. None of it is financial, investment, tax or legal advice, and none of it
+is a recommendation to buy, sell or hold anything. The app never places a trade. The software is provided as it is,
+without warranty of any kind, under its licence; the data comes from third parties and can be late, wrong or missing.
+Check anything that matters against the source.
+
+If you run your own copy you are the operator of that instance. You are responsible for who you invite, for what you
+tell them, and for complying with the laws that apply to you. The privacy notice (`/privacy`) and terms (`/terms`)
+shipped in the app are templates written for the original owner's instance: they have had no legal review, so replace
+the bracketed details and have them reviewed before you rely on them. The Ledger's verdicts and recommendations are
+owner-only (they need the `ai.use` permission), and every place that shows one is labelled informational and not
+advice.
+
+Every person can download their own data (Settings → Your data, `GET /api/v1/account/export`): one JSON file of their
+own rows, with no stored secrets. Its format is in [`docs/DATA_EXPORT_GUIDE.md`](docs/DATA_EXPORT_GUIDE.md).
+
 ## Prerequisites
 
 - Docker & Docker Compose

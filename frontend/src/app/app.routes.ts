@@ -39,6 +39,19 @@ export const APP_ROUTES: Routes = [
     redirectTo: AppRoute.Login.slice(1),
   },
   {
+    // The privacy notice and terms are readable before sign-in (the login page links to them) and after it.
+    path: AppRoute.Privacy.slice(1),
+    loadComponent: () =>
+      import('./modules/legal/pages/privacy/privacy.component').then(m => m.PrivacyComponent),
+    ...RouteTitleUtils.of('Privacy notice'),
+  },
+  {
+    path: AppRoute.Terms.slice(1),
+    loadComponent: () =>
+      import('./modules/legal/pages/terms/terms.component').then(m => m.TermsComponent),
+    ...RouteTitleUtils.of('Terms'),
+  },
+  {
     path: AppRoute.McpConnect.slice(1),
     loadComponent: () =>
       import('./modules/auth/pages/mcp-connect/mcp-connect.component').then(

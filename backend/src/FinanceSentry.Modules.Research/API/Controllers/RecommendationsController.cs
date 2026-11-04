@@ -10,10 +10,11 @@ using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
 /// The Decisions queue (#1069). Confirm only records the owner's decision - Finance Sentry never places, stages or
-/// transmits an order; the owner places it at the broker from the order text.
+/// transmits an order; the owner places it at the broker from the order text. Owner-only (<c>ai.use</c>): the queue
+/// holds the Ledger's calls, which are information for the owner and not advice to anyone else.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = AuthPolicies.RequireAiUse)]
 [Route("research/recommendations")]
 public class RecommendationsController(
     IQueryHandler<GetRecommendationsQuery, RecommendationsResult> listHandler,

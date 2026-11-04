@@ -1,0 +1,91 @@
+<div class="flex justify-center bg-surface-bg px-cmn-4 py-cmn-8">
+  <article
+    class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[720px] space-y-cmn-5"
+    data-testid="terms"
+  >
+    <header class="space-y-cmn-1">
+      <h1 class="font-headline text-cmn-xl font-bold text-text-primary">Terms of use</h1>
+      <p class="text-cmn-sm text-text-secondary">Finance Sentry, this instance only</p>
+    </header>
+
+    <cmn-alert variant="warning" class="block" data-testid="template-notice">{{
+      templateNotice
+    }}</cmn-alert>
+
+    <section class="space-y-cmn-2">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">What this is</h2>
+      <p class="text-cmn-sm text-text-secondary">
+        Finance Sentry is a personal finance tool. One person (the owner) runs this copy for
+        themselves and the people they invite. Access is by invitation, and the owner can remove it.
+        These terms cover this copy only.
+      </p>
+    </section>
+
+    <section class="space-y-cmn-2" data-testid="not-advice">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+        Not financial advice
+      </h2>
+      <p class="text-cmn-sm text-text-primary">{{ notAdviceNotice }}</p>
+      <p class="text-cmn-sm text-text-secondary">
+        Everything the app shows you is information: balances, totals, charts, scores, words such as
+        Buy, Hold or Avoid, and anything the AI assistant writes. None of it is advice or a
+        recommendation to buy, sell or hold anything, and none of it takes your situation into
+        account the way an adviser would. The app never places a trade. Decisions are yours. For
+        advice about your own money, talk to a licensed adviser.
+      </p>
+    </section>
+
+    <section class="space-y-cmn-2" data-testid="no-warranty">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">No warranty</h2>
+      <p class="text-cmn-sm text-text-secondary">
+        The app is provided as it is, with no promise that it is correct, complete, current or
+        always available. The data comes from your banks, exchanges and broker through other
+        companies and can be late, wrong or missing. Exchange rates, prices and calculations can be
+        wrong. Check anything that matters against the source before you act on it.
+      </p>
+      <p class="text-cmn-sm text-text-secondary">
+        To the extent the law allows, the owner is not responsible for losses that come from using
+        or relying on the app. Nothing here limits a right or a liability that the law does not let
+        anyone limit.
+      </p>
+    </section>
+
+    <section class="space-y-cmn-2">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Your account</h2>
+      <ul class="list-disc space-y-cmn-1 pl-cmn-5 text-cmn-sm text-text-secondary">
+        <li>Connect only accounts you are entitled to see.</li>
+        <li>Keep your sign-in secure. You are responsible for what happens under it.</li>
+        <li>
+          Do not try to reach anyone else's data, or to break or overload the app. The owner can
+          remove your access if you do.
+        </li>
+      </ul>
+    </section>
+
+    <section class="space-y-cmn-2">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Ending access</h2>
+      <p class="text-cmn-sm text-text-secondary">
+        You can close your account at any time in Settings, and download your data first. The owner
+        can end your access at any time. What happens to your data afterwards is in the privacy
+        notice.
+      </p>
+    </section>
+
+    <section class="space-y-cmn-2">
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Changes and law</h2>
+      <p class="text-cmn-sm text-text-secondary">
+        If these terms change in a way that matters, the owner will tell the people with access.
+        [Owner: add the law and courts that apply, and a contact email.]
+      </p>
+    </section>
+
+    <footer class="flex flex-wrap gap-cmn-2 pt-cmn-2">
+      <cmn-button (clicked)="back()" variant="secondary" data-testid="terms-back">{{
+        backLabel()
+      }}</cmn-button>
+      <cmn-button (clicked)="openPrivacy()" variant="secondary" data-testid="terms-privacy-link"
+        >Read the privacy notice</cmn-button
+      >
+    </footer>
+  </article>
+</div>

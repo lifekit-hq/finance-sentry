@@ -11,6 +11,7 @@ export const SettingsStore = signalStore(
   withAsyncStatus({defaultErrorMessage: 'Failed to load profile.'}),
   withNamedAsyncStatus('profileSave', {defaultErrorMessage: 'Failed to save profile.'}),
   withNamedAsyncStatus('closure', {defaultErrorMessage: 'Could not close the account.'}),
+  withNamedAsyncStatus('export', {defaultErrorMessage: 'Could not prepare your data download.'}),
   withMethods(settingsMethods),
   withComputed(settingsComputed),
   withMethods(settingsEffects),

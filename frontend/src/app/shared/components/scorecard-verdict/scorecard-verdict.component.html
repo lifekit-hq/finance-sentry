@@ -6,6 +6,7 @@
     </cmn-tag>
     <span class="text-cmn-xs text-text-secondary">Rules v{{ verdict.rulesVersion }}</span>
   </div>
+  <p class="text-cmn-xs text-text-secondary" data-testid="verdict-not-advice">{{ notAdvice }}</p>
   @if (firedRule(); as fired) {
     <p class="text-cmn-sm text-text-primary" data-testid="verdict-fired-rule">{{ fired }}</p>
   }

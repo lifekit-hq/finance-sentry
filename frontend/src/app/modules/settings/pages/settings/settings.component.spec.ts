@@ -1,10 +1,11 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {provideRouter} from '@angular/router';
+import {provideRouter, Router} from '@angular/router';
 import {CmnDialogService, ToastService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
@@ -41,6 +42,7 @@ function create(dialogResult?: string) {
     saveProfile: vi.fn(),
     applyChange: vi.fn(),
     closeAccount: vi.fn(),
+    exportData: vi.fn(),
   };
   const dialog = {open: vi.fn(() => ({afterClosed: () => of(dialogResult)}))};
   TestBed.configureTestingModule({
@@ -172,6 +174,7 @@ describe('SettingsComponent Save assumptions button', () => {
       closureDescription: signal('Close your account and sign out everywhere.'),
       canCloseAccount: signal(true),
       isClosureLoading: signal(false),
+      isExportLoading: signal(false),
       updateProfile: vi.fn(),
       saveProfile: vi.fn(),
       applyChange: vi.fn(),
@@ -390,5 +393,26 @@ describe('SettingsComponent account closure', () => {
     component.requestClose();
     expect(dialog.open).not.toHaveBeenCalled();
     expect(store.closeAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe('SettingsComponent your data and legal', () => {
+  it('asks the store to prepare the data download', () => {
+    const {store, component} = create();
+
+    component.exportData();
+
+    expect(store.exportData).toHaveBeenCalledOnce();
+  });
+
+  it('opens the privacy notice and the terms', () => {
+    const {component} = create();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    component.openPrivacy();
+    component.openTerms();
+
+    expect(navigate).toHaveBeenNthCalledWith(1, AppRoute.Privacy);
+    expect(navigate).toHaveBeenNthCalledWith(2, AppRoute.Terms);
   });
 });

@@ -297,6 +297,42 @@
         </cmn-settings-section>
       }
 
+      <cmn-settings-section
+        heading="Your data"
+        description="Download everything this instance holds about you as one JSON file: your accounts, transactions, holdings, budgets, alerts, notes and settings. Stored connection keys are never included."
+      >
+        <cmn-button
+          [loading]="store.isExportLoading()"
+          (clicked)="exportData()"
+          variant="secondary"
+          icon="Download"
+          data-testid="export-data"
+          >Download my data</cmn-button
+        >
+      </cmn-settings-section>
+
+      <cmn-settings-section
+        heading="Legal"
+        description="How this instance handles your data, and the terms of using it. Neither is financial advice."
+      >
+        <div class="flex flex-wrap gap-cmn-2">
+          <cmn-button
+            (clicked)="openPrivacy()"
+            variant="secondary"
+            icon="Shield"
+            data-testid="open-privacy"
+            >Privacy notice</cmn-button
+          >
+          <cmn-button
+            (clicked)="openTerms()"
+            variant="secondary"
+            icon="FileText"
+            data-testid="open-terms"
+            >Terms of use</cmn-button
+          >
+        </div>
+      </cmn-settings-section>
+
       <cmn-danger-zone
         [description]="store.closureDescription()"
         [disabled]="!store.canCloseAccount()"

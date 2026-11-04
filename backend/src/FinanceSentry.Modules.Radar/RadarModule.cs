@@ -76,6 +76,7 @@ public static class RadarModule
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")).UseUpdatedAtStamping(sp));
         services.AddScoped<IUserDataEraser, RadarUserDataEraser>();
+        services.AddScoped<IUserDataExporter, RadarUserDataExporter>();
 
         services.Configure<RadarOptions>(config.GetSection(RadarOptions.SectionName));
         services.Configure<RegimeOptions>(config.GetSection(RegimeOptions.SectionName));

@@ -59,6 +59,7 @@ public static class CompanionModule
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")).UseUpdatedAtStamping(sp));
         services.AddOwnedRowEraser<CompanionDbContext>("Companion");
+        services.AddOwnedRowExporter<CompanionDbContext>("Companion");
         services.AddScoped<IUserCredentialRevoker, CompanionCredentialRevoker>();
 
         services.Configure<CompanionOptions>(config.GetSection(CompanionOptions.SectionName));

@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 /// Aggregate dossier for one symbol: reads all per-ticker data sources in turn (they share one
 /// scoped DbContext) and composes the result. Each section degrades to null / empty on failure — never throws (feature 421).
 /// </summary>
-public sealed record GetAssetDossierQuery(Guid UserId, string Symbol) : IQuery<AssetDossierResult>;
+public sealed record GetAssetDossierQuery(Guid UserId, string Symbol, bool IncludeVerdicts = true) : IQuery<AssetDossierResult>;
 
 public sealed class GetAssetDossierQueryHandler(
     IBookFiguresService bookFigures,
@@ -65,7 +65,9 @@ public sealed class GetAssetDossierQueryHandler(
         var signalResult = await Safe("signals", () => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
         var capFraction = await Safe("position cap", () => positionCap.GetMaxPositionWeightAsync(userId, ct));
         var userTarget = await Safe("price target", () => priceTargets.GetAsync(userId, symbol, ct));
-        var pending = await Safe("pending recommendation", () => recommendations.FindPendingAsync(userId, symbol, ct));
+        var pending = request.IncludeVerdicts
+            ? await Safe("pending recommendation", () => recommendations.FindPendingAsync(userId, symbol, ct))
+            : null;
 
         var bookPosition = book?.Positions.FirstOrDefault(
             p => p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
@@ -97,7 +99,9 @@ public sealed class GetAssetDossierQueryHandler(
         var scorecardValuation = isCrypto
             ? ScorecardValuationAxis.NotApplicableAxis
             : ScorecardValuationAxis.From(valuationResult);
-        var scorecard = await Safe("scorecard", () => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct));
+        var scorecard = request.IncludeVerdicts
+            ? await Safe("scorecard", () => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct))
+            : null;
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 

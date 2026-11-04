@@ -49,6 +49,7 @@ public static class CryptoSyncModule
         services.AddDbContext<CryptoSyncDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
         services.AddOwnedRowEraser<CryptoSyncDbContext>("CryptoSync");
+        services.AddOwnedRowExporter<CryptoSyncDbContext>("CryptoSync");
         services.AddScoped<IUserCredentialRevoker, CryptoSyncCredentialRevoker>();
 
         services.TryAddSingleton(TimeProvider.System);

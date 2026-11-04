@@ -231,6 +231,18 @@ export class SettingsComponent {
     void this.router.navigateByUrl(AppRoute.SettingsPeople);
   }
 
+  public openPrivacy(): void {
+    void this.router.navigateByUrl(AppRoute.Privacy);
+  }
+
+  public openTerms(): void {
+    void this.router.navigateByUrl(AppRoute.Terms);
+  }
+
+  public exportData(): void {
+    this.store.exportData();
+  }
+
   public signOut(): void {
     this.authStore.logout();
   }

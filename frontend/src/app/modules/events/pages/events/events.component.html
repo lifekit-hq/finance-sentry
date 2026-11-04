@@ -266,7 +266,7 @@
                   {{ verdict.text }}
                   <span class="block text-cmn-xs text-text-secondary">
                     {{ verdict.notified ? 'Told you' : 'Kept quiet' }} ·
-                    {{ verdict.recordedAt | date: 'd MMM, HH:mm' }}
+                    {{ verdict.recordedAt | date: 'd MMM, HH:mm' }} · {{ notAdvice }}
                   </span>
                 </blockquote>
               }

@@ -1,11 +1,13 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {RouterLink} from '@angular/router';
 import {AlertComponent, ButtonComponent, SkeletonComponent} from '@lifekit-hq/ui';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../store/auth.store';
 
 @Component({
   selector: 'fns-login',
-  imports: [AlertComponent, ButtonComponent, SkeletonComponent],
+  imports: [AlertComponent, ButtonComponent, RouterLink, SkeletonComponent],
   templateUrl: './login.component.html',
   host: {class: 'block h-full'},
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +26,8 @@ export class LoginComponent {
     return methods !== null && !methods.oidc;
   });
   public readonly flashMessage = this.authStore.flashMessage;
+  public readonly privacyRoute = AppRoute.Privacy;
+  public readonly termsRoute = AppRoute.Terms;
 
   public retryMethods(): void {
     this.authStore.loadSignInMethods();

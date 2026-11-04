@@ -38,6 +38,6 @@ Only the latest release on `main` is supported.
 
 ## Known limits
 
-- No data-export endpoint exists yet (planned; see [`docs/DATA_EXPORT_GUIDE.md`](../docs/DATA_EXPORT_GUIDE.md)).
+- A person's data export (`GET /api/v1/account/export`) covers their own rows and never stored secrets; see [`docs/DATA_EXPORT_GUIDE.md`](../docs/DATA_EXPORT_GUIDE.md) for what is left out.
 - Static analysis is GitHub CodeQL default setup (repository-level scanning) plus Dependabot; there is no third-party penetration test.
 - Self-hosters own their TLS termination, host hardening, key custody and backups.

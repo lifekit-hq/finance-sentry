@@ -233,6 +233,7 @@ public static class ResearchModule
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_research", "public")).UseUpdatedAtStamping(sp));
         services.AddScoped<IUserDataEraser, ResearchUserDataEraser>();
+        services.AddScoped<IUserDataExporter, ResearchUserDataExporter>();
 
         services.AddScoped<IWatchlistRepository, WatchlistRepository>();
         services.AddScoped<IWatchlistReader, WatchlistReader>();

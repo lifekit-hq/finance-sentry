@@ -64,6 +64,7 @@ public static class WealthModule
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
         services.AddScoped<IUserDataEraser, WealthUserDataEraser>();
+        services.AddScoped<IUserDataExporter, WealthUserDataExporter>();
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         services.AddScoped<IManualHoldingRepository, ManualHoldingRepository>();

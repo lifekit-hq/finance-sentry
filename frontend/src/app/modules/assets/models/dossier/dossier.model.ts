@@ -289,11 +289,11 @@ export interface AssetDossierDto {
   performance?: Nullable<DossierPerformanceDto>;
   checks?: Nullable<DossierChecksDto>;
   userTarget?: Nullable<DossierUserTargetDto>;
-  /** Ledger's pending proposal on this ticker (#1069), awaiting the owner's Confirm or Reject. */
+  /** Ledger's pending proposal on this ticker (#1069), awaiting the owner's Confirm or Reject; null for a caller without ai.use. */
   pendingRecommendation?: Nullable<RecommendationDto>;
   /**
-   * The four-axis scorecard and its verdict word (spec 726 US2); null when it could not be read, absent
-   * from older API builds. A non-equity reads NotScored.
+   * The four-axis scorecard and its verdict word (spec 726 US2); null when it could not be read or the caller lacks ai.use,
+   * absent from older API builds. A non-equity reads NotScored.
    */
   scorecard?: Nullable<ScorecardDto>;
 }

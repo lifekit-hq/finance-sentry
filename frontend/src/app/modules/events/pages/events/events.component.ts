@@ -22,6 +22,7 @@ import {
   TagComponent,
 } from '@lifekit-hq/ui';
 
+import {NOT_ADVICE_SHORT} from '../../../../shared/constants/legal/legal.constants';
 import {AlertNavigation} from '../../../alerts/models/alert/alert-destination.model';
 import {
   EVENT_HORIZON_DAYS,
@@ -71,6 +72,7 @@ const SKELETON_ROWS = 4;
 })
 export class EventsComponent {
   public readonly store = inject(EventsStore);
+  public readonly notAdvice = NOT_ADVICE_SHORT;
   public readonly viewTabs: CmnTab[] = [...EVENTS_VIEW_OPTIONS];
   // lk-chip-row carries string values; the handlers convert back.
   public readonly horizonOptions: ChipRowOption[] = EVENT_HORIZON_DAYS.map(days => ({
