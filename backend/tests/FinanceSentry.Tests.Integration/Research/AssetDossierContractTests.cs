@@ -303,6 +303,8 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
     public Mock<IPositionLedgerSource> PositionLedgerMock { get; } = new(MockBehavior.Loose);
     public Mock<IPositionCapSource> PositionCapMock { get; } = new(MockBehavior.Loose);
     public Mock<IFundamentalsService> FundamentalsMock { get; } = new(MockBehavior.Loose);
+    public Mock<IMarketStructureReader> MarketStructureMock { get; } = new(MockBehavior.Loose);
+    public Mock<IMarketRegimeSource> MarketRegimeMock { get; } = new(MockBehavior.Loose);
     public InMemoryAssetLedgerReadRepository LedgerReads { get; } = new();
     public InMemoryAssetPriceTargetRepository PriceTargets { get; } = new();
 
@@ -327,6 +329,8 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             ReplaceService(services, PositionLedgerMock.Object);
             ReplaceService(services, PositionCapMock.Object);
             ReplaceService(services, FundamentalsMock.Object);
+            ReplaceService(services, MarketStructureMock.Object);
+            ReplaceService(services, MarketRegimeMock.Object);
 
             // The real upsert is one INSERT ... ON CONFLICT, which the in-memory provider cannot run
             // (ResearchUpsertTests covers it on Postgres).

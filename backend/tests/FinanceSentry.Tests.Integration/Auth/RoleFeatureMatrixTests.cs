@@ -2,14 +2,18 @@ namespace FinanceSentry.Tests.Integration.Auth;
 
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
+using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Tests.Integration.Research;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -108,6 +112,36 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
 
         passed.Distinct().Should().BeEquivalentTo(Permissions.ByRole[role]);
     }
+
+    /// <summary>
+    /// The dossier is open to every signed-in person, but its verdict sections are the owner's: the same
+    /// ai.use gate as /research/scorecards and /research/recommendations. A Member gets the dossier without the
+    /// scorecard's verdict word (the pending proposal is covered at the handler: the in-memory host cannot store one).
+    /// </summary>
+    [Theory]
+    [InlineData(AuthRoles.Owner, true)]
+    [InlineData(AuthRoles.Member, false)]
+    public async Task Dossier_ReturnsTheVerdictSectionsOnlyToACallerWithAiUse(string role, bool seesVerdicts)
+    {
+        const string symbol = "MATRIXDOSSIER";
+        factory.FundamentalsMock
+            .Setup(f => f.GetFundamentalsAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FundamentalsResult(symbol, [], new FundamentalsCoverage(FundamentalsCoverageStatus.NoSourceAvailable, null, null, [])));
+        using var client = factory.CreateAuthenticatedClient(Guid.NewGuid(), role);
+
+        var response = await client.GetAsync($"/api/v1/research/assets/{symbol}/dossier");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = body.RootElement;
+        root.GetProperty("symbol").GetString().Should().Be(symbol);
+        root.TryGetProperty("generatedAt", out _).Should().BeTrue("the rest of the dossier is unchanged for every caller");
+        IsPresent(root, "scorecard").Should().Be(seesVerdicts);
+        IsPresent(root, "pendingRecommendation").Should().BeFalse("nothing is pending for a fresh person");
+    }
+
+    private static bool IsPresent(JsonElement root, string property)
+        => root.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null;
 
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string feature)
     {

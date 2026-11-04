@@ -19,12 +19,15 @@ public class AssetDossierController(
     ICommandHandler<GenerateAssetLedgerReadCommand, AssetLedgerReadResult> generateHandler,
     IQueryHandler<GetAssetChartQuery, AssetChartResult> chartHandler,
     ICommandHandler<SetAssetPriceTargetCommand, DossierUserTarget> setTargetHandler,
-    ICommandHandler<ClearAssetPriceTargetCommand, bool> clearTargetHandler) : ControllerBase
+    ICommandHandler<ClearAssetPriceTargetCommand, bool> clearTargetHandler,
+    IAuthorizationService authorization) : ControllerBase
 {
+    /// <summary>The dossier. The scorecard verdict and the pending recommendation are the owner's (<c>ai.use</c>): left null for any other caller.</summary>
     [HttpGet("{symbol}/dossier")]
     public async Task<IActionResult> Get(string symbol, CancellationToken ct)
     {
-        var result = await handler.Handle(new GetAssetDossierQuery(User.RequireUserId(), symbol), ct);
+        var includeVerdicts = (await authorization.AuthorizeAsync(User, AuthPolicies.RequireAiUse)).Succeeded;
+        var result = await handler.Handle(new GetAssetDossierQuery(User.RequireUserId(), symbol, includeVerdicts), ct);
         return Ok(result);
     }
 
