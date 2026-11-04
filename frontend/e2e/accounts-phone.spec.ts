@@ -208,7 +208,8 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await openAccounts(page);
 
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
-      const rows = page.locator('cmn-disclosure-row');
+      // The performance panels' own "How this is computed" disclosures are not institution rows.
+      const rows = page.locator('cmn-disclosure-row:not([data-testid="growth-how-computed"])');
       await expect(rows).toHaveCount(3);
       await expect(rows.nth(1)).toContainText('Interactive Brokers');
       await expect(rows.nth(1)).toContainText('1 position');
