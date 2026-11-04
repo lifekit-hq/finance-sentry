@@ -13,6 +13,13 @@ public interface IAssetSignalReader
     /// </summary>
     Task<IReadOnlyList<DossierSignalItem>> GetRecentAsync(
         string symbol, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the Radar signals whose <c>Subject</c> equals <paramref name="symbol"/> dated on or after
+    /// <paramref name="since"/>, newest first, capped at <paramref name="limit"/>.
+    /// </summary>
+    Task<IReadOnlyList<DossierSignalItem>> GetSinceAsync(
+        string symbol, DateOnly since, int limit, CancellationToken ct = default);
 }
 
 /// <summary>A single Radar signal surfaced in the Asset Dossier.</summary>

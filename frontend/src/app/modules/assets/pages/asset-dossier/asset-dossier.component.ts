@@ -49,7 +49,10 @@ import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation
 import {VerdictBlockComponent} from '../../components/verdict-block/verdict-block.component';
 import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
 import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
-import {DOSSIER_SECTION_ID} from '../../constants/dossier/dossier-sections.constants';
+import {
+  DOSSIER_SECTION_ID,
+  NO_LINKED_MOVE_ITEMS_MESSAGE,
+} from '../../constants/dossier/dossier-sections.constants';
 import {
   type ChartRangeId,
   type DossierDeltaDirection,
@@ -149,6 +152,7 @@ export class AssetDossierComponent {
   };
 
   public readonly sectionId = DOSSIER_SECTION_ID;
+  public readonly noLinkedItemsMessage = NO_LINKED_MOVE_ITEMS_MESSAGE;
   public readonly chartRanges = CHART_RANGES;
   public readonly chartSkeletonHeight = CHART_SKELETON_HEIGHT;
   public readonly ownershipNote = OWNERSHIP_NOTE;

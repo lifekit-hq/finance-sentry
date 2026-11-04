@@ -155,4 +155,35 @@ public sealed class NewsArticleJsonbCollectionTests : IAsyncLifetime
         var limited = await repository.GetForTickerAsync("AMD", null, 1);
         limited.Select(a => a.Title).Should().Equal("nvda-a");
     }
+
+    [DockerRequiredFact]
+    public async Task GetForTickerBetween_is_half_open_and_not_crowded_out_by_newer_articles()
+    {
+        var from = DateTimeOffset.UtcNow.AddDays(-20);
+        var until = from.AddDays(2);
+        await SeedAtAsync("before", """["MU"]""", from.AddSeconds(-1));
+        await SeedAtAsync("at-from", """["MU"]""", from);
+        await SeedAtAsync("inside", """["MU"]""", from.AddDays(1));
+        await SeedAtAsync("at-until", """["MU"]""", until);
+        await SeedAtAsync("other-ticker", """["AMD"]""", from.AddDays(1));
+        for (var i = 0; i < 6; i++)
+            await SeedAtAsync($"newer-{i}", """["MU"]""", until.AddDays(1 + i));
+
+        await using var db = CreateContext();
+        var found = await new NewsRepository(db).GetForTickerBetweenAsync("mu", from, until, 3);
+
+        found.Select(a => a.Title).Should().Equal("inside", "at-from");
+    }
+
+    private async Task SeedAtAsync(string title, string tickersJson, DateTimeOffset publishedAt)
+    {
+        await using var db = CreateContext();
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO research.news_articles
+                ("Id", "Source", "Title", "Url", "ContentHash", "PublishedAt", "Tickers", "Categories", "ThesisIds")
+            VALUES (gen_random_uuid(), 'wire', {0}, 'https://example.test/' || {0}, {0}, {1}, {2}::jsonb, '[]'::jsonb, '[]'::jsonb)
+            """,
+            title, publishedAt, tickersJson);
+    }
 }

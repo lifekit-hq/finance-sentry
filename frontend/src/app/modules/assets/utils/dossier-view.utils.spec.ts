@@ -1,5 +1,6 @@
 import {
   type AssetDossierDto,
+  type DossierNotableMoveDto,
   type RecommendationTrendDto,
   type ThesisDto,
   type ValuationSnapshotDto,
@@ -249,6 +250,17 @@ describe('DossierViewUtils.dividendYield', () => {
 });
 
 describe('DossierViewUtils.sectionChips', () => {
+  it('adds a Moves chip only when a notable move exists', () => {
+    const moves = {thresholdPct: 5, windowDays: 1, visibleDays: 30};
+    const labels = (m: DossierNotableMoveDto[]): string[] =>
+      DossierViewUtils.sectionChips(dossier({notableMoves: {...moves, moves: m}})).map(
+        c => c.label
+      );
+
+    expect(labels([])).not.toContain('Moves');
+    expect(labels([{date: '2026-10-20', returnPct: 6, links: []}])).toContain('Moves');
+  });
+
   it('is empty without a dossier', () => {
     expect(DossierViewUtils.sectionChips(null)).toEqual([]);
   });

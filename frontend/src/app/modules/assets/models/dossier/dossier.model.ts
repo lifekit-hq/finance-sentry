@@ -275,6 +275,32 @@ export interface DossierSignalItem {
   payload: Record<string, unknown>;
 }
 
+/** A news item (`url` = its source article) or Radar signal (`severity`, no url) near a notable move. */
+export interface DossierMoveLinkDto {
+  kind: 'news' | 'signal';
+  timestamp: string;
+  title: string;
+  source: string;
+  url: Nullable<string>;
+  severity: Nullable<string>;
+  relevance: number;
+}
+
+/** A day whose return reached the threshold; empty `links` = no linked news or signal found. */
+export interface DossierNotableMoveDto {
+  date: string;
+  returnPct: number;
+  links: DossierMoveLinkDto[];
+}
+
+/** "Why is it moving": the notable moves in the visible window, newest first. */
+export interface DossierNotableMovesDto {
+  thresholdPct: number;
+  windowDays: number;
+  visibleDays: number;
+  moves: DossierNotableMoveDto[];
+}
+
 export interface AssetDossierDto {
   symbol: string;
   position: Nullable<DossierPositionSection>;
@@ -288,6 +314,8 @@ export interface AssetDossierDto {
   /** Null = no price history. */
   performance?: Nullable<DossierPerformanceDto>;
   checks?: Nullable<DossierChecksDto>;
+  /** Null = no price history; empty `moves` = no day reached the threshold. */
+  notableMoves?: Nullable<DossierNotableMovesDto>;
   userTarget?: Nullable<DossierUserTargetDto>;
   /** Ledger's pending proposal on this ticker (#1069), awaiting the owner's Confirm or Reject; null for a caller without ai.use. */
   pendingRecommendation?: Nullable<RecommendationDto>;

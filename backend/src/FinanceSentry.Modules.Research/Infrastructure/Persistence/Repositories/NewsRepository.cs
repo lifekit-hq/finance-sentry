@@ -62,6 +62,17 @@ public class NewsRepository(ResearchDbContext db) : INewsRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<NewsArticle>> GetForTickerBetweenAsync(
+        string ticker, DateTimeOffset from, DateTimeOffset until, int limit, CancellationToken ct = default)
+    {
+        var upper = ticker.ToUpperInvariant();
+        return await db.News.AsNoTracking()
+            .Where(a => a.Tickers.Contains(upper) && a.PublishedAt >= from && a.PublishedAt < until)
+            .OrderByDescending(a => a.PublishedAt)
+            .Take(Math.Clamp(limit, 1, MaxLimit))
+            .ToListAsync(ct);
+    }
+
     public async Task<int> InsertNewAsync(IReadOnlyCollection<NewsArticle> articles, CancellationToken ct = default)
     {
         if (articles.Count == 0)

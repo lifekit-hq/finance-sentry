@@ -259,6 +259,17 @@ window; the 52-week high and low are closing values, not intraday extremes; "fro
 close over that high minus 1. Trade markers are the ingested fills inside the window, each at its own
 trade price and currency.
 
+**Notable moves** (`AssetDossierResult.NotableMoves`, `NotableMoveLinker`, `NotableMoveOptions`, config section
+`NotableMoves`, #1218). A day is a notable move when its close-to-close return against the previous close in the
+same Yahoo series (own quote currency, no conversion; skipped when the previous close is not above 0) is, rounded
+to 0.1 %, at least `ThresholdPct` (default 5) in absolute value, up or down. Only days within the last
+`VisibleDays` (30) are listed, newest first. Each move is joined to the News articles and Radar signals already
+ingested for the symbol whose UTC date is within `WindowDays` (default 1) of the move's UTC date, ranked by whole
+days from the move, then relevance (news: symbol in the title +2, sole tagged ticker +1; signal: `ALERTED` 3,
+`NOTABLE` 2, else 1), then the newer item, at most `MaxLinksPerMove` (5). Items are read by date range, not from
+the dossier's newest-first capped lists. No match is an empty link list (the page says no linked news or signal
+was found); nothing is inferred as a cause. The block is null when there is no price history.
+
 **User target** (`PUT`/`DELETE /research/assets/{symbol}/target`, `AssetPriceTarget`). A per-person fair-value
 price for one symbol, stored as entered (above 0, at most 1e9) with the major currency of the price it was
 set against (optional ISO code). It is the user's own number, drawn beside the analyst mean and low/high (Yahoo `financialData`,

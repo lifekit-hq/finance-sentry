@@ -59,6 +59,24 @@ public sealed class ReadPortCompositionTests
     }
 
     [Fact]
+    public async Task Asset_signals_since_forward_the_given_date_to_the_subject_read()
+    {
+        ListSignalsQuery? captured = null;
+        var now = DateTimeOffset.UtcNow;
+        var handler = new Mock<IQueryHandler<ListSignalsQuery, IReadOnlyList<RadarSignalDto>>>();
+        handler.Setup(h => h.Handle(It.IsAny<ListSignalsQuery>(), It.IsAny<CancellationToken>()))
+            .Callback<ListSignalsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync([Signal(now.AddDays(-50), "older"), Signal(now.AddDays(-45), "newer")]);
+        var since = new DateOnly(2026, 9, 12);
+
+        var rows = await new AssetSignalAdapter(new SubjectSignalReader(handler.Object)).GetSinceAsync("MU", since, 10);
+
+        captured!.Subject.Should().Be("MU");
+        captured.Since.Should().Be(since);
+        rows.Select(r => r.SignalType).Should().Equal("newer", "older");
+    }
+
+    [Fact]
     public async Task Fired_alerts_pass_the_page_request_through_and_keep_the_total()
     {
         GetAlertsByTypesQuery? captured = null;

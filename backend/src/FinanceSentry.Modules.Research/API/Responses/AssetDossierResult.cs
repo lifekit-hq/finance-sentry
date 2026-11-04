@@ -12,6 +12,7 @@ using FinanceSentry.Modules.Research.Domain.Positions;
 /// Performance: the one-year strip, null = no price history. Checks: the summary wheel's traceable
 /// rules (always present; an axis that does not apply is absent). UserTarget: null = none set.
 /// PendingRecommendation: Ledger's pending proposal on the name (#1069), null = none.
+/// NotableMoves: days whose return reached the threshold, each with the news and signals near it (#1218); null = no price history.
 /// Scorecard: the four-axis scorecard and its verdict word (spec 726 US2), null = it could not be read.
 /// </summary>
 public sealed record AssetDossierResult(
@@ -28,7 +29,8 @@ public sealed record AssetDossierResult(
     DossierChecks? Checks = null,
     DossierUserTarget? UserTarget = null,
     RecommendationDto? PendingRecommendation = null,
-    ScorecardResult? Scorecard = null);
+    ScorecardResult? Scorecard = null,
+    DossierNotableMoves? NotableMoves = null);
 
 /// <summary>The user's own fair-value target, in <see cref="Currency"/> (the quote currency it was set in).</summary>
 public sealed record DossierUserTarget(decimal TargetPrice, string? Currency, DateTimeOffset UpdatedAt);
