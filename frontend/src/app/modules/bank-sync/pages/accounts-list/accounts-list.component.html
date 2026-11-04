@@ -198,13 +198,13 @@
             </ul>
           </cmn-disclosure-row>
         }
-        <!-- How the sleeve grew, moved here from Home (#1186): one performance card per sleeve. -->
+        <!-- How the sleeve grew, moved here from Home (#1186): one performance panel per sleeve, flush rows like the accounts above. -->
         @if (section.category === 'brokerage') {
-          <div class="px-cmn-4 pb-cmn-5" data-testid="brokerage-section-growth">
+          <div data-testid="brokerage-section-growth">
             <fns-brokerage-growth />
           </div>
         } @else if (section.category === 'crypto') {
-          <div class="px-cmn-4 pb-cmn-5" data-testid="crypto-section-growth">
+          <div data-testid="crypto-section-growth">
             <fns-brokerage-growth sleeve="crypto" />
           </div>
         }

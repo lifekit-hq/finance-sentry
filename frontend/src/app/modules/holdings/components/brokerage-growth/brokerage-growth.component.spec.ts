@@ -116,7 +116,7 @@ describe('BrokerageGrowthComponent', () => {
     expect(text(render(), 'brokerage-growth-since')).toBe('· since 2 Jul 2026');
   });
 
-  it('shows contributed, growth with its return and value now as stats', () => {
+  it('shows value now, contributed and growth with its return as rows', () => {
     const el = render();
 
     expect(text(el, 'brokerage-growth-contributed')).toContain('$100.00');
@@ -145,7 +145,7 @@ describe('BrokerageGrowthComponent', () => {
   it('puts the newly linked value inside the disclosure', () => {
     const el = render();
 
-    const disclosure = el.querySelector('details');
+    const disclosure = el.querySelector('cmn-disclosure-row');
     expect(disclosure?.textContent).toContain('How this is computed');
     expect(
       disclosure?.querySelector('[data-testid="brokerage-growth-newly-linked"]')
@@ -153,7 +153,17 @@ describe('BrokerageGrowthComponent', () => {
     expect(text(el, 'brokerage-growth-newly-linked')).toBe('+$510.00');
   });
 
-  it('draws the book against SPY line under the brokerage card', () => {
+  it('lists the rows in order: value now, contributed, growth', () => {
+    const labels = Array.from(render().querySelectorAll('cmn-list-item-row')).map(row =>
+      row.textContent?.replace(/\s+/g, ' ').trim()
+    );
+
+    expect(labels[0]).toContain('Value now');
+    expect(labels[1]).toContain('Contributed');
+    expect(labels[2]).toContain('Growth');
+  });
+
+  it('draws the book against SPY row under the brokerage rows', () => {
     expect(render().querySelector('fns-book-vs-spy')).not.toBeNull();
   });
 

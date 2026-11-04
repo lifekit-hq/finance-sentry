@@ -1444,7 +1444,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
 - **Surfaces.** The same `BookPerformance` is served at `GET /api/v1/radar/book-performance` (every period),
-  which the Accounts brokerage Performance card reads for its one "Book vs SPY" line (finance-framework P2): the
+  which the Accounts brokerage Performance panel reads for its one "Book vs SPY" row (finance-framework P2): the
   longest period with both TWRs and the window measured, shown from `bookTwrFrom` as the two signed percentages
   `bookTwr` vs `spyTwr` (the TWR is computed on USD values; the line shows no money amount, so nothing is
   converted to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons`
