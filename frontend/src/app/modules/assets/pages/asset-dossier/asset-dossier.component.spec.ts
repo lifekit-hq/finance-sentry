@@ -757,9 +757,17 @@ describe('AssetDossierComponent', () => {
       expect(text).toContain('+8.2%');
       expect(text).toContain('-6.1%');
       expect(card?.querySelector('a[href="https://example.com/a"]')).not.toBeNull();
-      expect(byTestId('move-signal-link')).not.toBeNull();
       expect(card?.querySelector('a[href^="#"]')).toBeNull();
       expect(text).toContain('no linked news or signal found');
+    });
+
+    it('shows a linked signal as plain text when the Radar signals card is not rendered', () => {
+      mockStore.dossier.set({...DOSSIER, notableMoves: MOVES, radarSignals: []});
+      fixture.detectChanges();
+
+      expect(byTestId('move-signal-link')).toBeNull();
+      expect(byTestId('move-signal-text')?.textContent).toContain('Volume Spike');
+      expect(byTestId('notable-moves')?.textContent).toContain('example-scanner');
     });
 
     it('scrolls to the Radar signals card, without navigating, when a signal is clicked', () => {

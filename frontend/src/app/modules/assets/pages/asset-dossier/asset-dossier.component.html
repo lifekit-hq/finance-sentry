@@ -1260,14 +1260,22 @@
                                     {{ link.timestamp | date: 'mediumDate' }}</span
                                   >
                                 } @else {
-                                  <button
-                                    type="button"
-                                    data-testid="move-signal-link"
-                                    (click)="scrollToSection(sectionId.signals)"
-                                    class="font-medium text-text-primary underline-offset-2 hover:underline"
-                                  >
-                                    {{ link.title | signalTypeLabel }}
-                                  </button>
+                                  @if (dossier.radarSignals.length > 0) {
+                                    <button
+                                      (click)="scrollToSection(sectionId.signals)"
+                                      type="button"
+                                      data-testid="move-signal-link"
+                                      class="font-medium text-text-primary underline-offset-2 hover:underline"
+                                    >
+                                      {{ link.title | signalTypeLabel }}
+                                    </button>
+                                  } @else {
+                                    <span
+                                      class="font-medium text-text-primary"
+                                      data-testid="move-signal-text"
+                                      >{{ link.title | signalTypeLabel }}</span
+                                    >
+                                  }
                                   <span class="text-cmn-xs text-text-secondary">
                                     · Radar signal · {{ link.source }} ·
                                     {{ link.timestamp | date: 'mediumDate' }}</span
