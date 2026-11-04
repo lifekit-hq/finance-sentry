@@ -61,20 +61,46 @@ public static class PublicAddressGuard
     }
 
     /// <summary>
-    /// Connects to the first public address the name resolves to. Used as the handler's connect
-    /// callback, so the check applies to the address actually dialled (no gap between a check and a
-    /// second DNS lookup) and to every redirect hop.
+    /// Connects to the first public address the name resolves to that accepts the connection. Used as
+    /// the handler's connect callback, so the check applies to the address actually dialled (no gap
+    /// between a check and a second DNS lookup) and to every redirect hop.
     /// </summary>
     public static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext context, CancellationToken ct)
     {
         var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, ct);
-        var target = addresses.FirstOrDefault(IsPublic)
-                     ?? throw new HttpRequestException($"No public address for {context.DnsEndPoint.Host}.");
+        return await ConnectFirstPublicAsync(context.DnsEndPoint.Host, addresses, context.DnsEndPoint.Port, DialAsync, ct);
+    }
 
-        var socket = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+    /// <summary>Tries each public address in resolver order and returns the first stream that connects; a failed address falls through to the next.</summary>
+    public static async ValueTask<Stream> ConnectFirstPublicAsync(
+        string host,
+        IEnumerable<IPAddress> addresses,
+        int port,
+        Func<IPEndPoint, CancellationToken, ValueTask<Stream>> dial,
+        CancellationToken ct)
+    {
+        Exception? last = null;
+        foreach (var address in addresses.Where(IsPublic))
+        {
+            try
+            {
+                return await dial(new IPEndPoint(address, port), ct);
+            }
+            catch (Exception ex) when (ex is SocketException or IOException)
+            {
+                last = ex;
+            }
+        }
+
+        throw new HttpRequestException(last is null ? $"No public address for {host}." : $"No public address for {host} accepted the connection.", last);
+    }
+
+    private static async ValueTask<Stream> DialAsync(IPEndPoint endpoint, CancellationToken ct)
+    {
+        var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
-            await socket.ConnectAsync(new IPEndPoint(target, context.DnsEndPoint.Port), ct);
+            await socket.ConnectAsync(endpoint, ct);
             return new NetworkStream(socket, ownsSocket: true);
         }
         catch
