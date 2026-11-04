@@ -549,6 +549,21 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Raises a Warning alert that the month is on track to finish above the person's estimate for it: the expected
+    /// month-end total (what is spent plus what is still due, <see cref="FinanceSentry.Core.Utils.BudgetPace"/> for
+    /// the discretionary lines) against the total of their effective amounts. Deduped per (<paramref name="year"/>,
+    /// <paramref name="month"/>) like the per-line alerts: once raised, never raised again for that month.
+    /// </summary>
+    Task GenerateBudgetTotalPaceAlertAsync(
+        Guid userId,
+        decimal estimateUsd,
+        decimal expectedMonthEndUsd,
+        decimal spentUsd,
+        int year,
+        int month,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Raises a monthly family-clearing-statement Info alert (434 S5) summarising per-counterparty
     /// received/sent and rent confirmation for one calendar month. Silenced so the monthly cron
     /// doesn't repeat on a re-run within the same month.

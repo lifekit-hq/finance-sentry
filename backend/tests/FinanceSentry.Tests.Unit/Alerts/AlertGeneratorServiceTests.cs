@@ -1037,6 +1037,50 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GenerateBudgetTotalPace_NoExisting_AddsWarningAlertForTheMonth()
+    {
+        AllowAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetTotalPaceAlertAsync(_userId, 1100m, 1430m, 200m, 2026, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.BudgetBreach &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "Monthly estimate" &&
+            a.Title.Contains("September 2026") &&
+            a.Message.Contains("1430.00") &&
+            a.Message.Contains("1100.00") &&
+            a.Message.Contains("130%")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetTotalPace_AlreadyRaisedForTheMonth_SkipsCreation()
+    {
+        _repo.Setup(r => r.ExistsAsync(_userId, AlertType.BudgetBreach, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(true);
+
+        await _service.GenerateBudgetTotalPaceAlertAsync(_userId, 1100m, 1430m, 200m, 2026, 9);
+
+        VerifyNothingAdded();
+    }
+
+    [Fact]
+    public async Task GenerateBudgetTotalPace_ADifferentMonth_IsADifferentReference()
+    {
+        var references = new List<Guid?>();
+        AllowAlert(AlertType.BudgetBreach);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => references.Add(a.ReferenceId))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateBudgetTotalPaceAlertAsync(_userId, 1100m, 1430m, 200m, 2026, 9);
+        await _service.GenerateBudgetTotalPaceAlertAsync(_userId, 1100m, 1430m, 200m, 2026, 10);
+
+        Assert.Equal(2, references.Distinct().Count());
+    }
+
+    [Fact]
     public async Task GenerateBudgetExceeded_NoExisting_AddsWarningAlert()
     {
         var budgetId = Guid.NewGuid();

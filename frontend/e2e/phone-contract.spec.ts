@@ -55,9 +55,8 @@ for (const [name, viewport] of Object.entries(PHONES)) {
     test('a tab root has a large title and no back chevron', async ({page}) => {
       await openPage(page, '/budgets');
 
-      await expect(page.getByRole('heading', {name: 'Budgets', level: 1})).toBeVisible();
+      await expect(page.getByRole('heading', {name: 'Monthly estimates', level: 1})).toBeVisible();
       await expect(page.getByRole('button', {name: 'Back'})).toHaveCount(0);
-      await expect(page.getByRole('button', {name: 'Add budget'})).toBeVisible();
     });
 
     test('More lists the destinations and the account items; the avatar is gone', async ({

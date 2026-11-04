@@ -8,7 +8,6 @@ import {guestGuard} from './modules/auth/guards/guest.guard';
 import {permissionGuard} from './modules/auth/guards/permission.guard';
 import {
   ALERTS_MARK_ALL_READ_ACTION,
-  BUDGETS_ADD_ACTION,
   SUBSCRIPTIONS_ADD_ACTION,
 } from './shared/constants/page-actions/page-actions.constants';
 import {TAB_PRELOAD_DATA} from './shared/constants/tab-preload/tab-preload.constants';
@@ -128,10 +127,7 @@ export const APP_ROUTES: Routes = [
         path: AppRoute.Budgets.slice(1),
         loadComponent: () =>
           import('./modules/budgets/pages/budgets/budgets.component').then(m => m.BudgetsComponent),
-        ...RouteTitleUtils.of('Budgets'),
-        data: {
-          actions: [{id: BUDGETS_ADD_ACTION, label: 'Add budget', icon: 'Plus'}],
-        } satisfies PageChromeData,
+        ...RouteTitleUtils.of('Monthly estimates'),
       },
       {
         path: AppRoute.Subscriptions.slice(1),

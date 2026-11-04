@@ -1,16 +1,16 @@
 import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
-import {type BudgetSummaryItem} from '../../models/budget/budget.model';
+import {type BudgetSummaryResponse} from '../../models/budget/budget.model';
 import {type BudgetsState} from './budgets.state';
 
 export function budgetsMethods(store: WritableStateSource<BudgetsState>) {
   return {
-    setSummaryItems(summaryItems: BudgetSummaryItem[]): void {
-      patchState(store, {summaryItems, refreshFailed: false});
+    setSummary(summary: BudgetSummaryResponse): void {
+      patchState(store, {summary, refreshFailed: false});
     },
-    setEditing(id: Nullable<string>): void {
-      patchState(store, {editingId: id});
+    setEditing(category: Nullable<string>): void {
+      patchState(store, {editingCategory: category});
     },
     clearRefreshFailed(): void {
       patchState(store, {refreshFailed: false});
@@ -18,28 +18,8 @@ export function budgetsMethods(store: WritableStateSource<BudgetsState>) {
     setRefreshFailed(): void {
       patchState(store, {refreshFailed: true});
     },
-    updateBudgetInList(id: string, monthlyLimit: number): void {
-      patchState(store, (s: BudgetsState) => ({
-        summaryItems: s.summaryItems.map(b =>
-          b.id === id
-            ? {
-                ...b,
-                monthlyLimit,
-                remaining: monthlyLimit - b.spent,
-                isOverBudget: b.spent > monthlyLimit,
-              }
-            : b
-        ),
-        editingId: null,
-      }));
-    },
-    removeBudget(id: string): void {
-      patchState(store, (s: BudgetsState) => ({
-        summaryItems: s.summaryItems.filter(b => b.id !== id),
-      }));
-    },
     setSelectedPeriod(year: number, month: number): void {
-      patchState(store, {selectedYear: year, selectedMonth: month});
+      patchState(store, {selectedYear: year, selectedMonth: month, summary: null});
     },
   };
 }

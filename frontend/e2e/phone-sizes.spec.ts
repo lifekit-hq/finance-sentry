@@ -28,10 +28,12 @@ const BUDGETS = {
   month: 9,
   items: [
     {
-      id: 'b-1',
+      overrideId: null,
       category: 'GROCERIES',
       categoryLabel: 'Groceries',
-      monthlyLimit: 600,
+      estimate: 600,
+      suggestedAmount: 600,
+      source: 'history',
       spent: 280,
       remaining: 320,
       isOverBudget: false,
@@ -39,10 +41,16 @@ const BUDGETS = {
       paceRatio: 0.47,
       projectedMonthEndSpend: 560,
       isOffPace: false,
+      expectedMonthEnd: 600,
     },
   ],
-  totalLimit: 600,
+  totalEstimate: 600,
   totalSpent: 280,
+  expectedMonthEnd: 600,
+  hasEnoughHistory: true,
+  historyMonthsUsed: 6,
+  minHistoryMonths: 3,
+  skippedMonths: [],
 };
 
 const WATCHLIST = [
@@ -191,7 +199,7 @@ for (const width of WIDTHS) {
         );
         expect(clipped).toEqual([]);
 
-        const heading = await box(page.getByRole('heading', {name: 'Budgets', level: 1}));
+        const heading = await box(page.getByRole('heading', {name: 'Monthly estimates', level: 1}));
         expect(heading.x).toBeGreaterThanOrEqual(GUTTER_PX);
         await proof(page, 'shell-budgets');
       });
@@ -208,8 +216,8 @@ test.describe('phone dialogs', () => {
       test.use({viewport, hasTouch: true, isMobile: true});
 
       test('a form opens as a bottom sheet with 16px+ fields', async ({page}) => {
-        await open(page, '/budgets');
-        await page.getByRole('button', {name: 'Add budget'}).click();
+        await open(page, '/subscriptions');
+        await page.getByRole('button', {name: 'Add subscription'}).click();
         const dialog = page.locator('.cmn-dialog-shell');
         await expect(dialog).toBeVisible();
         await expect(page.locator('cmn-dialog-container')).toHaveAttribute(
@@ -230,7 +238,7 @@ test.describe('phone dialogs', () => {
         for (const font of fonts) {
           expect(font).toBeGreaterThanOrEqual(MIN_FIELD_FONT_PX);
         }
-        await proof(page, 'sheet-add-budget');
+        await proof(page, 'sheet-add-subscription');
       });
 
       test('the connect flow is full-screen', async ({page}) => {
@@ -294,8 +302,8 @@ test.describe('phone dialogs', () => {
     test.use({viewport: DESKTOP});
 
     test('a form and a confirm stay centred dialogs', async ({page}) => {
-      await open(page, '/budgets');
-      await page.getByRole('button', {name: 'Add budget'}).click();
+      await open(page, '/subscriptions');
+      await page.getByRole('button', {name: 'Add subscription'}).click();
       const dialog = page.locator('.cmn-dialog-shell');
       await expect(dialog).toBeVisible();
       await expect(page.locator('cmn-dialog-container')).toHaveAttribute(

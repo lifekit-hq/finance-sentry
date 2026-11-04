@@ -1,20 +1,10 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-  ViewContainerRef,
-} from '@angular/core';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {type Params, Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   AsyncStateComponent,
   CardComponent,
-  CmnDialogService,
-  CmnPageActionsService,
   IconComponent,
   InputComponent,
   MenuComponent,
@@ -25,9 +15,7 @@ import {
   SkeletonComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
-import {take} from 'rxjs';
 
-import {BUDGETS_ADD_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
@@ -36,22 +24,34 @@ import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {CategoryColourUtils} from '../../../../shared/utils/category-colour.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {DateUtils} from '../../../../shared/utils/date.utils';
-import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
 import {
   BUDGET_NEAR_LIMIT_PCT,
   BUDGETS_LOAD_ERROR_MESSAGE,
 } from '../../constants/budget/budget.constants';
-import {type CreateBudgetRequest} from '../../models/budget/budget.model';
+import {type BudgetSummaryItem} from '../../models/budget/budget.model';
 import {BudgetsStore} from '../../store/budgets/budgets.store';
+import {BudgetEstimateUtils} from '../../utils/budget-estimate.utils';
 
 const PCT_MAX = 100;
 const SKELETON_CARDS = 3;
 
-const BUDGET_MENU_ITEMS: MenuItem[] = [
-  {id: 'edit', label: 'Edit limit', icon: 'Pencil'},
-  {id: 'transactions', label: 'View transactions', icon: 'ArrowRight'},
-  {id: 'remove', label: 'Remove budget', icon: 'Trash2', destructive: true},
-];
+const EDIT_ITEM: MenuItem = {id: 'edit', label: 'Edit estimate', icon: 'Pencil'};
+const TRANSACTIONS_ITEM: MenuItem = {
+  id: 'transactions',
+  label: 'View transactions',
+  icon: 'ArrowRight',
+};
+const RESET_ITEM: MenuItem = {id: 'reset', label: 'Reset to suggested', icon: 'Undo2'};
+const REMOVE_ITEM: MenuItem = {
+  id: 'reset',
+  label: 'Remove my amount',
+  icon: 'Trash2',
+  destructive: true,
+};
+
+const PLAIN_MENU: MenuItem[] = [EDIT_ITEM, TRANSACTIONS_ITEM];
+const RESET_MENU: MenuItem[] = [EDIT_ITEM, RESET_ITEM, TRANSACTIONS_ITEM];
+const REMOVE_MENU: MenuItem[] = [EDIT_ITEM, REMOVE_ITEM, TRANSACTIONS_ITEM];
 
 @Component({
   selector: 'fns-budgets',
@@ -78,8 +78,6 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
 })
 export class BudgetsComponent {
   private readonly router = inject(Router);
-  private readonly dialog = inject(CmnDialogService);
-  private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(BudgetsStore);
@@ -87,7 +85,7 @@ export class BudgetsComponent {
   public readonly skeletonCards = Array.from({length: SKELETON_CARDS});
   // The cards belong to one month, so a failed or pending month never keeps the previous
   // month's cards on screen (`hasData: false`): it shows the skeleton or the error instead.
-  // A failed refresh after an edit is the exception: the list is still valid, so it stays under
+  // A failed refresh after an edit is the exception: the page is still valid, so it stays under
   // the error banner.
   public readonly view = computed(() => {
     const hasData = this.store.refreshFailed();
@@ -102,90 +100,80 @@ export class BudgetsComponent {
   public readonly errorPlacement = computed(() =>
     this.store.refreshFailed() ? 'above' : 'replace'
   );
+  // An empty month is either "not enough history yet" (nothing can be estimated) or a quiet month.
+  public readonly emptyMessage = computed(() =>
+    this.store.hasEnoughHistory()
+      ? 'Nothing to estimate for ' + this.store.monthName()
+      : 'Not enough history to estimate yet'
+  );
+  public readonly emptySubMessage = computed(() =>
+    this.store.hasEnoughHistory()
+      ? 'No category has a typical amount or any spending this month.'
+      : `Estimates are learned from at least ${this.store.minHistoryMonths()} months of bank history; ${this.store.historyMonthsUsed()} so far.`
+  );
 
   public readonly editValue = signal('');
-  public readonly budgetMenuItems = BUDGET_MENU_ITEMS;
   public readonly nearLimitPct = BUDGET_NEAR_LIMIT_PCT;
   public readonly currentMonth = new Date();
-
-  constructor() {
-    inject(CmnPageActionsService)
-      .on(BUDGETS_ADD_ACTION)
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => this.openAddBudget());
-  }
 
   public categoryColor(category: string): string {
     return ChartColorUtils.css(CategoryColourUtils.of(category));
   }
 
-  public barPct(spent: number, limit: number): number {
-    return Math.min((spent / limit) * PCT_MAX, PCT_MAX);
+  public barPct(spent: number, estimate: number): number {
+    return BudgetEstimateUtils.usedPct(spent, estimate);
   }
 
   public pacePct(paceRatio: number): number {
     return Math.round(paceRatio * PCT_MAX);
   }
 
-  public barColor(spent: number, limit: number, category: string): string {
-    const pct = (spent / limit) * PCT_MAX;
-    if (spent > limit) {
+  public barColor(spent: number, estimate: number, category: string): string {
+    if (spent > estimate) {
       return 'var(--color-status-error)';
     }
-    if (pct >= BUDGET_NEAR_LIMIT_PCT) {
+    if (this.barPct(spent, estimate) >= BUDGET_NEAR_LIMIT_PCT) {
       return 'var(--color-status-warning)';
     }
     return this.categoryColor(category);
   }
 
-  public onBudgetAction(
-    action: string,
-    budget: {id: string; category: string; monthlyLimit: number}
-  ): void {
+  public menuFor(item: BudgetSummaryItem): MenuItem[] {
+    if (item.overrideId === null) {
+      return PLAIN_MENU;
+    }
+    return item.suggestedAmount === null ? REMOVE_MENU : RESET_MENU;
+  }
+
+  public onBudgetAction(action: string, item: BudgetSummaryItem): void {
     if (action === 'edit') {
-      this.startEdit(budget.id, budget.monthlyLimit);
+      this.startEdit(item.category, item.estimate);
     } else if (action === 'transactions') {
-      this.viewTransactions(budget.category);
-    } else if (action === 'remove') {
-      this.store.remove(budget.id);
+      this.viewTransactions(item.category);
+    } else if (action === 'reset' && item.overrideId !== null) {
+      this.store.resetOverride(item.overrideId);
     }
   }
 
-  public startEdit(id: string, monthlyLimit: number): void {
-    this.editValue.set(String(monthlyLimit));
-    this.store.setEditing(id);
+  public startEdit(category: string, estimate: number | null): void {
+    this.editValue.set(estimate === null ? '' : String(estimate));
+    this.store.setEditing(category);
   }
 
-  public saveEdit(id: string): void {
+  public saveEdit(item: BudgetSummaryItem): void {
     // Enter/Escape clear the editing state and the input's removal fires focusout; ignore that late save.
-    if (this.store.editingId() !== id) {
+    if (this.store.editingCategory() !== item.category) {
       return;
     }
-    const val = parseFloat(this.editValue());
-    if (!isNaN(val) && val > 0) {
-      this.store.update({id, monthlyLimit: val});
+    const amount = parseFloat(this.editValue());
+    if (!isNaN(amount) && amount > 0) {
+      this.store.saveOverride({category: item.category, overrideId: item.overrideId, amount});
     }
     this.store.setEditing(null);
   }
 
   public cancelEdit(): void {
     this.store.setEditing(null);
-  }
-
-  public openAddBudget(): void {
-    this.dialog
-      .open<CreateBudgetRequest>(AddBudgetDialogComponent, {
-        title: 'Add budget',
-        size: 'sm',
-        viewContainerRef: this.viewContainerRef,
-      })
-      .afterClosed()
-      .pipe(take(1))
-      .subscribe(request => {
-        if (request) {
-          this.store.create(request);
-        }
-      });
   }
 
   public viewTransactions(category: string): void {

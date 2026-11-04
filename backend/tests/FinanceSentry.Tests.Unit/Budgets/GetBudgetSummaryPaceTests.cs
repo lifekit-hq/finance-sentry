@@ -1,10 +1,13 @@
 namespace FinanceSentry.Tests.Unit.Budgets;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Budgets.API.Responses;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Queries;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -16,22 +19,26 @@ public sealed class GetBudgetSummaryPaceTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private static Task<FinanceSentry.Modules.Budgets.API.Responses.BudgetSummaryResponse> Run(
+    private static Task<BudgetSummaryResponse> Run(
         DateTimeOffset now, decimal spent, int? year = null, int? month = null)
     {
         var budgets = new Mock<IBudgetRepository>();
         budgets.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([Budget.Create(UserId, "FOOD", 100m, "USD")]);
-        var normalization = new Mock<ICategoryNormalizationService>();
-        normalization.Setup(n => n.Normalize(It.IsAny<string>())).Returns((string c) => c);
-        normalization.Setup(n => n.GetLabel(It.IsAny<string>())).Returns((string c) => c);
-        var spending = new Mock<IMerchantSpendingReader>();
-        spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
+            .ReturnsAsync([Budget.Create(UserId, "FOOD_AND_DRINK", 100m, "USD")]);
+        var spendMonth = $"{year ?? now.Year:D4}-{month ?? now.Month:D2}";
+        var spending = new Mock<IMonthlyCategorySpendReader>();
+        spending.Setup(s => s.GetAsync(
                 UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal> { ["FOOD"] = spent });
+            .ReturnsAsync(new MonthlyCategorySpend(
+                new DateOnly(2020, 1, 1), [new CategoryMonthSpend(spendMonth, "FOOD_AND_DRINK", spent)], []));
+        var holes = new Mock<ICoverageHoleReader>();
+        holes.Setup(h => h.GetHolesAsync(
+                UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
-        var handler = new GetBudgetSummaryQueryHandler(
-            budgets.Object, normalization.Object, spending.Object, new FixedClock(now));
+        var estimates = new BudgetEstimateService(
+            spending.Object, holes.Object, new CategoryNormalizationService(), Options.Create(new BudgetEstimateOptions()));
+        var handler = new GetBudgetSummaryQueryHandler(budgets.Object, estimates, new FixedClock(now));
         return handler.Handle(new GetBudgetSummaryQuery(UserId, year, month), CancellationToken.None);
     }
 

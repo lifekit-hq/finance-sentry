@@ -649,6 +649,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             ct);
     }
 
+    public Task GenerateBudgetTotalPaceAlertAsync(
+        Guid userId, decimal estimateUsd, decimal expectedMonthEndUsd, decimal spentUsd,
+        int year, int month, CancellationToken ct = default)
+    {
+        var expectedPct = estimateUsd == 0m ? 0 : (int)Math.Round(expectedMonthEndUsd / estimateUsd * 100);
+        var period = BudgetPeriodLabel(year, month);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("total-pace", Guid.Empty, year, month), TotalEstimateLabel,
+            $"Month off pace: {period}",
+            $"{period} is on track to finish at {expectedMonthEndUsd:F2} USD, {expectedPct}% of its {estimateUsd:F2} USD estimate ({spentUsd:F2} USD spent so far).")
+        { Dedup = AlertDedup.OncePerReference, AppPath = AlertAppPath.ForBudgetTotal(year, month) },
+            ct);
+    }
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -795,6 +811,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// </summary>
     private static Guid BudgetBreachReferenceId(string crossingKind, Guid budgetId, int year, int month)
         => DerivedReferenceId($"budget-breach:{crossingKind}:{budgetId:N}:{year:D4}-{month:D2}");
+
+    /// <summary>The reference label of the month-total alert, which belongs to no single category.</summary>
+    private const string TotalEstimateLabel = "Monthly estimate";
 
     private static string BudgetPeriodLabel(int year, int month)
         => new DateOnly(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);

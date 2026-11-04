@@ -580,6 +580,11 @@ public class RunThesisMonitorHandlerTests
             decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateBudgetTotalPaceAlertAsync(
+            Guid userId, decimal estimateUsd, decimal expectedMonthEndUsd, decimal spentUsd,
+            int year, int month, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task GenerateFamilyStatementAlertAsync(
             Guid userId, string headline, string body, CancellationToken ct = default)
             => Task.CompletedTask;

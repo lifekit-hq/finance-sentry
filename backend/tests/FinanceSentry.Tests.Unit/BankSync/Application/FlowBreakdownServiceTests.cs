@@ -373,4 +373,33 @@ public class FlowBreakdownServiceTests
 
         summary.TopCategory.Should().Be("UNCATEGORIZED");
     }
+
+    [Fact]
+    public async Task UnscopedRange_ReadsTheUnscopedRepositories_ForACallerWithNoPerson()
+    {
+        // A job has no principal, so the Owner-filtered reads would return nothing: the unscoped entry point must
+        // never touch them, and must label the rows exactly as the request path does.
+        var (account, accountId) = MakeAccount("USD");
+        var groceries = MakeTx(accountId, 400m, "debit", InMonth, "Groceries");
+        var salary = MakeTx(accountId, 1000m, "credit", InMonth, "Salary");
+
+        var txRepo = new Mock<ITransactionRepository>(MockBehavior.Strict);
+        txRepo.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync([groceries, salary]);
+        var accountRepo = new Mock<IBankAccountRepository>(MockBehavior.Strict);
+        accountRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync([account]);
+        var counterparty = new Mock<ICounterpartyClassificationService>();
+        counterparty.Setup(c => c.ClassifyForWindowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(CounterpartyResults.None);
+        var sut = new FlowBreakdownService(
+            txRepo.Object, accountRepo.Object, new TransferDetectionService(), counterparty.Object);
+
+        var result = await sut.GetRangeBreakdownUnscopedAsync(
+            UserId, new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 31), 12);
+
+        result.Items.Should().HaveCount(2);
+        result.Items.Single(i => i.TransactionId == groceries.Id).Bucket.Should().Be(FlowBuckets.Spending);
+        result.Items.Single(i => i.TransactionId == salary.Id).Bucket.Should().Be(FlowBuckets.Income);
+    }
 }

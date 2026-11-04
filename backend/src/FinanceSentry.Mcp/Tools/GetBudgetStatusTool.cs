@@ -19,7 +19,7 @@ public sealed class GetBudgetStatusTool(
     private readonly ILogger<GetBudgetStatusTool> _logger = logger;
 
     [McpServerTool(Name = "get_budget_status")]
-    [Description("Returns all active budgets, including spending, utilization and month-end pace (pace ratio, projected month-end spend, off-pace flag) for the requested period.")]
+    [Description("Returns the monthly estimate of every spending line (a median of the person's own usable past months, a detected commitment where there is one, or the amount they set by hand), including spending, utilization and month-end pace (pace ratio, projected month-end spend, off-pace flag) for the requested period. A line with no estimate yet reports a limit of 0.")]
     public async Task<IReadOnlyList<BudgetStatusEntry>> ExecuteAsync(
         [Description("Year of the budget period (e.g. 2024). Defaults to the current year.")] int? year = null,
         [Description("Month of the budget period (1–12). Defaults to the current month.")] int? month = null,
@@ -46,14 +46,14 @@ public sealed class GetBudgetStatusTool(
 
         return summary.Items
             .Select(b => new BudgetStatusEntry(
-                b.Id.ToString(),
+                b.OverrideId?.ToString() ?? b.Category,
                 b.CategoryLabel,
                 period,
-                b.MonthlyLimit,
+                b.Estimate ?? 0m,
                 b.Spent,
                 b.Currency,
-                b.MonthlyLimit > 0m
-                    ? Math.Round(b.Spent / b.MonthlyLimit * 100m, 2)
+                b.Estimate is > 0m
+                    ? Math.Round(b.Spent / b.Estimate.Value * 100m, 2)
                     : 0m,
                 b.PaceRatio,
                 b.ProjectedMonthEndSpend,

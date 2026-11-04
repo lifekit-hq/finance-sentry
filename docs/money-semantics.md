@@ -1374,8 +1374,9 @@ holdings-based current drawdown of section 5b is a separate measurement of the i
   `coverage_holes` row (`From` = Monday of the first quiet week, `To` null while open). The hole closes when two
   consecutive complete weeks are no longer quiet (at or above 20% of the opening baseline) and the account's sync is succeeding. A hole whose account (or its person) is closed ends with the latest complete week, and its alert
   resolves. Budget and estimate readers can query `ICoverageHoleReader.GetHolesAsync` to skip the
-  period instead of reading it as frugal; nothing consumes it yet, so existing budget and estimate figures are
-  unchanged.
+  period instead of reading it as frugal; the monthly estimates (section 13) are the first consumer, so a month a
+  hole touches is left out of what they learn from. The 12-month projection, FIRE and the other readers do not
+  consult it yet.
 
 ## 10. Benchmark-relative track record
 
@@ -1642,3 +1643,41 @@ shown on the flow-breakdown page as `fns-payday-transfer-tile`). It adds no meas
   `cushion = suggested - exact`. The step is a per-user setting (default 50 EUR). The margin is the rounding step, not
   an add-on.
 - **Out of scope.** Reminders, automatic transfers, other cards, and any Home placement.
+
+## 13. Monthly estimates (Budgets, #1231)
+
+The Budgets page is a set of per-line monthly estimates the app fills in from the person's own history; a typed
+amount is only an override over one line. Nothing about the estimate is stored: it is computed on every read
+(`BudgetEstimateService`, pure engine in `Budgets/Application/Estimates`), in USD.
+
+- **Spend it reads.** The Spending bucket of the honest flow breakdown (`IMonthlyCategorySpendReader`, built over
+  `FlowBreakdownService`), by month and line, so card payments, transfers, investing and routing never count and a
+  household or family-support transfer is a line of its own (`HOUSEHOLD`, `FAMILY_SUPPORT`) instead of looking like
+  an uncategorised transfer. Converted to USD once, at the reader.
+- **Window.** The `Projection.LookbackMonths` (6) complete months before the month shown; a past month learns from
+  the six before itself, the current or a future month from the six before the current one. Months before the
+  person's first transaction are "no data", not zero. A line with no spend in a usable month counts that month as
+  zero: a quiet month is information, a missing one is not.
+- **Left out, not zero.** A month is skipped (never counted as 0) when (1) it is on the exclusion list
+  (`Budgets:Estimates:ExcludedMonths`; default 2026-09 and 2026-10, because card spend moved to a Revolut card the
+  bank link does not expose; setting the key replaces the list, an empty list lifts it) or (2) a coverage hole
+  (section 9) overlaps it, open holes included. The page names the skipped months in plain words and why.
+- **Estimate.** The median of the usable months per line (`Projection.Median`). Below
+  `Projection.MinCompleteMonths` (3) usable months nothing is suggested from history; the page says how many months it
+  has. Lines with a zero median and no spend this month are hidden; a line with spend and no estimate shows as spend.
+- **Commitments.** An active, monthly commitment (subscription or installment, converted to USD) sits on the line its
+  latest charge landed in, so a mortgage paid as a household transfer is not counted twice. On a committed line
+  (loans, rent and utilities, family support, household) the commitment total replaces the median for the current and
+  future months, so a loan with one payment left is estimated at what is still charged; an installment past its end
+  date drops out. On any other line it is a floor: the estimate never falls below what its commitments charge.
+- **Override.** A hand edit is a `budgets` row for one line (stored in the person's base currency, as before). It
+  replaces the line's estimate and the screen keeps the suggestion beside it; "Reset to suggested" deletes the row.
+  An override on a line with no history still stands.
+- **Month end.** Expected month end per line = what was spent for a past month; the estimate for a future one; for
+  the current month spent plus what is still due before day 7, then the larger of the estimate and the pace
+  (spent / elapsed fraction) through day 21, never below spent; a committed line is never paced. The month's headline
+  is the sum. Off-pace uses `BudgetPace` (day 7-21, ratio at least 1.15), the same constants the alert job uses.
+- **Alerts.** `BudgetBreachDetectionJob` still alerts per line, but only for lines the person set by hand (an
+  override is the opt-in), at 90% (near limit) and 100% (exceeded) of the effective amount and on pace (day 7-21). It adds one month-level
+  `BudgetBreach` alert when expected month end is at least 1.15 times the month's total estimate within the pace
+  window, only for a person who has overrides and enough history (so the total is not merely their hand-set amounts).

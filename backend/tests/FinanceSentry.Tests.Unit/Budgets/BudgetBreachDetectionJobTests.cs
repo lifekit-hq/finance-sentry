@@ -4,39 +4,54 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
 using FinanceSentry.Modules.Budgets.Infrastructure.Jobs;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
 /// <summary>
 /// Unit tests for <see cref="BudgetBreachDetectionJob"/> (C2, ledger-heartbeat design).
-/// Verifies threshold gating (90% / 100%, independently evaluated) and per-budget alert dispatch.
+/// Verifies threshold gating (90% / 100%, independently evaluated) and per-override alert dispatch, through the real
+/// <see cref="BudgetEstimateService"/> over a mocked spend reader.
 /// Dedup — the part of the design that makes a crossing fire once per budget per month, and that
 /// governs a mid-month limit edit or a refund — is the alert generator's responsibility and is
 /// pinned in AlertGeneratorServiceTests, not here (same split as the other hygiene sentinels).
 /// </summary>
 public sealed class BudgetBreachDetectionJobTests
 {
+    // Spend is on the 2026-09 month the default clock sits in; the history before it is two far-back months, which is
+    // not enough for a suggestion, so these tests exercise the hand-set amounts only.
+    private static readonly DateOnly FirstDataDay = new(2020, 1, 1);
+
+    private DateOnly _firstData = FirstDataDay;
+
     private readonly Mock<IBudgetRepository> _budgets = new();
-    private readonly Mock<IMerchantSpendingReader> _spending = new();
-    private readonly Mock<ICategoryNormalizationService> _normalization = new();
+    private readonly Mock<IMonthlyCategorySpendReader> _spending = new();
+    private readonly Mock<ICoverageHoleReader> _holes = new();
+    private readonly CategoryNormalizationService _normalization = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
+    private readonly Dictionary<Guid, List<CategoryMonthSpend>> _rows = [];
     private readonly FixedClock _clock = new(new DateTimeOffset(2026, 9, 16, 23, 55, 0, TimeSpan.Zero));
 
     public BudgetBreachDetectionJobTests()
     {
-        // Identity normalization by default — tests use already-normalized category keys.
-        _normalization.Setup(n => n.Normalize(It.IsAny<string>())).Returns((string c) => c);
+        _holes.Setup(h => h.GetHolesAsync(
+                It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
+
+    private BudgetEstimateService MakeEstimates() =>
+        new(_spending.Object, _holes.Object, _normalization, Options.Create(new BudgetEstimateOptions()));
 
     private BudgetBreachDetectionJob MakeJob() => MakeJob(_clock);
 
     private BudgetBreachDetectionJob MakeJob(TimeProvider clock) =>
-        new(_budgets.Object, _spending.Object, _normalization.Object, _alerts.Object, clock,
+        new(_budgets.Object, MakeEstimates(), _alerts.Object, clock,
             NullLogger<BudgetBreachDetectionJob>.Instance);
 
     private static FixedClock At(int year, int month, int day) =>
@@ -59,15 +74,21 @@ public sealed class BudgetBreachDetectionJobTests
     }
 
     private BudgetBreachDetectionJob MakeJob(IAlertGeneratorService generator, TimeProvider clock) =>
-        new(_budgets.Object, _spending.Object, _normalization.Object, generator, clock,
+        new(_budgets.Object, MakeEstimates(), generator, clock,
             NullLogger<BudgetBreachDetectionJob>.Instance);
+
+    private void Publish(Guid userId)
+        => _spending.Setup(s => s.GetAsync(
+                userId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new MonthlyCategorySpend(_firstData, [.. _rows[userId]], []));
 
     private void SetMonthSpend(Guid userId, string category, int year, int month, decimal usdAmount)
     {
-        var from = new DateOnly(year, month, 1);
-        _spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
-                userId, from, from.AddMonths(1).AddDays(-1), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal> { [category] = usdAmount });
+        var key = $"{year:D4}-{month:D2}";
+        var rows = _rows.TryGetValue(userId, out var existing) ? existing : _rows[userId] = [];
+        rows.RemoveAll(r => r.Month == key && r.Line == category);
+        rows.Add(new CategoryMonthSpend(key, category, usdAmount));
+        Publish(userId);
     }
 
     private static Budget MakeBudget(Guid userId, string category, decimal limit, string currency = "USD")
@@ -77,22 +98,20 @@ public sealed class BudgetBreachDetectionJobTests
     }
 
     private void SetSpend(Guid userId, string category, decimal usdAmount)
-        => _spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
-                userId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal> { [category] = usdAmount });
+        => SetMonthSpend(userId, category, 2026, 9, usdAmount);
 
     [Fact]
     public async Task ExecuteAsync_SpendAt92Percent_FiresNearLimitOnly()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 92m);
+        SetSpend(userId, "FOOD_AND_DRINK", 92m);
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 92m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 92m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -103,25 +122,25 @@ public sealed class BudgetBreachDetectionJobTests
     {
         // A jump straight past both bars in one run still fires both — they're independent checks.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 105m);
+        SetSpend(userId, "FOOD_AND_DRINK", 105m);
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            userId, budget.Id, "GROCERIES", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task ExecuteAsync_SpendBelow90Percent_FiresNothing()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 50m);
+        SetSpend(userId, "FOOD_AND_DRINK", 50m);
 
         await MakeJob().ExecuteAsync();
 
@@ -140,7 +159,7 @@ public sealed class BudgetBreachDetectionJobTests
 
         await MakeJob().ExecuteAsync();
 
-        _spending.Verify(s => s.GetSpendingByCategoryUsdAsync(
+        _spending.Verify(s => s.GetAsync(
             It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -149,11 +168,10 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_NoSpendInCategory_TreatsAsZero_FiresNothing()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        _spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
-                userId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>());
+        _rows[userId] = [];
+        Publish(userId);
 
         await MakeJob().ExecuteAsync();
 
@@ -168,14 +186,14 @@ public sealed class BudgetBreachDetectionJobTests
         // 4000 UAH at the FallbackRates 0.024 rate is 96 USD — 90 USD spend is 93.75% of that,
         // above the 90% bar. A raw (unconverted) comparison would have read as far below it.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 4000m, "UAH");
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 4000m, "UAH");
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 90m);
+        SetSpend(userId, "FOOD_AND_DRINK", 90m);
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 90m, 96m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 90m, 96m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -183,16 +201,16 @@ public sealed class BudgetBreachDetectionJobTests
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
-        var budgetA = MakeBudget(userA, "GROCERIES", 100m);
-        var budgetB = MakeBudget(userB, "GROCERIES", 100m);
+        var budgetA = MakeBudget(userA, "FOOD_AND_DRINK", 100m);
+        var budgetB = MakeBudget(userB, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budgetA, budgetB]);
-        SetSpend(userA, "GROCERIES", 95m);
-        SetSpend(userB, "GROCERIES", 20m);
+        SetSpend(userA, "FOOD_AND_DRINK", 95m);
+        SetSpend(userB, "FOOD_AND_DRINK", 20m);
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userA, budgetA.Id, "GROCERIES", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userA, budgetA.Id, "FOOD_AND_DRINK", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
             userB, It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -202,20 +220,19 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_ContinuesOtherBudgets_WhenOneAlertThrows()
     {
         var userId = Guid.NewGuid();
-        var budgetA = MakeBudget(userId, "GROCERIES", 100m);
-        var budgetB = MakeBudget(userId, "DINING", 100m);
+        var budgetA = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
+        var budgetB = MakeBudget(userId, "ENTERTAINMENT", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budgetA, budgetB]);
-        _spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
-                userId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal> { ["GROCERIES"] = 95m, ["DINING"] = 95m });
+        SetSpend(userId, "FOOD_AND_DRINK", 95m);
+        SetSpend(userId, "ENTERTAINMENT", 95m);
         _alerts.Setup(a => a.GenerateBudgetNearLimitAlertAsync(
-                userId, budgetA.Id, "GROCERIES", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()))
+                userId, budgetA.Id, "FOOD_AND_DRINK", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db failure"));
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budgetB.Id, "DINING", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budgetB.Id, "ENTERTAINMENT", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -227,10 +244,10 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_LimitLoweredMidMonth_CrossesExceededThatDidNotCrossUnderOldLimit()
     {
         var userId = Guid.NewGuid();
-        SetSpend(userId, "GROCERIES", 150m);
+        SetSpend(userId, "FOOD_AND_DRINK", 150m);
 
         // Run 1: under the original $200 limit, 150/200 = 75% — no crossing.
-        var originalBudget = MakeBudget(userId, "GROCERIES", 200m);
+        var originalBudget = MakeBudget(userId, "FOOD_AND_DRINK", 200m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([originalBudget]);
         await MakeJob().ExecuteAsync();
 
@@ -240,12 +257,12 @@ public sealed class BudgetBreachDetectionJobTests
 
         // Run 2: the user lowers the limit to $100 mid-month — same spend, now 150% — exceeded fires
         // using the live limit, not anything cached from run 1.
-        var editedBudget = MakeBudget(userId, "GROCERIES", 100m);
+        var editedBudget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([editedBudget]);
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            userId, editedBudget.Id, "GROCERIES", 150m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, editedBudget.Id, "FOOD_AND_DRINK", 150m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -260,17 +277,17 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_RefundDropsSpendBelowThreshold_ThenClimbsBackUp_JobReportsBothRuns()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
 
         // Run 1: spend crosses 90%.
-        SetSpend(userId, "GROCERIES", 92m);
+        SetSpend(userId, "FOOD_AND_DRINK", 92m);
         await MakeJob().ExecuteAsync();
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 92m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 92m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
 
         // Run 2: a refund drops spend back under 90% — the job reports nothing this run.
-        SetSpend(userId, "GROCERIES", 70m);
+        SetSpend(userId, "FOOD_AND_DRINK", 70m);
         await MakeJob().ExecuteAsync();
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
@@ -278,10 +295,10 @@ public sealed class BudgetBreachDetectionJobTests
 
         // Run 3: spend climbs back over 90% — the job calls the generator again (its own dedup, not
         // the job's, is what keeps this from becoming a second alert row for the month).
-        SetSpend(userId, "GROCERIES", 95m);
+        SetSpend(userId, "FOOD_AND_DRINK", 95m);
         await MakeJob().ExecuteAsync();
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -292,7 +309,7 @@ public sealed class BudgetBreachDetectionJobTests
 
         await MakeJob().ExecuteAsync();
 
-        _spending.Verify(s => s.GetSpendingByCategoryUsdAsync(
+        _spending.Verify(s => s.GetAsync(
             It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -302,34 +319,34 @@ public sealed class BudgetBreachDetectionJobTests
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
-        var budgetA = MakeBudget(userA, "GROCERIES", 100m);
-        var budgetB = MakeBudget(userB, "GROCERIES", 100m);
+        var budgetA = MakeBudget(userA, "FOOD_AND_DRINK", 100m);
+        var budgetB = MakeBudget(userB, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budgetA, budgetB]);
-        _spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
+        _spending.Setup(s => s.GetAsync(
                 userA, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("read failed"));
-        SetSpend(userB, "GROCERIES", 95m);
+        SetSpend(userB, "FOOD_AND_DRINK", 95m);
 
         await MakeJob().ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userB, budgetB.Id, "GROCERIES", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userB, budgetB.Id, "FOOD_AND_DRINK", 95m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task ExecuteAsync_LateRunOnLastDayOfMonth_SeesThatDaysSpend()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 104m);
 
         await MakeJob(new FixedClock(new DateTimeOffset(2026, 9, 30, 23, 55, 0, TimeSpan.Zero))).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+            userId, budget.Id, "FOOD_AND_DRINK", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -340,9 +357,9 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_DismissedAlert_StaysSilentOnLaterRunSameMonth()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 104m);
 
         var (ledger, generator) = RealGenerator();
         var job = MakeJob(generator, At(2026, 9, 5));
@@ -365,16 +382,16 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_LastDaySlotStartingAfterMidnight_EvaluatesThatMonth()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 104m);
 
         await MakeJob(At(2026, 10, 1, 0, 3)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
-        _spending.Verify(s => s.GetSpendingByCategoryUsdAsync(
-            userId, new DateOnly(2026, 10, 1), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+            userId, budget.Id, "FOOD_AND_DRINK", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+        _spending.Verify(s => s.GetAsync(
+            userId, It.IsAny<DateOnly>(), new DateOnly(2026, 10, 31), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -384,10 +401,10 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_StartingPastMaxDelayAfterSlot_IsSkipped(int day, int hour, int minute)
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 150m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 150m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 150m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 10, 150m);
 
         await MakeJob(At(2026, 10, day, hour, minute)).ExecuteAsync();
 
@@ -399,10 +416,10 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_OnTimeThenLateThenSkippedRuns_RaiseEachCrossingOncePerMonth()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 104m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 104m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 10, 104m);
         var (ledger, generator) = RealGenerator();
 
         await MakeJob(generator, At(2026, 9, 30)).ExecuteAsync();
@@ -420,14 +437,14 @@ public sealed class BudgetBreachDetectionJobTests
         // limit gives a pace ratio of 46 / (100 * 14/30) = ~0.986 — just under. Bump to 47 USD to
         // clear 1.15: 47 / (100 * 14/30) ≈ 1.007, still under. Use 58 USD: 58 / 46.67 ≈ 1.243 — over.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 58m);
+        SetSpend(userId, "FOOD_AND_DRINK", 58m);
 
         await MakeJob(At(2026, 9, 14)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetPaceAlertAsync(
-            userId, budget.Id, "GROCERIES", 58m, 100m, It.Is<decimal>(p => p > 124m && p < 125m),
+            userId, budget.Id, "FOOD_AND_DRINK", 58m, 100m, It.Is<decimal>(p => p > 124m && p < 125m),
             2026, 9, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -436,9 +453,9 @@ public sealed class BudgetBreachDetectionJobTests
     {
         // 53 USD spent, elapsed fraction 14/30 -> pace ratio 53 / 46.67 ≈ 1.136 — under 1.15.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 53m);
+        SetSpend(userId, "FOOD_AND_DRINK", 53m);
 
         await MakeJob(At(2026, 9, 14)).ExecuteAsync();
 
@@ -453,9 +470,9 @@ public sealed class BudgetBreachDetectionJobTests
         // Before the day-7 window opens, even a wildly off-pace spend does not fire — the small
         // elapsed-fraction denominator this early would invent a crisis out of one large charge.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 90m);
+        SetSpend(userId, "FOOD_AND_DRINK", 90m);
 
         await MakeJob(At(2026, 9, 6)).ExecuteAsync();
 
@@ -470,9 +487,9 @@ public sealed class BudgetBreachDetectionJobTests
         // Past the day-21 window close, the exceeded/near-limit thresholds are the better signal —
         // a pace alert here would be a second notification about the same thing.
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetSpend(userId, "GROCERIES", 85m);
+        SetSpend(userId, "FOOD_AND_DRINK", 85m);
 
         await MakeJob(At(2026, 9, 22)).ExecuteAsync();
 
@@ -489,17 +506,134 @@ public sealed class BudgetBreachDetectionJobTests
     public async Task ExecuteAsync_SecondEvaluationSameMonth_DoesNotRefirePaceAlert()
     {
         var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        var budget = MakeBudget(userId, "FOOD_AND_DRINK", 100m);
         _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
         // 78 USD spent stays over the 1.15 pace ratio on both day 14 (ratio ~1.67) and day 20
         // (ratio ~1.17), while staying under the 90% near-limit threshold throughout, so the pace
         // dedup is exercised in isolation, with no near-limit/exceeded alert also landing in the
         // ledger.
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 78m);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 78m);
+        var (ledger, generator) = RealGenerator();
+
+        await MakeJob(generator, At(2026, 9, 14)).ExecuteAsync();
+        Assert.Single(ledger, a => a.Title.StartsWith("Budget off pace", StringComparison.Ordinal));
+
+        await MakeJob(generator, At(2026, 9, 20)).ExecuteAsync();
+
+        // The month as a whole is on the same pace here (the override is the only estimate), so its own alert is
+        // raised beside the line's; neither is raised twice.
+        Assert.Single(ledger, a => a.Title.StartsWith("Budget off pace", StringComparison.Ordinal));
+        Assert.Single(ledger, a => a.Title.StartsWith("Month off pace", StringComparison.Ordinal));
+        Assert.Equal(2, ledger.Count);
+    }
+
+    // -- the month as a whole ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A user with six months of 100 a month in food (so the food line is estimated at 100 and the history is enough)
+    /// and a hand-set 1000 on entertainment, the line that makes them a person with an override: the month's total
+    /// estimate is 1100.
+    /// </summary>
+    private (Guid UserId, Budget Entertainment) SeedMonthTotal()
+    {
+        var userId = Guid.NewGuid();
+        foreach (var month in new[] { 3, 4, 5, 6, 7, 8 })
+            SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, month, 100m);
+
+        var entertainment = MakeBudget(userId, "ENTERTAINMENT", 1000m);
+        _budgets.Setup(b => b.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([entertainment]);
+        return (userId, entertainment);
+    }
+
+    [Fact]
+    public async Task MonthTotal_ExpectedToBeatTheEstimateBy15Percent_FiresOneMonthAlert()
+    {
+        var (userId, _) = SeedMonthTotal();
+        // 200 on food by day 14 of 30 paces to 428.57 against its 100 estimate: 428.57 + the 1000 still due on
+        // entertainment is 1428.57 against a 1100 total.
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 200m);
+
+        await MakeJob(At(2026, 9, 14)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetTotalPaceAlertAsync(
+            userId, 1100m, It.Is<decimal>(e => e > 1428m && e < 1429m), 200m, 2026, 9,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task MonthTotal_ExpectedUnderTheTolerance_FiresNothing()
+    {
+        var (userId, _) = SeedMonthTotal();
+        // 100 on food by day 14 paces to 214.29: 1214.29 expected against 1100 is 1.10, under 1.15.
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 100m);
+
+        await MakeJob(At(2026, 9, 14)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetTotalPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(6)]
+    [InlineData(22)]
+    public async Task MonthTotal_OutsideThePaceWindow_FiresNothing(int day)
+    {
+        var (userId, _) = SeedMonthTotal();
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 900m);
+
+        await MakeJob(At(2026, 9, day)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetTotalPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MonthTotal_WithoutEnoughHistory_FiresNothing_BecauseTheTotalWouldBeOnlyTheHandSetAmounts()
+    {
+        var (userId, _) = SeedMonthTotal();
+        _firstData = new DateOnly(2026, 7, 1);
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 900m);
+
+        await MakeJob(At(2026, 9, 14)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetTotalPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LineAlerts_AreRaisedOnlyForTheLinesThePersonSetByHand()
+    {
+        var (userId, entertainment) = SeedMonthTotal();
+        // Food (no override) is far over its 100 estimate; entertainment (override) is under its 1000.
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 500m);
+        SetMonthSpend(userId, "ENTERTAINMENT", 2026, 9, 10m);
+
+        await MakeJob(At(2026, 9, 28)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), "FOOD_AND_DRINK", It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), "FOOD_AND_DRINK", It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
+            userId, entertainment.Id, "ENTERTAINMENT", It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MonthTotal_SecondEvaluationSameMonth_DoesNotRefireTheMonthAlert()
+    {
+        var (userId, _) = SeedMonthTotal();
+        SetMonthSpend(userId, "FOOD_AND_DRINK", 2026, 9, 200m);
         var (ledger, generator) = RealGenerator();
 
         await MakeJob(generator, At(2026, 9, 14)).ExecuteAsync();
         Assert.Single(ledger);
+        Assert.Contains("September 2026", ledger[0].Title);
 
         await MakeJob(generator, At(2026, 9, 20)).ExecuteAsync();
 

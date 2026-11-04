@@ -155,10 +155,12 @@ async function mockApis(page: Page, count: number): Promise<void> {
         year: 2026,
         month: 10,
         items: rows(i => ({
-          id: `b-${i}`,
+          overrideId: null,
           category: `CATEGORY_${i}`,
           categoryLabel: `Category ${i}`,
-          monthlyLimit: 100,
+          estimate: 100,
+          suggestedAmount: 100,
+          source: 'history',
           spent: 40,
           remaining: 60,
           isOverBudget: false,
@@ -166,9 +168,15 @@ async function mockApis(page: Page, count: number): Promise<void> {
           paceRatio: 0.4,
           projectedMonthEndSpend: 80,
           isOffPace: false,
+          expectedMonthEnd: 100,
         })),
-        totalLimit: count * 100,
+        totalEstimate: count * 100,
         totalSpent: count * 40,
+        expectedMonthEnd: count * 100,
+        hasEnoughHistory: true,
+        historyMonthsUsed: 6,
+        minHistoryMonths: 3,
+        skippedMonths: [],
       })
     )
   );

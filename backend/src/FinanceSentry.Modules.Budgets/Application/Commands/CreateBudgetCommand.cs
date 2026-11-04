@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Budgets.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Budgets.API.Responses;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Exceptions;
@@ -22,7 +23,8 @@ public class CreateBudgetCommandHandler(
 
     public async Task<BudgetDto> Handle(CreateBudgetCommand command, CancellationToken cancellationToken)
     {
-        if (!CategoryTaxonomy.ValidKeys.Contains(command.Category))
+        // An override sits over an estimate line, so only a line an estimate can exist for takes one.
+        if (!EstimateLines.IsEstimable(command.Category))
             throw new BudgetInvalidCategoryException();
 
         if (command.MonthlyLimit <= 0)

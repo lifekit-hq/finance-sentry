@@ -296,6 +296,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateBudgetNearLimitAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetExceededAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetPaceAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateBudgetTotalPaceAlertAsync(Guid userId, decimal estimateUsd, decimal expectedMonthEndUsd, decimal spentUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFamilyStatementAlertAsync(Guid userId, string headline, string body, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFireBriefAlertAsync(Guid userId, string headline, string body, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateRelativeUnderperformanceAlertAsync(Guid userId, string scope, string scopeKey, string label, string window, string benchmarkTicker, decimal excessReturnPct, int runs, decimal thresholdPct, CancellationToken ct = default) => Task.CompletedTask;

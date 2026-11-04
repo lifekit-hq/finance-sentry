@@ -4,7 +4,6 @@ import {type Observable} from 'rxjs';
 
 import {
   type Budget,
-  type BudgetsListResponse,
   type BudgetSummaryResponse,
   type CreateBudgetRequest,
   type UpdateBudgetRequest,
@@ -14,10 +13,6 @@ import {
 export class BudgetsService extends ApiService {
   constructor() {
     super('budgets');
-  }
-
-  public getBudgets(): Observable<BudgetsListResponse> {
-    return this.get<BudgetsListResponse>();
   }
 
   public createBudget(req: CreateBudgetRequest): Observable<Budget> {

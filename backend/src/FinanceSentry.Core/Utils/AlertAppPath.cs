@@ -132,6 +132,13 @@ public static partial class AlertAppPath
         return SpendIn(category.Trim(), MonthStart(first), MonthEnd(first));
     }
 
+    /// <summary>The month a total-estimate alert is about: every debit of it, whatever the category.</summary>
+    public static string ForBudgetTotal(int year, int month)
+    {
+        var first = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return SpendIn(null, MonthStart(first), MonthEnd(first));
+    }
+
     private static string Asset(string symbol) => $"/assets/{Uri.EscapeDataString(symbol)}";
 
     private static bool IsSymbol(string value) => SymbolShape().IsMatch(value);

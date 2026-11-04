@@ -3,19 +3,20 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
-import {type BudgetSummaryItem} from '../../models/budget/budget.model';
+import {
+  type BudgetSummaryResponse,
+  type SaveOverrideRequest,
+} from '../../models/budget/budget.model';
 import {BudgetsService} from '../../services/budgets.service';
 
 interface EffectsStore {
-  setSummaryItems: (items: BudgetSummaryItem[]) => void;
+  setSummary: (summary: BudgetSummaryResponse) => void;
   setLoading: () => void;
   setSuccess: () => void;
   setError: (errorCode: Nullable<string>) => void;
   clearRefreshFailed: () => void;
   setRefreshFailed: () => void;
-  setEditing: (id: Nullable<string>) => void;
-  updateBudgetInList: (id: string, limit: number) => void;
-  removeBudget: (id: string) => void;
+  setEditing: (category: Nullable<string>) => void;
   setSelectedPeriod: (year: number, month: number) => void;
   selectedYear: () => number;
   selectedMonth: () => number;
@@ -27,7 +28,7 @@ export function budgetsEffects(store: EffectsStore) {
   const fetchSummary = () =>
     service.getBudgetSummary(store.selectedYear(), store.selectedMonth()).pipe(
       tap(res => {
-        store.setSummaryItems(res.items);
+        store.setSummary(res);
         store.setSuccess();
       })
     );
@@ -40,6 +41,8 @@ export function budgetsEffects(store: EffectsStore) {
       })
     );
 
+  // The estimates are recomputed on the server (an override changes the month's total and pace),
+  // so every change is followed by a reload instead of a local patch.
   const refreshAfterChange = () =>
     fetchSummary().pipe(
       catchError(() => {
@@ -59,10 +62,15 @@ export function budgetsEffects(store: EffectsStore) {
       )
     ),
 
-    create: rxMethod<{category: string; monthlyLimit: number}>(
+    // A hand edit is an override: created the first time, updated after that.
+    saveOverride: rxMethod<SaveOverrideRequest>(
       pipe(
-        switchMap(req =>
-          service.createBudget(req).pipe(
+        switchMap(({category, overrideId, amount}) =>
+          (overrideId === null
+            ? service.createBudget({category, monthlyLimit: amount})
+            : service.updateBudget(overrideId, {monthlyLimit: amount})
+          ).pipe(
+            tap(() => store.setEditing(null)),
             switchMap(() => refreshAfterChange()),
             catchError(() => EMPTY)
           )
@@ -70,23 +78,11 @@ export function budgetsEffects(store: EffectsStore) {
       )
     ),
 
-    update: rxMethod<{id: string; monthlyLimit: number}>(
+    // Reset to suggested: drop the override, the line returns to its suggestion.
+    resetOverride: rxMethod<string>(
       pipe(
-        switchMap(({id, monthlyLimit}) =>
-          service.updateBudget(id, {monthlyLimit}).pipe(
-            tap(() => store.updateBudgetInList(id, monthlyLimit)),
-            switchMap(() => refreshAfterChange()),
-            catchError(() => EMPTY)
-          )
-        )
-      )
-    ),
-
-    remove: rxMethod<string>(
-      pipe(
-        switchMap(id =>
-          service.deleteBudget(id).pipe(
-            tap(() => store.removeBudget(id)),
+        switchMap(overrideId =>
+          service.deleteBudget(overrideId).pipe(
             switchMap(() => refreshAfterChange()),
             catchError(() => EMPTY)
           )

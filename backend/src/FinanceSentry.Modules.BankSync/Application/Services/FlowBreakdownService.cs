@@ -52,7 +52,8 @@ public record FlowBreakdownItem(
     string Direction,
     string Bucket,
     string? CounterpartyName,
-    string? FlowRole);
+    string? FlowRole,
+    int? Mcc = null);
 
 /// <summary>
 /// A month's — or, for the dashboard's day-level windows, a date range's — transactions, each
@@ -101,6 +102,18 @@ public interface IFlowBreakdownService
     /// same way. The range is held inside that window's loaded days.
     /// </summary>
     Task<FlowBreakdown> GetRangeBreakdownAsync(
+        Guid userId,
+        DateOnly from,
+        DateOnly to,
+        int months = 6,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// <see cref="GetRangeBreakdownAsync"/> for a caller with no person in scope (a job): it reads the user's
+    /// accounts and transactions with the Owner filter opted out and keeps its own <c>UserId</c> predicate, and
+    /// classifies exactly as the request path does.
+    /// </summary>
+    Task<FlowBreakdown> GetRangeBreakdownUnscopedAsync(
         Guid userId,
         DateOnly from,
         DateOnly to,
@@ -166,6 +179,20 @@ public class FlowBreakdownService(
     }
 
     /// <inheritdoc />
+    public async Task<FlowBreakdown> GetRangeBreakdownUnscopedAsync(
+        Guid userId,
+        DateOnly from,
+        DateOnly to,
+        int months = 6,
+        CancellationToken ct = default)
+    {
+        var start = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var items = await BuildItemsAsync(userId, months, d => d >= start && d < end, ct, unscoped: true);
+        return new FlowBreakdown(string.Empty, items, from, to);
+    }
+
+    /// <inheritdoc />
     public async Task<SpendingSummary> GetSpendingSummaryAsync(
         Guid userId,
         Guid? accountId,
@@ -197,17 +224,22 @@ public class FlowBreakdownService(
         Guid userId,
         int months,
         Func<DateTime, bool> inRange,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool unscoped = false)
     {
         // Mirrors MoneyFlowStatisticsService step for step: same window, same account-currency
         // map, same shared classification entry point (memoized per request), same transfer
         // detection over the non-counterparty remainder.
-        var accountList = await _accounts.GetByUserIdAsync(userId, ct);
+        var accountList = unscoped
+            ? await _accounts.GetByUserIdUnscopedAsync(userId, ct)
+            : await _accounts.GetByUserIdAsync(userId, ct);
         var accountsById = accountList.ToDictionary(a => a.Id);
         var accountCurrencies = accountsById.ToDictionary(kv => kv.Key, kv => kv.Value.Currency);
 
-        var txList = (await _transactions.GetByUserIdSinceAsync(
-            userId, MonthWindow.StartOfMonthsAgo(months), ct)).ToList();
+        var since = MonthWindow.StartOfMonthsAgo(months);
+        var txList = (unscoped
+            ? await _transactions.GetByUserIdSinceUnscopedAsync(userId, since, ct)
+            : await _transactions.GetByUserIdSinceAsync(userId, since, ct)).ToList();
 
         var classification = await _counterpartyClassification.ClassifyForWindowAsync(userId, months, ct);
         var matches = classification.Matches ?? new Dictionary<Guid, CounterpartyMatch>();
@@ -242,7 +274,8 @@ public class FlowBreakdownService(
                     isCredit ? "in" : "out",
                     bucket,
                     counterparty?.Name,
-                    counterparty?.FlowRole);
+                    counterparty?.FlowRole,
+                    t.Mcc);
             })
             .OrderByDescending(i => i.Date)
             .ToList();
