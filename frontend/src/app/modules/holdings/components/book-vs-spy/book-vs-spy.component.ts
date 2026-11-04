@@ -1,6 +1,6 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {AsyncStateComponent, SkeletonComponent} from '@lifekit-hq/ui';
+import {AsyncStateComponent, ListItemRowComponent, SkeletonComponent} from '@lifekit-hq/ui';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {BookPerformanceStore} from '../../store/book-performance/book-performance.store';
@@ -12,7 +12,13 @@ import {BookPerformanceStore} from '../../store/book-performance/book-performanc
  */
 @Component({
   selector: 'fns-book-vs-spy',
-  imports: [AsyncStateComponent, DatePipe, HeadlineBadgeComponent, SkeletonComponent],
+  imports: [
+    AsyncStateComponent,
+    DatePipe,
+    HeadlineBadgeComponent,
+    ListItemRowComponent,
+    SkeletonComponent,
+  ],
   templateUrl: './book-vs-spy.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [BookPerformanceStore],

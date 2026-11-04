@@ -1,5 +1,5 @@
 @if (store.status() !== 'success' || store.hasHistory()) {
-  <cmn-card [attr.data-testid]="store.sleeve + '-growth'">
+  <section [attr.data-testid]="store.sleeve + '-growth'" class="border-t border-border-default">
     <cmn-async-state
       [status]="store.status()"
       [errorMessage]="store.errorMessage()"
@@ -7,14 +7,14 @@
       emptySubMessage="Performance shows once these holdings have value history."
       retryable
     >
-      <div skeleton class="space-y-cmn-2">
+      <div skeleton class="space-y-cmn-2 px-cmn-4 py-cmn-3">
         <cmn-skeleton height="1rem" width="40%" />
         <cmn-skeleton height="0.875rem" width="70%" />
         <cmn-skeleton height="0.875rem" width="70%" />
       </div>
 
       @if (store.growth(); as growth) {
-        <div class="flex items-baseline justify-between gap-cmn-2">
+        <div class="flex items-baseline justify-between gap-cmn-2 px-cmn-4 pt-cmn-3">
           <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
             {{ store.copy.title }}
             <span
@@ -32,33 +32,45 @@
 
         @switch (store.view()) {
           @case ('split') {
-            <div
-              [attr.data-testid]="store.sleeve + '-growth-split'"
-              class="mt-cmn-3 grid grid-cols-1 gap-cmn-2 sm:grid-cols-3"
-            >
-              <cmn-stat-card
-                [attr.data-testid]="store.sleeve + '-growth-contributed'"
-                [value]="growth.contributed | money: growth.currency : {signed: true}"
-                label="Contributed"
-              />
-              <cmn-stat-card
-                [attr.data-testid]="store.sleeve + '-growth-growth'"
-                [value]="growth.growth | money: growth.currency : {signed: true}"
-                [delta]="store.returnPercent()"
-                [deltaLabel]="store.returnLabel() ?? ''"
-                label="Growth"
-              />
-              <cmn-stat-card
-                [attr.data-testid]="store.sleeve + '-growth-value-now'"
-                [value]="growth.endValue | money: growth.currency"
-                label="Value now"
-              />
+            <div [attr.data-testid]="store.sleeve + '-growth-split'">
+              <cmn-list-item-row label="Value now">
+                <span
+                  [attr.data-testid]="store.sleeve + '-growth-value-now'"
+                  amount
+                  class="tabular-nums text-cmn-sm text-text-primary"
+                >
+                  {{ growth.endValue | money: growth.currency }}
+                </span>
+              </cmn-list-item-row>
+              <cmn-list-item-row label="Contributed">
+                <span
+                  [attr.data-testid]="store.sleeve + '-growth-contributed'"
+                  amount
+                  class="tabular-nums text-cmn-sm text-text-primary"
+                >
+                  {{ growth.contributed | money: growth.currency : {signed: true} }}
+                </span>
+              </cmn-list-item-row>
+              <cmn-list-item-row label="Growth">
+                <span
+                  [attr.data-testid]="store.sleeve + '-growth-growth'"
+                  [class.text-gain]="(store.returnPercent() ?? 0) > 0"
+                  [class.text-loss]="(store.returnPercent() ?? 0) < 0"
+                  amount
+                  class="tabular-nums text-cmn-sm text-text-primary"
+                >
+                  {{ growth.growth | money: growth.currency : {signed: true} }}
+                  @if (store.returnLabel(); as returnLabel) {
+                    <span class="ml-cmn-1 text-cmn-xs">{{ returnLabel }}</span>
+                  }
+                </span>
+              </cmn-list-item-row>
             </div>
           }
           @case ('no-flows') {
             <div
               [attr.data-testid]="store.sleeve + '-growth-no-flows'"
-              class="mt-cmn-3 space-y-cmn-1 text-cmn-sm text-text-secondary"
+              class="space-y-cmn-1 px-cmn-4 py-cmn-3 text-cmn-sm text-text-secondary"
             >
               <p class="text-text-primary">
                 No contributions recorded yet for {{ store.missingProviderLabels() }}.
@@ -76,7 +88,7 @@
           @default {
             <p
               [attr.data-testid]="store.sleeve + '-growth-short-history'"
-              class="mt-cmn-3 text-cmn-sm text-text-secondary"
+              class="px-cmn-4 py-cmn-3 text-cmn-sm text-text-secondary"
             >
               Growth shows once there are two days of value history.
             </p>
@@ -84,18 +96,16 @@
         }
 
         @if (store.sleeve === 'brokerage') {
-          <fns-book-vs-spy class="mt-cmn-3 block" />
+          <fns-book-vs-spy class="block" />
         }
 
         @if (store.view() === 'split') {
-          <details class="mt-cmn-3 text-cmn-xs text-text-secondary">
-            <summary
-              class="inline-block cursor-pointer font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-              data-testid="growth-how-computed"
-            >
-              How this is computed
-            </summary>
-            <div class="mt-cmn-2 space-y-cmn-2">
+          <cmn-disclosure-row
+            [open]="false"
+            label="How this is computed"
+            data-testid="growth-how-computed"
+          >
+            <div class="space-y-cmn-2 px-cmn-4 pb-cmn-3 text-cmn-xs text-text-secondary">
               <div class="flex items-center justify-between text-cmn-sm">
                 <span>Value then</span>
                 <span class="tabular-nums text-text-primary">
@@ -134,9 +144,9 @@
                 </p>
               }
             </div>
-          </details>
+          </cmn-disclosure-row>
         }
       }
     </cmn-async-state>
-  </cmn-card>
+  </section>
 }

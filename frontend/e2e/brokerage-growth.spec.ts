@@ -25,7 +25,10 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
     await page.goto('/accounts/list');
 
-    await page.getByTestId('brokerage-growth').locator('summary').click();
+    await page
+      .getByTestId('brokerage-growth')
+      .getByRole('button', {name: 'How this is computed'})
+      .click();
     await expect(page.getByTestId('brokerage-growth-timing-gap')).toHaveText(
       'Your investments returned +7.1% (time-weighted); your money earned +9.9% ' +
         '(money-weighted). The difference, 2.8 points, is the timing of your deposits and ' +

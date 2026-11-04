@@ -6,24 +6,22 @@
   emptySubMessage="The book against SPY shows once a window was measured for both."
   retryable
 >
-  <cmn-skeleton skeleton height="1rem" width="70%" />
+  <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="1rem" width="70%" />
 
   @if (store.comparison(); as comparison) {
-    <div
-      class="flex items-baseline justify-between gap-cmn-3 text-cmn-sm"
+    <cmn-list-item-row
+      [label]="'Book vs SPY'"
+      [sublabel]="'since ' + (comparison.from | date: 'd MMM y')"
       data-testid="book-vs-spy"
     >
-      <span class="text-text-secondary">
-        Book vs SPY · since {{ comparison.from | date: 'd MMM y' }}
-      </span>
-      <span class="flex items-baseline gap-cmn-2">
+      <span amount class="flex items-baseline gap-cmn-2 text-cmn-sm">
         @if (comparison.headline; as headline) {
           <fns-headline-badge [headline]="headline" label="Book return" />
         }
-        <span class="tabular-nums font-medium text-text-primary" data-testid="book-vs-spy-returns">
+        <span class="tabular-nums text-text-primary" data-testid="book-vs-spy-returns">
           {{ comparison.bookReturn }} vs {{ comparison.benchmarkReturn }}
         </span>
       </span>
-    </div>
+    </cmn-list-item-row>
   }
 </cmn-async-state>
