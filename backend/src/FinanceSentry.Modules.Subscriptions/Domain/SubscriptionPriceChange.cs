@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Subscriptions.Domain;
 
+using FinanceSentry.Core.Utils;
+
 /// <summary>
 /// One observed change in what a detected subscription charges: the previous charge's amount, the new
 /// charge's amount, the change in percent and the date of the new charge. Stored for an increase and a
@@ -8,10 +10,11 @@ namespace FinanceSentry.Modules.Subscriptions.Domain;
 public class SubscriptionPriceChange
 {
     /// <summary>
-    /// The relative difference between two charges that is still the same price: rounding, and the cents
-    /// an FX-converted charge moves by. Anything above it is a change.
+    /// The relative difference between two charges that is still the same price: the variance band detection
+    /// itself admits for a subscription (a metered bill, a charge converted at a moving FX rate). Anything
+    /// above it is a change.
     /// </summary>
-    public const decimal Tolerance = 0.02m;
+    public const decimal Tolerance = SubscriptionPriceBand.MaxRelativeVariation;
 
     private const int PercentScale = 2;
     private const decimal PercentFactor = 100m;

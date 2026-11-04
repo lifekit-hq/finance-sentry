@@ -110,6 +110,31 @@ public class SubscriptionPriceChangeDetectionTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task FxMovedCharge_WithinTheTolerance_RecordsNothing()
+    {
+        var service = Service();
+        await DetectAsync(service, Charge(9.20m, 3), Charge(9.20m, 4), Charge(9.20m, 5));
+        await DetectAsync(service, Charge(9.20m, 3), Charge(9.20m, 4), Charge(9.20m, 5), Charge(9.55m, 6));
+
+        (await StoredChangesAsync()).Should().BeEmpty();
+        VerifyNoAlert();
+    }
+
+    [Fact]
+    public async Task MeteredBill_WithinTheTolerance_RecordsNothingOnAnyMonth()
+    {
+        var service = Service();
+        SubscriptionDetectionAlgorithm.TxRow[] metered =
+            [Charge(80.00m, 3), Charge(84.50m, 4), Charge(79.00m, 5)];
+        await DetectAsync(service, metered);
+        await DetectAsync(service, [.. metered, Charge(86.00m, 6)]);
+
+        (await StoredChangesAsync()).Should().BeEmpty();
+        VerifyNoAlert();
+        (await ListedAsync()).LatestPriceChange.Should().BeNull();
+    }
+
+    [Fact]
     public async Task RepeatChargeAtTheNewPrice_DoesNotAlertAgain()
     {
         var service = Service();

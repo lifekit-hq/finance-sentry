@@ -15,7 +15,7 @@ differs from that subscription's previous charge by more than a small tolerance,
 
 ## Acceptance
 - A new charge (later `LastChargeDate`) on an existing, detection-owned subscription, in the same currency as its previous
-  charge, whose amount differs from the previous charge by more than 2% (`SubscriptionPriceChange.Tolerance`: rounding),
+  charge, whose amount differs from the previous charge by more than 10% (`SubscriptionPriceChange.Tolerance`, the variance band detection admits, `SubscriptionPriceBand.MaxRelativeVariation`),
   records a price-change event: old amount, new amount, change in percent, charge date.
 - An increase raises a `PriceHike` alert naming the merchant and the old and new amounts; it opens the Subscriptions page
   (`AlertAppPath`) and references the subscription. A decrease records the event and raises nothing.

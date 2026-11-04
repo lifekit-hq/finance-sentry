@@ -48,15 +48,19 @@ public class SubscriptionPriceChangeTests
 
     [Theory]
     [InlineData(10.00, 10.00)]
-    [InlineData(10.00, 10.20)]   // exactly the tolerance: still the same price
-    [InlineData(10.00, 9.80)]
+    [InlineData(10.00, 11.00)]   // exactly the tolerance: still the same price
+    [InlineData(10.00, 9.00)]
     [InlineData(9.99, 10.01)]    // rounding
+    [InlineData(9.20, 9.55)]     // a USD price charged to a EUR account moving with the exchange rate
+    [InlineData(80.00, 84.50)]   // a metered bill the detection variance gate admits
+    [InlineData(84.50, 79.00)]
+    [InlineData(79.00, 86.00)]
     public void WithinTolerance_RecordsNothing(double oldAmount, double newAmount) =>
         Compare((decimal)oldAmount, (decimal)newAmount).Should().BeNull();
 
     [Fact]
     public void JustPastTolerance_IsAChange() =>
-        Compare(10.00m, 10.21m).Should().NotBeNull();
+        Compare(10.00m, 11.01m).Should().NotBeNull();
 
     [Fact]
     public void ADifferentCurrency_IsNotComparable() =>
