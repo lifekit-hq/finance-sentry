@@ -232,13 +232,17 @@ public class BudgetsContractTests(BudgetsApiFactory factory) : IClassFixture<Bud
         var body = await response.Content.ReadFromJsonAsync<BudgetSummaryShape>();
         body.Should().NotBeNull();
         body!.Items.Should().BeEmpty();
-        body.TotalLimit.Should().Be(0m);
+        body.TotalEstimate.Should().Be(0m);
         body.TotalSpent.Should().Be(0m);
+        body.HasEnoughHistory.Should().BeFalse("a user with no transactions has no history to learn from");
+        body.MinHistoryMonths.Should().Be(3);
     }
 
     private record BudgetsListShape(List<object> Items, int TotalCount);
     private record BudgetDtoShape(Guid Id, string Category, string CategoryLabel, decimal MonthlyLimit, string Currency);
-    private record BudgetSummaryShape(int Year, int Month, List<object> Items, decimal TotalLimit, decimal TotalSpent);
+    private record BudgetSummaryShape(
+        int Year, int Month, List<object> Items, decimal TotalEstimate, decimal TotalSpent, decimal ExpectedMonthEnd,
+        bool HasEnoughHistory, int HistoryMonthsUsed, int MinHistoryMonths, List<object> SkippedMonths);
     private record ErrorShape(string ErrorCode, string Message);
 }
 

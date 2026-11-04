@@ -44,6 +44,9 @@ internal sealed class InMemoryDetectedSubscriptionStore(SubscriptionsDbContext d
     public Task<IReadOnlyList<DetectedSubscription>> GetActiveByUserIdUnscopedAsync(string userId, CancellationToken ct = default)
         => _repository.GetActiveByUserIdUnscopedAsync(userId, ct);
 
+    public Task<IReadOnlyList<DetectedSubscription>> GetEndedByUserIdUnscopedAsync(string userId, CancellationToken ct = default)
+        => _repository.GetEndedByUserIdUnscopedAsync(userId, ct);
+
     public Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveUnscopedAsync(string userId, CancellationToken ct = default)
         => _repository.GetStaleActiveUnscopedAsync(userId, ct);
 

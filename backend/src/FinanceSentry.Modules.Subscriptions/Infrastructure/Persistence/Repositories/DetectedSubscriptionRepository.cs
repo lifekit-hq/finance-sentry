@@ -121,6 +121,15 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<DetectedSubscription>> GetEndedByUserIdUnscopedAsync(
+        string userId, CancellationToken ct = default)
+    {
+        return await AllUsers.AsNoTracking()
+            .Where(s => s.UserId == userId
+                     && (s.Status == SubscriptionStatus.Completed || s.Status == SubscriptionStatus.PotentiallyCancelled))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveUnscopedAsync(
         string userId, CancellationToken ct = default)
     {

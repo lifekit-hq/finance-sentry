@@ -68,4 +68,13 @@ public class CategoryNormalizationServiceTests
     {
         _sut.GetLabel("nonexistent").Should().Be("Uncategorized");
     }
+
+    [Fact]
+    public void Household_IsAKnownLine_WithItsOwnLabel()
+    {
+        var sut = new CategoryNormalizationService();
+
+        Assert.Equal("HOUSEHOLD", sut.Normalize("household"));
+        Assert.Equal("Household bills", sut.GetLabel("HOUSEHOLD"));
+    }
 }

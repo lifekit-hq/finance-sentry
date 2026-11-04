@@ -2,26 +2,28 @@ namespace FinanceSentry.Modules.Budgets.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Budgets.API.Responses;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Daily hygiene sentinel (C2, ledger-heartbeat design): fires a BudgetBreach alert when a monthly
-/// budget's month-to-date spend reaches 90% or 100% of its limit, or when its pace
-/// (<see cref="BudgetPace"/>) projects it to overshoot the limit by day 7 through day 21 of the
-/// month. Reads budgets.budgets
-/// (<see cref="IBudgetRepository"/>) and month-to-date category spend, already converted to USD at
-/// the read boundary (<see cref="IMerchantSpendingReader"/> — never a native amount is summed). The
-/// budget's own limit is converted the same way via <see cref="CurrencyConverter.ToUsd"/>, mirroring
-/// <c>GetBudgetSummaryQueryHandler</c> so the two figures are compared apples-to-apples.
+/// Daily hygiene sentinel (C2, ledger-heartbeat design). The amounts it watches are the hand-set ones: a line the
+/// person never set an amount for carries no alert (an alert on a number they never chose is noise), so the sentinel
+/// walks the override rows (<see cref="IBudgetRepository"/>) and reads each user's month through
+/// <see cref="IBudgetEstimateService"/>, the same figures the page shows. For every overridden line it fires a
+/// BudgetBreach alert when month-to-date spend reaches 90% or 100% of the amount, or when its pace
+/// (<see cref="BudgetPace"/>) projects an overshoot by day 7 through day 21 of the month. For a person who has
+/// hand-set any amount it also fires one alert on the month as a whole when its expected month-end total beats the
+/// total estimate by <see cref="BudgetPace.Tolerance"/> in the same days (only where there is history enough for the
+/// total to mean something). Spend is already USD at the read boundary; an override's own amount is converted by the
+/// estimate service, so the two sides are compared apples-to-apples.
 ///
-/// Both thresholds are checked independently every run, not as an if/else-if ladder: a budget that
-/// jumps straight from 70% to 105% spend in one day crosses both the same day, and each is its own
-/// alert. Dedup — the part that makes a crossing fire once per budget per month — lives entirely in
-/// <see cref="IAlertGeneratorService"/> (its reference id carries the budget, the crossing kind, and
-/// the year/month); this job just reports what it observed on every run.
+/// Both thresholds are checked independently every run, not as an if/else-if ladder: a line that jumps straight from
+/// 70% to 105% spend in one day crosses both the same day, and each is its own alert. Dedup — the part that makes a
+/// crossing fire once per line per month — lives entirely in <see cref="IAlertGeneratorService"/> (its reference id
+/// carries the line, the crossing kind, and the year/month); this job just reports what it observed on every run.
 ///
 /// A run evaluates only the UTC month of the daily slot it was scheduled for
 /// (<see cref="ScheduledSlotUtc"/>), not of the moment it happens to execute: the slot is late in
@@ -30,19 +32,18 @@ using Microsoft.Extensions.Logging;
 /// A run starting more than <see cref="MaxStartDelay"/> past its slot is skipped.
 ///
 /// Two decisions worth stating (each pinned by its own test):
-/// - A mid-month limit edit is never snapshotted — every run reads the budget's CURRENT
-///   MonthlyLimit and recomputes against it. An edit changes what counts as a crossing going
-///   forward; it never retroactively resolves an alert already raised earlier in the month.
+/// - A mid-month amount edit is never snapshotted — every run reads the CURRENT override and recomputes against it.
+///   An edit changes what counts as a crossing going forward; it never retroactively resolves an alert already
+///   raised earlier in the month.
 /// - A refund that drops spend back under an already-alerted threshold does not resolve that
 ///   alert — BudgetBreach has no Resolve method, like the other hygiene sentinels (PriceHike,
 ///   CategorySpike, …). If spend later climbs back over the same threshold in the same month, the
-///   alert already raised on that (budget, kind, month) reference — open, dismissed or resolved —
+///   alert already raised on that (line, kind, month) reference — open, dismissed or resolved —
 ///   suppresses a second one.
 /// </summary>
 public sealed class BudgetBreachDetectionJob(
     IBudgetRepository budgets,
-    IMerchantSpendingReader merchantSpending,
-    ICategoryNormalizationService normalization,
+    IBudgetEstimateService estimates,
     IAlertGeneratorService alerts,
     TimeProvider clock,
     ILogger<BudgetBreachDetectionJob> logger)
@@ -86,9 +87,6 @@ public sealed class BudgetBreachDetectionJob(
             return;
         }
 
-        // A breach that only becomes visible after the month closes, because a bank posted late, is not alerted.
-        var monthStart = new DateOnly(slot.Year, slot.Month, 1);
-
         IReadOnlyList<Budget> all;
         try
         {
@@ -102,70 +100,72 @@ public sealed class BudgetBreachDetectionJob(
 
         foreach (var group in all.GroupBy(b => b.UserId))
         {
-            await ProcessUserAsync(group.Key, group.ToList(), monthStart, slot, ct);
+            await ProcessUserAsync(group.Key, group.ToList(), slot, ct);
         }
     }
 
     private async Task ProcessUserAsync(
-        Guid userId, IReadOnlyList<Budget> userBudgets, DateOnly monthStart, DateTime asOf, CancellationToken ct)
+        Guid userId, IReadOnlyList<Budget> overrides, DateTime slot, CancellationToken ct)
     {
-        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-        IReadOnlyDictionary<string, decimal> rawSpending;
+        // A breach that only becomes visible after the month closes, because a bank posted late, is not alerted.
+        BudgetSummaryResponse summary;
         try
         {
-            rawSpending = await merchantSpending.GetSpendingByCategoryUsdAsync(userId, monthStart, monthEnd, ct);
+            summary = await estimates.ComputeAsync(userId, slot.Year, slot.Month, slot, overrides, ct);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "BudgetBreachDetectionJob: failed to read spend for user {UserId}", userId);
+            logger.LogWarning(ex, "BudgetBreachDetectionJob: failed to read the month for user {UserId}", userId);
             return;
         }
 
-        var spentByCategory = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (rawCategory, amount) in rawSpending)
-        {
-            var normalized = normalization.Normalize(rawCategory);
-            spentByCategory[normalized] = spentByCategory.GetValueOrDefault(normalized) + amount;
-        }
-
-        foreach (var budget in userBudgets)
+        foreach (var item in summary.Items.Where(i => i.OverrideId is not null))
         {
             try
             {
-                await EvaluateAsync(budget, spentByCategory, monthStart.Year, monthStart.Month, asOf, ct);
+                await EvaluateLineAsync(userId, item, slot, ct);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex,
                     "BudgetBreachDetectionJob: alert failed for user {UserId} category {Category}",
-                    userId, budget.Category);
+                    userId, item.Category);
             }
+        }
+
+        try
+        {
+            await EvaluateMonthAsync(userId, summary, slot, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "BudgetBreachDetectionJob: month alert failed for user {UserId}", userId);
         }
     }
 
-    private async Task EvaluateAsync(
-        Budget budget, IReadOnlyDictionary<string, decimal> spentByCategory, int year, int month,
-        DateTime asOf, CancellationToken ct)
+    private async Task EvaluateLineAsync(Guid userId, BudgetSummaryItemDto item, DateTime asOf, CancellationToken ct)
     {
-        var limitUsd = CurrencyConverter.ToUsd(budget.MonthlyLimit, budget.Currency);
-        if (limitUsd <= 0m)
+        var limitUsd = item.Estimate ?? 0m;
+        if (limitUsd <= 0m || item.OverrideId is not { } budgetId)
         {
             return;
         }
 
-        var spentUsd = spentByCategory.GetValueOrDefault(budget.Category, 0m);
+        var year = asOf.Year;
+        var month = asOf.Month;
+        var spentUsd = item.Spent;
         var ratio = spentUsd / limitUsd;
 
         if (ratio >= NearLimitThreshold)
         {
             await alerts.GenerateBudgetNearLimitAlertAsync(
-                budget.UserId, budget.Id, budget.Category, spentUsd, limitUsd, year, month, ct);
+                userId, budgetId, item.Category, spentUsd, limitUsd, year, month, ct);
         }
 
         if (ratio >= ExceededThreshold)
         {
             await alerts.GenerateBudgetExceededAlertAsync(
-                budget.UserId, budget.Id, budget.Category, spentUsd, limitUsd, year, month, ct);
+                userId, budgetId, item.Category, spentUsd, limitUsd, year, month, ct);
         }
 
         if (asOf.Day >= PaceWindowStartDay && asOf.Day <= PaceWindowEndDay)
@@ -174,9 +174,29 @@ public sealed class BudgetBreachDetectionJob(
             if (pace.PaceRatio >= PaceTolerance)
             {
                 await alerts.GenerateBudgetPaceAlertAsync(
-                    budget.UserId, budget.Id, budget.Category, spentUsd, limitUsd,
+                    userId, budgetId, item.Category, spentUsd, limitUsd,
                     pace.ProjectedMonthEndSpend, year, month, ct);
             }
+        }
+    }
+
+    private async Task EvaluateMonthAsync(Guid userId, BudgetSummaryResponse summary, DateTime asOf, CancellationToken ct)
+    {
+        // Without enough history the total is only the hand-set amounts, and the spend of every other line would
+        // read as an overshoot of a total that never included it.
+        if (!summary.HasEnoughHistory
+            || summary.TotalEstimate <= 0m
+            || asOf.Day < PaceWindowStartDay
+            || asOf.Day > PaceWindowEndDay)
+        {
+            return;
+        }
+
+        if (summary.ExpectedMonthEnd / summary.TotalEstimate >= PaceTolerance)
+        {
+            await alerts.GenerateBudgetTotalPaceAlertAsync(
+                userId, summary.TotalEstimate, summary.ExpectedMonthEnd, summary.TotalSpent,
+                asOf.Year, asOf.Month, ct);
         }
     }
 }

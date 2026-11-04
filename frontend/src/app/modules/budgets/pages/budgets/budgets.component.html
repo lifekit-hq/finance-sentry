@@ -1,6 +1,8 @@
 <cmn-page-container spacing="none" fill>
   <div class="flex min-h-0 flex-1 flex-col gap-cmn-5">
-    <p class="text-cmn-sm text-text-secondary">Monthly spending limits</p>
+    <p class="text-cmn-sm text-text-secondary">
+      What a month usually costs, learned from your own history
+    </p>
 
     <cmn-month-stepper
       [value]="store.selectedMonthDate()"
@@ -14,12 +16,12 @@
         [status]="view().status"
         [errorMessage]="view().errorMessage"
         [errorPlacement]="errorPlacement()"
-        [isEmpty]="store.summaryItems().length === 0"
+        [isEmpty]="store.items().length === 0"
         [keepContent]="false"
-        [emptyMessage]="'No budgets for ' + store.monthName()"
+        [emptyMessage]="emptyMessage()"
+        [emptySubMessage]="emptySubMessage()"
         (retry)="store.loadSummary()"
         class="block space-y-cmn-5"
-        emptySubMessage="Set a monthly limit for a category to see how much you have left."
         emptyIcon="PiggyBank"
         retryable
       >
@@ -53,60 +55,71 @@
           </div>
         </div>
 
-        <!-- Over-budget warning -->
+        <!-- Months the estimates do not learn from, in plain words -->
+        @if (store.skippedNote(); as note) {
+          <cmn-alert variant="info" class="block" data-testid="budgets-skipped-note">
+            {{ note }}
+          </cmn-alert>
+        }
+
+        @if (!store.hasEnoughHistory()) {
+          <cmn-alert variant="info" class="block" data-testid="budgets-short-history">
+            Not enough history to suggest amounts yet: {{ store.historyMonthsUsed() }} of the
+            {{ store.minHistoryMonths() }} months needed. Lines below show what was spent.
+          </cmn-alert>
+        }
+
+        <!-- Over-estimate warning -->
         @if (store.overBudgetCount() > 0) {
           <cmn-alert variant="warning" class="block">
             {{ store.overBudgetCount() }}
             {{ store.overBudgetCount() === 1 ? 'category is' : 'categories are' }}
-            over budget this month.
+            over {{ store.overBudgetCount() === 1 ? 'its' : 'their' }} estimate this month.
           </cmn-alert>
         }
 
-        <!-- Left this month -->
-        @let over = store.totalSpent() > store.totalBudget();
-        @let heroAmount =
-          over
-            ? store.totalSpent() - store.totalBudget()
-            : store.totalBudget() - store.totalSpent();
+        <!-- Expected by month end -->
+        @let behind = store.expectedMonthEnd() > store.totalEstimate();
         <cmn-card class="block">
           <div
             class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
           >
-            Left this month
+            {{ store.isCurrentMonth() ? 'Expected by month end' : 'Spent in ' + store.monthName() }}
           </div>
           <div class="mt-cmn-1 flex flex-wrap items-baseline gap-x-cmn-2">
             <span
-              [class.text-status-error]="over"
-              [class.text-text-primary]="!over"
+              [class.text-status-warning]="store.isCurrentMonth() && behind"
+              [class.text-text-primary]="!(store.isCurrentMonth() && behind)"
               class="tabular-nums text-cmn-xl font-bold"
+              data-testid="budgets-expected"
             >
-              {{ heroAmount | money }}
+              {{ store.expectedMonthEnd() | money }}
             </span>
             <span class="text-cmn-sm text-text-secondary">
-              {{
-                over
-                  ? 'over · ' + (store.totalBudget() | money) + ' budget'
-                  : 'left of ' + (store.totalBudget() | money)
-              }}
+              of {{ store.totalEstimate() | money }} estimated
             </span>
           </div>
           <div class="mt-cmn-3 h-2.5 overflow-hidden rounded-full bg-surface-raised">
             <div
               [style.width.%]="store.overallPct()"
-              [class.bg-status-error]="over"
-              [class.bg-accent-default]="!over"
+              [class.bg-status-error]="store.totalSpent() > store.totalEstimate()"
+              [class.bg-accent-default]="store.totalSpent() <= store.totalEstimate()"
               class="h-full rounded-full"
             ></div>
           </div>
+          <div class="mt-cmn-1 text-cmn-xs text-text-secondary">
+            {{ store.totalSpent() | money }} spent so far
+          </div>
         </cmn-card>
 
-        <!-- Category cards grid -->
+        <!-- One card per line: the estimate, and whether it is the suggestion or a hand edit -->
         <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
-          @for (b of store.summaryItems(); track b.id) {
-            @let pct = barPct(b.spent, b.monthlyLimit);
-            @let nearOver = !b.isOverBudget && pct >= nearLimitPct;
-            @let isEditing = store.editingId() === b.id;
-            @let leftAmount = b.isOverBudget ? b.spent - b.monthlyLimit : b.remaining;
+          @for (b of store.items(); track b.category) {
+            @let estimate = b.estimate;
+            @let pct = estimate === null ? 0 : barPct(b.spent, estimate);
+            @let nearOver = !b.isOverBudget && estimate !== null && pct >= nearLimitPct;
+            @let isEditing = store.editingCategory() === b.category;
+            @let leftAmount = b.isOverBudget ? b.spent - (estimate ?? 0) : b.remaining;
 
             <cmn-card>
               <div class="mb-cmn-3 flex items-center justify-between gap-cmn-2">
@@ -115,14 +128,23 @@
                     [style.background]="categoryColor(b.category)"
                     class="h-2.5 w-2.5 shrink-0 rounded-sm"
                   ></div>
-                  <a
-                    [routerLink]="transactionsRoute"
-                    [queryParams]="transactionsParams(b.category)"
-                    class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
-                    data-testid="budget-category-link"
-                  >
-                    {{ b.categoryLabel }}
-                  </a>
+                  @if (hasTransactions(b.category)) {
+                    <a
+                      [routerLink]="transactionsRoute"
+                      [queryParams]="transactionsParams(b.category)"
+                      class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
+                      data-testid="budget-category-link"
+                    >
+                      {{ b.categoryLabel }}
+                    </a>
+                  } @else {
+                    <span
+                      class="truncate font-label text-cmn-sm font-semibold text-text-primary"
+                      data-testid="budget-category-label"
+                    >
+                      {{ b.categoryLabel }}
+                    </span>
+                  }
                 </div>
                 <div class="flex shrink-0 items-center gap-cmn-1">
                   @if (b.isOverBudget) {
@@ -133,9 +155,9 @@
                     <cmn-tag variant="warning">Near limit</cmn-tag>
                   }
                   <cmn-menu
-                    [items]="budgetMenuItems"
+                    [items]="menuFor(b)"
                     (itemSelect)="onBudgetAction($event.id, b)"
-                    ariaLabel="Budget actions"
+                    ariaLabel="Estimate actions"
                     triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
                   >
                     <cmn-icon name="Ellipsis" size="sm" />
@@ -143,51 +165,83 @@
                 </div>
               </div>
 
-              <!-- Amount left (or over) of the limit -->
-              <div class="flex flex-wrap items-baseline gap-x-cmn-2">
-                <span
-                  [class.text-status-error]="b.isOverBudget"
-                  [class.text-text-primary]="!b.isOverBudget"
-                  class="tabular-nums text-cmn-md font-bold"
-                >
-                  {{ leftAmount | money }}
-                </span>
-                <span class="text-cmn-xs text-text-secondary">
-                  {{ b.isOverBudget ? 'over ·' : 'left of' }}
-                  @if (!isEditing) {
-                    {{ b.monthlyLimit | money }}{{ b.isOverBudget ? ' budget' : '' }}
-                  }
-                </span>
-                @if (isEditing) {
-                  <cmn-input
-                    [ngModel]="editValue()"
-                    (ngModelChange)="editValue.set($event)"
-                    (focusout)="saveEdit(b.id)"
-                    (keydown.enter)="saveEdit(b.id)"
-                    (keydown.escape)="cancelEdit()"
-                    class="w-28"
-                    size="sm"
-                    type="number"
-                    inputmode="decimal"
-                    enterkeyhint="done"
-                    aria-label="Monthly limit"
-                  />
-                }
-              </div>
+              @if (estimate === null) {
+                <!-- Spend with nothing to estimate it from yet -->
+                <div class="flex flex-wrap items-baseline gap-x-cmn-2">
+                  <span class="tabular-nums text-cmn-md font-bold text-text-primary">
+                    {{ b.spent | money }}
+                  </span>
+                  <span class="text-cmn-xs text-text-secondary">spent · no estimate yet</span>
+                </div>
+              } @else {
+                <!-- Amount left (or over) of the estimate -->
+                <div class="flex flex-wrap items-baseline gap-x-cmn-2">
+                  <span
+                    [class.text-status-error]="b.isOverBudget"
+                    [class.text-text-primary]="!b.isOverBudget"
+                    class="tabular-nums text-cmn-md font-bold"
+                  >
+                    {{ leftAmount | money }}
+                  </span>
+                  <span class="text-cmn-xs text-text-secondary">
+                    {{ b.isOverBudget ? 'over ·' : 'left of' }}
+                    @if (!isEditing) {
+                      {{ estimate | money }}{{ b.isOverBudget ? ' estimate' : '' }}
+                    }
+                  </span>
+                </div>
+              }
+              @if (isEditing) {
+                <cmn-input
+                  [ngModel]="editValue()"
+                  (ngModelChange)="editValue.set($event)"
+                  (focusout)="saveEdit(b)"
+                  (keydown.enter)="saveEdit(b)"
+                  (keydown.escape)="cancelEdit()"
+                  class="mt-cmn-1 block w-28"
+                  size="sm"
+                  type="number"
+                  inputmode="decimal"
+                  enterkeyhint="done"
+                  aria-label="Monthly estimate"
+                />
+              }
 
-              <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
-                <div
-                  [style.width.%]="pct"
-                  [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
-                  class="h-full rounded-full"
-                ></div>
-              </div>
-              <div class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                {{ b.spent | money }} spent
-              </div>
+              @if (estimate !== null) {
+                <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
+                  <div
+                    [style.width.%]="pct"
+                    [style.background]="barColor(b.spent, estimate, b.category)"
+                    class="h-full rounded-full"
+                  ></div>
+                </div>
+                <div class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                  {{ b.spent | money }} spent
+                </div>
+              }
+              @switch (b.source) {
+                @case ('override') {
+                  <div class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="budget-source">
+                    Your amount{{ b.suggestedAmount === null ? '' : ' · suggested ' }}
+                    @if (b.suggestedAmount !== null) {
+                      {{ b.suggestedAmount | money }}
+                    }
+                  </div>
+                }
+                @case ('history') {
+                  <div class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="budget-source">
+                    A typical month for you
+                  </div>
+                }
+                @case ('commitment') {
+                  <div class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="budget-source">
+                    Fixed monthly charges
+                  </div>
+                }
+              }
               @if (b.isOffPace) {
                 <div class="mt-cmn-1 text-cmn-xs text-status-warning">
-                  On track to finish the month at {{ pacePct(b.paceRatio) }}% of the limit ({{
+                  On track to finish the month at {{ pacePct(b.paceRatio) }}% of the estimate ({{
                     b.projectedMonthEndSpend | money
                   }})
                 </div>

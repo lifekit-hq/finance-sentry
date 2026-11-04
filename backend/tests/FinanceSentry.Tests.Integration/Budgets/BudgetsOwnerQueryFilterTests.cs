@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.Budgets;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Infrastructure.Jobs;
@@ -11,6 +12,7 @@ using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -113,18 +115,23 @@ public sealed class BudgetsOwnerQueryFilterTests : IAsyncLifetime
         await SeedAsync();
         var now = DateTimeOffset.UtcNow;
         var slot = new DateTimeOffset(now.Year, now.Month, now.Day, 23, 55, 0, TimeSpan.Zero);
-        var spending = new Mock<IMerchantSpendingReader>();
-        spending.Setup(s => s.GetSpendingByCategoryUsdAsync(
+        var spending = new Mock<IMonthlyCategorySpendReader>();
+        spending.Setup(s => s.GetAsync(
                 It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal> { ["FOOD_AND_DRINK"] = 150m });
-        var normalization = new Mock<ICategoryNormalizationService>();
-        normalization.Setup(n => n.Normalize(It.IsAny<string>())).Returns((string c) => c);
+            .ReturnsAsync(new MonthlyCategorySpend(
+                new DateOnly(2020, 1, 1), [new CategoryMonthSpend($"{slot.Year:D4}-{slot.Month:D2}", "FOOD_AND_DRINK", 150m)], [], []));
+        var holes = new Mock<ICoverageHoleReader>();
+        holes.Setup(h => h.GetHolesAsync(
+                It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var estimates = new BudgetEstimateService(
+            spending.Object, holes.Object, new CategoryNormalizationService(), Options.Create(new BudgetEstimateOptions()));
         var alerts = new Mock<IAlertGeneratorService>();
 
         await using (var asNoOne = CreateContext())
         {
             await new BudgetBreachDetectionJob(
-                new BudgetRepository(asNoOne), spending.Object, normalization.Object, alerts.Object,
+                new BudgetRepository(asNoOne), estimates, alerts.Object,
                 new FixedTimeProvider(slot), NullLogger<BudgetBreachDetectionJob>.Instance).ExecuteAsync();
         }
 

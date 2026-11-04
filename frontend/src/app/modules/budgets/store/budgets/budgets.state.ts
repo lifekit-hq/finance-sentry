@@ -1,10 +1,11 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {type BudgetSummaryItem} from '../../models/budget/budget.model';
+import {type BudgetSummaryResponse} from '../../models/budget/budget.model';
 
 export interface BudgetsState {
-  summaryItems: BudgetSummaryItem[];
-  editingId: Nullable<string>;
+  summary: Nullable<BudgetSummaryResponse>;
+  /** The category whose estimate is being edited inline. */
+  editingCategory: Nullable<string>;
   refreshFailed: boolean;
   selectedYear: number;
   selectedMonth: number;
@@ -13,8 +14,8 @@ export interface BudgetsState {
 const now = new Date();
 
 export const initialBudgetsState: BudgetsState = {
-  summaryItems: [],
-  editingId: null,
+  summary: null,
+  editingCategory: null,
   refreshFailed: false,
   selectedYear: now.getFullYear(),
   selectedMonth: now.getMonth() + 1,

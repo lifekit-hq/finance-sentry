@@ -21,6 +21,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain.Ports;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
@@ -235,7 +236,11 @@ public sealed class ToolParityTests
 
         // Domain service + BankSync spend read port needed by GetBudgetSummaryQueryHandler.
         services.AddScoped<ICategoryNormalizationService, CategoryNormalizationService>();
-        services.AddScoped<IMerchantSpendingReader, MerchantSpendingReader>();
+        services.AddOptions<BudgetEstimateOptions>();
+        services.AddScoped<IBudgetEstimateService, BudgetEstimateService>();
+        services.AddScoped<IMonthlyCategorySpendReader, MonthlyCategorySpendReader>();
+        services.AddScoped<ICoverageHoleReader, CoverageHoleReader>();
+        services.AddScoped<IActiveCommitmentsReader, FinanceSentry.Modules.Subscriptions.Application.Services.ActiveCommitmentsReader>();
 
         // Money-flow statistics stack (spec 044) needed by GetMoneyFlowStatisticsQueryHandler,
         // which GetCashflowReportTool now depends on instead of raw transactions (#675).
@@ -252,6 +257,7 @@ public sealed class ToolParityTests
         services.AddScoped<ITransferDetectionService, TransferDetectionService>();
         services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();
         services.AddScoped<IMoneyFlowStatisticsService, MoneyFlowStatisticsService>();
+        services.AddScoped<IFlowBreakdownService, FlowBreakdownService>();
 
         // CQRS: registers all IQueryHandler / ICommandHandler / IEventHandler
         // implementations from each module assembly, wrapped in validation and logging
@@ -394,8 +400,8 @@ public sealed class ToolParityTests
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
-        // BankSyncDbContext must be initialised so that GetMerchantSpendingQueryHandler
-        // can query transactions (returns empty → spending = 0, which is fine).
+        // BankSyncDbContext must be initialised so that the spend reader can query transactions
+        // (returns empty → spending = 0, which is fine).
         _ = svc.GetRequiredService<BankSyncDbContext>();
 
         var budgetDb = svc.GetRequiredService<BudgetsDbContext>();
@@ -412,7 +418,7 @@ public sealed class ToolParityTests
             e.BudgetId.Should().NotBeNullOrEmpty();
             e.Name.Should().NotBeNullOrEmpty();
             e.Period.Should().MatchRegex(@"^\d{4}-\d{2}$");
-            e.LimitAmount.Should().BeGreaterThan(0);
+            e.LimitAmount.Should().BeGreaterThan(0, "the line is a hand-set amount over an estimate");
             e.Currency.Should().NotBeNullOrEmpty();
             e.SpentAmount.Should().BeGreaterThanOrEqualTo(0);
             e.UtilizationPercent.Should().BeGreaterThanOrEqualTo(0);

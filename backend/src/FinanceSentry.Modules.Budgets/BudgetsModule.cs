@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Budgets;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Budgets.Application.Estimates;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
 using FinanceSentry.Modules.Budgets.Infrastructure.Jobs;
@@ -52,6 +53,8 @@ public static class BudgetsModule
 
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<ICategoryNormalizationService, CategoryNormalizationService>();
+        services.AddOptions<BudgetEstimateOptions>().BindConfiguration(BudgetEstimateOptions.SectionName);
+        services.AddScoped<IBudgetEstimateService, BudgetEstimateService>();
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<BudgetBreachDetectionJob>();

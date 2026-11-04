@@ -33,6 +33,7 @@ public static class SubscriptionsModule
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<ISubscriptionDetectionResultService, SubscriptionDetectionResultService>();
         services.AddScoped<IActiveSubscriptionsReader, ActiveSubscriptionsReader>();
+        services.AddScoped<IActiveCommitmentsReader, ActiveCommitmentsReader>();
 
         services.AddSingleton<IMerchantBrandCatalog, MerchantBrandCatalog>();
         services.TryAddSingleton(TimeProvider.System);
