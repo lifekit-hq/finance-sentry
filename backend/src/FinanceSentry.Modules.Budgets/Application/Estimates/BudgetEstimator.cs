@@ -55,7 +55,7 @@ public static class BudgetEstimator
 
         var endedLines = commitments
             .Where(c => c.EndDate < month)
-            .Concat(endedCommitments.Where(c => c.EndDate is null || c.EndDate < month))
+            .Concat(endedCommitments)
             .Select(c => c.Line)
             .Where(EstimateLines.IsEstimable)
             .ToHashSet(StringComparer.Ordinal);

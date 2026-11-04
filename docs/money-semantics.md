@@ -1672,9 +1672,9 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   (loans, rent and utilities, family support, household) the commitment total replaces the median for the current and
   future months, so a loan with one payment left is estimated at what is still charged; an installment past its end
   date drops out. A committed line whose commitments have all ended (a completed installment, a lapsed or
-  potentially-cancelled rent or subscription, or an active one past its end date) is suggested nothing, not the
-  median, which still holds the payments that stopped; a commitment that ends in the month shown still counts for
-  it. Ended commitments are read through `IActiveCommitmentsReader.GetEndedCommitmentsAsync` and placed like active
+  potentially-cancelled rent or subscription, whatever end date it carries, or an active one past its end date) is
+  suggested nothing, not the median, which still holds the payments that stopped; an active commitment that ends in
+  the month shown still counts for it. Ended commitments are read through `IActiveCommitmentsReader.GetEndedCommitmentsAsync` and placed like active
   ones; a past month ignores them (it learns from its own history). A committed line that never had a commitment keeps
   the median. On any other line the commitment is a floor: the estimate never falls below what its commitments charge,
   and an ended one leaves its median alone.

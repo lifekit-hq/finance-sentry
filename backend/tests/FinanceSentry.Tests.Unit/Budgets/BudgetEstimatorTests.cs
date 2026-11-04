@@ -197,12 +197,19 @@ public sealed class BudgetEstimatorTests
     }
 
     [Fact]
-    public void EndedCommitment_WhoseFinalPaymentIsThisMonth_DoesNotSuppress()
+    public void CompletedCommitment_WhoseEndDateIsOnOrAfterTheMonth_StillGetsNoSuggestion()
     {
         var rows = SixMonths.Select(m => Spend(m, "LOAN_PAYMENTS", 200m)).ToArray();
-        var finishing = new[] { new CommitmentOnLine("LOAN_PAYMENTS", 200m, Month) };
+        var paidOffEarly = new[]
+        {
+            new CommitmentOnLine("LOAN_PAYMENTS", 200m, Month),
+            new CommitmentOnLine("LOAN_PAYMENTS", 200m, Month.AddMonths(2)),
+        };
 
-        Assert.Equal(200m, Suggest("LOAN_PAYMENTS", History(SixMonths), rows, ended: finishing).Amount);
+        var suggestion = Suggest("LOAN_PAYMENTS", History(SixMonths), rows, ended: paidOffEarly);
+
+        Assert.Null(suggestion.Amount);
+        Assert.Null(suggestion.Basis);
     }
 
     [Fact]
