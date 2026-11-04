@@ -40,6 +40,8 @@ public sealed class DispositionTests
     [InlineData(CompanionEventKind.ThesisBreak)]
     [InlineData(CompanionEventKind.LowBalance)]
     [InlineData(CompanionEventKind.Opportunity)]
+    [InlineData(CompanionEventKind.PriceHike)]
+    [InlineData(CompanionEventKind.FilingLanded)]
     public void Other_kinds_keep_the_mode_disposition_regardless_of_staleness(CompanionEventKind kind)
     {
         _policy.DispositionFor(NotificationMode.Realtime, kind).Should().Be(EventDisposition.Pending);
@@ -51,6 +53,8 @@ public sealed class DispositionTests
     [InlineData(CompanionEventKind.EarningsAhead)]
     [InlineData(CompanionEventKind.FamilyStatement)]
     [InlineData(CompanionEventKind.FireBrief)]
+    [InlineData(CompanionEventKind.MarketStructure)]
+    [InlineData(CompanionEventKind.NewsCluster)]
     public void Digest_only_kinds_are_held_for_the_digest_in_every_waking_mode(CompanionEventKind kind)
     {
         foreach (var mode in new[] { NotificationMode.Digest, NotificationMode.Scan, NotificationMode.Realtime })
@@ -62,6 +66,8 @@ public sealed class DispositionTests
     [InlineData(CompanionEventKind.EarningsAhead)]
     [InlineData(CompanionEventKind.FamilyStatement)]
     [InlineData(CompanionEventKind.FireBrief)]
+    [InlineData(CompanionEventKind.MarketStructure)]
+    [InlineData(CompanionEventKind.NewsCluster)]
     public void Digest_only_kinds_stay_silent_under_quiet(CompanionEventKind kind)
         => _policy.DispositionFor(NotificationMode.Quiet, kind).Should().Be(EventDisposition.SuppressedByMode);
 

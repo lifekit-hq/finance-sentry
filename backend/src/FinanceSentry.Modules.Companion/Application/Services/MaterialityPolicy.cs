@@ -26,6 +26,10 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         CompanionEventKind.EarningsAhead,
         CompanionEventKind.FamilyStatement,
         CompanionEventKind.FireBrief,
+        // Batched into the three-times-a-day ledger-pulse instead of one fresh agent session per signal
+        // (issue #1274, owner decision 2026-11-04). Revert: delete these two entries.
+        CompanionEventKind.MarketStructure,
+        CompanionEventKind.NewsCluster,
     };
 
     // Alert type strings are the cross-module contract value carried on each alert (Alerts module).

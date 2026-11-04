@@ -156,4 +156,32 @@ public sealed class DigestConsolidationTests
 
         result.Events.Should().BeEmpty();
     }
+    [Theory]
+    [InlineData(CompanionEventKind.MarketStructure)]
+    [InlineData(CompanionEventKind.NewsCluster)]
+    public async Task Batched_kinds_are_held_surface_on_a_pulse_pull_and_repeat_reads_are_stable(CompanionEventKind kind)
+    {
+        var disposition = new MaterialityPolicy().DispositionFor(NotificationMode.Realtime, kind);
+        disposition.Should().Be(EventDisposition.HeldForDigest);
+
+        await using var db = NewDb();
+        var events = new CompanionEventRepository(db);
+        var evt = new CompanionEvent
+        {
+            UserId = User, Kind = kind, Subject = "SYM", Severity = "info", Summary = "generic",
+            DedupKey = $"batched:{kind}", Disposition = disposition, OccurredAt = DateTimeOffset.UtcNow,
+        };
+        db.Events.Add(evt);
+        await db.SaveChangesAsync();
+
+        var handler = NewHandler(events);
+        var plain = await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default);
+        plain.Events.Should().BeEmpty("a held kind never rides the instant pull");
+
+        var query = new GetPendingCompanionEventsQuery(User, 25, true, "ledger pulse");
+        var first = await handler.Handle(query, default);
+        var second = await handler.Handle(query, default);
+        first.Events.Should().ContainSingle(e => e.Id == evt.Id);
+        second.Events.Select(e => e.Id).Should().Equal(first.Events.Select(e => e.Id), "reading twice neither loses nor duplicates");
+    }
 }
