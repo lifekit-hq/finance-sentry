@@ -41,8 +41,10 @@ using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Application.Services.DetectionPhrases;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Subscriptions.Application.Icons;
 using FinanceSentry.Modules.Subscriptions.Domain;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
+using FinanceSentry.Modules.Subscriptions.Infrastructure.Icons;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Integration;
@@ -241,6 +243,11 @@ public sealed class ToolParityTests
         services.AddScoped<ICommittedMerchantPinRepository, CommittedMerchantPinRepository>();
         services.AddScoped<IActiveSubscriptionsReader, FinanceSentry.Modules.Subscriptions.Application.Services.ActiveSubscriptionsReader>();
         services.AddSingleton<IDetectionPhraseProvider>(FixedDetectionPhraseProvider.Seed);
+        // GetSubscriptionsQueryHandler resolves icon ids from the curated catalog and the cached-icon read
+        // model; the list never fetches, so the fetcher is a no-network stand-in for the SSRF-guarded one.
+        services.AddSingleton<IMerchantBrandCatalog, MerchantBrandCatalog>();
+        services.AddScoped<IMerchantIconService, MerchantIconService>();
+        services.AddSingleton<IMerchantIconFetcher, NoNetworkIconFetcher>();
         services.AddScoped<ICommittedOutflowPolicy, CommittedOutflowPolicy>();
         services.AddScoped<ITransferDetectionService, TransferDetectionService>();
         services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();
@@ -2033,5 +2040,10 @@ public sealed class ToolParityTests
     {
         public Task<IReadOnlySet<Guid>> GetClosedUserIdsAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
+    }
+
+    private sealed class NoNetworkIconFetcher : IMerchantIconFetcher
+    {
+        public Task<FetchedIcon?> FetchAsync(string host, CancellationToken ct) => Task.FromResult<FetchedIcon?>(null);
     }
 }

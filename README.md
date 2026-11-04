@@ -11,7 +11,7 @@ Personal finance aggregation platform — bank accounts, crypto, brokerage, budg
 
 - **Multi-provider sync** — TrueLayer (EU/UK open banking), Monobank, Binance, Revolut X, Interactive Brokers, Inzhur (read-only cabinet sync)
 - **Automatic transaction sync** with cursor-based incremental updates and webhook support
-- **Subscription detection** via a merchant/cadence heuristic over synced transactions (installment-aware for Monobank)
+- **Subscription detection** via a merchant/cadence heuristic over synced transactions (installment-aware for Monobank); rows show the merchant's logo, cached server-side, with a category icon as fallback
 - **Budget tracking** with spending analysis per category
 - **Alerts** — unusual spend detection and configurable thresholds
 - **Multi-currency dashboard** with aggregated net worth, money flow, and category breakdown

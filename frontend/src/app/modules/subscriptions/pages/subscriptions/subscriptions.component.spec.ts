@@ -4,6 +4,7 @@ import {provideRouter, Router} from '@angular/router';
 import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
 import {onTestFinished} from 'vitest';
 
+import {environment} from '../../../../../environments/environment';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type Subscription} from '../../models/subscription/subscription.model';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
@@ -140,6 +141,7 @@ describe('SubscriptionsComponent async states', () => {
       activeSubscriptions?: Subscription[];
       hasInsufficientHistory?: boolean;
       offline?: boolean;
+      installments?: Subscription[];
     } = {}
   ) {
     const subscriptions = overrides.subscriptions ?? [];
@@ -155,8 +157,8 @@ describe('SubscriptionsComponent async states', () => {
         subscriptions.length > 0 ? [{id: 'upcoming', label: '', items: subscriptions}] : []
       ),
       activeSubscriptions: signal(overrides.activeSubscriptions ?? subscriptions),
-      activeInstallments: signal<Subscription[]>([]),
-      sortedInstallments: signal<Subscription[]>([]),
+      activeInstallments: signal<Subscription[]>(overrides.installments ?? []),
+      sortedInstallments: signal<Subscription[]>(overrides.installments ?? []),
       completedInstallments: signal<Subscription[]>([]),
       dismissedSubscriptions: signal<Subscription[]>([]),
       sortedDismissed: signal<Subscription[]>([]),
@@ -293,5 +295,51 @@ describe('SubscriptionsComponent async states', () => {
     expect(host.textContent).toContain('Netflix');
     expect(host.querySelector('[data-testid="subscriptions-skeleton"]')).toBeNull();
     expect(host.textContent).not.toContain('No active subscriptions yet');
+  });
+
+  describe('row avatar', () => {
+    const iconUrlOf = (host: HTMLElement) =>
+      host.querySelector('[data-testid="merchant-icon"] img')?.getAttribute('src');
+
+    it('shows the curated merchant icon, served by our API, on a subscription row', () => {
+      const {host} = render({subscriptions: [{...NETFLIX, iconId: 7, category: 'ENTERTAINMENT'}]});
+
+      expect(iconUrlOf(host)).toBe(`${environment.apiBaseUrl}/subscriptions/icons/7`);
+      expect(host.querySelector('[data-testid="category-icon"]')).toBeNull();
+    });
+
+    it('shows the same merchant icon on an installment row', () => {
+      const installment: Subscription = {...NETFLIX, id: 'i1', kind: 'installment', iconId: 7};
+      const {host} = render({subscriptions: [NETFLIX], installments: [installment]});
+
+      expect(iconUrlOf(host)).toBe(`${environment.apiBaseUrl}/subscriptions/icons/7`);
+    });
+
+    it('falls back to the category icon when no merchant matched', () => {
+      const {host} = render({
+        subscriptions: [{...NETFLIX, iconId: null, category: 'ENTERTAINMENT'}],
+      });
+
+      expect(host.querySelector('[data-testid="merchant-icon"]')).toBeNull();
+      expect(host.querySelector('[data-testid="category-icon"]')).not.toBeNull();
+    });
+
+    it('keeps the plain initial when there is neither a merchant icon nor a category icon', () => {
+      const {host} = render({subscriptions: [{...NETFLIX, iconId: null, category: null}]});
+
+      expect(host.querySelector('[data-testid="merchant-icon"]')).toBeNull();
+      expect(host.querySelector('[data-testid="category-icon"]')).toBeNull();
+      expect(host.textContent).toContain('N');
+    });
+
+    it('shows the initial, not a broken image, when the icon fails to load', () => {
+      const {fixture, host} = render({subscriptions: [{...NETFLIX, iconId: 7}]});
+
+      host.querySelector('[data-testid="merchant-icon"] img')?.dispatchEvent(new Event('error'));
+      fixture.detectChanges();
+
+      expect(host.querySelector('[data-testid="merchant-icon"] img')).toBeNull();
+      expect(host.querySelector('[data-testid="merchant-icon"]')?.textContent).toContain('N');
+    });
   });
 });

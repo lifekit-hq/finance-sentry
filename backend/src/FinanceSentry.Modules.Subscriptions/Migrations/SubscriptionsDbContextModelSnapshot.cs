@@ -143,6 +143,57 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                     b.ToTable("detected_subscriptions", (string)null);
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Subscriptions.Domain.MerchantBrand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)");
+
+                    b.Property<string>("Keyword")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Keyword")
+                        .IsUnique()
+                        .HasDatabaseName("idx_merchant_brand_keyword_unique");
+
+                    b.ToTable("merchant_brands", (string)null);
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Subscriptions.Domain.MerchantIcon", b =>
+                {
+                    b.Property<string>("Domain")
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)");
+
+                    b.Property<byte[]>("Content")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Domain");
+
+                    b.ToTable("merchant_icons", (string)null);
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Subscriptions.Domain.SubscriptionPriceChange", b =>
                 {
                     b.Property<Guid>("Id")

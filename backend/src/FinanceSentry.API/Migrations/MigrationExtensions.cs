@@ -67,6 +67,7 @@ public static class MigrationExtensions
         MigrateContext<EventsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
+        SeedMerchantBrands(sp, app.Logger, status);
         SeedRoles(sp, app.Logger, status);
         SeedSmokeAccount(sp, app.Logger, status);
 
@@ -112,6 +113,22 @@ public static class MigrationExtensions
         catch (Exception ex)
         {
             logger.LogError(ex, "Smoke account seeding failed. Startup will continue.");
+        }
+    }
+
+    private static void SeedMerchantBrands(IServiceProvider sp, ILogger logger, StartupMigrationStatus status)
+    {
+        // Nothing to seed into a schema this process never migrated; the readiness check names that case.
+        if (status.SkippedContexts.Contains(typeof(SubscriptionsDbContext)))
+            return;
+
+        try
+        {
+            MerchantBrandSeeder.Seed(sp.GetRequiredService<SubscriptionsDbContext>());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Merchant brand seeding failed. Startup will continue.");
         }
     }
 

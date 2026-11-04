@@ -51,6 +51,21 @@ public class SubscriptionsContractTests(SubscriptionsApiFactory factory)
     }
 
     [Fact]
+    public async Task GetIcon_NoAuth_Returns401()
+    {
+        var anon = _factory.CreateClient();
+        var response = await anon.GetAsync("/api/v1/subscriptions/icons/1");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetIcon_UnknownBrand_Returns404()
+    {
+        var response = await _client.GetAsync("/api/v1/subscriptions/icons/987654");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task GetSummary_NoAuth_Returns401()
     {
         var anon = _factory.CreateClient();

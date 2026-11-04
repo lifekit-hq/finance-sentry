@@ -21,7 +21,10 @@ public record SubscriptionDto(
     int? RemainingPayments,
     bool IsManual,
     bool IsTracked,
-    SubscriptionPriceChangeDto? LatestPriceChange);
+    SubscriptionPriceChangeDto? LatestPriceChange,
+    // The curated merchant whose icon GET subscriptions/icons/{IconId} serves; null when no curated
+    // merchant matches or its host is known to have no usable icon (the client falls back to a category icon).
+    int? IconId = null);
 
 /// <summary>The latest change in what a subscription charges: the previous and the new charge, and when the new one landed.</summary>
 public record SubscriptionPriceChangeDto(
