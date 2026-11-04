@@ -116,13 +116,11 @@
                           (sub.nextExpectedDate | date: 'd MMM')
                     "
                   >
-                    <div
-                      [style.background]="sub.merchantName | merchantColor"
+                    <ng-container
+                      [ngTemplateOutlet]="rowAvatar"
+                      [ngTemplateOutletContext]="{$implicit: sub}"
                       avatar
-                      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
-                    >
-                      {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
-                    </div>
+                    />
                     <div amount class="min-w-[72px] text-right">
                       <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
                       <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
@@ -198,13 +196,11 @@
                       : ' · not linked to transactions')
                   "
                 >
-                  <div
-                    [style.background]="item.merchantName | merchantColor"
+                  <ng-container
+                    [ngTemplateOutlet]="rowAvatar"
+                    [ngTemplateOutletContext]="{$implicit: item}"
                     avatar
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
-                  >
-                    {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
-                  </div>
+                  />
                   <div amount class="min-w-[72px] text-right">
                     <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                       {{ item.monthlyEquivalent | money: item.currency }}
@@ -238,13 +234,11 @@
               <cmn-card padding="none">
                 @for (item of store.completedInstallments(); track item.id) {
                   <cmn-list-item-row [label]="item.merchantName || 'Unknown'" [dimmed]="true">
-                    <div
-                      [style.background]="item.merchantName | merchantColor"
+                    <ng-container
+                      [ngTemplateOutlet]="rowAvatar"
+                      [ngTemplateOutletContext]="{$implicit: item}"
                       avatar
-                      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
-                    >
-                      {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
-                    </div>
+                    />
                     <div meta class="min-w-[110px] text-center text-cmn-xs text-text-disabled">
                       {{ item.occurrenceCount }} payments · done
                     </div>
@@ -282,13 +276,11 @@
             <cmn-card padding="none">
               @for (sub of store.sortedDismissed(); track sub.id) {
                 <cmn-list-item-row [label]="sub.merchantName || 'Unknown'" [dimmed]="true">
-                  <div
-                    [style.background]="sub.merchantName | merchantColor"
+                  <ng-container
+                    [ngTemplateOutlet]="rowAvatar"
+                    [ngTemplateOutletContext]="{$implicit: sub}"
                     avatar
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
-                  >
-                    {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
-                  </div>
+                  />
                   <div amount class="min-w-[72px] text-right">
                     <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                       {{ sub.monthlyEquivalent | money: sub.currency }}
@@ -309,3 +301,24 @@
     </cmn-page-scroll>
   </div>
 </cmn-page-container>
+
+<!-- The avatar of every row: the curated merchant's icon (served by our API; the shared avatar falls
+     back to the initial if it fails to load), else the row's category icon, else the initial. -->
+<ng-template #rowAvatar let-row>
+  @if (row.iconId | merchantIconUrl; as iconUrl) {
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center" data-testid="merchant-icon">
+      <cmn-institution-avatar [logoUrl]="iconUrl" [name]="row.merchantName || '?'" size="lg" />
+    </div>
+  } @else {
+    <div
+      [style.background]="row.merchantName | merchantColor"
+      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
+    >
+      @if (row.category | categoryIcon; as fallbackIcon) {
+        <cmn-icon [name]="fallbackIcon" data-testid="category-icon" size="md" />
+      } @else {
+        {{ `${row.merchantName || '?'}` | slice: 0 : 1 | uppercase }}
+      }
+    </div>
+  }
+</ng-template>

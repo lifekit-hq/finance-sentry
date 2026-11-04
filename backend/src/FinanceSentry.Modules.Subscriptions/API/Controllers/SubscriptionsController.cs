@@ -5,6 +5,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.API.Responses;
 using FinanceSentry.Modules.Subscriptions.Application.Commands;
+using FinanceSentry.Modules.Subscriptions.Application.Icons;
 using FinanceSentry.Modules.Subscriptions.Application.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,8 +24,24 @@ public class SubscriptionsController(
     ICommandHandler<CompleteInstallmentCommand, bool> completeInstallment,
     ICommandHandler<DeleteInstallmentCommand, bool> deleteInstallment,
     ICommandHandler<AddCommitmentCommand, Guid> addCommitment,
-    ICommandHandler<LinkCommitmentCommand, bool> linkCommitment) : ControllerBase
+    ICommandHandler<LinkCommitmentCommand, bool> linkCommitment,
+    IMerchantIconService merchantIcons) : ControllerBase
 {
+    /// <summary>
+    /// A curated merchant's icon, served from our own origin (the browser never sees the merchant's
+    /// URL). 404 when the brand is unknown or its host has no usable icon.
+    /// </summary>
+    [HttpGet("icons/{brandId:int}")]
+    public async Task<IActionResult> GetIcon(int brandId, CancellationToken ct = default)
+    {
+        var icon = await merchantIcons.GetAsync(brandId, ct);
+        if (icon is null)
+            return NotFound();
+
+        Response.Headers.CacheControl = "private, max-age=86400";
+        return File(icon.Content, icon.ContentType);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetSubscriptions(
         [FromQuery] bool includeDismissed = false,

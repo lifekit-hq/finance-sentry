@@ -1,4 +1,4 @@
-import {DatePipe, DecimalPipe, SlicePipe, UpperCasePipe} from '@angular/common';
+import {DatePipe, DecimalPipe, NgTemplateOutlet, SlicePipe, UpperCasePipe} from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,6 +19,7 @@ import {
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
+  InstitutionAvatarComponent,
   ListItemRowComponent,
   MenuComponent,
   type MenuItem,
@@ -46,8 +47,10 @@ import {
   type Subscription,
   type SubscriptionSort,
 } from '../../models/subscription/subscription.model';
+import {CategoryIconPipe} from '../../pipes/category-icon.pipe';
 import {InstallmentProgressPipe} from '../../pipes/installment-progress.pipe';
 import {MerchantColorPipe} from '../../pipes/merchant-color.pipe';
+import {MerchantIconUrlPipe} from '../../pipes/merchant-icon-url.pipe';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionUtils} from '../../utils/subscription.utils';
 import {NO_ACTIVE_SUBSCRIPTIONS_COPY} from './subscriptions.constants';
@@ -89,15 +92,19 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     CardComponent,
     AlertComponent,
     AsyncStateComponent,
+    CategoryIconPipe,
     DatePipe,
     DecimalPipe,
     EmptyStateComponent,
     IconComponent,
     InstallmentProgressPipe,
+    InstitutionAvatarComponent,
     ListItemRowComponent,
     MenuComponent,
     MerchantColorPipe,
+    MerchantIconUrlPipe,
     MoneyPipe,
+    NgTemplateOutlet,
     SkeletonComponent,
     SlicePipe,
     StatCardComponent,

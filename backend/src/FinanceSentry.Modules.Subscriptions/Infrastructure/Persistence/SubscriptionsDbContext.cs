@@ -15,6 +15,8 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
 
     public DbSet<DetectedSubscription> DetectedSubscriptions { get; set; } = null!;
     public DbSet<SubscriptionPriceChange> SubscriptionPriceChanges { get; set; } = null!;
+    public DbSet<MerchantBrand> MerchantBrands { get; set; } = null!;
+    public DbSet<MerchantIcon> MerchantIcons { get; set; } = null!;
 
     // Read by the Owner query filter on every query this context runs. The UserId of DetectedSubscription and
     // SubscriptionPriceChange is a string
@@ -89,5 +91,20 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
 
         pc.HasIndex(c => c.UserId)
             .HasDatabaseName("idx_subscription_price_change_user");
+
+        // Shared reference data, not per-user: no owner filter (see MerchantBrand).
+        var mb = modelBuilder.Entity<MerchantBrand>();
+        mb.ToTable("merchant_brands");
+        mb.HasKey(b => b.Id);
+        mb.Property(b => b.Keyword).IsRequired().HasMaxLength(100);
+        mb.Property(b => b.Domain).IsRequired().HasMaxLength(253);
+        mb.HasIndex(b => b.Keyword).IsUnique().HasDatabaseName("idx_merchant_brand_keyword_unique");
+
+        var mi = modelBuilder.Entity<MerchantIcon>();
+        mi.ToTable("merchant_icons");
+        mi.HasKey(i => i.Domain);
+        mi.Property(i => i.Domain).HasMaxLength(253);
+        mi.Property(i => i.ContentType).HasMaxLength(50);
+        mi.Ignore(i => i.IsNegative);
     }
 }

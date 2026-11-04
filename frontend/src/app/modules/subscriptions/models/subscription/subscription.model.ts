@@ -36,6 +36,10 @@ export interface Subscription {
   /** False for a legacy hand-typed row: it matches no charge, so its dates are only what was typed. */
   isTracked: boolean;
   latestPriceChange: Nullable<SubscriptionPriceChange>;
+  /** Spending-category key derived from the merchant's MCC; picks the fallback icon. */
+  category: Nullable<string>;
+  /** The curated merchant whose icon the API serves; null when none matched or its host has no icon. */
+  iconId: Nullable<number>;
 }
 
 /** Adds a commitment from a picked transaction; later charges like it keep it current. */

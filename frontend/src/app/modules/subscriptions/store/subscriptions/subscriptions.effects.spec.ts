@@ -31,6 +31,8 @@ const SUBSCRIPTION: Subscription = {
   isManual: false,
   isTracked: true,
   latestPriceChange: null,
+  category: null,
+  iconId: null,
 };
 
 const LIST_RESPONSE: SubscriptionsListResponse = {
