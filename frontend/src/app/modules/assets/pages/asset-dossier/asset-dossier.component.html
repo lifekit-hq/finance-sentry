@@ -1261,14 +1261,14 @@
                                   >
                                 } @else {
                                   @if (dossier.radarSignals.length > 0) {
-                                    <button
-                                      (click)="scrollToSection(sectionId.signals)"
-                                      type="button"
+                                    <cmn-button
+                                      (clicked)="scrollToSection(sectionId.signals)"
+                                      variant="secondary"
+                                      size="sm"
                                       data-testid="move-signal-link"
-                                      class="font-medium text-text-primary underline-offset-2 hover:underline"
                                     >
                                       {{ link.title | signalTypeLabel }}
-                                    </button>
+                                    </cmn-button>
                                   } @else {
                                     <span
                                       class="font-medium text-text-primary"
