@@ -30,6 +30,7 @@ function sub(id: string, nextExpectedDate: string, overrides: Partial<Subscripti
     remainingPayments: null,
     isManual: false,
     isTracked: true,
+    latestPriceChange: null,
     ...overrides,
   } satisfies Subscription;
 }

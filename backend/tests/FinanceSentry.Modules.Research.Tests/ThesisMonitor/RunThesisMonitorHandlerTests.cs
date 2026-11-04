@@ -516,7 +516,7 @@ public class RunThesisMonitorHandlerTests
 
         public Task GeneratePriceHikeAlertAsync(
             Guid userId, Guid subscriptionId, string merchantName,
-            decimal baselineAmount, decimal currentAmount, string currency, CancellationToken ct = default)
+            decimal oldAmount, decimal newAmount, string currency, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GenerateDuplicateChargeAlertAsync(
@@ -611,9 +611,6 @@ public class RunThesisMonitorHandlerTests
             => Task.CompletedTask;
 
         public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public Task ResolvePriceHikeAlertAsync(Guid userId, Guid subscriptionId, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task ResolveCategorySpikeAlertAsync(Guid userId, string category, CancellationToken ct = default)

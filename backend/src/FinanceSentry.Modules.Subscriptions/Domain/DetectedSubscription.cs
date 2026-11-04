@@ -237,7 +237,11 @@ public class DetectedSubscription : IHasUpdatedAt
     private DateOnly NextChargeAfter(DateOnly chargeDate) =>
         Cadence == SubscriptionCadences.Annual ? chargeDate.AddYears(1) : chargeDate.AddMonths(1);
 
-    public void UpdateFromDetection(
+    /// <summary>
+    /// Restates the row from a fresh detection pass. Returns the price change the pass implies against the
+    /// charge the row already held (<see cref="SubscriptionPriceChange.TryCreate"/>), or null when there is none.
+    /// </summary>
+    public SubscriptionPriceChange? UpdateFromDetection(
         string merchantNameDisplay,
         decimal averageAmount,
         decimal lastKnownAmount,
@@ -251,6 +255,9 @@ public class DetectedSubscription : IHasUpdatedAt
         bool isCompleted = false,
         decimal? previousAmount = null)
     {
+        var priceChange = SubscriptionPriceChange.TryCreate(
+            UserId, Id, LastKnownAmount, Currency, LastChargeDate, lastKnownAmount, currency, lastChargeDate);
+
         // A masked card number must never clobber a human-readable name the row already
         // has (e.g. a mortgage renamed by the user whose charges show only the PAN).
         if (string.IsNullOrWhiteSpace(MerchantNameDisplay) || !MaskedPan.IsLikely(merchantNameDisplay))
@@ -273,6 +280,7 @@ public class DetectedSubscription : IHasUpdatedAt
         Kind = kind;
         Status = SubscriptionStatus.Active;
         EvaluateCompletion(isCompleted);
+        return priceChange;
     }
 
     /// <summary>

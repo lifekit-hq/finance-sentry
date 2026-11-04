@@ -40,8 +40,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         // Active-alert dedup is the primary guard; 24h prevents re-alert the same day after a
         // manual resolve.
         [AlertType.CashShortfall] = TimeSpan.FromHours(24),
-        // 30-day backstop: prevents re-alert after a manual dismiss until the next price move.
-        [AlertType.PriceHike] = TimeSpan.FromDays(30),
         // 7-day backstop: no re-alert in the same week after a manual dismiss.
         [AlertType.DuplicateCharge] = TimeSpan.FromDays(7),
         // 7-day backstop while the spike persists within the month.
@@ -360,21 +358,25 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
     public Task GeneratePriceHikeAlertAsync(
         Guid userId, Guid subscriptionId, string merchantName,
-        decimal baselineAmount, decimal currentAmount, string currency,
+        decimal oldAmount, decimal newAmount, string currency,
         CancellationToken ct = default)
     {
-        var hikePct = (int)Math.Round((currentAmount - baselineAmount) / baselineAmount * 100);
+        var changePct = (int)Math.Round((newAmount - oldAmount) / oldAmount * 100);
 
-        return EmitAsync(userId, new AlertDraft(
+        var draft = new AlertDraft(
             AlertType.PriceHike, AlertSeverity.Warning, subscriptionId, merchantName,
             $"Price hike: {merchantName}",
-            $"{merchantName} now charges {currentAmount:F2} {currency} (+{hikePct}% above the {baselineAmount:F2} {currency} baseline)."),
-            ct);
-    }
+            string.Create(CultureInfo.InvariantCulture,
+                $"{merchantName} went up from {oldAmount:F2} {currency} to {newAmount:F2} {currency} (+{changePct}%)."))
+        {
+            // The caller raises this once per observed change, so the change itself is the dedup; a second change
+            // while the first alert is still open takes its place (one open alert per subscription).
+            Dedup = AlertDedup.Always,
+            SupersedeOpen = true,
+        };
 
-    public Task ResolvePriceHikeAlertAsync(
-        Guid userId, Guid subscriptionId, CancellationToken ct = default)
-        => ResolveAsync(userId, AlertType.PriceHike, subscriptionId, ct);
+        return EmitAsync(userId, draft, ct);
+    }
 
     public Task GenerateDuplicateChargeAlertAsync(
         Guid userId, Guid accountId, string merchantKey, string merchantName,

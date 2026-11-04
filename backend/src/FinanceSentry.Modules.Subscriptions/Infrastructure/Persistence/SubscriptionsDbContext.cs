@@ -10,10 +10,14 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
 {
     private const int MoneyPrecision = 15;
     private const int MoneyScale = 2;
+    private const int ChangePercentPrecision = 9;
+    private const int ChangePercentScale = 2;
 
     public DbSet<DetectedSubscription> DetectedSubscriptions { get; set; } = null!;
+    public DbSet<SubscriptionPriceChange> SubscriptionPriceChanges { get; set; } = null!;
 
-    // Read by the Owner query filter on every query this context runs. DetectedSubscription.UserId is a string
+    // Read by the Owner query filter on every query this context runs. The UserId of DetectedSubscription and
+    // SubscriptionPriceChange is a string
     // written as Guid.ToString() (lower-case "D" format) by every writer, so the acting person's id is compared in
     // that same form; null (no person in scope) matches no row.
     private string? CurrentUserKey => currentUser.UserId?.ToString();
@@ -64,5 +68,26 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
         sb.HasIndex(s => new { s.UserId, s.LastChargeDate })
             .HasDatabaseName("idx_detected_subscription_last_charge")
             .HasFilter("\"Status\" = 'active'");
+
+        // A change belongs to its subscription but carries the owner itself, so the Owner filter and the person's
+        // export and erasure need no join. No foreign key: a subscription row can be deleted or re-keyed without
+        // taking its history with it.
+        var pc = modelBuilder.Entity<SubscriptionPriceChange>();
+        pc.ToTable("subscription_price_changes");
+        pc.HasKey(c => c.Id);
+        pc.HasQueryFilter(OwnerQueryFilter.Name, c => c.UserId == CurrentUserKey);
+        pc.Property(c => c.UserId).IsRequired().HasMaxLength(450);
+        pc.Property(c => c.OldAmount).IsRequired();
+        pc.Property(c => c.NewAmount).IsRequired();
+        pc.Property(c => c.Currency).IsRequired().HasMaxLength(3);
+        pc.Property(c => c.ChangePercent).IsRequired().HasPrecision(ChangePercentPrecision, ChangePercentScale);
+        pc.Property(c => c.DetectedAt).HasDefaultValueSql("now()");
+        pc.Ignore(c => c.IsIncrease);
+
+        pc.HasIndex(c => new { c.SubscriptionId, c.ChargeDate })
+            .HasDatabaseName("idx_subscription_price_change_subscription_date");
+
+        pc.HasIndex(c => c.UserId)
+            .HasDatabaseName("idx_subscription_price_change_user");
     }
 }

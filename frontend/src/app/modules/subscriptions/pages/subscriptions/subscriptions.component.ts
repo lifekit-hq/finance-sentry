@@ -1,4 +1,4 @@
-import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
+import {DatePipe, DecimalPipe, SlicePipe, UpperCasePipe} from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -90,6 +90,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     AlertComponent,
     AsyncStateComponent,
     DatePipe,
+    DecimalPipe,
     EmptyStateComponent,
     IconComponent,
     InstallmentProgressPipe,

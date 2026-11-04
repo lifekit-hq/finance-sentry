@@ -138,4 +138,22 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
                      && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.PotentiallyCancelled))
             .ToListAsync(ct);
     }
+
+    public void AddPriceChange(SubscriptionPriceChange change) => _db.SubscriptionPriceChanges.Add(change);
+
+    public async Task<IReadOnlyDictionary<Guid, SubscriptionPriceChange>> GetLatestPriceChangesAsync(
+        string userId, CancellationToken ct = default)
+    {
+        var changes = await _db.SubscriptionPriceChanges.AsNoTracking()
+            .Where(c => c.UserId == userId)
+            .ToListAsync(ct);
+
+        // Latest per subscription is taken in memory: a person has a handful of subscriptions and a change each few
+        // months at most, and ordering by the charge date then detection time keeps a same-day pair deterministic.
+        return changes
+            .GroupBy(c => c.SubscriptionId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(c => c.ChargeDate).ThenByDescending(c => c.DetectedAt).First());
+    }
 }

@@ -11,6 +11,10 @@ Thresholds are bound from the `HygieneSentinels` config section into `HygieneSen
 
 New alert types (`PriceHike`, `DuplicateCharge`, `CategorySpike`, `FxSpread`) are added to `AlertType`, `IAlertGeneratorService`, `AlertGeneratorService`, `CompanionEventKind`, and `MaterialityPolicy` in one PR each.
 
+> US1 below was superseded by 1217 (`specs/1217-subscription-price-change/`): the job, the Core port and the adapter
+> described in this section and the next no longer exist. The displaced-cluster baseline (`PreviousAmount`) and the
+> single-currency price series stay, as detection still needs them.
+
 ## Cross-module boundary (US1)
 
 `PriceHikeDetectionJob` lives in BankSync which only references Core. To access `DetectedSubscription` data without a module-to-module reference:

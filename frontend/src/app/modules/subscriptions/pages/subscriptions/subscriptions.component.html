@@ -129,6 +129,25 @@
                         {{ sub.monthlyEquivalent | money: sub.currency }}
                       </div>
                       <div class="text-cmn-xs text-text-disabled">/ mo</div>
+                      @if (sub.latestPriceChange; as change) {
+                        @let raised = change.newAmount > change.oldAmount;
+                        @let percent = raised ? change.changePercent : -change.changePercent;
+                        <div
+                          [class.text-status-success]="!raised"
+                          [class.text-status-warning]="raised"
+                          [title]="
+                            'Was ' +
+                            (change.oldAmount | money: sub.currency) +
+                            ', now ' +
+                            (change.newAmount | money: sub.currency)
+                          "
+                          class="text-cmn-xs"
+                          data-testid="price-change"
+                        >
+                          {{ raised ? 'Up' : 'Down' }} {{ percent | number: '1.0-0' }}% ·
+                          {{ change.chargeDate | date: 'd MMM' }}
+                        </div>
+                      }
                     </div>
                     <div actions class="flex shrink-0 gap-cmn-1">
                       <cmn-menu

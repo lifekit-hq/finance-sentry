@@ -465,7 +465,10 @@ API's `hiddenReason` without deciding anything itself. Group totals and weights 
   (`SubscriptionDetectionAlgorithm.InCurrentBillingCurrency`) — a merchant's charges are grouped by
   name alone, and a user's accounts span currencies, so without that partition moving a
   subscription from a GBP card to a EUR one reads as a clean 18–27% "price hike" (inside every
-  repricing guard) that no merchant charged.
+  repricing guard) that no merchant charged. The price-change event (1217,
+  `SubscriptionPriceChange.TryCreate`) applies the same rule at the point it compares two
+  consecutive charges: charges in different currencies are never compared, so a card moved
+  between accounts records no change.
 - **An amount and its currency are restated together.** Any entity holding both must assign
   both on every update path — `DetectedSubscription.UpdateFromDetection` takes `currency`
   alongside the amounts for this reason. A row left labelled with the old currency while its

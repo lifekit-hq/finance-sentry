@@ -16,7 +16,7 @@ public static class SubscriptionDetectionAlgorithm
     // often only have a few months of history, so requiring 4 hid real subscriptions
     // (Netcup, OpenAI, Claude) whose window only holds 3 charges.
     private const int MinOccurrences = 3;
-    private const double MaxAmountCv = 0.10;
+    private const double MaxAmountCv = (double)SubscriptionPriceBand.MaxRelativeVariation;
     private const int MonthlyMinDays = 28;
     private const int MonthlyMaxDays = 35;
     private const int AnnualMinDays = 351;

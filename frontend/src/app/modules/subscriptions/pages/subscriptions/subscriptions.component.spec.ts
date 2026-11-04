@@ -253,6 +253,40 @@ describe('SubscriptionsComponent async states', () => {
     expect(host.textContent).not.toContain('Recurring charges show up here');
   });
 
+  describe('latest price change', () => {
+    const withChange = (oldAmount: number, newAmount: number, changePercent: number) =>
+      ({
+        ...NETFLIX,
+        latestPriceChange: {oldAmount, newAmount, changePercent, chargeDate: '2026-06-15'},
+      }) as unknown as Subscription;
+
+    const line = (host: HTMLElement) => host.querySelector('[data-testid="price-change"]');
+
+    it('flags an increase with its percent and date, and names both amounts on hover', () => {
+      const {host} = render({subscriptions: [withChange(9.99, 12.99, 30.03)]});
+
+      const el = line(host);
+      expect(el?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Up 30% · 15 Jun');
+      expect(el?.classList.contains('text-status-warning')).toBe(true);
+      expect(el?.getAttribute('title')).toBe('Was €9.99, now €12.99');
+    });
+
+    it('shows a decrease as a positive percent in the success colour', () => {
+      const {host} = render({subscriptions: [withChange(12.99, 9.99, -23.09)]});
+
+      const el = line(host);
+      expect(el?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Down 23% · 15 Jun');
+      expect(el?.classList.contains('text-status-success')).toBe(true);
+    });
+
+    it('shows nothing for a subscription that never changed price', () => {
+      const unchanged: Subscription = {...NETFLIX, latestPriceChange: null};
+      const {host} = render({subscriptions: [unchanged]});
+
+      expect(line(host)).toBeNull();
+    });
+  });
+
   it('lists the subscriptions once loaded', () => {
     const {host} = render({subscriptions: [NETFLIX]});
 

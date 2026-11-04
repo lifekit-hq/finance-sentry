@@ -269,23 +269,17 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Raises a Warning alert when a recurring subscription or installment's latest charge is
-    /// significantly above the historical average (044). <paramref name="subscriptionId"/> is the
-    /// dedup key so a daily sentinel never duplicates while the price remains elevated.
+    /// Raises a Warning alert when a detected subscription's new charge is higher than its previous one (1217).
+    /// Called once per observed change, so each change is its own alert: it is recorded unconditionally, and
+    /// supersedes a still-open alert for an earlier change of the same subscription.
     /// </summary>
     Task GeneratePriceHikeAlertAsync(
         Guid userId,
         Guid subscriptionId,
         string merchantName,
-        decimal baselineAmount,
-        decimal currentAmount,
+        decimal oldAmount,
+        decimal newAmount,
         string currency,
-        CancellationToken ct = default);
-
-    /// <summary>Resolves the price-hike Alert once the charge falls back to (or below) baseline.</summary>
-    Task ResolvePriceHikeAlertAsync(
-        Guid userId,
-        Guid subscriptionId,
         CancellationToken ct = default);
 
     /// <summary>

@@ -33,4 +33,14 @@ public interface IDetectedSubscriptionRepository
     /// </summary>
     Task<IReadOnlyList<DetectedSubscription>> GetLiveManualUnscopedAsync(
         string userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stages a price change to be written by the next <see cref="UpsertAsync"/> of its subscription, so the row's new
+    /// amount and the event that explains it are saved together or not at all.
+    /// </summary>
+    void AddPriceChange(SubscriptionPriceChange change);
+
+    /// <summary>The user's most recent price change per subscription, newest charge first; a subscription that never changed has none.</summary>
+    Task<IReadOnlyDictionary<Guid, SubscriptionPriceChange>> GetLatestPriceChangesAsync(
+        string userId, CancellationToken ct = default);
 }

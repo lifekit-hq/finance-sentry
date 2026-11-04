@@ -17,7 +17,7 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -30,6 +30,7 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                         .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("AverageAmount")
+                        .HasPrecision(15, 2)
                         .HasColumnType("numeric(15,2)");
 
                     b.Property<string>("Cadence")
@@ -78,6 +79,7 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                         .HasColumnType("date");
 
                     b.Property<decimal>("LastKnownAmount")
+                        .HasPrecision(15, 2)
                         .HasColumnType("numeric(15,2)");
 
                     b.Property<string>("MerchantNameDisplay")
@@ -99,6 +101,7 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                         .HasDefaultValue(0);
 
                     b.Property<decimal?>("PreviousAmount")
+                        .HasPrecision(15, 2)
                         .HasColumnType("numeric(15,2)");
 
                     b.Property<DateOnly?>("StartDate")
@@ -138,6 +141,57 @@ namespace FinanceSentry.Modules.Subscriptions.Migrations
                         .HasDatabaseName("idx_detected_subscription_user_status");
 
                     b.ToTable("detected_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Subscriptions.Domain.SubscriptionPriceChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("ChangePercent")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.Property<DateOnly>("ChargeDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateTimeOffset>("DetectedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<decimal>("NewAmount")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("numeric(15,2)");
+
+                    b.Property<decimal>("OldAmount")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("numeric(15,2)");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_subscription_price_change_user");
+
+                    b.HasIndex("SubscriptionId", "ChargeDate")
+                        .HasDatabaseName("idx_subscription_price_change_subscription_date");
+
+                    b.ToTable("subscription_price_changes", (string)null);
                 });
 #pragma warning restore 612, 618
         }

@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Subscriptions.Domain;
 using FinanceSentry.Modules.Subscriptions.Domain.Exceptions;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -39,7 +40,8 @@ public class ManualCommitmentTrackingTests
         repo.Setup(r => r.GetLiveManualUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(rows);
         repo.Setup(r => r.GetStaleActiveUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => rows.Where(r => r.Status == SubscriptionStatus.Active).ToList());
-        return (new SubscriptionDetectionResultService(repo.Object), repo);
+        return (new SubscriptionDetectionResultService(
+            repo.Object, Mock.Of<IAlertGeneratorService>(), NullLogger<SubscriptionDetectionResultService>.Instance), repo);
     }
 
     // --- Domain ---

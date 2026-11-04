@@ -19,6 +19,7 @@ public class GetSubscriptionsQueryHandler(IDetectedSubscriptionRepository reposi
 
         var active = await _repository.GetActiveByUserIdAsync(request.UserId, cancellationToken);
         var hasInsufficientHistory = active.Count == 0 && items.Count == 0;
+        var priceChanges = await _repository.GetLatestPriceChangesAsync(request.UserId, cancellationToken);
 
         var dtos = items.Select(s => new SubscriptionDto(
             s.Id,
@@ -40,7 +41,10 @@ public class GetSubscriptionsQueryHandler(IDetectedSubscriptionRepository reposi
             s.StartDate,
             s.RemainingPayments,
             s.IsManual,
-            s.IsTracked)).ToList();
+            s.IsTracked,
+            priceChanges.TryGetValue(s.Id, out var change)
+                ? new SubscriptionPriceChangeDto(change.OldAmount, change.NewAmount, change.ChangePercent, change.ChargeDate)
+                : null)).ToList();
 
         return new SubscriptionsListResponse(dtos, dtos.Count, hasInsufficientHistory);
     }

@@ -414,12 +414,12 @@ public class AlertGeneratorServiceTests
     // (DuplicateCharge, CategorySpike) derive their reference id rather than carrying a natural one.
 
     [Fact]
-    public async Task GeneratePriceHike_NoExisting_AddsWarningAlert()
+    public async Task GeneratePriceHike_NothingOpen_AddsWarningAlertNamingTheOldAndNewAmounts()
     {
         var subscriptionId = Guid.NewGuid();
         AllowAlert(AlertType.PriceHike);
 
-        await _service.GeneratePriceHikeAlertAsync(_userId, subscriptionId, "Netflix", 10m, 12.50m, "EUR");
+        await _service.GeneratePriceHikeAlertAsync(_userId, subscriptionId, "Netflix", 9.99m, 12.99m, "EUR");
 
         _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
             a.Type == AlertType.PriceHike &&
@@ -427,41 +427,38 @@ public class AlertGeneratorServiceTests
             a.UserId == _userId &&
             a.ReferenceId == subscriptionId &&
             a.ReferenceLabel == "Netflix" &&
-            a.Message.Contains("+25%")), default), Times.Once);
+            a.AppPath == "/subscriptions" &&
+            a.Message == "Netflix went up from 9.99 EUR to 12.99 EUR (+30%)."), default), Times.Once);
     }
 
     [Fact]
-    public async Task GeneratePriceHike_ExistingActive_SkipsCreation()
+    public async Task GeneratePriceHike_ASecondChangeInsideTheSilenceWindow_StillAlerts()
     {
-        SuppressByActiveAlert(AlertType.PriceHike);
+        // One alert per observed change: the change is the dedup, so the 30-day window the sentinel used to apply
+        // must not swallow a second rise that follows the first within the month.
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.PriceHike, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(true);
 
-        await _service.GeneratePriceHikeAlertAsync(_userId, Guid.NewGuid(), "Netflix", 10m, 12.50m, "EUR");
+        await _service.GeneratePriceHikeAlertAsync(_userId, Guid.NewGuid(), "Netflix", 12.99m, 14.99m, "EUR");
 
-        VerifyNothingAdded();
-        VerifyNoSilenceWindowLookup();
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.PriceHike), default), Times.Once);
     }
 
     [Fact]
-    public async Task GeneratePriceHike_RecentDismissed_SkipsCreation()
+    public async Task GeneratePriceHike_AnEarlierChangeStillOpen_IsSupersededByTheNewOne()
     {
-        SuppressBySilenceWindow(AlertType.PriceHike);
+        var open = new Alert { Id = Guid.NewGuid() };
+        var subscriptionId = Guid.NewGuid();
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.PriceHike, subscriptionId, default))
+            .ReturnsAsync(open);
 
-        await _service.GeneratePriceHikeAlertAsync(_userId, Guid.NewGuid(), "Netflix", 10m, 12.50m, "EUR");
+        await _service.GeneratePriceHikeAlertAsync(_userId, subscriptionId, "Netflix", 12.99m, 14.99m, "EUR");
 
-        VerifyNothingAdded();
-    }
-
-    [Fact]
-    public async Task GeneratePriceHike_ExistingActive_BumpsOccurrenceInsteadOfDropping()
-    {
-        var existingId = Guid.NewGuid();
-        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.PriceHike, It.IsAny<Guid?>(), default))
-            .ReturnsAsync(new Alert { Id = existingId });
-
-        await _service.GeneratePriceHikeAlertAsync(_userId, Guid.NewGuid(), "Netflix", 10m, 12.50m, "EUR");
-
-        _repo.Verify(r => r.BumpOccurrenceAsync(existingId, default), Times.Once);
-        VerifyNothingAdded();
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.ReferenceId == subscriptionId && a.Message.Contains("12.99 EUR to 14.99 EUR")), default), Times.Once);
     }
 
     [Fact]
@@ -1291,6 +1288,8 @@ public class AlertGeneratorServiceTests
         // Retired types keep their constant so stored alerts still resolve, but nothing generates
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
+        // Raised once per observed change by its caller, so the change is the dedup and no window applies.
+        var perObservedChange = new[] { AlertType.PriceHike };
         // Deduped once per reference, ever — no silence window applies.
         var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.ConnectionDormant };
         // The silent-detector alert is the only generator left on JobFailure and sets its own window per draft.
@@ -1304,7 +1303,7 @@ public class AlertGeneratorServiceTests
             .GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(f => f.IsLiteral && f.FieldType == typeof(string))
             .Select(f => (string)f.GetRawConstantValue()!)
-            .Where(t => !retired.Contains(t) && !oncePerReference.Contains(t) && !windowPerDraft.Contains(t))
+            .Where(t => !retired.Contains(t) && !oncePerReference.Contains(t) && !perObservedChange.Contains(t) && !windowPerDraft.Contains(t))
             .ToList();
 
         Assert.NotEmpty(live);
