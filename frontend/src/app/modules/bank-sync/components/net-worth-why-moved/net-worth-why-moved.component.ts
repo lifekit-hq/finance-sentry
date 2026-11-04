@@ -13,9 +13,9 @@ import {NetWorthBridgeStore} from '../../store/net-worth-bridge/net-worth-bridge
 const SKELETON_LINES = 3;
 
 /**
- * Home's "why it moved": the net worth bridge over the page's window read as three lines - what you
- * saved, what markets did, what exchange rates did - each with one sentence, and the change they come
- * to. The full statement, with revaluation, linked accounts and the unexplained residual, is on Breakdown.
+ * Home's "why it moved": the net worth bridge over the page's window read as two lines - what you
+ * saved and what markets did - each with one sentence, and the change they come to. The full statement,
+ * with the currency effect, revaluation, linked accounts and the unexplained residual, is on Breakdown.
  */
 @Component({
   selector: 'fns-net-worth-why-moved',
