@@ -1260,11 +1260,14 @@
                                     {{ link.timestamp | date: 'mediumDate' }}</span
                                   >
                                 } @else {
-                                  <a
-                                    [href]="'#' + sectionId.signals"
+                                  <button
+                                    type="button"
+                                    data-testid="move-signal-link"
+                                    (click)="scrollToSection(sectionId.signals)"
                                     class="font-medium text-text-primary underline-offset-2 hover:underline"
-                                    >{{ link.title | signalTypeLabel }}</a
                                   >
+                                    {{ link.title | signalTypeLabel }}
+                                  </button>
                                   <span class="text-cmn-xs text-text-secondary">
                                     · Radar signal · {{ link.source }} ·
                                     {{ link.timestamp | date: 'mediumDate' }}</span

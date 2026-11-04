@@ -757,8 +757,36 @@ describe('AssetDossierComponent', () => {
       expect(text).toContain('+8.2%');
       expect(text).toContain('-6.1%');
       expect(card?.querySelector('a[href="https://example.com/a"]')).not.toBeNull();
-      expect(card?.querySelector('a[href="#radar-signals"]')).not.toBeNull();
+      expect(byTestId('move-signal-link')).not.toBeNull();
+      expect(card?.querySelector('a[href^="#"]')).toBeNull();
       expect(text).toContain('no linked news or signal found');
+    });
+
+    it('scrolls to the Radar signals card, without navigating, when a signal is clicked', () => {
+      mockStore.dossier.set({
+        ...DOSSIER,
+        notableMoves: MOVES,
+        radarSignals: [
+          {
+            timestamp: '2026-10-21T09:00:00Z',
+            scanner: 'volume',
+            signalType: 'volume_spike',
+            severity: 'notable',
+            payload: {},
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const target = root().ownerDocument.getElementById('radar-signals');
+      expect(target).not.toBeNull();
+      const scrollSpy = vi.fn();
+      if (target) {
+        target.scrollIntoView = scrollSpy;
+      }
+      byTestId('move-signal-link')?.click();
+
+      expect(scrollSpy).toHaveBeenCalled();
     });
 
     it('shows nothing when no day reached the threshold', () => {
