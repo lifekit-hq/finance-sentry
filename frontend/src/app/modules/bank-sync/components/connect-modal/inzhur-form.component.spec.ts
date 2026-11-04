@@ -14,8 +14,8 @@ const PASTED = 'fake-refresh';
 
 function buildInzhurStore(opts: {isReconnect?: boolean} = {}) {
   return {
-    asyncStatus: signal('success'),
-    loadErrorMessage: signal(''),
+    status: signal('success'),
+    errorMessage: signal(''),
     isReconnect: signal(opts.isReconnect ?? false),
   };
 }
