@@ -17,6 +17,7 @@ import {
   type AccountNote,
   type ClosedAccountRow,
 } from '../../models/account-lifecycle/account-lifecycle.model';
+import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {type ManualHoldingRow} from '../../models/manual-holding/manual-holding.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -50,6 +51,7 @@ export function setupFixture(
     setInstitutionOpen?: (key: string, isOpen: boolean) => void;
     closed?: ClosedAccountRow[];
     notes?: Record<string, AccountNote>;
+    accounts?: BankAccount[];
     manual?: ManualHoldingRow[];
     positions?: Record<string, PositionRow[]>;
     openProvider?: (provider: Nullable<string>) => void;
@@ -66,6 +68,7 @@ export function setupFixture(
     load: state.load ?? vi.fn(),
     closedAccounts: signal(state.closed ?? []),
     accountNotes: signal(state.notes ?? {}),
+    allAccounts: signal(state.accounts ?? []),
     manualRows: signal(state.manual ?? []),
     manualTotal: signal((state.manual ?? []).reduce((sum, row) => sum + row.amount, 0)),
     saveManualHolding: vi.fn(),

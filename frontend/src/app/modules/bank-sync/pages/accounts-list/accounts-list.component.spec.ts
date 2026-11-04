@@ -905,8 +905,8 @@ describe('AccountsListComponent closed accounts', () => {
     const labels = (row: ClosedAccountRow) =>
       fixture.componentInstance.closedAccountMenu(row).map(item => item.label);
 
-    expect(labels(closedRow)).toEqual(['Reopen', 'Remove']);
-    expect(labels({...closedRow, reopenable: false})).toEqual(['Remove']);
+    expect(labels(closedRow)).toEqual(['Connection details', 'Reopen', 'Remove']);
+    expect(labels({...closedRow, reopenable: false})).toEqual(['Connection details', 'Remove']);
   });
 
   it('reopens straight away, without asking', () => {

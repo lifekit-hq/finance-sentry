@@ -1,0 +1,11 @@
+<dl class="divide-y divide-border-default" data-testid="connection-details">
+  @for (row of data.rows; track row.label) {
+    <div
+      class="flex items-baseline justify-between gap-cmn-4 py-cmn-2"
+      data-testid="connection-detail"
+    >
+      <dt class="shrink-0 text-cmn-sm text-text-secondary">{{ row.label }}</dt>
+      <dd class="min-w-0 text-right text-cmn-sm text-text-primary">{{ row.value }}</dd>
+    </div>
+  }
+</dl>
