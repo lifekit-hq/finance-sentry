@@ -7,6 +7,8 @@ Use GitHub's private vulnerability reporting: **Security → Report a vulnerabil
 Please do not open a public issue for a vulnerability, and do not include real
 account data in any report.
 
+If you cannot use GitHub, email denys.sychov.dev@gmail.com instead.
+
 This is a one-person project: expect an acknowledgement within a few days, not hours.
 Only the latest release on `main` is supported.
 
