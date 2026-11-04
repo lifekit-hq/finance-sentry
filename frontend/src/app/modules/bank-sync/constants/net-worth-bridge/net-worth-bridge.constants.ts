@@ -24,11 +24,10 @@ export const NET_WORTH_BRIDGE_LABELS = {
   end: 'End',
 } as const;
 
-/** Home's three "why it moved" lines and the change they add up to, in plain words. */
+/** Home's two "why it moved" lines and the change they add up to, in plain words. */
 export const NET_WORTH_BRIDGE_SUMMARY_LABELS = {
   savings: 'You saved',
   investmentReturn: 'Markets',
-  fxTranslation: 'Exchange rates',
   change: 'Change',
 } as const;
 

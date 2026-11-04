@@ -196,13 +196,12 @@ describe('NetWorthBridgeUtils', () => {
       expect(NetWorthBridgeUtils.summary(unavailable())).toBeNull();
     });
 
-    it('reads three lines and the change, with no note when they add up', () => {
+    it('reads two lines and the change, the currency effect folded into markets, with no note when they add up', () => {
       const summary = NetWorthBridgeUtils.summary(bridge());
 
       expect(summary?.lines.map(l => [l.key, l.label, l.amount])).toEqual([
         ['savings', 'You saved', 600],
-        ['investmentReturn', 'Markets', 300],
-        ['fxTranslation', 'Exchange rates', 100],
+        ['investmentReturn', 'Markets', 400],
       ]);
       expect(summary?.change).toBe(1_000);
       expect(summary?.changeNote).toBeNull();
@@ -237,20 +236,13 @@ describe('NetWorthBridgeUtils', () => {
       expect(summary?.changeNote).toBeNull();
     });
 
-    it('explains a rate move in one sentence, by direction', () => {
-      const sentence = (fxTranslation: number) =>
-        NetWorthBridgeUtils.summary(bridge({fxTranslation, endValue: 10_900 + fxTranslation}))
-          ?.lines[2].explanation;
+    it('keeps the lines reconciled to the change when the currency effect moves', () => {
+      const summary = NetWorthBridgeUtils.summary(bridge({fxTranslation: -100, endValue: 10_800}));
+      const shown = summary?.lines.reduce((sum, l) => sum + l.amount, 0);
 
-      expect(sentence(100)).toBe(
-        'Rates moved, so your accounts in other currencies are worth more in USD, though you did nothing.'
-      );
-      expect(sentence(-100)).toBe(
-        'Rates moved, so your accounts in other currencies are worth less in USD, though you did nothing.'
-      );
-      expect(sentence(0.2)).toBe(
-        'Accounts in other currencies are counted in USD; rates did not move them.'
-      );
+      expect(summary?.lines.map(l => l.key)).toEqual(['savings', 'investmentReturn']);
+      expect(shown).toBe(summary?.change);
+      expect(summary?.changeNote).toBeNull();
     });
   });
 });

@@ -60,19 +60,14 @@ const amountOf = (page: Page, key: string) =>
   page.getByTestId(`net-worth-why-moved-${key}`).getByTestId('net-worth-why-moved-amount');
 
 test.describe('Home: why net worth moved', () => {
-  test('reads the move as you saved, markets and exchange rates, after the range chips', async ({
-    page,
-  }) => {
+  test('reads the move as you saved and markets, after the range chips', async ({page}) => {
     await openHome(page);
 
     const card = page.getByTestId('net-worth-why-moved');
     await expect(card.locator('h2')).toContainText('Why it moved');
     await expect(amountOf(page, 'savings')).toHaveText('+$300');
-    await expect(amountOf(page, 'investmentReturn')).toHaveText('-$150');
-    await expect(amountOf(page, 'fxTranslation')).toHaveText('-$80');
-    await expect(page.getByTestId('net-worth-why-moved-fxTranslation')).toContainText(
-      'Rates moved, so your accounts in other currencies are worth less in USD'
-    );
+    await expect(amountOf(page, 'investmentReturn')).toHaveText('-$230');
+    await expect(page.getByTestId('net-worth-why-moved-fxTranslation')).toHaveCount(0);
     await expect(page.getByTestId('net-worth-why-moved-change')).toContainText('+$100');
     await expect(page.getByTestId('net-worth-why-moved-change-note')).toHaveText(
       'Includes +$30 from accounts linked or removed, revaluations and moves not yet explained.'
