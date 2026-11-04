@@ -9,6 +9,7 @@ export const DOSSIER_SECTION_ID = {
   analysts: 'analyst-coverage',
   thesis: 'thesis',
   earnings: 'next-earnings',
+  moves: 'why-it-moved',
   news: 'recent-news',
   signals: 'radar-signals',
   ownership: 'ownership',
@@ -27,7 +28,10 @@ export const DOSSIER_SECTION_CHIPS = {
   analysts: {id: DOSSIER_SECTION_ID.analysts, label: 'Analysts'},
   thesis: {id: DOSSIER_SECTION_ID.thesis, label: 'Plan'},
   earnings: {id: DOSSIER_SECTION_ID.earnings, label: 'Earnings'},
+  moves: {id: DOSSIER_SECTION_ID.moves, label: 'Moves'},
   news: {id: DOSSIER_SECTION_ID.news, label: 'News'},
   signals: {id: DOSSIER_SECTION_ID.signals, label: 'Signals'},
   dataStatus: {id: DOSSIER_SECTION_ID.dataStatus, label: 'Data'},
 } as const satisfies Record<string, DossierSectionChip>;
+
+export const NO_LINKED_MOVE_ITEMS_MESSAGE = 'no linked news or signal found';

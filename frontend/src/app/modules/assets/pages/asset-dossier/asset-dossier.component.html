@@ -1206,6 +1206,81 @@
               </cmn-card>
             }
 
+            <!-- Why is it moving? Notable daily moves joined to the news and Radar signals already held; nothing is inferred. -->
+            @if (dossier.notableMoves; as moves) {
+              @if (moves.moves.length > 0) {
+                <cmn-card
+                  [id]="sectionId.moves"
+                  class="block scroll-mt-20"
+                  data-testid="notable-moves"
+                >
+                  <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                    Why is it moving?
+                  </h2>
+                  <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                    Days with a move of {{ moves.thresholdPct | number: '1.0-1' }}% or more in the
+                    last {{ moves.visibleDays }} days, with the news and signals within
+                    {{ moves.windowDays }} day{{ moves.windowDays !== 1 ? 's' : '' }} of each.
+                  </p>
+                  <ul class="mt-cmn-4 space-y-cmn-4">
+                    @for (move of moves.moves; track move.date) {
+                      <li
+                        class="border-b border-border-default pb-cmn-3 last:border-0 last:pb-0"
+                        data-testid="notable-move"
+                      >
+                        <p class="flex items-baseline gap-cmn-3 text-cmn-sm">
+                          <span class="tabular-nums text-text-secondary">{{
+                            move.date | date: 'mediumDate'
+                          }}</span>
+                          <span
+                            [class]="move.returnPct >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                            class="font-semibold tabular-nums"
+                            >{{ move.returnPct >= 0 ? '+' : ''
+                            }}{{ move.returnPct | number: '1.1-1' }}%</span
+                          >
+                        </p>
+                        @if (move.links.length === 0) {
+                          <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                            {{ noLinkedItemsMessage }}
+                          </p>
+                        } @else {
+                          <ul class="mt-cmn-2 space-y-cmn-1">
+                            @for (link of move.links; track $index) {
+                              <li class="text-cmn-sm">
+                                @if (link.url; as url) {
+                                  <a
+                                    [href]="url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="font-medium text-text-primary underline-offset-2 hover:underline"
+                                    >{{ link.title }}</a
+                                  >
+                                  <span class="text-cmn-xs text-text-secondary">
+                                    · {{ link.source | newsSourceLabel }} ·
+                                    {{ link.timestamp | date: 'mediumDate' }}</span
+                                  >
+                                } @else {
+                                  <a
+                                    [href]="'#' + sectionId.signals"
+                                    class="font-medium text-text-primary underline-offset-2 hover:underline"
+                                    >{{ link.title | signalTypeLabel }}</a
+                                  >
+                                  <span class="text-cmn-xs text-text-secondary">
+                                    · Radar signal · {{ link.source }} ·
+                                    {{ link.timestamp | date: 'mediumDate' }}</span
+                                  >
+                                }
+                              </li>
+                            }
+                          </ul>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </cmn-card>
+              }
+            }
+
             <!-- Recent News -->
             @if (dossier.recentNews.length > 0) {
               <cmn-card [id]="sectionId.news" class="block scroll-mt-20">

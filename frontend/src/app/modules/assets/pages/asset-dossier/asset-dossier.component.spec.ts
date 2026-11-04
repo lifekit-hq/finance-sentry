@@ -713,6 +713,62 @@ describe('AssetDossierComponent', () => {
     expect(text).not.toContain('yahoo:DRAM');
   });
 
+  describe('Why is it moving?', () => {
+    const MOVES = {
+      thresholdPct: 5,
+      windowDays: 1,
+      visibleDays: 30,
+      moves: [
+        {
+          date: '2026-10-20',
+          returnPct: 8.2,
+          links: [
+            {
+              kind: 'news' as const,
+              timestamp: '2026-10-20T12:00:00Z',
+              title: 'Memory prices climb',
+              source: 'yahoo:DRAM',
+              url: 'https://example.com/a',
+              severity: null,
+              relevance: 3,
+            },
+            {
+              kind: 'signal' as const,
+              timestamp: '2026-10-21T09:00:00Z',
+              title: 'volume_spike',
+              source: 'example-scanner',
+              url: null,
+              severity: 'Notable',
+              relevance: 2,
+            },
+          ],
+        },
+        {date: '2026-10-14', returnPct: -6.1, links: []},
+      ],
+    };
+
+    it('lists each move with its linked news and signal, and says so plainly when none', () => {
+      mockStore.dossier.set({...DOSSIER, notableMoves: MOVES});
+      fixture.detectChanges();
+
+      const card = byTestId('notable-moves');
+      expect(card).not.toBeNull();
+      const text = card?.textContent ?? '';
+      expect(text).toContain('+8.2%');
+      expect(text).toContain('-6.1%');
+      expect(card?.querySelector('a[href="https://example.com/a"]')).not.toBeNull();
+      expect(card?.querySelector('a[href="#radar-signals"]')).not.toBeNull();
+      expect(text).toContain('no linked news or signal found');
+    });
+
+    it('shows nothing when no day reached the threshold', () => {
+      mockStore.dossier.set({...DOSSIER, notableMoves: {...MOVES, moves: []}});
+      fixture.detectChanges();
+
+      expect(byTestId('notable-moves')).toBeNull();
+    });
+  });
+
   describe('Ledger read (Owner: ai.use)', () => {
     it('shows a single line with the action when nothing is generated', () => {
       fixture.detectChanges();

@@ -159,6 +159,9 @@ export class DossierViewUtils {
     if (dossier.nextEarnings) {
       chips.push(DOSSIER_SECTION_CHIPS.earnings);
     }
+    if ((dossier.notableMoves?.moves.length ?? 0) > 0) {
+      chips.push(DOSSIER_SECTION_CHIPS.moves);
+    }
     if (dossier.recentNews.length > 0) {
       chips.push(DOSSIER_SECTION_CHIPS.news);
     }

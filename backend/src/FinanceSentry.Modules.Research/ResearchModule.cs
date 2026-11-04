@@ -275,6 +275,7 @@ public static class ResearchModule
         services.AddScoped<IAssetPriceTargetRepository, AssetPriceTargetRepository>();
         services.Configure<OpportunityOptions>(config.GetSection(OpportunityOptions.SectionName));
         services.Configure<VerdictOptions>(config.GetSection(VerdictOptions.SectionName));
+        services.Configure<NotableMoveOptions>(config.GetSection(NotableMoveOptions.SectionName));
         services.AddScoped<ScorecardReader>();
         services.Configure<ResearchRetrievalOptions>(config.GetSection(ResearchRetrievalOptions.SectionName));
         services.Configure<AnalystSourcesOptions>(config.GetSection(AnalystSourcesOptions.SectionName));
