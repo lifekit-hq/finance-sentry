@@ -31,7 +31,7 @@ describe('InzhurConnectStore', () => {
     const store = TestBed.inject(InzhurConnectStore);
 
     expect(inzhur.getStatus).toHaveBeenCalledTimes(1);
-    expect(store.asyncStatus()).toBe('success');
+    expect(store.status()).toBe('success');
     expect(store.isReconnect()).toBe(false);
   });
 
@@ -46,7 +46,7 @@ describe('InzhurConnectStore', () => {
     inzhur.getStatus.mockReturnValue(throwError(() => new Error('down')));
     const store = TestBed.inject(InzhurConnectStore);
 
-    expect(store.asyncStatus()).toBe('error');
-    expect(store.loadErrorMessage()).toContain("Couldn't load your Inzhur connection");
+    expect(store.status()).toBe('error');
+    expect(store.errorMessage()).toContain("Couldn't load your Inzhur connection");
   });
 });
