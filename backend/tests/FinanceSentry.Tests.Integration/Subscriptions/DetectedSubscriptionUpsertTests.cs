@@ -9,6 +9,8 @@ using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositorie
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -209,7 +211,9 @@ public sealed class DetectedSubscriptionUpsertTests : IAsyncLifetime
         for (var run = 0; run < 2; run++)
         {
             await using var ctx = CreateContext();
-            await new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(ctx))
+            await new SubscriptionDetectionResultService(
+                    new DetectedSubscriptionRepository(ctx), Mock.Of<IAlertGeneratorService>(),
+                    NullLogger<SubscriptionDetectionResultService>.Instance)
                 .UpsertDetectedSubscriptionsAsync(_user, [detected]);
         }
 

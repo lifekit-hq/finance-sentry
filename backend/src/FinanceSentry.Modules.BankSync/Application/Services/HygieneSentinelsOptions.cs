@@ -1,7 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 /// <summary>
-/// Tuning for the four 044 hygiene sentinels. Bound from the <c>HygieneSentinels</c> config section.
+/// Tuning for the three 044 hygiene sentinels that run on a threshold. Bound from the <c>HygieneSentinels</c> config section.
 /// The defaults here are the contract: an absent section leaves every sentinel on its documented
 /// setting, and a mistyped key now fails to bind loudly instead of silently reverting one job to a
 /// literal nobody can grep for.
@@ -9,9 +9,6 @@ namespace FinanceSentry.Modules.BankSync.Application.Services;
 public sealed class HygieneSentinelsOptions
 {
     public const string SectionName = "HygieneSentinels";
-
-    /// <summary>US1 — a subscription fires when it bills more than this fraction above its hike baseline.</summary>
-    public decimal PriceHikeThreshold { get; set; } = 0.15m;
 
     /// <summary>US2 — how far back a repeat of the same merchant/amount charge still reads as a duplicate.</summary>
     public int DuplicateWindowDays { get; set; } = 5;

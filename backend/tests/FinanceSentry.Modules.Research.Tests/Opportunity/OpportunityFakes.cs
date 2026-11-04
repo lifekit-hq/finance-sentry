@@ -277,7 +277,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GeneratePerformanceBriefAlertAsync(Guid userId, string headline, string body, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCashShortfallAlertAsync(Guid userId, Guid accountId, string accountName, DateOnly shortfallDate, decimal shortfallAmount, string currency, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCashShortfallAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GeneratePriceHikeAlertAsync(Guid userId, Guid subscriptionId, string merchantName, decimal baselineAmount, decimal currentAmount, string currency, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GeneratePriceHikeAlertAsync(Guid userId, Guid subscriptionId, string merchantName, decimal oldAmount, decimal newAmount, string currency, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateDuplicateChargeAlertAsync(Guid userId, Guid accountId, string merchantKey, string merchantName, decimal chargeAmount, string currency, int chargeCount, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCategorySpikeAlertAsync(Guid userId, string category, decimal currentMonthSpend, decimal baselineSpend, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFxSpreadAlertAsync(Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency, decimal impliedRate, decimal marketRate, CancellationToken ct = default) => Task.CompletedTask;
@@ -304,7 +304,6 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateDetectorSilentAlertAsync(Guid userId, string detectorName, int silentDays, int inputCount, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveDetectorSilentAlertAsync(Guid userId, string detectorName, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
-    public Task ResolvePriceHikeAlertAsync(Guid userId, Guid subscriptionId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCategorySpikeAlertAsync(Guid userId, string category, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;

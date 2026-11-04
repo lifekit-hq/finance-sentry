@@ -30,7 +30,6 @@ public static class SubscriptionsModule
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<ISubscriptionDetectionResultService, SubscriptionDetectionResultService>();
         services.AddScoped<IActiveSubscriptionsReader, ActiveSubscriptionsReader>();
-        services.AddScoped<ISubscriptionHygieneSummaryReader, SubscriptionHygieneSummaryReader>();
 
         return services;
     }

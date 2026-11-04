@@ -30,6 +30,7 @@ const SUBSCRIPTION: Subscription = {
   remainingPayments: null,
   isManual: false,
   isTracked: true,
+  latestPriceChange: null,
 };
 
 const LIST_RESPONSE: SubscriptionsListResponse = {

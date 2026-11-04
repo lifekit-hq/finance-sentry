@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Xunit;
 
 /// <summary>
-/// The six 044 threshold keys are deployed in appsettings under <c>HygieneSentinels</c>; the sentinels
+/// The five 044 threshold keys are deployed in appsettings under <c>HygieneSentinels</c>; the sentinels
 /// read them through <see cref="HygieneSentinelsOptions"/>. Nothing in the compiler ties the two
 /// together, so renaming a property would silently orphan the deployed key and leave that sentinel on
 /// its in-code default in production — the exact failure the options object exists to prevent.
@@ -17,7 +17,6 @@ public class HygieneSentinelsOptionsTests
     // setting and the in-code default, so an override that fails to land is visible.
     private static readonly Dictionary<string, string?> Overrides = new()
     {
-        ["HygieneSentinels:PriceHikeThreshold"] = "0.25",
         ["HygieneSentinels:DuplicateWindowDays"] = "9",
         ["HygieneSentinels:CategorySpikeMultiplier"] = "3.5",
         ["HygieneSentinels:FxSpreadLookbackDays"] = "7",
@@ -64,7 +63,6 @@ public class HygieneSentinelsOptionsTests
             .AddInMemoryCollection(Overrides)
             .Build());
 
-        options.PriceHikeThreshold.Should().Be(0.25m);
         options.DuplicateWindowDays.Should().Be(9);
         options.CategorySpikeMultiplier.Should().Be(3.5m);
         options.FxSpreadLookbackDays.Should().Be(7);
@@ -74,14 +72,13 @@ public class HygieneSentinelsOptionsTests
 
     /// <summary>
     /// An absent section must leave every sentinel on the setting spec.md documents — the defaults are
-    /// the contract, not a placeholder, because no environment file overrides all six.
+    /// the contract, not a placeholder, because no environment file overrides all five.
     /// </summary>
     [Fact]
     public void Bind_LeavesDocumentedDefaults_WhenSectionAbsent()
     {
         var options = Bind(new ConfigurationBuilder().Build());
 
-        options.PriceHikeThreshold.Should().Be(0.15m);
         options.DuplicateWindowDays.Should().Be(5);
         options.CategorySpikeMultiplier.Should().Be(2.0m);
         options.FxSpreadLookbackDays.Should().Be(3);

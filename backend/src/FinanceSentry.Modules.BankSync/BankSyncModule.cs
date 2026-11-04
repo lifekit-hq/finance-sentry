@@ -85,10 +85,10 @@ public static class BankSyncModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily());
 
-            mgr.AddOrUpdate<PriceHikeDetectionJob>(
-                "price-hike-detection",
-                job => job.ExecuteAsync(CancellationToken.None),
-                Cron.Daily());
+            // Retired by 1217: a price change is alerted where detection observes it (SubscriptionDetectionResultService),
+            // not by a daily comparison against a baseline. The stored schedule has to be withdrawn by name.
+            mgr.RemoveIfExists("price-hike-detection");
+
             mgr.AddOrUpdate<DuplicateChargeDetectionJob>(
                 "duplicate-charge-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -273,7 +273,6 @@ public static class BankSyncModule
         services.AddScoped<SubscriptionDetectionJob>();
         services.AddScoped<StaleSyncReaperJob>();
         services.AddScoped<ConsentExpiryReminderJob>();
-        services.AddScoped<PriceHikeDetectionJob>();
         services.AddScoped<DuplicateChargeDetectionJob>();
         services.AddScoped<CategorySpikeDetectionJob>();
         services.AddScoped<CoverageSentinelJob>();

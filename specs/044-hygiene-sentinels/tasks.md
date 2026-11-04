@@ -2,6 +2,8 @@
 
 ## [US1] Price hike detection
 
+> Superseded by 1217: the job, `ISubscriptionHygieneSummaryReader` and `PriceHikeThreshold` were removed; the items below record what shipped under 044.
+
 - [x] Create `ISubscriptionHygieneSummaryReader` port in Core
 - [x] Implement `SubscriptionHygieneSummaryReader` in Subscriptions module + register
 - [x] Add `PriceHike` to `AlertType`, `IAlertGeneratorService`, `AlertGeneratorService`

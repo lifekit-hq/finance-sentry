@@ -28,6 +28,7 @@ function mkSubscription(overrides: Partial<Subscription> = {}): Subscription {
     remainingPayments: null,
     isManual: false,
     isTracked: true,
+    latestPriceChange: null,
     ...overrides,
   };
 }

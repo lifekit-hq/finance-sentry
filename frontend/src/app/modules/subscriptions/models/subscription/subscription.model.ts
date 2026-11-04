@@ -5,6 +5,15 @@ export type DismissedSubscription = Extract<SubscriptionStatus, 'dismissed'>;
 export type SubscriptionKind = 'subscription' | 'installment';
 export type SubscriptionCadence = 'monthly' | 'annual';
 
+/** The latest change in what a subscription charges: the previous and the new charge, and when the new one landed. */
+export interface SubscriptionPriceChange {
+  oldAmount: number;
+  newAmount: number;
+  /** Signed: positive for an increase, negative for a decrease. */
+  changePercent: number;
+  chargeDate: string;
+}
+
 export interface Subscription {
   id: string;
   merchantName: string;
@@ -26,6 +35,7 @@ export interface Subscription {
   isManual: boolean;
   /** False for a legacy hand-typed row: it matches no charge, so its dates are only what was typed. */
   isTracked: boolean;
+  latestPriceChange: Nullable<SubscriptionPriceChange>;
 }
 
 /** Adds a commitment from a picked transaction; later charges like it keep it current. */

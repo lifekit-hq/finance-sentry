@@ -9,6 +9,8 @@ using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositorie
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -60,6 +62,10 @@ public sealed class SubscriptionsOwnerQueryFilterTests : IAsyncLifetime
         DateOnly.FromDateTime(DateTime.UtcNow), DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
         OccurrenceCount: 4, ConfidenceScore: 90, Category: null);
 
+    private static SubscriptionDetectionResultService DetectionService(SubscriptionsDbContext ctx) => new(
+        new DetectedSubscriptionRepository(ctx), Mock.Of<IAlertGeneratorService>(),
+        NullLogger<SubscriptionDetectionResultService>.Instance);
+
     private async Task SeedAsync(params DetectedSubscription[] subscriptions)
     {
         // Inserts are not filtered, so a no-person context writes any user's rows.
@@ -82,7 +88,7 @@ public sealed class SubscriptionsOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().ContainSingle().Which.ClrType.Should().Be<DetectedSubscription>();
+        perUser.Select(e => e.ClrType).Should().BeEquivalentTo([typeof(DetectedSubscription), typeof(SubscriptionPriceChange)]);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -120,7 +126,7 @@ public sealed class SubscriptionsOwnerQueryFilterTests : IAsyncLifetime
 
         await using (var ctx = CreateContext())
         {
-            var detection = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(ctx));
+            var detection = DetectionService(ctx);
             await detection.UpsertDetectedSubscriptionsAsync(_userA.ToString(), [Detection(17.99m)]);
         }
 
@@ -140,7 +146,7 @@ public sealed class SubscriptionsOwnerQueryFilterTests : IAsyncLifetime
 
         await using (var ctx = CreateContext())
         {
-            var detection = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(ctx));
+            var detection = DetectionService(ctx);
             await detection.MarkStaleAsPotentiallyCancelledAsync(_userA.ToString());
         }
 
@@ -163,15 +169,33 @@ public sealed class SubscriptionsOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
-    public async Task Hygiene_reader_with_no_person_returns_every_users_active_subscriptions()
+    public async Task A_price_change_recorded_with_no_person_belongs_to_its_owner_alone()
     {
-        var a = NewSubscription(_userA);
-        var b = NewSubscription(_userB);
+        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        var a = NewSubscription(_userA, amount: 15.99m, lastCharge: yesterday);
+        var b = NewSubscription(_userB, amount: 15.99m, lastCharge: yesterday);
         await SeedAsync(a, b);
 
-        await using var ctx = CreateContext();
-        var summaries = await new SubscriptionHygieneSummaryReader(ctx).GetAllActiveAsync();
+        await using (var ctx = CreateContext())
+            await DetectionService(ctx).UpsertDetectedSubscriptionsAsync(_userA.ToString(), [Detection(17.99m)]);
 
-        summaries.Select(s => (s.Id, s.UserId)).Should().BeEquivalentTo([(a.Id, _userA), (b.Id, _userB)]);
+        await using (var asA = CreateContext(_userA))
+        {
+            var change = (await new DetectedSubscriptionRepository(asA).GetLatestPriceChangesAsync(_userA.ToString()))
+                .Should().ContainSingle().Which;
+            change.Key.Should().Be(a.Id);
+            change.Value.OldAmount.Should().Be(15.99m);
+            change.Value.NewAmount.Should().Be(17.99m);
+        }
+
+        await using (var asB = CreateContext(_userB))
+        {
+            (await asB.SubscriptionPriceChanges.AnyAsync()).Should().BeFalse("another person's change is invisible");
+            (await asB.SubscriptionPriceChanges.AnyAsync(c => c.UserId == _userA.ToString())).Should().BeFalse(
+                "the filter holds even when a query names another person explicitly");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.SubscriptionPriceChanges.AnyAsync()).Should().BeFalse("no person in scope matches no row");
     }
 }

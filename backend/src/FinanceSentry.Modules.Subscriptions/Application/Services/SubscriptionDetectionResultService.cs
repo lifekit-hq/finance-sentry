@@ -3,10 +3,14 @@ namespace FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.Domain;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
 // Its only caller is the subscription detection job, which has no person in scope, so its reads are unscoped and
 // keyed by the user it is given.
-public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository repository)
+public class SubscriptionDetectionResultService(
+    IDetectedSubscriptionRepository repository,
+    IAlertGeneratorService alerts,
+    ILogger<SubscriptionDetectionResultService> logger)
     : ISubscriptionDetectionResultService
 {
     private readonly IDetectedSubscriptionRepository _repository = repository;
@@ -44,7 +48,7 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
             }
             else if (ShouldUpdate(existing, result))
             {
-                existing.UpdateFromDetection(
+                var priceChange = existing.UpdateFromDetection(
                     result.MerchantNameDisplay,
                     result.AverageAmount,
                     result.LastKnownAmount,
@@ -58,8 +62,35 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
                     result.IsCompleted,
                     result.PreviousAmount);
 
+                // The event is written with the row that moved, so a charge at the new price (which compares equal to
+                // the stored one on the next pass) can never record it twice.
+                if (priceChange is not null)
+                    _repository.AddPriceChange(priceChange);
+
                 await _repository.UpsertAsync(existing, ct);
+
+                if (priceChange is { IsIncrease: true })
+                    await AlertPriceIncreaseAsync(existing, priceChange, ct);
             }
+        }
+    }
+
+    // The change is already stored, so a failed alert costs the notification and nothing else: it must not fail the
+    // detection pass for the user's other subscriptions.
+    private async Task AlertPriceIncreaseAsync(
+        DetectedSubscription subscription, SubscriptionPriceChange change, CancellationToken ct)
+    {
+        try
+        {
+            await alerts.GeneratePriceHikeAlertAsync(
+                Guid.Parse(subscription.UserId), subscription.Id, subscription.MerchantNameDisplay,
+                change.OldAmount, change.NewAmount, change.Currency, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex,
+                "Price-change alert failed for user {UserId} subscription {SubscriptionId}",
+                subscription.UserId, subscription.Id);
         }
     }
 

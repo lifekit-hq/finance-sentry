@@ -49,4 +49,10 @@ internal sealed class InMemoryDetectedSubscriptionStore(SubscriptionsDbContext d
 
     public Task<IReadOnlyList<DetectedSubscription>> GetLiveManualUnscopedAsync(string userId, CancellationToken ct = default)
         => _repository.GetLiveManualUnscopedAsync(userId, ct);
+
+    public void AddPriceChange(SubscriptionPriceChange change) => _repository.AddPriceChange(change);
+
+    public Task<IReadOnlyDictionary<Guid, SubscriptionPriceChange>> GetLatestPriceChangesAsync(
+        string userId, CancellationToken ct = default)
+        => _repository.GetLatestPriceChangesAsync(userId, ct);
 }
