@@ -1271,13 +1271,14 @@ and the FX line also carries the start's re-statement, start × (closing factor 
 still sum to the converted End − Start. A date with no published rate takes today's (`FX_TODAY_RATE`). The
 tolerance flag stays the USD one.
 
-**Home's three lines** (`NetWorthBridgeUtils.summary`, presentation only): Home reads the same response as
-three lines and a total - *You saved* (savings), *Markets* (investment return) and *Exchange rates* (FX
-translation, with one plain sentence on what the rate move did) - and *Change*, End − Start. Revaluation, newly
-linked, unlinked and the residual are not lines there: they stay inside the Change total, and when together they
-are 1 unit of the currency or more a note under it names them ("Includes +$350 from accounts linked or removed,
-revaluations and moves not yet explained."). Nothing is recomputed or stored: the lines are the bridge's own
-amounts, so the three lines plus the note still add to the Change. Home carries no badge for the bridge: when its
+**Home's two lines** (`NetWorthBridgeUtils.summary`, presentation only): Home reads the same response as
+two lines and a total - *You saved* (savings) and *Markets* (investment return, without the currency effect) -
+and *Change*, End − Start. The currency effect (FX translation), revaluation, newly linked, unlinked and the
+residual are not lines there: they stay inside the Change total, and when together they are 1 unit of the
+currency or more a note under it names them ("Includes +$350 from currency moves, accounts linked or removed,
+revaluations and moves not yet explained."). The currency effect is visible on Breakdown only, as its own
+*Currency moves* row. Nothing is recomputed or stored: the lines are the bridge's own amounts, so the two lines
+plus the note still add to the Change. Home carries no badge for the bridge: when its
 quality is not complete or the residual is above tolerance it shows one sentence that the figures are estimates, with
 a link to Breakdown, where the waterfall says why. The full statement, every line and the
 residual's own row, is the waterfall on Breakdown (`/dashboard/breakdown`); Home's "Full statement" link opens

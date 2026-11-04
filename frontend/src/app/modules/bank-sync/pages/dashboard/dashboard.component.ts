@@ -255,8 +255,8 @@ const HISTORY_RANGES: ChipRowOption[] = [
           </cmn-card>
 
           <!--
-            Why the hero's change happened over the same range, in three lines: what you saved, what
-            markets did, what exchange rates did. The full statement (M5) is on Breakdown.
+            Why the hero's change happened over the same range, in two lines: what you saved and what
+            markets did. The full statement (M5) is on Breakdown.
           -->
           <fns-net-worth-why-moved [period]="tileHeading()" [detailsParams]="breakdownParams()" />
 

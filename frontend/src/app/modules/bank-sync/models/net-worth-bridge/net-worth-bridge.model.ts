@@ -69,8 +69,8 @@ export interface NetWorthBridgeSummaryLine {
 }
 
 /**
- * Home's plain reading of the bridge: three lines and the change. Revaluation, accounts linked or removed
- * and the unexplained residual fold into the change (`changeNote` names them); the full statement stays on
+ * Home's plain reading of the bridge: two lines and the change. The currency effect, revaluation, accounts
+ * linked or removed and the unexplained residual fold into the change (`changeNote` names them); the full statement stays on
  * Breakdown.
  */
 export interface NetWorthBridgeSummary {

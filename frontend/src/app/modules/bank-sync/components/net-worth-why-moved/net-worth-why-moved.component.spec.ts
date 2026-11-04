@@ -57,8 +57,8 @@ describe('NetWorthWhyMovedComponent', () => {
     expect(text(render(bridge()).querySelector('h2'))).toBe('Why it moved · Last 3 months');
   });
 
-  it('reads the move as what you saved, markets and exchange rates, then the change', () => {
-    const el = render(bridge());
+  it('reads the move as what you saved and markets, then the change', () => {
+    const el = render(bridge({fxTranslation: 0, endValue: 10_900}));
     const amount = (key: string): string =>
       text(
         el.querySelector(
@@ -68,26 +68,18 @@ describe('NetWorthWhyMovedComponent', () => {
 
     expect(amount('savings')).toBe('+$600');
     expect(amount('investmentReturn')).toBe('+$300');
-    expect(amount('fxTranslation')).toBe('+$100');
+    expect(el.querySelector('[data-testid="net-worth-why-moved-fxTranslation"]')).toBeNull();
     expect(text(el.querySelector('[data-testid="net-worth-why-moved-change"]'))).toBe(
-      'Change +$1,000'
+      'Change +$900'
     );
     expect(el.querySelector('[data-testid="net-worth-why-moved-change-note"]')).toBeNull();
   });
 
-  it('explains the exchange-rate line in one plain sentence', () => {
-    expect(
-      text(render(bridge()).querySelector('[data-testid="net-worth-why-moved-fxTranslation"] p'))
-    ).toBe(
-      'Rates moved, so your accounts in other currencies are worth more in USD, though you did nothing.'
-    );
-  });
-
-  it('notes what the change holds beyond the three lines', () => {
+  it('notes what the change holds beyond the two lines', () => {
     const el = render(bridge({endValue: 11_250, newlyLinked: 250}));
 
     expect(text(el.querySelector('[data-testid="net-worth-why-moved-change-note"]'))).toBe(
-      'Includes +$250 from accounts linked or removed, revaluations and moves not yet explained.'
+      'Includes +$350 from currency moves, accounts linked or removed, revaluations and moves not yet explained.'
     );
   });
 
