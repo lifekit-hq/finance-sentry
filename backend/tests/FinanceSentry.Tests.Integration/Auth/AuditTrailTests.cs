@@ -139,12 +139,38 @@ public sealed class AuditTrailTests : IAsyncLifetime
         first.Events.Select(e => e.FieldNames.Single()).Should().Equal("Field4", "Field3");
         first.NextBefore.Should().NotBeNull();
 
-        var second = await handler.Handle(new ListAuditEventsQuery(_personA, first.NextBefore, 2), default);
+        var second = await handler.Handle(new ListAuditEventsQuery(_personA, first.NextBefore, first.NextBeforeId, 2), default);
         second.Events.Select(e => e.FieldNames.Single()).Should().Equal("Field2", "Field1");
 
-        var last = await handler.Handle(new ListAuditEventsQuery(_personA, second.NextBefore, 2), default);
+        var last = await handler.Handle(new ListAuditEventsQuery(_personA, second.NextBefore, second.NextBeforeId, 2), default);
         last.Events.Select(e => e.FieldNames.Single()).Should().Equal("Field0");
         last.NextBefore.Should().BeNull();
+        last.NextBeforeId.Should().BeNull();
+    }
+
+    [DockerRequiredFact]
+    public async Task APageBoundary_InsideOneBatch_LosesNoEvent()
+    {
+        const int batchSize = 7;
+        const int pageSize = 3;
+        var fields = Enumerable.Range(0, batchSize).Select(i => $"Field{i}").ToArray();
+        await RecordAsync(fields.Select(field => Entry(_personA, [field])).ToArray());
+
+        await using var db = CreateContext(_personA);
+        var handler = new ListAuditEventsQueryHandler(db);
+
+        (await db.AuditEvents.Select(e => e.OccurredAt).Distinct().CountAsync()).Should().Be(1, "a batch is stamped with one time");
+
+        var seen = new List<string>();
+        var page = await handler.Handle(new ListAuditEventsQuery(_personA, Take: pageSize), default);
+        seen.AddRange(page.Events.Select(e => e.FieldNames.Single()));
+        while (page.NextBefore is not null)
+        {
+            page = await handler.Handle(new ListAuditEventsQuery(_personA, page.NextBefore, page.NextBeforeId, pageSize), default);
+            seen.AddRange(page.Events.Select(e => e.FieldNames.Single()));
+        }
+
+        seen.Should().BeEquivalentTo(fields).And.OnlyHaveUniqueItems();
     }
 
     [DockerRequiredFact]

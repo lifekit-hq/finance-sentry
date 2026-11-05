@@ -16,7 +16,10 @@ public class ListAuditEventsQueryHandler(AuthDbContext db) : IQueryHandler<ListA
 
         var events = db.AuditEvents.AsNoTracking().Where(e => e.SubjectUserId == query.UserId);
         if (query.Before is { } before)
-            events = events.Where(e => e.OccurredAt < before);
+        {
+            var beforeId = query.BeforeId ?? Guid.Empty;
+            events = events.Where(e => e.OccurredAt < before || (e.OccurredAt == before && e.Id.CompareTo(beforeId) < 0));
+        }
 
         // One extra row says whether there is another page.
         var rows = await events
@@ -29,6 +32,7 @@ public class ListAuditEventsQueryHandler(AuthDbContext db) : IQueryHandler<ListA
                 e.Id, e.OccurredAt, e.ActorKind.ToString(), e.Action.ToString(), e.ResourceType, e.ResourceId, e.FieldNames, e.TraceId))
             .ToList();
 
-        return new AuditEventPageDto(page, rows.Count > take ? page[^1].OccurredAt : null);
+        var hasMore = rows.Count > take;
+        return new AuditEventPageDto(page, hasMore ? page[^1].OccurredAt : null, hasMore ? page[^1].Id : null);
     }
 }
