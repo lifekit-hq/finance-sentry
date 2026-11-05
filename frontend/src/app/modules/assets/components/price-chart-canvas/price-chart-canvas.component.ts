@@ -236,14 +236,14 @@ export class PriceChartCanvasComponent {
     const text = this.token('--color-text-secondary', '#46565e');
     chart.applyOptions({
       layout: {
-        background: {type: lib.ColorType.Solid, color: 'rgba(0, 0, 0, 0)'},
+        background: {type: lib.ColorType.Solid, color: 'transparent'},
         textColor: text,
         fontFamily: this.token('--font-sans', 'system-ui, sans-serif'),
         attributionLogo: true,
       },
       grid: {
-        vertLines: {color: this.token('--color-chart-grid', '#d6dde0')},
-        horzLines: {color: this.token('--color-chart-grid', '#d6dde0')},
+        vertLines: {color: this.token('--color-chart-grid', text)},
+        horzLines: {color: this.token('--color-chart-grid', text)},
       },
       crosshair: {
         vertLine: {
