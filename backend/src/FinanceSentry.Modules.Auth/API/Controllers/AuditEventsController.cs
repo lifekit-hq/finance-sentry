@@ -8,7 +8,8 @@ namespace FinanceSentry.Modules.Auth.API.Controllers;
 
 /// <summary>
 /// The signed-in person's audit trail: who wrote to, or read through MCP or the in-app agent, their declared profile
-/// data. Read-only and scoped to the caller - there is no way to ask for another person's events and no export of them.
+/// data. Read-only and scoped to the caller - there is no way to ask for another person's events. The person's own events also leave through the account data
+/// export (<c>AuthUserDataExporter</c>).
 /// </summary>
 [ApiController]
 [Authorize]

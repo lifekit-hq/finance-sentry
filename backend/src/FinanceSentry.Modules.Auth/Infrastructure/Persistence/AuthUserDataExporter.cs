@@ -8,7 +8,7 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 
 /// <summary>
 /// Exports the person's account: the profile and preferences on the Identity user, their roles and their per-person
-/// permission grants. Never the password hash or security stamps, the sign-in links to the identity provider, or any
+/// permission grants, and the audit events about their declared data (ids and field names). Never the password hash or security stamps, the sign-in links to the identity provider, or any
 /// refresh token, MCP code or MCP service token (the credential rows <see cref="AuthUserDataEraser"/> deletes): those
 /// let the holder act as the person, they are not data about them. Written column by column, not by serialising the
 /// Identity entity, so a column Identity adds later is not exported by accident.
