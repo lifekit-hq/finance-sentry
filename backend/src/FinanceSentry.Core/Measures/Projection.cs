@@ -158,6 +158,24 @@ public static class Projection
     }
 
     /// <summary>
+    /// The level monthly saving that takes <paramref name="currentUsd"/> to <paramref name="targetUsd"/> in
+    /// <paramref name="months"/>, at each of the three return assumptions - the same future-value arithmetic
+    /// <see cref="ValueAfter"/> runs, solved for the contribution. A higher return needs less, so the low return gives the
+    /// <c>High</c> bound. Never negative: a balance that compounds to the target on its own needs no saving.
+    /// </summary>
+    public static ProjectionRange RequiredMonthlySaving(
+        int months, decimal targetUsd, decimal currentUsd, ProjectionAssumptions assumptions)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(months, 1);
+
+        var returns = assumptions.RealAnnualReturns;
+        return ProjectionRange.Of(
+            SavingToReach(targetUsd, currentUsd, returns.Low, months),
+            SavingToReach(targetUsd, currentUsd, returns.Central, months),
+            SavingToReach(targetUsd, currentUsd, returns.High, months));
+    }
+
+    /// <summary>
     /// <c>NW·(1 + rm)^n + c·((1 + rm)^n − 1) / rm</c>: the current balance and a level monthly contribution, both
     /// compounding at <paramref name="realAnnualReturn"/>'s monthly rate; <c>NW + c·n</c> at a zero return.
     /// </summary>
@@ -169,6 +187,20 @@ public static class Projection
 
         var growth = (decimal)Math.Pow(1 + (double)monthlyReturn, months);
         return currentUsd * growth + monthlySavingsUsd * (growth - 1m) / monthlyReturn;
+    }
+
+    /// <summary>
+    /// <c>(target − NW·(1 + rm)^n) · rm / ((1 + rm)^n − 1)</c>: the future-value formula solved for the monthly
+    /// contribution; <c>(target − NW) / n</c> at a zero return. Floored at zero.
+    /// </summary>
+    private static decimal SavingToReach(decimal targetUsd, decimal currentUsd, decimal realAnnualReturn, int months)
+    {
+        var monthlyReturn = MonthlyRateFromAnnual(realAnnualReturn);
+        if (monthlyReturn == 0m)
+            return Math.Max(0m, (targetUsd - currentUsd) / months);
+
+        var growth = (decimal)Math.Pow(1 + (double)monthlyReturn, months);
+        return Math.Max(0m, (targetUsd - currentUsd * growth) * monthlyReturn / (growth - 1m));
     }
 
     /// <summary>

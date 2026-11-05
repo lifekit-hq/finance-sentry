@@ -99,7 +99,7 @@ function render(
 }
 
 describe('FlowBreakdownComponent whole book', () => {
-  it('draws the bridge, the outlook, FIRE and the cashflow profile above the account filter', () => {
+  it('draws the bridge, the outlook, FIRE, the cashflow profile and the goals above the account filter', () => {
     const el = render(GROUP, null, null, {
       accountChips: [
         {accountId: 'a', label: 'A'},
@@ -118,6 +118,7 @@ describe('FlowBreakdownComponent whole book', () => {
     ).not.toBeNull();
     expect(book?.querySelector('fns-fire-tile')).not.toBeNull();
     expect(book?.querySelector('fns-cashflow-profile')).not.toBeNull();
+    expect(book?.querySelector('fns-goals-progress')).not.toBeNull();
     expect(book?.querySelector('fns-payday-transfer-tile')).not.toBeNull();
     expect(book?.compareDocumentPosition(filter as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });

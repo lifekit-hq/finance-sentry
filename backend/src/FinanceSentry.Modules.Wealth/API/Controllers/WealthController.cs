@@ -21,9 +21,11 @@ public class WealthController(
     IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> netWorthProjectionHandler,
     IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> monthlyIncomeLensHandler,
     IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse> cashflowProfileHandler,
+    IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse> goalsProgressHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
     private readonly IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse> _cashflowProfileHandler = cashflowProfileHandler ?? throw new ArgumentNullException(nameof(cashflowProfileHandler));
+    private readonly IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse> _goalsProgressHandler = goalsProgressHandler ?? throw new ArgumentNullException(nameof(goalsProgressHandler));
     private readonly IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> _monthlyIncomeLensHandler = monthlyIncomeLensHandler ?? throw new ArgumentNullException(nameof(monthlyIncomeLensHandler));
     private readonly IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> _netWorthProjectionHandler = netWorthProjectionHandler ?? throw new ArgumentNullException(nameof(netWorthProjectionHandler));
     private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
@@ -162,6 +164,53 @@ public class WealthController(
             MonthlySavings = Fx(projection.MonthlySavings),
             ProjectedNetWorth = projection.ProjectedNetWorth is { } range
                 ? new ProjectionRange(Fx(range.Low), Fx(range.Central), Fx(range.High))
+                : null,
+            BaseCurrency = baseCurrency,
+        };
+    }
+
+    /// <summary>
+    /// Each IPS goal tracked against net worth plus savings, at the shared projection assumptions (#454 S2), context
+    /// only: <c>GET /api/v1/wealth/goals</c>.
+    /// </summary>
+    [HttpGet("goals")]
+    public async Task<IActionResult> GetGoalsProgress(CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _goalsProgressHandler.Handle(new GetGoalsProgressQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // Months, counts and the return range are untouched; every amount is re-expressed.
+    private static GoalsProgressResponse InBaseCurrency(GoalsProgressResponse goals, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return goals with { BaseCurrency = baseCurrency };
+
+        decimal? Fx(decimal? usd) => usd is { } v ? CurrencyConverter.FromUsd(v, baseCurrency) : null;
+        ProjectionRange? FxRange(ProjectionRange? range) => range is { } r
+            ? new ProjectionRange(Fx(r.Low)!.Value, Fx(r.Central)!.Value, Fx(r.High)!.Value)
+            : null;
+
+        return goals with
+        {
+            CurrentNetWorth = Fx(goals.CurrentNetWorth),
+            MonthlySavings = Fx(goals.MonthlySavings),
+            Goals = [.. goals.Goals.Select(g => g with
+            {
+                TargetAmount = Fx(g.TargetAmount),
+                RequiredMonthlySaving = FxRange(g.RequiredMonthlySaving),
+                ProjectedAtTargetDate = FxRange(g.ProjectedAtTargetDate),
+            })],
+            ContributionPlan = goals.ContributionPlan is { } plan
+                ? plan with
+                {
+                    PlannedAmount = Fx(plan.PlannedAmount)!.Value,
+                    PlannedMonthly = Fx(plan.PlannedMonthly),
+                    ActualMonthlySavings = Fx(plan.ActualMonthlySavings),
+                    Difference = Fx(plan.Difference),
+                }
                 : null,
             BaseCurrency = baseCurrency,
         };

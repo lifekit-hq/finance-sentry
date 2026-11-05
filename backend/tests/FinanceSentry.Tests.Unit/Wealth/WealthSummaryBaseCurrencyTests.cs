@@ -51,6 +51,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -110,6 +111,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -170,6 +172,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             projection.Object,
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -226,6 +229,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             lens.Object,
             Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -284,6 +288,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -344,6 +349,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
             profile.Object,
+            Mock.Of<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -382,5 +388,98 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.BaseCurrency.Should().Be("USD");
         result.IncomeMonthlyMedian.Should().Be(4_320m);
         result.BurnMonthlyMedian.Should().Be(3_240m);
+    }
+
+    private static async Task<GoalsProgressResponse> GetGoals(string? profileCurrency)
+    {
+        var goals = new Mock<IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>>();
+        goals.Setup(h => h.Handle(It.IsAny<GetGoalsProgressQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GoalsProgressResponse(
+                GoalsProgressStatus.Shown,
+                CurrentNetWorth: 540m,
+                MonthlySavings: 54m,
+                CompleteMonths: 6,
+                [
+                    new GoalProgress(
+                        "House deposit", 1080m, new DateOnly(2030, 1, 1), "high", MonthsLeft: 40,
+                        RequiredMonthlySaving: new ProjectionRange(10.8m, 16.2m, 21.6m),
+                        ProjectedAtTargetDate: new ProjectionRange(1080m, 1188m, 1296m),
+                        AlreadyReached: false, GoalTrack.OnTrack),
+                    new GoalProgress(
+                        "Someday", null, null, "low", MonthsLeft: null, RequiredMonthlySaving: null,
+                        ProjectedAtTargetDate: null, AlreadyReached: false, GoalTrack.NoTargetAmount),
+                ],
+                new ContributionPlanComparison(
+                    PlannedAmount: 27m, "weekly", PlannedMonthly: 108m, ActualMonthlySavings: 54m, Difference: -54m),
+                new ProjectionRange(0.02m, 0.05m, 0.08m),
+                HasStaleSleeves: false));
+        var reader = new Mock<IUserBaseCurrencyReader>();
+        reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
+
+        var controller = new WealthController(
+            Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
+            goals.Object,
+            reader.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", UserId.ToString())], "test")),
+                },
+            },
+        };
+
+        var ok = (OkObjectResult)await controller.GetGoalsProgress(CancellationToken.None);
+        return (GoalsProgressResponse)ok.Value!;
+    }
+
+    [Fact]
+    public async Task Goals_EuroBase_ConvertsEveryAmount_AndLabelsThemEur()
+    {
+        var result = await GetGoals("EUR");
+
+        result.BaseCurrency.Should().Be("EUR");
+        result.CurrentNetWorth.Should().Be(500m);
+        result.MonthlySavings.Should().Be(50m);
+        var house = result.Goals[0];
+        house.TargetAmount.Should().Be(1000m);
+        house.RequiredMonthlySaving.Should().Be(new ProjectionRange(10m, 15m, 20m));
+        house.ProjectedAtTargetDate.Should().Be(new ProjectionRange(1000m, 1100m, 1200m));
+        house.MonthsLeft.Should().Be(40, "a month count is not money");
+        result.ContributionPlan!.PlannedAmount.Should().Be(25m);
+        result.ContributionPlan.PlannedMonthly.Should().Be(100m);
+        result.ContributionPlan.ActualMonthlySavings.Should().Be(50m);
+        result.ContributionPlan.Difference.Should().Be(-50m);
+        result.RealAnnualReturnRange.Should().Be(new ProjectionRange(0.02m, 0.05m, 0.08m), "returns are not money");
+    }
+
+    [Fact]
+    public async Task Goals_EuroBase_LeavesAbsentFiguresAbsent()
+    {
+        var result = await GetGoals("EUR");
+
+        var someday = result.Goals[1];
+        someday.TargetAmount.Should().BeNull();
+        someday.RequiredMonthlySaving.Should().BeNull();
+        someday.ProjectedAtTargetDate.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("USD")]
+    public async Task Goals_UsdOrUnsetBase_LeavesAmountsUntouched(string? profile)
+    {
+        var result = await GetGoals(profile);
+
+        result.BaseCurrency.Should().Be("USD");
+        result.Goals[0].TargetAmount.Should().Be(1080m);
+        result.ContributionPlan!.Difference.Should().Be(-54m);
     }
 }

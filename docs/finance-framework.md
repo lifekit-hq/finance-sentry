@@ -330,6 +330,14 @@ income across them, nothing is shown. It is context for the person's own plannin
 so, there is no signal wording, and it adds no goal or IPS link. It takes a scope of the whole umbrella and states its
 window in months, so the §3.6 headline contract does not apply yet (like the projections, §11).
 
+**Goal progress (a derived read over M10, not an eleventh measure).** `GetGoalsProgressQueryHandler` (money-semantics §16)
+tracks each goal on the IPS (read through the `IGoalsReader` port, so the IPS stays the only home of goals) against the
+**whole** net worth plus the savings path, with `Projection.RequiredMonthlySaving` (the same future-value formula solved
+for the contribution) and `ValueAfter` at the one assumption set. Goals are not earmarked, so they are not additive, and
+the surface says so. `Behind` and `OnTrack` are context for the person's own planning, never a signal; the figures take
+the projections' "Hypothetical, not a guarantee." disclosure. It stores nothing and adds no goal entity, so the §3.6
+headline contract does not apply yet (like the projections, §11).
+
 ### 3.5 Worked example (fictional numbers)
 
 | Date | Event | Value |

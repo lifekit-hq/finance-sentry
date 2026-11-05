@@ -9,7 +9,7 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-11-05 (§15 cashflow profile, §14 exchange-rate insight); 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
+Last verified: 2026-11-05 (§16 goal progress, §15 cashflow profile, §14 exchange-rate insight); 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
 2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
 2026-10-15.
 
@@ -1786,3 +1786,49 @@ already reads, through the same `ProjectionInputsReader`.
   signal wording, no goal and no link to the IPS.
 - **Not here.** No declared income, no contribution-plan comparison and no per-goal figure: those are other slices of
   #454. Burn here is total honest outflow; the committed / discretionary split is §5a's.
+
+## 16. Goal progress (IPS goals, #454 S2)
+
+How far each goal on the person's Investment Policy Statement is from its target, and whether the current savings path
+gets there. A derived read over the projection inputs of §11, not a new measure: `GetGoalsProgressQueryHandler` (Wealth;
+`GET /api/v1/wealth/goals`, MCP `get_goals_progress`, the `fns-goals-progress` card on the Breakdown page). Computed on
+read; it stores nothing, adds no goal entity and needs no migration.
+
+- **Where the goals come from.** The IPS (`InvestmentGoal`: label, `TargetAmountUsd`, `TargetDate`, free-text priority,
+  plus the `ContributionPlan`) through `IGoalsReader` (`FinanceSentry.Core`), implemented inside Research over its own
+  `GetIpsQuery` and read only through the port, so Wealth never references Research (the pattern of
+  `IRiskToleranceReader`). The IPS stays the single home of the goals; they are edited through `save_ips` (an in-app
+  editor would write a new IPS version). A person with no current IPS, or an IPS with no goals, gets `NoGoals` and the
+  card's empty state.
+- **What a goal is measured against: the whole net worth plus savings.** Every goal starts from the latest snapshot's
+  `TotalNetWorth` (§8) and the savings path of §11 (median complete-month net). Nothing is earmarked per goal, so two
+  goals each count the same money and **goals are not additive**; the response (`basis`) and the card say so.
+- **Same engine, same assumptions.** `Projection.RequiredMonthlySaving` solves the future-value formula of §11 for the
+  contribution, `Projection.ValueAfter` runs it forward; both use the person's `ProjectionAssumptions` and its low /
+  central / high return range from `ProjectionInputsReader`. There is no second return assumption set.
+- **Per goal.** `monthsLeft`: whole calendar months from today to `targetDate` (at least 1 while the date is still ahead;
+  0 once it is today or past). `requiredMonthlySaving`: the level monthly saving that takes the current net worth to the
+  target by then, as a range. A higher return needs less, so `low` is the saving at the highest return and `high` at the
+  lowest; it is floored at zero (a balance that compounds to the target alone needs no saving). `projectedAtTargetDate`:
+  where the current savings path lands by then, as the range of `ValueAfter`. `alreadyReached`: net worth is at or above
+  the target now.
+- **`onTrack`.** `OnTrack` when the central projection reaches the target by the date, otherwise `Behind`. A date that
+  has passed gives `OnTrack` if net worth reached the target and `Behind` (reason `TARGET_DATE_PASSED`) if not, with
+  nothing projected. `NoTargetDate` / `NoTargetAmount`: the IPS goal lacks that input (a missing or non-positive
+  amount, or a date more than 1,200 months (100 years) out, reason `TARGET_DATE_TOO_FAR`, `monthsLeft` still stated and
+  no required saving or projection worked out), so nothing is claimed. `InsufficientHistory`: no snapshot (`NO_SNAPSHOT`), or under three complete months so
+  there is no savings path (`INSUFFICIENT_MONTHS`; the required saving is still stated, it needs only the snapshot).
+  `Behind` is context, not an alarm: the card draws it as a warning, not an error, and nothing downstream acts on it.
+- **Plan against actual.** The IPS `ContributionPlan` (an amount per free-text cadence) next to the measured savings
+  path: `plannedMonthly` converts `weekly`, `biweekly`/`fortnightly`, `monthly`, `quarterly`, `semiannual`, `annual`
+  (weeks counted as 52 a year); any other cadence leaves it null with reason `UNRECOGNIZED_CADENCE` and the plan shown as
+  written. `actualMonthlySavings` is the savings path (the median complete-month **net**, which is what is left after
+  all spending, not only what was invested) and `difference` is actual minus planned. It is a comparison of two
+  different things on purpose and is worded as such ("your median net").
+- **Currency.** The handler computes in USD (`TargetAmountUsd` is already USD); `WealthController` re-expresses the
+  targets, required savings, projections, net worth and plan amounts in the profile base currency and returns
+  `baseCurrency` (§3). Months, counts and the return range are not converted.
+- **Disclosure and boundaries.** Every response carries "Hypothetical, not a guarantee." and says it is context for the
+  person's own planning, never a trading signal or advice; the MCP description says the same. The card states its
+  inputs in words (net worth, monthly saving and the months it is the median over, the return and its range).
+  `hasStaleSleeves` is the §11 flag and shows the same warning. No headline record yet (finance-framework §3.6).

@@ -243,4 +243,59 @@ public class ProjectionTests
 
         return months;
     }
+    // --- required monthly saving -------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(100_000, 130_000, 24)]
+    [InlineData(0, 50_000, 60)]
+    [InlineData(-5_000, 20_000, 36)]
+    public void RequiredMonthlySaving_FedBackThroughValueAfter_LandsOnTheTargetAtEveryReturn(
+        int current, int target, int months)
+    {
+        var required = Projection.RequiredMonthlySaving(months, target, current, Central5);
+
+        // Each bound is the saving at one of the three returns; the contribution that reaches the target at that
+        // return, projected at that same return, lands on it.
+        var returns = Central5.RealAnnualReturns;
+        foreach (var (saving, annualReturn) in new[]
+                 {
+                     (required.Low, returns.High), (required.Central, returns.Central), (required.High, returns.Low),
+                 })
+        {
+            Projection.ValueAfter(months, current, saving, new ProjectionAssumptions(annualReturn, 0.04m)).Central
+                .Should().BeApproximately(target, 0.5m);
+        }
+    }
+
+    [Fact]
+    public void RequiredMonthlySaving_AHigherReturnNeedsLess_SoTheLowReturnGivesTheHighBound()
+    {
+        var required = Projection.RequiredMonthlySaving(24, 130_000m, 100_000m, Central5);
+
+        required.Low.Should().BeLessThan(required.Central);
+        required.Central.Should().BeLessThan(required.High);
+    }
+
+    [Fact]
+    public void RequiredMonthlySaving_ZeroReturn_IsThePlainGapOverTheMonths()
+    {
+        Projection.RequiredMonthlySaving(24, 130_000m, 100_000m, ZeroReturn()).High.Should().Be(1_250m);
+    }
+
+    [Fact]
+    public void RequiredMonthlySaving_ABalanceThatCompoundsToTheTargetAlone_NeedsNothing()
+    {
+        Projection.RequiredMonthlySaving(24, 100_000m, 100_000m, Central5).Should().Be(new ProjectionRange(0m, 0m, 0m));
+        Projection.RequiredMonthlySaving(24, 90_000m, 100_000m, ZeroReturn()).Should().Be(new ProjectionRange(0m, 0m, 0m));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void RequiredMonthlySaving_WithoutAFutureMonth_Throws(int months)
+    {
+        var act = () => Projection.RequiredMonthlySaving(months, 10_000m, 0m, Central5);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }
