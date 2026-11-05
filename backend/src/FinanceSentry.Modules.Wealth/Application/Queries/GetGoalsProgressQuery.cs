@@ -48,6 +48,9 @@ public static class GoalsProgressReasons
 
     /// <summary>The contribution plan's cadence is not one the monthly equivalent can be worked out for.</summary>
     public const string UnrecognizedCadence = "UNRECOGNIZED_CADENCE";
+
+    /// <summary>The target date is further out than <c>GoalHorizonMonths</c>: no required saving or projection is worked out.</summary>
+    public const string TargetDateTooFar = "TARGET_DATE_TOO_FAR";
 }
 
 /// <summary>
@@ -130,6 +133,7 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
     private const decimal WeeksPerYear = 52m;
     private const decimal MonthsPerYear = 12m;
     private const int PlanDecimals = 2;
+    private const int GoalHorizonMonths = 1200;
 
     private readonly ProjectionInputsReader _inputs = inputs;
     private readonly IGoalsReader _goals = goals;
@@ -203,6 +207,9 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
                 ? Result(GoalTrack.OnTrack, monthsLeft: 0, required: new ProjectionRange(0m, 0m, 0m), reached: true)
                 : Result(GoalTrack.Behind, GoalsProgressReasons.TargetDatePassed, monthsLeft: 0);
         }
+
+        if (monthsLeft > GoalHorizonMonths)
+            return Result(GoalTrack.NoTargetDate, GoalsProgressReasons.TargetDateTooFar, monthsLeft, reached: reached);
 
         var required = Projection.RequiredMonthlySaving(monthsLeft, target, current, inputs.Assumptions);
         if (inputs.SavingsPath is not { } path)

@@ -150,6 +150,8 @@ export class GoalsProgressUtils {
     switch (goal.reason) {
       case GOALS_PROGRESS_REASONS.targetDatePassed:
         return 'The target date has passed and net worth is below the target.';
+      case GOALS_PROGRESS_REASONS.targetDateTooFar:
+        return 'The target date is too far out to project; set a nearer date.';
       case GOALS_PROGRESS_REASONS.noSnapshot:
         return 'No net-worth snapshot yet, so this goal cannot be measured.';
       case GOALS_PROGRESS_REASONS.insufficientMonths:

@@ -1815,7 +1815,8 @@ read; it stores nothing, adds no goal entity and needs no migration.
 - **`onTrack`.** `OnTrack` when the central projection reaches the target by the date, otherwise `Behind`. A date that
   has passed gives `OnTrack` if net worth reached the target and `Behind` (reason `TARGET_DATE_PASSED`) if not, with
   nothing projected. `NoTargetDate` / `NoTargetAmount`: the IPS goal lacks that input (a missing or non-positive
-  amount), so nothing is claimed. `InsufficientHistory`: no snapshot (`NO_SNAPSHOT`), or under three complete months so
+  amount, or a date more than 1,200 months (100 years) out, reason `TARGET_DATE_TOO_FAR`, `monthsLeft` still stated and
+  no required saving or projection worked out), so nothing is claimed. `InsufficientHistory`: no snapshot (`NO_SNAPSHOT`), or under three complete months so
   there is no savings path (`INSUFFICIENT_MONTHS`; the required saving is still stated, it needs only the snapshot).
   `Behind` is context, not an alarm: the card draws it as a warning, not an error, and nothing downstream acts on it.
 - **Plan against actual.** The IPS `ContributionPlan` (an amount per free-text cadence) next to the measured savings

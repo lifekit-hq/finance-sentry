@@ -196,6 +196,22 @@ describe('GoalsProgressUtils', () => {
       expect(row?.note).toBe('The target date has passed and net worth is below the target.');
     });
 
+    it('explains a target date too far out to project', () => {
+      const [row] = GoalsProgressUtils.rows(
+        progress({
+          goals: [
+            goal({
+              requiredMonthlySaving: null,
+              projectedAtTargetDate: null,
+              onTrack: 'NoTargetDate',
+              reason: 'TARGET_DATE_TOO_FAR',
+            }),
+          ],
+        })
+      );
+      expect(row?.note).toBe('The target date is too far out to project; set a nearer date.');
+    });
+
     it('explains missing history, with the months so far', () => {
       const [row] = GoalsProgressUtils.rows(
         progress({

@@ -8,6 +8,7 @@ export const GOALS_PROGRESS_REASONS = {
   noSnapshot: 'NO_SNAPSHOT',
   insufficientMonths: 'INSUFFICIENT_MONTHS',
   targetDatePassed: 'TARGET_DATE_PASSED',
+  targetDateTooFar: 'TARGET_DATE_TOO_FAR',
   unrecognizedCadence: 'UNRECOGNIZED_CADENCE',
 } as const;
 

@@ -217,6 +217,31 @@ public class GetGoalsProgressQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TargetDateBeyondTheGoalHorizon_IsNoTargetDate_AndLeavesOtherGoalsTracked()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m, 1_000m),
+            Goals(
+                plan: null,
+                Goal(200_000m, new DateOnly(9999, 12, 31), "Someday"),
+                Goal(130_000m, new DateOnly(2028, 9, 26))));
+
+        var goals = (await Run()).Goals;
+
+        var far = goals.Single(g => g.Label == "Someday");
+        far.OnTrack.Should().Be(GoalTrack.NoTargetDate);
+        far.Reason.Should().Be(GoalsProgressReasons.TargetDateTooFar);
+        far.MonthsLeft.Should().BeGreaterThan(1200);
+        far.RequiredMonthlySaving.Should().BeNull();
+        far.ProjectedAtTargetDate.Should().BeNull();
+
+        var near = goals.Single(g => g.Label == "House deposit");
+        near.Reason.Should().BeNull();
+        near.RequiredMonthlySaving.Should().NotBeNull();
+        near.ProjectedAtTargetDate.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Handle_TargetDatePassedWithTheTargetReached_IsOnTrack()
     {
         Arrange(
