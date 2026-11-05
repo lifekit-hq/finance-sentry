@@ -1,0 +1,78 @@
+<cmn-card data-testid="cashflow-profile">
+  <div class="space-y-cmn-3">
+    <span class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary">
+      Burn, savings rate and runway
+    </span>
+
+    <!-- The host's own spacing lays out the children; the keep-content wrapper would put them in one box. -->
+    <cmn-async-state
+      [status]="store.view().status"
+      [errorMessage]="store.view().errorMessage"
+      [isEmpty]="store.isEmpty()"
+      [emptyMessage]="emptyMessage"
+      [emptySubMessage]="store.emptySubMessage()"
+      [keepContent]="false"
+      (retry)="store.load()"
+      class="block space-y-cmn-3"
+      errorPlacement="above"
+      retryable
+    >
+      <div skeleton class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-3">
+        @for (_ of skeletonFigures; track $index) {
+          <cmn-skeleton height="3.5rem" />
+        }
+      </div>
+
+      @if (store.figures(); as profile) {
+        <dl class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-3" data-testid="cashflow-figures">
+          <div>
+            <dt class="text-cmn-sm text-text-secondary">Monthly burn</dt>
+            <dd
+              class="font-headline text-cmn-lg font-semibold tabular-nums text-text-primary"
+              data-testid="cashflow-burn"
+            >
+              {{ profile.burnMonthlyMedian | money: profile.baseCurrency : {maxFractionDigits: 0} }}
+            </dd>
+            <dd class="text-cmn-xs text-text-secondary">what a typical month costs</dd>
+          </div>
+          <div>
+            <dt class="text-cmn-sm text-text-secondary">Savings rate</dt>
+            <dd
+              class="font-headline text-cmn-lg font-semibold tabular-nums text-text-primary"
+              data-testid="cashflow-rate"
+            >
+              {{ store.rate() ?? '—' }}
+            </dd>
+            <dd class="text-cmn-xs text-text-secondary">{{ store.rateNote() }}</dd>
+          </div>
+          <div>
+            <dt class="text-cmn-sm text-text-secondary">Runway</dt>
+            <dd
+              class="font-headline text-cmn-lg font-semibold tabular-nums text-text-primary"
+              data-testid="cashflow-runway"
+            >
+              {{ store.runway() ?? '—' }}
+            </dd>
+            <dd class="text-cmn-xs text-text-secondary" data-testid="cashflow-runway-note">
+              {{ store.runwayNote() ?? 'of cash at that burn' }}
+            </dd>
+          </div>
+        </dl>
+
+        @if (store.hasStaleSleeves()) {
+          <cmn-alert variant="warning" data-testid="cashflow-stale"
+            >Some account data is stale — carried forward from the last successful sync, so the
+            runway is an estimate.</cmn-alert
+          >
+        }
+
+        <p
+          class="text-cmn-xs leading-relaxed text-text-secondary"
+          data-testid="cashflow-assumptions"
+        >
+          {{ store.assumptions() }}
+        </p>
+      }
+    </cmn-async-state>
+  </div>
+</cmn-card>

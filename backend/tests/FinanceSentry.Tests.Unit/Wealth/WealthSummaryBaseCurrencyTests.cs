@@ -50,6 +50,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -108,6 +109,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -167,6 +169,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             projection.Object,
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -222,6 +225,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             lens.Object,
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -279,6 +283,7 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
             growth.Object,
             Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
             Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            Mock.Of<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>(),
             reader.Object)
         {
             ControllerContext = new ControllerContext
@@ -319,5 +324,63 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.Currency.Should().Be("USD");
         result.Growth.Should().Be(108m);
         result.Headline.Amount.Should().Be(108m);
+    }
+    private static async Task<CashflowProfileResponse> GetCashflowProfile(string? profileCurrency)
+    {
+        var profile = new Mock<IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse>>();
+        profile.Setup(h => h.Handle(It.IsAny<GetCashflowProfileQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CashflowProfileResponse(
+                CashflowProfileStatus.Shown, CompleteMonths: 6, FromMonth: "2026-03", ToMonth: "2026-08",
+                IncomeMonthlyMedian: 4_320m, BurnMonthlyMedian: 3_240m, SavingsRate: 0.25m, RunwayMonths: 6.0m,
+                RunwayReason: null, CommittedShare: 0.2m, HasStaleSleeves: false));
+        var reader = new Mock<IUserBaseCurrencyReader>();
+        reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
+
+        var controller = new WealthController(
+            Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse>>(),
+            Mock.Of<IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse>>(),
+            Mock.Of<IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse>>(),
+            profile.Object,
+            reader.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", UserId.ToString())], "test")),
+                },
+            },
+        };
+
+        var ok = (OkObjectResult)await controller.GetCashflowProfile(CancellationToken.None);
+        return (CashflowProfileResponse)ok.Value!;
+    }
+
+    [Fact]
+    public async Task CashflowProfile_EuroBase_ConvertsTheTwoMonthlyAmounts_NotTheRateRunwayOrShare()
+    {
+        var result = await GetCashflowProfile("EUR");
+
+        result.BaseCurrency.Should().Be("EUR");
+        result.IncomeMonthlyMedian.Should().Be(4_000m);
+        result.BurnMonthlyMedian.Should().Be(3_000m);
+        result.SavingsRate.Should().Be(0.25m);
+        result.RunwayMonths.Should().Be(6.0m);
+        result.CommittedShare.Should().Be(0.2m);
+    }
+
+    [Theory]
+    [InlineData("USD")]
+    [InlineData(null)]
+    public async Task CashflowProfile_UsdOrUnsetBase_LeavesAmountsUntouched(string? profile)
+    {
+        var result = await GetCashflowProfile(profile);
+
+        result.BaseCurrency.Should().Be("USD");
+        result.IncomeMonthlyMedian.Should().Be(4_320m);
+        result.BurnMonthlyMedian.Should().Be(3_240m);
     }
 }
