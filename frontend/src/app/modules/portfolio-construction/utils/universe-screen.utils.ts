@@ -4,6 +4,7 @@ import {
   UNIVERSE_ALL_FILTER,
   UNIVERSE_CROWDING_ORDER,
   UNIVERSE_MISSING,
+  UNIVERSE_NOT_SCORED_WORD,
   UNIVERSE_VERDICT_ORDER,
 } from '../constants/universe-screen/universe-screen.constants';
 import {
@@ -27,7 +28,7 @@ export class UniverseScreenUtils {
     if (filter === UNIVERSE_ALL_FILTER) {
       return [...rows];
     }
-    return rows.filter(r => r.verdict?.word === filter);
+    return rows.filter(r => (r.verdict?.word ?? UNIVERSE_NOT_SCORED_WORD) === filter);
   }
 
   /** A stable ordering by one key; ties fall to the ticker. */

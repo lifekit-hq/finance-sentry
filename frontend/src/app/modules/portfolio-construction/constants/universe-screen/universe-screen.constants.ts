@@ -19,6 +19,8 @@ export const UNIVERSE_SORT_OPTIONS: readonly (SelectOption & {value: UniverseSor
 
 export const UNIVERSE_DEFAULT_SORT: UniverseSortKey = 'construction';
 export const UNIVERSE_ALL_FILTER: UniverseVerdictFilter = 'All';
+/** The word a row with no verdict at all (it failed to score) reads as. */
+export const UNIVERSE_NOT_SCORED_WORD: UniverseVerdictFilter = 'NotScored';
 
 export const UNIVERSE_VERDICT_FILTERS: readonly {value: UniverseVerdictFilter; label: string}[] = [
   {value: 'All', label: 'All'},

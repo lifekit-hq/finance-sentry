@@ -27,6 +27,17 @@ describe('UniverseScreenUtils', () => {
       expect(symbols(UniverseScreenUtils.filter(rows, 'Avoid'))).toEqual(['BBB']);
     });
 
+    it('treats a name that failed to score as NotScored, beside a NotScored verdict', () => {
+      const withWord = [
+        ...rows,
+        row('DDD', {
+          verdict: {word: 'NotScored', rulesVersion: 1, firedRuleId: 'x', firedRule: ''},
+        }),
+      ];
+
+      expect(symbols(UniverseScreenUtils.filter(withWord, 'NotScored'))).toEqual(['CCC', 'DDD']);
+    });
+
     it('returns nothing when no row carries the word', () => {
       expect(UniverseScreenUtils.filter(rows, 'StrongBuy')).toEqual([]);
     });
