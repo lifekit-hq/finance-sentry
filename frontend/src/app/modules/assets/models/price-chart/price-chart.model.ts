@@ -10,9 +10,13 @@ export type PriceChartKind = 'candles' | 'line' | 'area';
 
 export type MovingAverageId = 'sma20' | 'sma50' | 'sma100' | 'sma200' | 'ema9' | 'ema21';
 
-/** One bar; `time` is epoch seconds on the exchange's own clock (its wall-clock reads as UTC). */
+/**
+ * One bar; `time` is the bar's real start in epoch seconds (strictly ascending down a series), `offset` the
+ * exchange's UTC offset in seconds at that bar: `time + offset` read as UTC is the exchange's own wall-clock.
+ */
 export interface PriceBarDto {
   time: number;
+  offset: number;
   open: number;
   high: number;
   low: number;
@@ -73,7 +77,7 @@ export interface MovingAverageGap {
   available: number;
 }
 
-/** A span of bars, picked by pan/zoom or by the measure tool, as bar times (inclusive). */
+/** A span of bars, picked by pan/zoom or by the measure tool, as real bar times (inclusive). */
 export interface TimeSpan {
   from: number;
   to: number;
@@ -87,7 +91,7 @@ export interface RangeChange {
   toPrice: number;
   change: number;
   changePct: Nullable<number>;
-  /** Calendar seconds between the two bars. */
+  /** Real seconds between the two bars. */
   seconds: number;
   bars: number;
 }

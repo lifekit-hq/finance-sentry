@@ -26,6 +26,7 @@ const COMPACT_MIN = 1000;
 const UTC = 'UTC';
 const DAY_FORMAT = 'd MMM y';
 const INTRADAY_FORMAT = 'd MMM y, HH:mm';
+const AXIS_FORMATS = {year: 'y', month: 'MMM', day: 'd', time: 'HH:mm'} as const;
 const MS_PER_SECOND = 1000;
 const INTRADAY: readonly PriceIntervalId[] = ['5m', '15m', '1h'];
 
@@ -96,20 +97,25 @@ export class PriceChartViewUtils {
   }
 
   /** A bar's start on the exchange's own clock: "12 Oct 2026" for a day or longer, with the time under a day. */
-  public static timeLabel(time: number, interval: PriceIntervalId): string {
+  public static timeLabel(time: number, offset: number, interval: PriceIntervalId): string {
     return formatDate(
-      time * MS_PER_SECOND,
+      (time + offset) * MS_PER_SECOND,
       PriceChartViewUtils.isIntraday(interval) ? INTRADAY_FORMAT : DAY_FORMAT,
       APP_LOCALE,
       UTC
     );
   }
 
+  /** A time-axis tick on the exchange's own clock, as the year, month, day of month or time of day it marks. */
+  public static axisLabel(time: number, offset: number, kind: AxisTickKind): string {
+    return formatDate((time + offset) * MS_PER_SECOND, AXIS_FORMATS[kind], APP_LOCALE, UTC);
+  }
+
   /** The crosshair legend: the bar's start, OHLC and volume, formatted. */
   public static legend(bar: PriceBarDto, bars: AssetPriceBarsDto): LegendView {
     const price = (value: number): string => MoneyUtils.format(value, bars.currency);
     return {
-      time: PriceChartViewUtils.timeLabel(bar.time, bars.interval),
+      time: PriceChartViewUtils.timeLabel(bar.time, bar.offset, bars.interval),
       open: price(bar.open),
       high: price(bar.high),
       low: price(bar.low),
@@ -135,7 +141,8 @@ export class PriceChartViewUtils {
     if (!bars || !bars.truncated || bars.bars.length === 0) {
       return null;
     }
-    return `Price history starts ${PriceChartViewUtils.timeLabel(bars.windowStart, bars.interval)}, so this period is shorter than asked.`;
+    const offset = bars.bars.find(b => b.time === bars.windowStart)?.offset ?? 0;
+    return `Price history starts ${PriceChartViewUtils.timeLabel(bars.windowStart, offset, bars.interval)}, so this period is shorter than asked.`;
   }
 
   /** Why a switched-on average draws nothing: it needs more bars than the source has. */
@@ -150,6 +157,8 @@ export class PriceChartViewUtils {
     return `Not drawn: ${parts.join('; ')}.`;
   }
 }
+
+export type AxisTickKind = keyof typeof AXIS_FORMATS;
 
 export interface MoveReadout {
   text: string;

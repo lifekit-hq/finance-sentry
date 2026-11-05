@@ -14,6 +14,7 @@ import {
   type PricePeriodId,
 } from '../models/price-chart/price-chart.model';
 import {DossierService} from '../services/dossier.service';
+import {PriceChartDataUtils} from '../utils/price-chart-data.utils';
 import {PriceChartSelectionUtils} from '../utils/price-chart-selection.utils';
 import {PriceChartStore} from './price-chart.store';
 
@@ -23,6 +24,7 @@ const START = 1_760_000_000;
 function bars(count: number): PriceBarDto[] {
   return Array.from({length: count}, (_, i) => ({
     time: START + i * DAY,
+    offset: 0,
     open: 100 + i,
     high: 102 + i,
     low: 99 + i,
@@ -259,8 +261,8 @@ describe('PriceChartStore', () => {
         of(
           dto({
             bars: [
-              {time: START, open: 10, high: 10, low: 8, close: 10, volume: 1},
-              {time: START + DAY, open: 9, high: 9, low: 7, close: 8, volume: 1},
+              {time: START, offset: 0, open: 10, high: 10, low: 8, close: 10, volume: 1},
+              {time: START + DAY, offset: 0, open: 9, high: 9, low: 7, close: 8, volume: 1},
             ],
             windowStart: START,
           })
@@ -308,6 +310,78 @@ describe('PriceChartStore', () => {
 
       store.setHoverTime(null);
       expect(store.legend()?.close).toBe('$130.00');
+    });
+
+    describe('across a fall-back clock change', () => {
+      // Europe/London left BST on 2026-10-25: 00:30 UTC and 01:30 UTC both read 01:30 on the wall clock.
+      const bst = Date.UTC(2026, 9, 25, 0, 30) / 1000;
+      const gmt = Date.UTC(2026, 9, 25, 1, 30) / 1000;
+      const hour = (time: number, offset: number, close: number): PriceBarDto => ({
+        time,
+        offset,
+        open: close,
+        high: close,
+        low: close,
+        close,
+        volume: 1,
+      });
+
+      it('keeps both repeated-hour bars on a strictly ascending, unique axis', () => {
+        service.getBars.mockReturnValue(
+          of(
+            dto({
+              interval: '1h',
+              timeZone: 'Europe/London',
+              bars: [hour(bst, 3600, 100), hour(gmt, 0, 110)],
+              windowStart: bst,
+            })
+          )
+        );
+        const store = inject();
+        TestBed.tick();
+
+        const times = PriceChartDataUtils.closes(store.bars()?.bars ?? []).map(p => p.time);
+        expect(times).toEqual([bst, gmt]);
+        expect(times[0]).toBeLessThan(times[1]);
+      });
+
+      it('reads the legend of the bar hovered, not its twin on the wall clock', () => {
+        service.getBars.mockReturnValue(
+          of(
+            dto({
+              interval: '1h',
+              timeZone: 'Europe/London',
+              bars: [hour(bst, 3600, 100), hour(gmt, 0, 110)],
+              windowStart: bst,
+            })
+          )
+        );
+        const store = inject();
+        TestBed.tick();
+
+        store.setHoverTime(bst);
+        expect(store.legend()).toMatchObject({close: '$100.00', time: '25 Oct 2026, 01:30'});
+        store.setHoverTime(gmt);
+        expect(store.legend()).toMatchObject({close: '$110.00', time: '25 Oct 2026, 01:30'});
+      });
+
+      it('measures the real hour between them, not zero', () => {
+        service.getBars.mockReturnValue(
+          of(
+            dto({
+              interval: '1h',
+              timeZone: 'Europe/London',
+              bars: [hour(bst, 3600, 100), hour(gmt, 0, 110)],
+              windowStart: bst,
+            })
+          )
+        );
+        const store = inject();
+        TestBed.tick();
+        store.setMeasured({from: bst, to: gmt});
+
+        expect(store.measureChange()).toMatchObject({seconds: 3600, bars: 2, change: 10});
+      });
     });
 
     it('names the 52-week range, and says so when the series is younger', () => {

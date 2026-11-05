@@ -105,7 +105,7 @@ public class AssetPriceBarsContractTests(AssetDossierApiFactory factory)
     {
         _ = seed;
         var bars = Enumerable.Range(0, count)
-            .Select(i => new PriceBar(LastDay - ((count - 1 - i) * Day), 100m + i, 101m + i, 99m + i, 100.5m + i, 1_000 + i))
+            .Select(i => new PriceBar(LastDay - ((count - 1 - i) * Day), 0, 100m + i, 101m + i, 99m + i, 100.5m + i, 1_000 + i))
             .ToList();
         return new PriceBarSeries("USD", "America/New_York", bars);
     }

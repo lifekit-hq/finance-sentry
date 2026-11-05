@@ -80,7 +80,7 @@ public sealed class YahooPriceBarService(
         }
 
         var quote = quotes[0];
-        var rows = new List<(long Epoch, PriceBar Bar)>();
+        var rows = new List<PriceBar>();
         var count = timestamps.GetArrayLength();
         for (var i = 0; i < count; i++)
         {
@@ -97,18 +97,16 @@ public sealed class YahooPriceBarService(
 
             var volume = Read(quote, "volume", i) is decimal traded ? (long)traded : 0L;
             var offset = zone is null ? currentOffset : (long)zone.GetUtcOffset(DateTimeOffset.FromUnixTimeSeconds(epoch)).TotalSeconds;
-            rows.Add((epoch, new PriceBar(epoch + offset, open / divisor, high / divisor, low / divisor, close / divisor, volume)));
+            rows.Add(new PriceBar(epoch, offset, open / divisor, high / divisor, low / divisor, close / divisor, volume));
         }
 
         // A daily, weekly or monthly series can carry the live day as a second row for the same trading date; keep one
-        // bar per date. Intraday bars are distinct instants (the wall-clock hour repeated at a fall-back change is two
-        // real bars), so only a row repeating the same instant is collapsed.
+        // bar per date. Intraday bars are distinct instants, so only a row repeating the same instant is collapsed.
         var intraday = PriceInterval.IsIntraday(interval);
         var ordered = rows
-            .GroupBy(r => intraday ? (object)r.Epoch : r.Bar.Date)
+            .GroupBy(r => intraday ? (object)r.Time : r.Date)
             .Select(g => g.Last())
-            .OrderBy(r => r.Epoch)
-            .Select(r => r.Bar)
+            .OrderBy(r => r.Time)
             .ToList();
         return new PriceBarSeries(currency, timeZone, ordered);
     }

@@ -3,8 +3,8 @@ import {describe, expect, it} from 'vitest';
 import {type PriceBarDto} from '../models/price-chart/price-chart.model';
 import {PriceChartDataUtils} from './price-chart-data.utils';
 
-const up: PriceBarDto = {time: 1, open: 10, high: 12, low: 9, close: 11, volume: 100};
-const down: PriceBarDto = {time: 2, open: 11, high: 11, low: 8, close: 9, volume: 0};
+const up: PriceBarDto = {time: 1, offset: 0, open: 10, high: 12, low: 9, close: 11, volume: 100};
+const down: PriceBarDto = {time: 2, offset: 0, open: 11, high: 11, low: 8, close: 9, volume: 0};
 
 describe('PriceChartDataUtils', () => {
   it('reshapes bars to candles without the volume', () => {

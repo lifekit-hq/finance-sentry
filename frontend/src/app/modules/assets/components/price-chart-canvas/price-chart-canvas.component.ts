@@ -20,6 +20,7 @@ import {
   type LogicalRange,
   type MouseEventParams,
   type SeriesType,
+  type TickMarkType,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -43,7 +44,7 @@ import {
   type TimeSpan,
 } from '../../models/price-chart/price-chart.model';
 import {PriceChartDataUtils} from '../../utils/price-chart-data.utils';
-import {PriceChartViewUtils} from '../../utils/price-chart-view.utils';
+import {type AxisTickKind, PriceChartViewUtils} from '../../utils/price-chart-view.utils';
 
 type ChartLib = typeof import('lightweight-charts');
 
@@ -91,6 +92,7 @@ export class PriceChartCanvasComponent {
   private weekLines: IPriceLine[] = [];
   private readonly averageSeries = new Map<MovingAverageId, ISeriesApi<'Line'>>();
   private drawnBars: Nullable<AssetPriceBarsDto> = null;
+  private readonly offsets = new Map<number, number>();
   private lastHover: Nullable<number> = null;
   private lastVisible: Nullable<TimeSpan> = null;
   /** True from a new window being shown until the viewer pans or zooms: a resize in that time re-fits the window. */
@@ -280,6 +282,29 @@ export class PriceChartCanvasComponent {
     }
     const data = bars.bars;
 
+    this.offsets.clear();
+    for (const bar of data) {
+      this.offsets.set(bar.time, bar.offset);
+    }
+    chart.applyOptions({
+      localization: {
+        timeFormatter: (time: Time) =>
+          typeof time === 'number'
+            ? PriceChartViewUtils.timeLabel(time, this.offsets.get(time) ?? 0, bars.interval)
+            : '',
+      },
+      timeScale: {
+        tickMarkFormatter: (time: Time, type: TickMarkType) =>
+          typeof time === 'number'
+            ? PriceChartViewUtils.axisLabel(
+                time,
+                this.offsets.get(time) ?? 0,
+                this.tickKind(lib, type)
+              )
+            : '',
+      },
+    });
+
     this.drawPrice(lib, chart, data, kind);
     this.drawAverages(lib, chart, lines);
     this.drawVolume(lib, chart, data);
@@ -304,6 +329,17 @@ export class PriceChartCanvasComponent {
       this.showWindow(bars);
       this.clearMeasure();
     }
+  }
+
+  private tickKind(lib: ChartLib, type: TickMarkType): AxisTickKind {
+    const tick = lib.TickMarkType;
+    return type === tick.Year
+      ? 'year'
+      : type === tick.Month
+        ? 'month'
+        : type === tick.DayOfMonth
+          ? 'day'
+          : 'time';
   }
 
   private drawPrice(

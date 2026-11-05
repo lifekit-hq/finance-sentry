@@ -11,15 +11,16 @@ public interface IPriceBarService
 }
 
 /// <summary>
-/// One bar. <see cref="Time"/> is the bar's start in epoch seconds shifted by the exchange's UTC offset at that bar (its
-/// wall-clock reads as UTC), so a daily bar's date is the exchange's own trading date whatever the time zone.
+/// One bar. <see cref="Time"/> is the bar's real start in epoch seconds (unique and ascending down a series);
+/// <see cref="Offset"/> is the exchange's UTC offset in seconds at that bar, so <c>Time + Offset</c> read as UTC is the
+/// exchange's own wall-clock and <see cref="Date"/> its trading date, whatever the time zone.
 /// </summary>
-public sealed record PriceBar(long Time, decimal Open, decimal High, decimal Low, decimal Close, long Volume)
+public sealed record PriceBar(long Time, long Offset, decimal Open, decimal High, decimal Low, decimal Close, long Volume)
 {
-    public DateOnly Date => DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(Time).UtcDateTime);
+    public DateOnly Date => DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(Time + Offset).UtcDateTime);
 }
 
-/// <summary>Bars oldest first by real instant (an intraday <see cref="PriceBar.Time"/> repeats across a fall-back clock change in a round-the-clock market), priced in <see cref="Currency"/> (the quote currency; null when the source omits it).</summary>
+/// <summary>Bars oldest first by real instant, priced in <see cref="Currency"/> (the quote currency; null when the source omits it).</summary>
 public sealed record PriceBarSeries(string? Currency, string? TimeZone, IReadOnlyList<PriceBar> Bars)
 {
     public static PriceBarSeries Empty { get; } = new(null, null, []);

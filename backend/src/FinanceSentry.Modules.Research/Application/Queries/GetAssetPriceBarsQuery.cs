@@ -53,7 +53,7 @@ public sealed class GetAssetPriceBarsQueryHandler(
             allowed,
             series.Currency,
             series.TimeZone,
-            bars.Select(b => new PriceBarDto(b.Time, b.Open, b.High, b.Low, b.Close, b.Volume)).ToList(),
+            bars.Select(b => new PriceBarDto(b.Time, b.Offset, b.Open, b.High, b.Low, b.Close, b.Volume)).ToList(),
             windowStart,
             truncated,
             week is { } w ? new WeekRangeDto(w.High, w.Low, w.From, w.CoversYear) : null,

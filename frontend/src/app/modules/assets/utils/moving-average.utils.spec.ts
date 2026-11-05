@@ -6,6 +6,7 @@ import {MovingAverageUtils} from './moving-average.utils';
 
 const bar = (time: number, close: number): PriceBarDto => ({
   time,
+  offset: 0,
   open: close,
   high: close,
   low: close,

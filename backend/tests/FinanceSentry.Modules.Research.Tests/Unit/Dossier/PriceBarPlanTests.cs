@@ -175,5 +175,5 @@ public class PriceBarPlanTests
         => PriceBarPlan.WeekRange([]).Should().BeNull();
 
     private static PriceBar Bar(long time, decimal high = 11m, decimal low = 9m)
-        => new(time, 10m, high, low, 10m, 100);
+        => new(time, 0, 10m, high, low, 10m, 100);
 }

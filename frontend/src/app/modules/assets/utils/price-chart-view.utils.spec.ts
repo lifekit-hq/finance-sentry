@@ -10,8 +10,9 @@ import {PriceChartViewUtils} from './price-chart-view.utils';
 const START = 1_760_000_000; // 2025-10-09 08:53:20 on the exchange clock
 const DAY = 86_400;
 
-const bar = (time: number, close: number, volume = 0): PriceBarDto => ({
+const bar = (time: number, close: number, volume = 0, offset = 0): PriceBarDto => ({
   time,
+  offset,
   open: close,
   high: close,
   low: close,
@@ -101,11 +102,30 @@ describe('PriceChartViewUtils', () => {
   });
 
   describe('timeLabel', () => {
-    it('reads the exchange clock as written: a date for a day, the time under one', () => {
-      // 2026-10-12 13:30 on the exchange clock.
+    it('reads the exchange clock: a date for a day, the time under one', () => {
+      // 2026-10-12 13:30 UTC is 09:30 in New York (UTC-4).
       const time = Date.UTC(2026, 9, 12, 13, 30) / 1000;
-      expect(PriceChartViewUtils.timeLabel(time, '1d')).toBe('12 Oct 2026');
-      expect(PriceChartViewUtils.timeLabel(time, '5m')).toBe('12 Oct 2026, 13:30');
+      const offset = -4 * 3600;
+      expect(PriceChartViewUtils.timeLabel(time, offset, '1d')).toBe('12 Oct 2026');
+      expect(PriceChartViewUtils.timeLabel(time, offset, '5m')).toBe('12 Oct 2026, 09:30');
+    });
+
+    it('moves the date with the offset when the exchange is a day ahead of UTC', () => {
+      // 2026-10-12 23:00 UTC is 10:00 on 13 Oct in Sydney (UTC+11).
+      const time = Date.UTC(2026, 9, 12, 23, 0) / 1000;
+      expect(PriceChartViewUtils.timeLabel(time, 11 * 3600, '1d')).toBe('13 Oct 2026');
+    });
+  });
+
+  describe('axisLabel', () => {
+    it('reads each tick kind on the exchange clock', () => {
+      // 2026-10-12 01:30 UTC is 2026-10-11 21:30 in New York (UTC-4).
+      const time = Date.UTC(2026, 9, 12, 1, 30) / 1000;
+      const offset = -4 * 3600;
+      expect(PriceChartViewUtils.axisLabel(time, offset, 'year')).toBe('2026');
+      expect(PriceChartViewUtils.axisLabel(time, offset, 'month')).toBe('Oct');
+      expect(PriceChartViewUtils.axisLabel(time, offset, 'day')).toBe('11');
+      expect(PriceChartViewUtils.axisLabel(time, offset, 'time')).toBe('21:30');
     });
   });
 

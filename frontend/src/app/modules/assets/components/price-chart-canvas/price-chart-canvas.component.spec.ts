@@ -19,6 +19,7 @@ const BAR_COUNT = 80;
 function dto(volume = 1000): AssetPriceBarsDto {
   const bars = Array.from({length: BAR_COUNT}, (_, i) => ({
     time: START + i * DAY,
+    offset: 0,
     open: 100 + i,
     high: 102 + i,
     low: 99 + i,
@@ -135,6 +136,27 @@ describe('PriceChartCanvasComponent', () => {
 
     expect(host.querySelectorAll('canvas').length).toBeGreaterThan(0);
     expect(MOVING_AVERAGES.length).toBeGreaterThan(0);
+  });
+
+  it('draws and reports the bars of a repeated wall-clock hour on their real times', async () => {
+    // Europe/London left BST on 2026-10-25: 00:30 UTC and 01:30 UTC both read 01:30.
+    const first = Date.UTC(2026, 9, 25, 0, 30) / 1000;
+    const hourly = ['bst', 'gmt', 'gmt'].map((_, i) => ({
+      time: first + i * 3600,
+      offset: i === 0 ? 3600 : 0,
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100 + i,
+      volume: 10,
+    }));
+    await render({...dto(), interval: '1h', bars: hourly, windowStart: first});
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      const span = visible[visible.length - 1];
+      expect(span).toEqual({from: first, to: first + 2 * 3600});
+    });
   });
 
   describe('measure tool', () => {

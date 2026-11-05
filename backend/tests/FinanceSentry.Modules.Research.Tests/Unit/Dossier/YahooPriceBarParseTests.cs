@@ -13,7 +13,7 @@ public class YahooPriceBarParseTests
     private const int NewYorkOffset = -14_400;
 
     [Fact]
-    public void Parse_ReadsAllFiveSeriesOldestFirst_OnTheExchangeClock()
+    public void Parse_ReadsAllFiveSeriesOldestFirst_OnTheRealInstant()
     {
         var series = YahooPriceBarService.Parse(Chart(
             "usd", NewYorkOffset, [Open + Day, Open],
@@ -24,7 +24,7 @@ public class YahooPriceBarParseTests
         series.TimeZone.Should().Be("America/New_York");
         series.Bars.Select(b => b.Close).Should().Equal(10.5m, 11.5m);
         series.Bars[0].Should().Be(new FinanceSentry.Modules.Research.Application.Services.PriceBar(
-            Open + NewYorkOffset, 10m, 11m, 9.5m, 10.5m, 1000));
+            Open, NewYorkOffset, 10m, 11m, 9.5m, 10.5m, 1000));
         series.Bars[0].Date.Should().Be(new DateOnly(2026, 10, 12));
     }
 
@@ -50,7 +50,7 @@ public class YahooPriceBarParseTests
             "usd", -18_000, [beforeChange, afterChange], ["1", "1"], ["1", "1"], ["1", "1"], ["1", "1"], ["1", "1"],
             zone: "America/New_York"), "5m");
 
-        series.Bars.Select(b => DateTimeOffset.FromUnixTimeSeconds(b.Time).UtcDateTime)
+        series.Bars.Select(b => DateTimeOffset.FromUnixTimeSeconds(b.Time + b.Offset).UtcDateTime)
             .Should().Equal(new DateTime(2026, 10, 30, 9, 30, 0), new DateTime(2026, 11, 2, 9, 30, 0));
     }
 
@@ -60,7 +60,7 @@ public class YahooPriceBarParseTests
         var series = YahooPriceBarService.Parse(Chart(
             "usd", NewYorkOffset, [Open], ["1"], ["1"], ["1"], ["1"], ["1"], zone: "Nowhere/Atlantis"), "5m");
 
-        series.Bars.Single().Time.Should().Be(Open + NewYorkOffset);
+        series.Bars.Single().Should().Match<FinanceSentry.Modules.Research.Application.Services.PriceBar>(b => b.Time == Open && b.Offset == NewYorkOffset);
     }
 
     [Fact]
@@ -118,6 +118,8 @@ public class YahooPriceBarParseTests
             zone: "Europe/London"), "5m");
 
         series.Bars.Select(b => b.Close).Should().Equal(1m, 2m);
+        series.Bars.Select(b => b.Time).Should().BeInAscendingOrder().And.OnlyHaveUniqueItems().And.Equal(bst, gmt);
+        series.Bars.Select(b => b.Time + b.Offset).Should().Equal(gmt, gmt);
     }
 
     [Fact]

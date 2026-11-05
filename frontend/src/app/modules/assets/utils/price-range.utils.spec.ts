@@ -7,6 +7,7 @@ const DAY = 86_400;
 
 const bars: PriceBarDto[] = [100, 110, 99, 120].map((close, i) => ({
   time: i * DAY,
+  offset: 0,
   open: close,
   high: close,
   low: close,
@@ -56,8 +57,8 @@ describe('PriceRangeUtils.change', () => {
 
   it('has no percent when the first close is zero', () => {
     const zero: PriceBarDto[] = [
-      {time: 0, open: 0, high: 0, low: 0, close: 0, volume: 0},
-      {time: DAY, open: 1, high: 1, low: 1, close: 1, volume: 0},
+      {time: 0, offset: 0, open: 0, high: 0, low: 0, close: 0, volume: 0},
+      {time: DAY, offset: 0, open: 1, high: 1, low: 1, close: 1, volume: 0},
     ];
     expect(PriceRangeUtils.change(zero, {from: 0, to: DAY})?.changePct).toBeNull();
   });

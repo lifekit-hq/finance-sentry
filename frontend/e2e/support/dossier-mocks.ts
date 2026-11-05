@@ -687,7 +687,7 @@ function barAt(index: number, first: number, last: number, total: number, time: 
   const low = Math.min(open, close) * (1 - b.spread / b.halfSpread);
   const volume = Math.round(b.baseVolume * (1 + b.volumeSwing * Math.sin(index * b.volumeSkew)));
   const r = (n: number) => +n.toFixed(b.digits);
-  return {time, open: r(open), high: r(high), low: r(low), close: r(close), volume};
+  return {time, offset: 0, open: r(open), high: r(high), low: r(low), close: r(close), volume};
 }
 
 function dailyBars(first: number, last: number) {
