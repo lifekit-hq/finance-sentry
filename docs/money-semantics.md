@@ -1840,3 +1840,46 @@ read; it stores nothing, adds no goal entity and needs no migration.
   person's own planning, never a trading signal or advice; the MCP description says the same. The card states its
   inputs in words (net worth, monthly saving and the months it is the median over, the return and its range).
   `hasStaleSleeves` is the §11 flag and shows the same warning. No headline record yet (finance-framework §3.6).
+
+## 17. Disposal-tax context (CGT and exit tax, #454 S6)
+
+"If you sold this position today, the Irish regime that would apply and a rough amount." A derived read over the
+position ledger of §1, not a new measure: `DisposalTaxContextReader` / `DisposalTaxCalculator` (Research;
+`position.disposalTax` on the asset dossier, MCP `get_disposal_tax_context`, the `fns-disposal-tax` `<details>` block
+under the position card). Computed on read; it stores nothing and needs no migration.
+
+- **Gates: withhold, never guess.** A figure is shown only when all hold; otherwise `status` is `withheld`, there are no
+  figures, and `withheldReasons` lists the codes that failed. `PROVIDER_NOT_SUPPORTED`: the position is not held at IBKR
+  (Inzhur and crypto are a follow-up). `PARTIAL_COVERAGE`: `PositionReturnCalculator` coverage is not `complete`, or the
+  FIFO walk of the fills does not add up to the held quantity. `UNCLASSIFIED`: the instrument has no human-set
+  classification (`OrdinaryShare` -> CGT, `OffshoreFund` -> exit tax; two instruments in one symbol that disagree count
+  as unclassified). `BASIS_NOT_VERIFIED`: the book position's `BasisState` is not `Verified` (§1, fs-688).
+  `FOUR_WEEK_RULE` (CGT only) and `DEEMED_DISPOSAL_PASSED` (exit tax only) are below.
+- **First-in-first-out lots, not average cost.** The fills are walked oldest first: a buy opens a lot (quantity times
+  price plus the commission paid, in the trade currency), a sell or gift consumes the oldest lots first. The §1 return
+  decomposition uses average cost; Irish matching is not average cost, so its realized figure is never reused here.
+- **Euro.** Irish tax is computed in euro: each lot's cost is converted at the USD rate of its purchase date (the
+  historical series of §3, one series per currency) and then at the euro rate of that day; the proceeds are today's
+  value in USD at today's euro rate, shared across lots by quantity. All amounts in the context are EUR
+  (`currency`); there is no base-currency re-expression. If a historical rate is missing the day falls back to today's
+  rate, as §1's decomposition does.
+- **Rates.** A versioned table keyed by tax year (`IrishTaxReference`), each value cited to revenue.ie in the source and
+  flagged re-check each tax year: 2026 CGT 33%, annual exemption EUR 1,270 (per individual per year, shared by all that
+  year's disposals), exit tax 38% on a fund gain with an 8-year deemed disposal. A year with no row reads the latest
+  earlier row and sets `ratesCarriedForward`; a rate announced for a later year is not entered until enacted (a cut of
+  the exit-tax rate from 1 January 2027 was announced but not enacted when the 2026 row was written).
+- **CGT (ordinary share).** Tax = 33% of the net gain across the lots (floored at zero). `estimatedTaxEur` is before the
+  annual exemption; `taxAfterExemptionEur` subtracts the full exemption and so assumes this sale is the year's only
+  disposal. Under Irish rules a sale within four weeks of a purchase of the same shares (before or after) is matched
+  to that purchase instead of first-in-first-out; that matching is not modelled, so a position with any buy and any sell
+  within 28 days of each other is withheld as `FOUR_WEEK_RULE`.
+- **Exit tax (offshore fund / ETF).** Tax = the exit-tax rate times the sum of each lot's positive gain: a modelling
+  choice, no loss relief across lots (check with an adviser). Each lot carries `deemedDisposalOn`, its purchase date plus
+  8 years, and the context names the nearest one still ahead. A lot already past its 8th anniversary has had a deemed
+  disposal whose value on the day is not ingested, so its cost base is unknown: the whole estimate is withheld as
+  `DEEMED_DISPOSAL_PASSED`.
+- **Not modelled.** Selling costs on the sale, tax already paid on an earlier deemed disposal, a partial sale, other
+  disposals in the year, foreign tax credits, dividends. `method` says so.
+- **Boundaries.** Context for the person's own planning, never advice or a tax return: every context carries the
+  refer-to-Revenue/adviser line, and the MCP description says the same and tells the agent not to estimate tax itself for a
+  withheld position. No tax identifier or tax profile is stored; the annual tax pack (#435) is out of scope.

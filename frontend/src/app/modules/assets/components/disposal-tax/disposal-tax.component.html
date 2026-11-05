@@ -1,0 +1,106 @@
+@let ctx = context();
+<details class="group border-t border-border-default pt-cmn-3" data-testid="disposal-tax">
+  <summary class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden">
+    Tax if sold today
+    @if (isShown()) {
+      <span class="text-text-secondary">· {{ regimeLabel() }}</span>
+    }
+    <span class="text-text-secondary group-open:hidden">· show</span>
+    <span class="hidden text-text-secondary group-open:inline">· hide</span>
+  </summary>
+
+  <div class="mt-cmn-3 space-y-cmn-3 text-cmn-sm">
+    @if (isShown()) {
+      <div class="flex flex-wrap items-center gap-cmn-2">
+        <cmn-tag variant="info" data-testid="disposal-tax-regime">{{ regimeLabel() }}</cmn-tag>
+        <span class="text-text-secondary" data-testid="disposal-tax-rate"
+          >{{ ratePercent() }}% · {{ ctx.taxYear }} rates</span
+        >
+      </div>
+
+      <dl class="grid grid-cols-2 gap-cmn-2 sm:grid-cols-4">
+        <div>
+          <dt class="text-cmn-xs text-text-secondary">Proceeds</dt>
+          <dd class="tabular-nums text-text-primary" data-testid="disposal-tax-proceeds">
+            {{ ctx.proceedsEur | money: ctx.currency }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-cmn-xs text-text-secondary">Cost</dt>
+          <dd class="tabular-nums text-text-primary" data-testid="disposal-tax-cost">
+            {{ ctx.costEur | money: ctx.currency }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-cmn-xs text-text-secondary">Gain</dt>
+          <dd class="tabular-nums text-text-primary" data-testid="disposal-tax-gain">
+            {{ ctx.gainEur | money: ctx.currency }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-cmn-xs text-text-secondary">Estimated tax</dt>
+          <dd class="tabular-nums font-medium text-text-primary" data-testid="disposal-tax-amount">
+            {{ ctx.estimatedTaxEur | money: ctx.currency }}
+          </dd>
+        </div>
+      </dl>
+
+      @if (ctx.annualExemptionEur !== null) {
+        <p class="text-cmn-xs text-text-secondary" data-testid="disposal-tax-exemption">
+          {{ exemptionNote }}: {{ ctx.annualExemptionEur | money: ctx.currency }}. If this were the
+          year’s only disposal the tax would be
+          {{ ctx.taxAfterExemptionEur | money: ctx.currency }}.
+        </p>
+      }
+
+      @if (isExitTax()) {
+        <p class="text-cmn-xs text-text-secondary" data-testid="disposal-tax-deemed">
+          {{ exitNote }}
+          @if (ctx.nextDeemedDisposalOn) {
+            Next: {{ ctx.nextDeemedDisposalOn | date: 'mediumDate' }}.
+          }
+        </p>
+      }
+
+      @if (ctx.ratesCarriedForward) {
+        <p class="text-cmn-xs text-text-secondary" data-testid="disposal-tax-carried">
+          {{ carriedForwardNote }}
+        </p>
+      }
+
+      <div class="space-y-cmn-1" data-testid="disposal-tax-lots">
+        @for (lot of ctx.lots; track lot.acquiredOn) {
+          <div
+            class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2"
+          >
+            <span class="text-text-secondary">{{ lot.acquiredOn | date: 'mediumDate' }}</span>
+            <span class="tabular-nums text-text-primary">{{ lot.quantity }}</span>
+            <span class="tabular-nums text-text-secondary"
+              >{{ lot.costEur | money: ctx.currency }} →
+              {{ lot.proceedsEur | money: ctx.currency }}</span
+            >
+            <span class="tabular-nums text-text-primary">{{
+              lot.gainEur | money: ctx.currency
+            }}</span>
+          </div>
+        }
+      </div>
+    } @else {
+      <div data-testid="disposal-tax-withheld">
+        <p class="font-medium text-text-primary">{{ withheldTitle }}</p>
+        <ul class="mt-cmn-1 list-disc space-y-cmn-1 pl-cmn-5 text-text-secondary">
+          @for (reason of reasons(); track $index) {
+            <li>{{ reason }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    <p class="text-cmn-xs text-text-secondary" data-testid="disposal-tax-disclaimer">
+      {{ ctx.disclaimer }}
+    </p>
+    @if (isShown()) {
+      <p class="text-cmn-xs text-text-secondary">{{ ctx.method }}</p>
+    }
+  </div>
+</details>

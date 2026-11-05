@@ -35,6 +35,7 @@ public sealed class GetAssetDossierQueryHandler(
     IAssetPriceTargetRepository priceTargets,
     IRecommendationRepository recommendations,
     PositionReturnsReader returnsReader,
+    DisposalTaxContextReader disposalTax,
     ScorecardReader scorecards,
     ILogger<GetAssetDossierQueryHandler> logger,
     IOptions<NotableMoveOptions>? moveOptions = null)
@@ -229,6 +230,9 @@ public sealed class GetAssetDossierQueryHandler(
         }
 
         var reading = await Safe("position returns", () => returnsReader.ReadAsync(userId, pos, ct));
+        var disposal = reading is null
+            ? null
+            : await Safe("disposal tax", () => disposalTax.ReadAsync(userId, pos, reading, ct));
 
         return new DossierPositionSection(
             Provider: pos.Provider,
@@ -241,7 +245,8 @@ public sealed class GetAssetDossierQueryHandler(
             TaxLots: taxLots,
             ShareOfBookPercent: shareOfBook,
             PositionCapPercent: capPercent,
-            Returns: reading?.Returns);
+            Returns: reading?.Returns,
+            DisposalTax: disposal);
     }
 
     private static DossierCheckInputs BuildCheckInputs(

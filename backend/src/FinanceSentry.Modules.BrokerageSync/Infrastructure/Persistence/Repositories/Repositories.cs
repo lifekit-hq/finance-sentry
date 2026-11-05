@@ -401,6 +401,15 @@ public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentReposito
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<BrokerageInstrument>> GetBySymbolUnscopedAsync(
+        Guid userId, string symbol, CancellationToken ct = default)
+    {
+        var upper = symbol.ToUpperInvariant();
+        return await _context.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(i => i.UserId == userId && i.Symbol.ToUpper() == upper)
+            .ToListAsync(ct);
+    }
+
     public async Task AddAsync(BrokerageInstrument instrument, CancellationToken ct = default)
     {
         await _context.BrokerageInstruments.AddAsync(instrument, ct);

@@ -96,6 +96,7 @@ public class GetAssetDossierVerdictGateTests
             Mock.Of<IAssetPriceTargetRepository>(),
             recommendations.Object,
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
+            new DisposalTaxContextReader(Mock.Of<IInstrumentTaxRegimeSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new ScorecardReader(
                 Mock.Of<IMarketStructureReader>(),
                 fundamentals.Object,

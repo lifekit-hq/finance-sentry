@@ -310,6 +310,10 @@
                 </div>
               </details>
             }
+
+            @if (position.disposalTax; as disposalTax) {
+              <fns-disposal-tax [context]="disposalTax" class="mt-cmn-3" />
+            }
           </div>
         }
 
