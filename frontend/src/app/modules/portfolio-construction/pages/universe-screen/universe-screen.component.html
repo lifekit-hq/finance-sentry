@@ -1,0 +1,248 @@
+<cmn-page-container spacing="none" fill>
+  <div class="flex min-h-0 w-full max-w-[900px] flex-1 flex-col gap-cmn-3">
+    <p class="text-cmn-sm text-text-secondary">{{ titleNote }}</p>
+    <p class="text-cmn-xs text-text-secondary" data-testid="construction-not-advice">
+      {{ notAdvice }}
+    </p>
+
+    <cmn-page-scroll label="Universe">
+      <!-- Skeleton, empty and content are the host's direct children; the host spaces them. -->
+      <cmn-async-state
+        [status]="view().status"
+        [errorMessage]="view().errorMessage"
+        [isEmpty]="isEmpty()"
+        [emptySubMessage]="emptyCopy.subMessage"
+        [keepContent]="false"
+        (retry)="store.load()"
+        class="block space-y-cmn-5"
+        errorPlacement="above"
+        retryable
+      >
+        <div skeleton class="space-y-cmn-3" data-testid="universe-skeleton">
+          <cmn-card padding="none" class="block">
+            <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+          </cmn-card>
+        </div>
+
+        <cmn-empty-state
+          [message]="emptyCopy.message"
+          [subMessage]="emptyCopy.subMessage"
+          [icon]="emptyCopy.icon"
+          empty
+          iconClass="text-text-secondary"
+        />
+
+        @if (store.screen(); as screen) {
+          <section class="space-y-cmn-2" data-testid="universe-archetype">
+            <cmn-segmented
+              [options]="store.archetypeSegments()"
+              [value]="screen.archetype"
+              [label]="archetypeLabel"
+              (valueChange)="chooseArchetype($event)"
+            />
+            @if (store.activeArchetype(); as archetype) {
+              <p class="text-cmn-sm text-text-secondary" data-testid="universe-archetype-gates">
+                {{ archetype.description }} Builds from
+                @for (word of archetype.eligibleVerdicts; track word; let last = $last) {
+                  {{ wordLabel[word] }}{{ last ? '' : ', ' }}
+                }
+                @if (archetype.minStructure !== null) {
+                  with adjusted structure of at least {{ archetype.minStructure }}
+                }
+                @if (archetype.minFundamentals !== null) {
+                  and fundamentals of at least {{ archetype.minFundamentals }}
+                }
+                @if (archetype.excludeExtended) {
+                  , never Extended
+                }
+                . Ordered by {{ archetype.ordering.join(' then ') }}.
+              </p>
+            }
+          </section>
+
+          <cmn-card class="block" data-testid="universe-construction">
+            <h2 class="mb-cmn-2 font-label text-cmn-sm font-semibold text-text-primary">
+              The suggested book
+            </h2>
+            @if (screen.construction.refusal; as refusal) {
+              <cmn-alert variant="warning" data-testid="universe-refusal">{{ refusal }}</cmn-alert>
+            } @else {
+              <dl class="grid grid-cols-[1fr_auto] gap-x-cmn-3 gap-y-cmn-1 text-cmn-sm">
+                @for (sleeve of screen.construction.sleeves; track sleeve.assetClass) {
+                  <dt class="text-text-secondary">{{ sleeve.assetClass }}</dt>
+                  <dd
+                    [attr.data-testid]="'universe-sleeve-' + sleeve.assetClass"
+                    class="text-right tabular-nums text-text-primary"
+                  >
+                    {{ sleeve.weightPct | number: '1.0-2' }}%
+                  </dd>
+                }
+              </dl>
+              <p class="mt-cmn-2 text-cmn-xs text-text-secondary">
+                {{ screen.construction.namesHeld }} names. {{ weightNote }}
+              </p>
+            }
+            <h3 class="mt-cmn-3 mb-cmn-1 text-cmn-sm font-medium text-text-primary">
+              Limits applied
+            </h3>
+            <ul
+              class="space-y-cmn-1 text-cmn-xs text-text-secondary"
+              data-testid="universe-constraints"
+            >
+              @for (constraint of screen.construction.constraints; track constraint.key) {
+                <li>
+                  {{ constraint.label }}: {{ constraint.value | number: '1.0-2'
+                  }}{{ constraint.key === 'nameCount' ? '' : '%' }}
+                  <cmn-tag variant="neutral">{{ constraint.source }}</cmn-tag>
+                </li>
+              }
+            </ul>
+            @for (note of screen.construction.notes; track $index) {
+              <p class="mt-cmn-2 text-cmn-xs text-text-secondary">{{ note }}</p>
+            }
+          </cmn-card>
+
+          @if (screen.truncated) {
+            <cmn-alert variant="info">{{ truncatedNote }}</cmn-alert>
+          }
+
+          <section class="space-y-cmn-2" data-testid="universe-controls">
+            <div
+              [attr.aria-label]="filterLabel"
+              class="flex flex-wrap items-center gap-cmn-2"
+              role="group"
+            >
+              @for (filter of verdictFilters; track filter.value) {
+                <cmn-chip
+                  [selected]="store.verdictFilter() === filter.value"
+                  [attr.data-testid]="'universe-filter-' + filter.value"
+                  (clicked)="chooseFilter(filter.value)"
+                >
+                  {{ filter.label }}
+                </cmn-chip>
+              }
+            </div>
+            <div class="max-w-[320px]">
+              <cmn-select
+                [options]="sortOptions"
+                [ngModel]="store.sortKey()"
+                [ariaLabel]="sortLabel"
+                (ngModelChange)="chooseSort($event)"
+                data-testid="universe-sort"
+              />
+            </div>
+          </section>
+
+          @if (noMatch()) {
+            <cmn-empty-state
+              [message]="noMatchCopy.message"
+              [subMessage]="noMatchCopy.subMessage"
+              [icon]="noMatchCopy.icon"
+              iconClass="text-text-secondary"
+              data-testid="universe-no-match"
+            />
+          } @else {
+            <cmn-card padding="none" class="block" data-testid="universe-list">
+              @for (view of store.rows(); track view.row.symbol) {
+                @let row = view.row;
+                <details
+                  class="group border-b border-border-subtle p-cmn-4 last:border-b-0"
+                  data-testid="universe-row"
+                >
+                  <summary
+                    [attr.aria-label]="'Why ' + row.symbol"
+                    class="flex cursor-pointer list-none flex-col gap-cmn-1 marker:hidden"
+                  >
+                    <span class="flex flex-wrap items-center gap-x-cmn-2 gap-y-cmn-1">
+                      <a
+                        [routerLink]="['/assets', row.symbol]"
+                        class="text-cmn-base font-semibold text-text-primary hover:underline"
+                        data-testid="universe-symbol"
+                        >{{ row.symbol }}</a
+                      >
+                      @if (row.verdict; as verdict) {
+                        <cmn-tag
+                          [variant]="wordVariant[verdict.word]"
+                          data-testid="universe-verdict"
+                        >
+                          {{ wordLabel[verdict.word] }}
+                        </cmn-tag>
+                      } @else {
+                        <cmn-tag variant="neutral" data-testid="universe-failed"
+                          >Not scored</cmn-tag
+                        >
+                      }
+                      @for (source of row.sources; track source) {
+                        <span class="text-cmn-xs text-text-secondary">{{
+                          sourceLabel[source]
+                        }}</span>
+                      }
+                      @if (view.weightText) {
+                        <span
+                          class="ml-auto text-cmn-base font-semibold tabular-nums text-text-primary"
+                          data-testid="universe-weight"
+                          >{{ view.weightText }}</span
+                        >
+                      }
+                    </span>
+                    @if (row.failureReason; as failure) {
+                      <span
+                        class="text-cmn-sm text-text-secondary"
+                        data-testid="universe-failure"
+                        >{{ failure }}</span
+                      >
+                    } @else {
+                      <span
+                        class="grid grid-cols-2 gap-x-cmn-3 gap-y-cmn-1 text-cmn-xs text-text-secondary sm:grid-cols-4"
+                      >
+                        <span data-testid="universe-structure"
+                          >Structure {{ view.structureText }}
+                          @if (view.structureRawText) {
+                            ({{ view.structureRawText }})
+                          }
+                        </span>
+                        <span data-testid="universe-fundamentals"
+                          >Fundamentals {{ view.fundamentalsText }}</span
+                        >
+                        <span data-testid="universe-crowding"
+                          >Crowding {{ view.crowdingText }}</span
+                        >
+                        <span data-testid="universe-valuation">{{ view.valuationText }}</span>
+                      </span>
+                    }
+                  </summary>
+
+                  <div class="mt-cmn-3 space-y-cmn-2 text-cmn-sm" data-testid="universe-why">
+                    <p class="text-text-primary" data-testid="universe-reason">{{ row.reason }}</p>
+                    @if (row.verdict; as verdict) {
+                      <p class="text-text-secondary" data-testid="universe-rule">
+                        Verdict rule <span class="font-medium">{{ verdict.firedRuleId }}</span
+                        >, rules v{{ verdict.rulesVersion }}: {{ view.verdictRuleText }}
+                      </p>
+                    }
+                    @for (reason of view.notEvaluableTexts; track $index) {
+                      <p class="text-cmn-xs text-text-secondary">Not evaluable: {{ reason }}</p>
+                    }
+                    @if (row.scoredAt) {
+                      <p class="text-cmn-xs text-text-secondary">
+                        Scored {{ row.scoredAt | date: 'd MMM y, HH:mm' }}
+                        @if (row.valuation?.stale) {
+                          . The valuation quote is stale.
+                        }
+                      </p>
+                    }
+                    <a
+                      [routerLink]="['/assets', row.symbol]"
+                      class="text-cmn-sm text-accent-default hover:underline"
+                      >Open the full drill-down</a
+                    >
+                  </div>
+                </details>
+              }
+            </cmn-card>
+          }
+        }
+      </cmn-async-state>
+    </cmn-page-scroll>
+  </div>
+</cmn-page-container>

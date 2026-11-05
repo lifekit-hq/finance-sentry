@@ -2,6 +2,7 @@ namespace FinanceSentry.Integration;
 
 using FinanceSentry.Core.Services;
 using FinanceSentry.Modules.Events.Domain.Ports;
+using FinanceSentry.Modules.PortfolioConstruction.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Ports;
@@ -50,6 +51,11 @@ public static class CrossModulePortRegistration
         services.AddScoped<ITrackRecordSource, ResearchTrackRecordSource>();
         // #986: Ledger scoreboard headline — bridges Research → Radar's weekly performance brief.
         services.AddScoped<ILedgerScoreboardSource, ResearchLedgerScoreboardSource>();
+
+        // 726: Portfolio Construction reads scorecards, the IPS and risk limits, and holdings through these ports.
+        services.AddScoped<IUniverseScorecardSource, ResearchUniverseScorecardAdapter>();
+        services.AddScoped<IConstructionPolicySource, ConstructionPolicyAdapter>();
+        services.AddScoped<IHeldEquitySource, BrokerageHeldEquityAdapter>();
         return services;
     }
 }

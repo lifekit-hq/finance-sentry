@@ -6,7 +6,9 @@
 
 **Status**: Draft; open questions OQ-1..OQ-10 closed by the owner on 2026-10-07 (see [Decisions](#decisions-formerly-open-questions)).
 The verdict-only slice of US2 was built on 2026-10-15 by the owner's call (see
-[Build status](#build-status-verdict-only-slice)); the rest is planned for November.
+[Build status](#build-status-verdict-only-slice)); the ranked universe screen with suggested weights was built on
+2026-11-05 (see [Build status: universe screen](#build-status-universe-screen-and-constructor-slice)); the rest
+is planned.
 
 **GitHub Issue**: #726
 
@@ -48,6 +50,41 @@ FR-001/FR-003), US3 (archetype constructor, a new module, FR-012..FR-018), US4 (
 suggested weights, the lifekit-common axis strip (FR-009/FR-010, SC-006 baselines), calibration of the v1
 thresholds against stored `CandidateScore` rows (they carry no valuation premium, so the slice calibrates on a
 synthetic fixture), and the FR-023 flag. Nothing in the slice places a trade.
+
+## Build status: universe screen and constructor slice
+
+Built 2026-11-05 after the owner approved the queued items ("lets implement them"). It is the first vertical part
+of US1 + US3: a ranked universe screen with the verdict and a suggested weight per name, reusing the scorecard,
+IPS and Risk modules unchanged. Verdicts stay owner-only: the endpoint is `GET /api/v1/portfolio-construction/universe`
+behind `ai.use`, pinned in `RoleFeatureMatrixTests`. There is no migration and no stored state: scorecards are read
+at request time through Research's published `IScorecardSnapshotReader` port (the same `GetScorecardQuery` the dossier
+uses, so a row can never disagree with the dossier) and cached per symbol for 30 minutes (`ScorecardCacheMinutes`; a
+failed read is never cached). The new module `FinanceSentry.Modules.PortfolioConstruction` reaches other modules only
+through its own ports (`Domain/Ports`), implemented in `FinanceSentry.Integration` over Research's
+`IScorecardSnapshotReader`, `IIpsAllocationReader` and `IIpsExclusionsReader` ports, Risk's `IRiskLimitsReader`, and
+the brokerage holdings reader.
+
+| Requirement | Status in this slice | Where |
+|---|---|---|
+| FR-001 | Partial: the universe is built per request from the viewer's holdings, watchlist and a configured curated list, and one scorecard per symbol is shared through the cache; it is not yet a persisted shared scoring run. | `GetUniverseScreenQuery`, `ResearchUniverseScorecardAdapter` |
+| FR-002 | Covered: rows come from the existing scorecard read; no parallel formula. | `IScorecardSnapshotReader` |
+| FR-003 | Covered: the universe is capped (`MaxUniverseSize`, 40) and no index-wide structure scan runs. Shortlist members (OQ-1) are not included. | `PortfolioConstructionOptions` |
+| FR-012 | Covered: archetypes `growth` and `balanced` are configuration (gate per axis, ordering, name count, cap, sleeves, cash floor); a list or dictionary a configured archetype names replaces the shipped one rather than merging into it. | `Archetype`, `PortfolioConstructionOptions` |
+| FR-013 | Covered: pure, deterministic constructor (gate, lexicographic order, top N, equal weight, cap, remainder to cash), property-tested. | `PortfolioConstructor` |
+| FR-014 | Covered: the stricter of archetype and risk-rule position cap / cash floor is applied, and each limit shows its source ("archetype default", "your risk rules", "your IPS"). | `PortfolioConstructor`, `ConstructionPolicyAdapter` |
+| FR-015 | Covered: IPS exclusions are honoured by ticker (an entry matching no universe ticker, such as a sector, is listed in a note as "not applied: no sector data"; sector filtering needs a sector data source and is a follow-up); IPS sleeve targets set the sleeve weights (a shortfall under 100% goes to cash, over 100% refuses, OQ-10). | `PortfolioConstructor` |
+| FR-016 | Covered: every name carries a reason (gate, verdict, rank, weight and cap), and the row opens into the fired rule and rules version. | `UniverseRowDto.Reason` |
+| FR-007 / FR-008 | Covered: no composite number; a missing axis reads "no data" and fails its gate. | `UniverseScreenResult` shape test |
+| FR-017 | Not built: the constructor enforces the position cap and cash floor by construction, but the proposed book is not run through Risk's evaluator (`IProposedBookEvaluator`). | - |
+| FR-018 | Covered: nothing is created or placed. | - |
+| FR-021 | Partial: the screen has a REST read; no MCP tool yet. | `PortfolioConstructionController` |
+| FR-022 / OQ-7 | Not built: the archetype is a request parameter (default from configuration), not an IPS field; that needs a migration. | - |
+| FR-023 | Not applied: owner-only, as for the verdict slice. | - |
+
+Not built here (follow-ups under #726): universe scorecards persisted by a `UniverseScoringJob` (migration),
+scan-shortlist membership, `IProposedBookEvaluator` (FR-017), the archetype as an IPS field (FR-022), gap mode
+(US4), MCP `get_universe_screen` / `get_scorecard`, the lifekit-common axis strip, and adoption of the library page
+template once the pinned `@lifekit-hq/ui` ships it.
 
 ### Verdict rule table v1
 

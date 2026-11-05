@@ -149,6 +149,15 @@ export const APP_ROUTES: Routes = [
         ...RouteTitleUtils.of('Watchlist'),
       },
       {
+        path: AppRoute.Construction.slice(1),
+        canMatch: [permissionGuard(Permission.AiUse)],
+        loadComponent: () =>
+          import('./modules/portfolio-construction/pages/universe-screen/universe-screen.component').then(
+            m => m.UniverseScreenComponent
+          ),
+        ...RouteTitleUtils.of('Construction'),
+      },
+      {
         path: AppRoute.Alerts.slice(1),
         loadComponent: () =>
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),

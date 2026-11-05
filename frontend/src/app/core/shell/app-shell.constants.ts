@@ -11,6 +11,7 @@ export const CONNECT_ACTION_ID = '_connect';
  * enforces). Entries not listed here are shown to every signed-in user.
  */
 export const PERMISSION_BY_ENTRY: Readonly<Record<string, Permission>> = {
+  [AppRoute.Construction]: Permission.AiUse,
   [AppRoute.Ledger]: Permission.AiUse,
   [AppRoute.LedgerDecisions]: Permission.AiUse,
   [AppRoute.SettingsPeople]: Permission.UsersManage,
@@ -31,6 +32,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {label: 'Alerts', icon: 'Bell', route: AppRoute.Alerts},
   {label: 'Events', icon: 'CalendarDays', route: AppRoute.Events},
   {label: 'Watchlist', icon: 'Eye', route: AppRoute.Watchlist},
+  {label: 'Construction', icon: 'Layers', route: AppRoute.Construction},
   {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
 ];
 

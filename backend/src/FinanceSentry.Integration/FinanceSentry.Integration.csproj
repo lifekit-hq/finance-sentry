@@ -10,6 +10,7 @@
     <ProjectReference Include="..\FinanceSentry.Modules.BrokerageSync\FinanceSentry.Modules.BrokerageSync.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Companion\FinanceSentry.Modules.Companion.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Events\FinanceSentry.Modules.Events.csproj" />
+    <ProjectReference Include="..\FinanceSentry.Modules.PortfolioConstruction\FinanceSentry.Modules.PortfolioConstruction.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Radar\FinanceSentry.Modules.Radar.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Research\FinanceSentry.Modules.Research.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
