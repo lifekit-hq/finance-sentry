@@ -26,7 +26,10 @@ describe('VerdictChipComponent', () => {
     const chip = render(word).querySelector('[data-testid="verdict-chip"]');
 
     expect(chip?.textContent?.trim()).toBe(label);
-    expect(chip?.getAttribute('aria-label')).toBe(`Verdict for new money: ${label}`);
+    expect(chip?.getAttribute('aria-label')).toBe(
+      `Verdict for new money: ${label}. Informational only. Not financial advice.`
+    );
+    expect(chip?.getAttribute('title')).toBe('Informational only. Not financial advice.');
   });
 
   it('is a label, not a control: nothing inside it is focusable', () => {
