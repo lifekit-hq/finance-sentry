@@ -16,7 +16,7 @@ import {RATE_FORMAT} from './fx-impact-widget.constants';
   imports: [CardComponent, DatePipe, DecimalPipe, LineChartComponent, MoneyPipe, ToggleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [FxImpactStore],
-  host: {'[hidden]': '!store.available()'},
+  host: {'[hidden]': '!store.available()', '[class.block]': 'store.available()'},
   templateUrl: './fx-impact-widget.component.html',
 })
 export class FxImpactWidgetComponent {
