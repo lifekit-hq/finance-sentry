@@ -45,7 +45,7 @@ public sealed class YahooPriceBarService(
     }
 
     /// <summary>Parses a chart response; public + static so a test can assert it against a fixture.</summary>
-    public static PriceBarSeries Parse(JsonElement root)
+    public static PriceBarSeries Parse(JsonElement root, string interval)
     {
         if (!root.TryGetProperty("chart", out var chart) ||
             !chart.TryGetProperty("result", out var results) ||
@@ -80,7 +80,7 @@ public sealed class YahooPriceBarService(
         }
 
         var quote = quotes[0];
-        var bars = new List<PriceBar>();
+        var rows = new List<(long Epoch, PriceBar Bar)>();
         var count = timestamps.GetArrayLength();
         for (var i = 0; i < count; i++)
         {
@@ -97,14 +97,18 @@ public sealed class YahooPriceBarService(
 
             var volume = Read(quote, "volume", i) is decimal traded ? (long)traded : 0L;
             var offset = zone is null ? currentOffset : (long)zone.GetUtcOffset(DateTimeOffset.FromUnixTimeSeconds(epoch)).TotalSeconds;
-            bars.Add(new PriceBar(epoch + offset, open / divisor, high / divisor, low / divisor, close / divisor, volume));
+            rows.Add((epoch, new PriceBar(epoch + offset, open / divisor, high / divisor, low / divisor, close / divisor, volume)));
         }
 
-        // A weekly or monthly series can carry the live day as a second row; keep one bar per start time.
-        var ordered = bars
-            .GroupBy(b => b.Time)
+        // A daily, weekly or monthly series can carry the live day as a second row for the same trading date; keep one
+        // bar per date. Intraday bars are distinct instants (the wall-clock hour repeated at a fall-back change is two
+        // real bars), so only a row repeating the same instant is collapsed.
+        var intraday = PriceInterval.IsIntraday(interval);
+        var ordered = rows
+            .GroupBy(r => intraday ? (object)r.Epoch : r.Bar.Date)
             .Select(g => g.Last())
-            .OrderBy(b => b.Time)
+            .OrderBy(r => r.Epoch)
+            .Select(r => r.Bar)
             .ToList();
         return new PriceBarSeries(currency, timeZone, ordered);
     }
@@ -159,7 +163,7 @@ public sealed class YahooPriceBarService(
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-            return (Parse(doc.RootElement), true);
+            return (Parse(doc.RootElement, interval), true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

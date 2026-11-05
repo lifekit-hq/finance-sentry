@@ -19,7 +19,7 @@ public sealed record PriceBar(long Time, decimal Open, decimal High, decimal Low
     public DateOnly Date => DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(Time).UtcDateTime);
 }
 
-/// <summary>Bars oldest first with strictly increasing <see cref="PriceBar.Time"/>, priced in <see cref="Currency"/> (the quote currency; null when the source omits it).</summary>
+/// <summary>Bars oldest first by real instant (an intraday <see cref="PriceBar.Time"/> repeats across a fall-back clock change in a round-the-clock market), priced in <see cref="Currency"/> (the quote currency; null when the source omits it).</summary>
 public sealed record PriceBarSeries(string? Currency, string? TimeZone, IReadOnlyList<PriceBar> Bars)
 {
     public static PriceBarSeries Empty { get; } = new(null, null, []);
