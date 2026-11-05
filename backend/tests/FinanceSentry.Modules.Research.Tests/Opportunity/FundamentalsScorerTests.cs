@@ -62,6 +62,71 @@ public sealed class FundamentalsScorerTests
     }
 
     [Fact]
+    public void Score_DerivesGrossMargin_FromRevenueLessCostOfRevenue_WhenNoGrossProfitIsReported()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 200m, 2026, "FY", new DateOnly(2026, 12, 31)),
+            Fact("CostOfRevenue", 120m, 2026, "FY", new DateOnly(2026, 12, 31)),
+            Fact("Revenue", 100m, 2025, "FY", new DateOnly(2025, 12, 31)),
+            Fact("CostOfRevenue", 70m, 2025, "FY", new DateOnly(2025, 12, 31)),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.GrossMarginLatest.Should().Be(0.4m);
+        result.GrossMarginTrend.Should().Be(0.1m);
+        result.NotEvaluableReasons.Should().NotContain("gross_margin_not_evaluable");
+        result.NotEvaluableReasons.Should().NotContain("gross_margin_trend_not_evaluable");
+    }
+
+    [Fact]
+    public void Score_PrefersReportedGrossProfit_OverTheDerivedFigure()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("CostOfRevenue", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("GrossProfit", 55m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+
+        FundamentalsScorer.Evaluate(facts).GrossMarginLatest.Should().Be(0.55m);
+    }
+
+    [Fact]
+    public void Score_DerivesOnlyTheMissingPeriods_AndNeverZeroFillsACostGap()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q1", new DateOnly(2026, 2, 28)),
+            Fact("GrossProfit", 50m, 2026, "Q1", new DateOnly(2026, 2, 28)),
+            Fact("Revenue", 100m, 2025, "Q4", new DateOnly(2025, 11, 30)),
+            Fact("CostOfRevenue", 80m, 2025, "Q4", new DateOnly(2025, 11, 30)),
+        };
+
+        var periods = FundamentalMath.SelectPeriods(facts, "GrossProfit", ThesisPeriodType.Quarter);
+
+        // Q2 has revenue but neither gross profit nor cost: absent, not a 100% margin.
+        periods.Select(p => (p.PeriodEnd, p.Value)).Should().Equal(
+            (new DateOnly(2026, 2, 28), 50m),
+            (new DateOnly(2025, 11, 30), 20m));
+        periods[1].Label.Should().Be(FundamentalMath.DerivedGrossProfitLabel);
+    }
+
+    [Fact]
+    public void Score_DoesNotDeriveGrossMargin_WhenRevenueAndCostUnitsDiffer()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("CostOfRevenue", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)) with { Unit = "EUR" },
+        };
+
+        FundamentalsScorer.Evaluate(facts).GrossMarginLatest.Should().BeNull();
+    }
+
+    [Fact]
     public void Score_IsDeterministic_ForIdenticalInputs()
     {
         // Five quarters of margins: the spec's 4-quarter trend window (FR-004) compares the

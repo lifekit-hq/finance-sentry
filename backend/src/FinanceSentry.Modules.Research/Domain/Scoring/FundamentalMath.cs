@@ -11,6 +11,11 @@ public static class FundamentalMath
 {
     public const string FiscalYearPeriod = "FY";
 
+    public const string RevenueConcept = "Revenue";
+    public const string GrossProfitConcept = "GrossProfit";
+    public const string CostOfRevenueConcept = "CostOfRevenue";
+    public const string DerivedGrossProfitLabel = "Gross profit (derived: revenue less cost of revenue)";
+
     public static readonly IReadOnlyDictionary<string, string> RawConceptByMetric = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [ThesisMetric.Revenue] = "Revenue",
@@ -21,7 +26,7 @@ public static class FundamentalMath
     public static readonly IReadOnlyDictionary<string, (string Numerator, string Denominator)> MarginConceptsByMetric =
         new Dictionary<string, (string, string)>(StringComparer.Ordinal)
         {
-            [ThesisMetric.GrossMargin] = ("GrossProfit", "Revenue"),
+            [ThesisMetric.GrossMargin] = (GrossProfitConcept, RevenueConcept),
             [ThesisMetric.OperatingMargin] = ("OperatingIncome", "Revenue"),
             [ThesisMetric.NetMargin] = ("NetIncome", "Revenue"),
         };
@@ -39,8 +44,19 @@ public static class FundamentalMath
     /// facts for one period (original + amended filing, or a comparative re-reported in a later
     /// filing) resolve deterministically: amended forms (…/A) win, then the latest filing
     /// (highest FiscalYear), then Form ordinal — never source order.
+    /// For <see cref="GrossProfitConcept"/>, a period the filer reports no gross profit for is
+    /// derived as revenue less cost of revenue (see <see cref="DeriveGrossProfit"/>).
     /// </summary>
     public static IReadOnlyList<FundamentalFact> SelectPeriods(
+        IReadOnlyList<FundamentalFact> facts, string concept, ThesisPeriodType periodType)
+    {
+        var reported = SelectReportedPeriods(facts, concept, periodType);
+        return string.Equals(concept, GrossProfitConcept, StringComparison.Ordinal)
+            ? DeriveGrossProfit(facts, reported, periodType)
+            : reported;
+    }
+
+    private static List<FundamentalFact> SelectReportedPeriods(
         IReadOnlyList<FundamentalFact> facts, string concept, ThesisPeriodType periodType)
         => facts
             .Where(f => string.Equals(f.Concept, concept, StringComparison.Ordinal) && MatchesPeriodType(f, periodType))
@@ -52,6 +68,37 @@ public static class FundamentalMath
                 .First())
             .OrderByDescending(f => f.PeriodEnd)
             .ToList();
+
+    // Many filers (retailers, SaaS, most IFRS reporters) tag no GrossProfit at all, only revenue and a
+    // cost-of-revenue line (us-gaap CostOfRevenue / CostOfGoodsAndServicesSold / CostOfGoodsSold, ifrs-full
+    // CostOfSales, all read as CostOfRevenue). A period with a reported GrossProfit keeps it - the filer's
+    // own figure wins - and only the periods without one are derived, from the revenue fact of the same
+    // period end and unit, carrying that revenue fact's provenance. Never zero-filled: a period missing
+    // either side stays missing.
+    private static List<FundamentalFact> DeriveGrossProfit(
+        IReadOnlyList<FundamentalFact> facts, List<FundamentalFact> reported, ThesisPeriodType periodType)
+    {
+        var costs = SelectReportedPeriods(facts, CostOfRevenueConcept, periodType)
+            .ToDictionary(f => f.PeriodEnd);
+        if (costs.Count == 0)
+        {
+            return reported;
+        }
+
+        var reportedEnds = reported.Select(f => f.PeriodEnd).ToHashSet();
+        var derived = SelectReportedPeriods(facts, RevenueConcept, periodType)
+            .Where(revenue => !reportedEnds.Contains(revenue.PeriodEnd)
+                              && costs.TryGetValue(revenue.PeriodEnd, out var cost)
+                              && string.Equals(cost.Unit, revenue.Unit, StringComparison.Ordinal))
+            .Select(revenue => revenue with
+            {
+                Concept = GrossProfitConcept,
+                Label = DerivedGrossProfitLabel,
+                Value = revenue.Value - costs[revenue.PeriodEnd].Value,
+            });
+
+        return reported.Concat(derived).OrderByDescending(f => f.PeriodEnd).ToList();
+    }
 
     /// <summary>
     /// The fact one fiscal year before <paramref name="current"/>, paired by PERIOD END (closest

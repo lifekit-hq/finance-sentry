@@ -11,7 +11,7 @@ using FinanceSentry.Modules.Research.Domain.Fundamentals;
 public interface IFundamentalsService
 {
     /// <summary>
-    /// Revenue, GrossProfit, OperatingIncome, NetIncome, DilutedEPS and StockholdersEquity for the
+    /// Revenue, GrossProfit, CostOfRevenue (EDGAR only; the inputs of a derived gross margin), OperatingIncome, NetIncome, DilutedEPS and StockholdersEquity for the
     /// ticker, up to <paramref name="maxPerConcept"/> newest datapoints per concept (clamped 1-20),
     /// ordered by concept then newest period first. Every fact carries its <see cref="SourceProvenance"/>.
     /// </summary>
