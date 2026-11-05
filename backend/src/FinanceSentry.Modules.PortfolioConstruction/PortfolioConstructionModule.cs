@@ -22,7 +22,9 @@ public static class PortfolioConstructionModule
     public static IServiceCollection AddPortfolioConstructionModule(
         this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<PortfolioConstructionOptions>(config.GetSection(PortfolioConstructionOptions.SectionName));
+        services.AddOptions<PortfolioConstructionOptions>()
+            .Configure(options => PortfolioConstructionOptions.Bind(
+                config.GetSection(PortfolioConstructionOptions.SectionName), options));
         services.AddMemoryCache();
         services.TryAddSingleton(TimeProvider.System);
         return services;

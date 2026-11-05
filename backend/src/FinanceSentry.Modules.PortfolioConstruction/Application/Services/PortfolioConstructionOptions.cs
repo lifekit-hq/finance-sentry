@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.PortfolioConstruction.Application.Services;
 
 using FinanceSentry.Modules.PortfolioConstruction.Domain;
+using Microsoft.Extensions.Configuration;
 
 /// <summary>
 /// Configuration of the construction screen (section <c>PortfolioConstruction</c>). The archetypes and the curated
@@ -12,6 +13,44 @@ public sealed class PortfolioConstructionOptions
 
     /// <summary>The archetype used when the request names none.</summary>
     public string DefaultArchetype { get; set; } = "growth";
+
+    /// <summary>
+    /// Binds the section onto the shipped defaults. A list or dictionary the configuration names replaces the
+    /// shipped one (the configuration binder would append to it), so a configured archetype or curated list means
+    /// exactly what it says; a key it does not name keeps the shipped value.
+    /// </summary>
+    public static void Bind(IConfiguration section, PortfolioConstructionOptions options)
+    {
+        if (section.GetSection(nameof(CuratedUniverse)).Exists())
+        {
+            options.CuratedUniverse.Clear();
+        }
+
+        foreach (var configured in section.GetSection(nameof(Archetypes)).GetChildren())
+        {
+            if (!options.Archetypes.TryGetValue(configured.Key, out var archetype))
+            {
+                options.Archetypes[configured.Key] = archetype = new Archetype();
+            }
+
+            if (configured.GetSection(nameof(Archetype.EligibleVerdicts)).Exists())
+            {
+                archetype.EligibleVerdicts.Clear();
+            }
+
+            if (configured.GetSection(nameof(Archetype.Ordering)).Exists())
+            {
+                archetype.Ordering.Clear();
+            }
+
+            if (configured.GetSection(nameof(Archetype.Sleeves)).Exists())
+            {
+                archetype.Sleeves.Clear();
+            }
+        }
+
+        section.Bind(options);
+    }
 
     /// <summary>
     /// The configured curated list: a bounded set of well-known single equities that keeps the universe non-empty
