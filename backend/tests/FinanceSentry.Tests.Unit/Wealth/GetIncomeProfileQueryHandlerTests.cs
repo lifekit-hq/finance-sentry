@@ -183,8 +183,8 @@ public sealed class GetIncomeProfileQueryHandlerTests
         _sources.SetupGet(s => s.CanReadEncryptedFields).Returns(false);
         _sources.Setup(s => s.ListOutlinesAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(
         [
-            new IncomeSourceOutline(Guid.NewGuid(), IncomeKind.Salary, "USD", IncomeCadence.Monthly, IncomeBasis.Net, Start, null),
-            new IncomeSourceOutline(Guid.NewGuid(), IncomeKind.Side, "EUR", IncomeCadence.Weekly, IncomeBasis.Gross, Start, new DateOnly(2026, 1, 1)),
+            new IncomeSourceOutline(Guid.NewGuid(), IncomeKind.Salary, "USD", IncomeCadence.Monthly, IncomeBasis.Net, Start, null, null),
+            new IncomeSourceOutline(Guid.NewGuid(), IncomeKind.Side, "EUR", IncomeCadence.Weekly, IncomeBasis.Gross, Start, new DateOnly(2026, 1, 1), null),
         ]);
         Observed(3_700m);
 
@@ -198,6 +198,27 @@ public sealed class GetIncomeProfileQueryHandlerTests
         profile.DeclaredMonthlyUsd.Should().BeNull();
         profile.ObservedMonthlyUsd.Should().Be(3_700m);
         _sources.Verify(s => s.ListAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OnAHostWithoutTheKey_ASourceRetiredBeforeItStarted_IsNeverActive()
+    {
+        var notStarted = new DateOnly(2026, 12, 1);
+        var retiredOn = new DateTimeOffset(2026, 11, 5, 0, 0, 0, TimeSpan.Zero);
+        _sources.SetupGet(s => s.CanReadEncryptedFields).Returns(false);
+        _sources.Setup(s => s.ListOutlinesAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new IncomeSourceOutline(Guid.NewGuid(), IncomeKind.Salary, "USD", IncomeCadence.Monthly, IncomeBasis.Net, notStarted, notStarted, retiredOn),
+        ]);
+        Observed(3_700m);
+
+        var profile = await new GetIncomeProfileQueryHandler(
+            _sources.Object, _cashflow.Object, new FixedClock(new DateTimeOffset(2026, 12, 1, 12, 0, 0, TimeSpan.Zero)))
+            .Handle(new GetIncomeProfileQuery(UserId), CancellationToken.None);
+
+        profile.Sources.Should().ContainSingle().Which.Active.Should().BeFalse();
+        profile.ActiveSources.Should().Be(0);
+        profile.Variance.Should().Be(IncomeVariance.NoDeclared);
     }
 
     [Fact]

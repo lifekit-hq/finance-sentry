@@ -119,9 +119,12 @@ public sealed class IncomeSource : IHasUpdatedAt, IUserOwned
     /// Whether the income is declared as running on <paramref name="day"/>. A source retired before it started never runs:
     /// its end date is clamped to the start date only so the dates stay valid.
     /// </summary>
-    public bool IsActiveOn(DateOnly day) =>
-        StartDate <= day && (EndDate is null || EndDate.Value >= day)
-        && !(RetiredAt is { } retired && DateOnly.FromDateTime(retired.UtcDateTime) < StartDate);
+    public bool IsActiveOn(DateOnly day) => IsActiveOn(StartDate, EndDate, RetiredAt, day);
+
+    /// <summary>The one rule behind <see cref="IsActiveOn(DateOnly)"/>, shared with the key-less outline read.</summary>
+    public static bool IsActiveOn(DateOnly startDate, DateOnly? endDate, DateTimeOffset? retiredAt, DateOnly day) =>
+        startDate <= day && (endDate is null || endDate.Value >= day)
+        && !(retiredAt is { } retired && DateOnly.FromDateTime(retired.UtcDateTime) < startDate);
 
     /// <summary>The amount per month, or null when the cadence is irregular (a guess would pass as a fact).</summary>
     public decimal? MonthlyEquivalent => IncomeCadenceMath.MonthlyEquivalent(Amount, Cadence);

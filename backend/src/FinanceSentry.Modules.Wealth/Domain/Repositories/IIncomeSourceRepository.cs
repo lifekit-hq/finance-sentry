@@ -2,7 +2,11 @@ namespace FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 /// <summary>The non-sensitive columns of an income source: readable on a host that holds no encryption key.</summary>
 public sealed record IncomeSourceOutline(
-    Guid Id, IncomeKind Kind, string Currency, IncomeCadence Cadence, IncomeBasis GrossOrNet, DateOnly StartDate, DateOnly? EndDate);
+    Guid Id, IncomeKind Kind, string Currency, IncomeCadence Cadence, IncomeBasis GrossOrNet, DateOnly StartDate, DateOnly? EndDate,
+    DateTimeOffset? RetiredAt)
+{
+    public bool IsActiveOn(DateOnly day) => IncomeSource.IsActiveOn(StartDate, EndDate, RetiredAt, day);
+}
 
 public interface IIncomeSourceRepository
 {

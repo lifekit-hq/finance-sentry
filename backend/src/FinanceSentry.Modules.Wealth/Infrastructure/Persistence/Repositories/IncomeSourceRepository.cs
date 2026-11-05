@@ -20,7 +20,7 @@ public class IncomeSourceRepository(WealthDbContext db) : IIncomeSourceRepositor
         => await db.IncomeSources.AsNoTracking()
             .Where(s => s.UserId == userId)
             .OrderBy(s => s.CreatedAt)
-            .Select(s => new IncomeSourceOutline(s.Id, s.Kind, s.Currency, s.Cadence, s.GrossOrNet, s.StartDate, s.EndDate))
+            .Select(s => new IncomeSourceOutline(s.Id, s.Kind, s.Currency, s.Cadence, s.GrossOrNet, s.StartDate, s.EndDate, s.RetiredAt))
             .ToListAsync(ct);
 
     public Task<IncomeSource?> GetAsync(Guid userId, Guid id, CancellationToken ct = default)

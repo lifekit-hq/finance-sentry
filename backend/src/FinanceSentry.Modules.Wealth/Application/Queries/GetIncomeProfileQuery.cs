@@ -99,7 +99,7 @@ public class GetIncomeProfileQueryHandler(
             var unreadable = outlines
                 .Select(o => new IncomeProfileSource(
                     o.Id, o.Kind, null, null, o.Currency, o.Cadence, o.GrossOrNet, o.StartDate, o.EndDate,
-                    IsActive(o.StartDate, o.EndDate, today), null))
+                    o.IsActiveOn(today), null))
                 .ToList();
             var active = unreadable.Count(s => s.Active);
             return new IncomeProfileResponse(
@@ -123,8 +123,6 @@ public class GetIncomeProfileQueryHandler(
             true, declared, activeSources.Count, declaredMonthly, basis, observedMonthly, observed.Reason,
             VarianceOf(activeSources.Count, declaredMonthly, basis, observedMonthly));
     }
-
-    private static bool IsActive(DateOnly start, DateOnly? end, DateOnly today) => start <= today && (end is null || end.Value >= today);
 
     private static string? BasisOf(IReadOnlyList<IncomeProfileSource> priced)
     {
