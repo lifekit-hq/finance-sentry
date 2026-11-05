@@ -222,6 +222,43 @@ public sealed class SecEdgarFundamentalsTests
     }
 
     [Fact]
+    public async Task FilerReportingTotalAndNarrowerCostTags_DerivesGrossMargin_FromTheTotal()
+    {
+        string Concept(string label, long value) => $$$"""
+            {"label":"{{{label}}}","units":{"USD":[
+              {"start":"2025-01-01","end":"2025-12-31","val":{{{value}}},"accn":"0000000000-26-000001","fy":2025,"fp":"FY","form":"10-K"}
+            ]}}
+            """;
+        var sut = CreateSut(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.RequestUri.Host == "www.sec.gov")
+            {
+                return Json(BabaTickerMap);
+            }
+
+            if (path.EndsWith("/us-gaap/Revenues.json", StringComparison.Ordinal))
+            {
+                return Json(Concept("Revenue", 1_000));
+            }
+
+            if (path.EndsWith("/us-gaap/CostOfRevenue.json", StringComparison.Ordinal))
+            {
+                return Json(Concept("Total cost", 700));
+            }
+
+            return path.EndsWith("/us-gaap/CostOfGoodsSold.json", StringComparison.Ordinal)
+                ? Json(Concept("Product cost", 450))
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("BABA", FundamentalFact.UsGaapTaxonomy)).Facts;
+
+        facts.Single(f => f.Concept == "CostOfRevenue").Value.Should().Be(700m);
+        FundamentalsScorer.Evaluate(facts).GrossMarginLatest.Should().Be(0.3m, "(1000 - 700) / 1000, not the product-only 450");
+    }
+
+    [Fact]
     public async Task EveryTagFailing_IsAFailure_NotNoData_AndIsNotCached()
     {
         // PR 896's limit: a us-gaap fetch that errored on every tag looked like "no us-gaap facts",

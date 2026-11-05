@@ -41,11 +41,13 @@ public sealed class SecEdgarService(
     // overlapping period). Company taxonomies differ (e.g. some report Revenues, others
     // RevenueFromContractWithCustomer...), hence fallbacks. CostOfRevenue exists so gross margin can be
     // derived (revenue less cost) for filers that report no GrossProfit - see FundamentalMath.SelectPeriods.
+    // Its tags run narrowest to broadest because the later tag wins: a filer reporting both the total
+    // (CostOfRevenue) and a product-only line (CostOfGoodsSold) must keep the total, or the margin is inflated.
     private static readonly (string Concept, string[] Tags)[] CoreConcepts =
     [
         ("Revenue", ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"]),
         ("GrossProfit", ["GrossProfit"]),
-        ("CostOfRevenue", ["CostOfRevenue", "CostOfGoodsAndServicesSold", "CostOfGoodsSold"]),
+        ("CostOfRevenue", ["CostOfGoodsSold", "CostOfGoodsAndServicesSold", "CostOfRevenue"]),
         ("OperatingIncome", ["OperatingIncomeLoss"]),
         ("NetIncome", ["NetIncomeLoss"]),
         ("DilutedEPS", ["EarningsPerShareDiluted"]),
