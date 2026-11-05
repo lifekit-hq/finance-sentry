@@ -1,6 +1,8 @@
 namespace FinanceSentry.Tests.Integration.Auth;
 
 using System.Diagnostics;
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using FinanceSentry.Core.Auditing;
 using FinanceSentry.Core.Auth;
@@ -172,6 +174,39 @@ public sealed class AuditTrailTests : IAsyncLifetime
 
         seen.Should().BeEquivalentTo(fields).And.OnlyHaveUniqueItems();
     }
+
+    [DockerRequiredFact]
+    public async Task TheCursor_ReturnedByTheApi_PagesOnOverHttp()
+    {
+        const int batchSize = 5;
+        const int pageSize = 2;
+        var fields = Enumerable.Range(0, batchSize).Select(i => $"Field{i}").ToArray();
+        await RecordAsync(fields.Select(field => Entry(_personA, [field])).ToArray());
+
+        await using var factory = new PostgresApiFactory(_database!.ConnectionString);
+        factory.CreateClient().Dispose();
+        await factory.CreateAccountAsync(_personA, AuthRoles.Member);
+        using var client = await factory.ClientForAsync(_personA);
+
+        var seen = new List<string>();
+        var url = $"/api/v1/me/audit-events?take={pageSize}";
+        while (true)
+        {
+            var response = await client.GetAsync(url);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var page = (await response.Content.ReadFromJsonAsync<PageShape>())!;
+            seen.AddRange(page.Events.Select(e => e.FieldNames.Single()));
+            if (page.NextBefore is null)
+                break;
+            url = $"/api/v1/me/audit-events?take={pageSize}&before={Uri.EscapeDataString(page.NextBefore)}&beforeId={page.NextBeforeId}";
+        }
+
+        seen.Should().BeEquivalentTo(fields).And.OnlyHaveUniqueItems();
+    }
+
+    private sealed record PageShape(List<EventShape> Events, string? NextBefore, Guid? NextBeforeId);
+
+    private sealed record EventShape(string[] FieldNames);
 
     [DockerRequiredFact]
     public async Task Erasure_RemovesTheEventsConcerningThePerson_AndOnlyThose()

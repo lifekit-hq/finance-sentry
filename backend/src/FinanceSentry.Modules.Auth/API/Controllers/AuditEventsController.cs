@@ -17,7 +17,7 @@ public class AuditEventsController(IQueryHandler<ListAuditEventsQuery, AuditEven
 {
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] DateTime? before, [FromQuery] Guid? beforeId,
+        [FromQuery] DateTimeOffset? before, [FromQuery] Guid? beforeId,
         [FromQuery] int take = ListAuditEventsQuery.DefaultTake, CancellationToken ct = default)
-        => Ok(await listHandler.Handle(new ListAuditEventsQuery(User.RequireUserId(), before, beforeId, take), ct));
+        => Ok(await listHandler.Handle(new ListAuditEventsQuery(User.RequireUserId(), before?.UtcDateTime, beforeId, take), ct));
 }
