@@ -163,6 +163,36 @@ export const BROKERAGE_GROWTH = {
   currency: 'USD',
 };
 
+/**
+ * The brokerage sleeve's net deposited with its realized and unrealized P&L: realized is complete, unrealized
+ * covers 2 of 3 positions (one has no verified basis), so it keeps its amount, drops its percent and names the rest.
+ */
+export const BROKERAGE_PNL = {
+  from: '2026-06-30',
+  to: '2026-09-14',
+  netDepositedUsd: 35200,
+  sourcesWithoutFlows: [],
+  realized: {
+    usd: 1240,
+    percentOfNetDeposited: 3.52,
+    status: 'COMPLETE',
+    measured: 2,
+    total: 2,
+    coverage: null,
+    unavailableSymbols: [],
+  },
+  unrealized: {
+    usd: 2310,
+    percentOfNetDeposited: null,
+    status: 'PARTIAL',
+    measured: 2,
+    total: 3,
+    coverage: 0.78,
+    unavailableSymbols: ['KYIV'],
+  },
+  currency: 'USD',
+};
+
 /** The crypto venues' contributions-vs-growth split; no time-weighted return measured yet. */
 export const CRYPTO_GROWTH = {
   ...BROKERAGE_GROWTH,
@@ -196,6 +226,8 @@ export const BOOK_PERFORMANCE = {
       bookTwr: 0.1251,
       spyTwr: 0.1532,
       delta: -0.0281,
+      qqqTwr: 0.1874,
+      qqqDelta: -0.0623,
       bookTwrFrom: '2025-09-14',
       bookTwrTo: '2026-09-14',
       bookTwrReasons: [],
@@ -207,13 +239,14 @@ export const BOOK_PERFORMANCE = {
 
 /**
  * The accounts page reads the wealth summary and both holdings feeds; its brokerage and crypto sections
- * also read both growth splits and the book against SPY. */
+ * also read both growth splits, the brokerage P&L split and the book against SPY and QQQ. */
 export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/summary', WEALTH_SUMMARY_FULL);
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);
   await mockGet(page, 'crypto/holdings', CRYPTO_HOLDINGS_FULL);
   await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
   await mockGet(page, 'wealth/crypto/growth', CRYPTO_GROWTH);
+  await mockGet(page, 'wealth/brokerage/pnl', BROKERAGE_PNL);
   await mockGet(page, 'radar/book-performance', BOOK_PERFORMANCE);
   await mockGet(page, 'wealth/manual-holdings', []);
 }

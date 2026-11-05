@@ -12,6 +12,7 @@ const COMPARISON: BookVsSpy = {
   from: '2025-10-19',
   bookReturn: '+12.0%',
   benchmarkReturn: '+10.0%',
+  qqqReturn: '+14.0%',
   headline: null,
 };
 
@@ -64,6 +65,18 @@ describe('BookVsSpyComponent', () => {
     expect(el.querySelector('[data-testid="book-vs-spy-returns"]')?.textContent?.trim()).toBe(
       '+12.0% vs +10.0%'
     );
+  });
+
+  it('adds QQQ over the same dates when it was measured', () => {
+    expect(render().querySelector('[data-testid="book-vs-qqq-returns"]')?.textContent?.trim()).toBe(
+      'QQQ +14.0%'
+    );
+  });
+
+  it('leaves QQQ out when it was not measured over the book window', () => {
+    store.comparison.set({...COMPARISON, qqqReturn: null});
+
+    expect(render().querySelector('[data-testid="book-vs-qqq-returns"]')).toBeNull();
   });
 
   it('renders nothing when no window was measured for both', () => {

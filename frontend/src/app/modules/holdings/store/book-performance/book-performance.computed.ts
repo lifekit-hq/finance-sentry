@@ -41,6 +41,10 @@ export function bookPerformanceComputed(store: StateSignals) {
         from: period.bookTwrFrom,
         bookReturn: PercentUtils.signed(period.bookTwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
         benchmarkReturn: PercentUtils.signed(period.spyTwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
+        qqqReturn:
+          period.qqqTwr == null
+            ? null
+            : PercentUtils.signed(period.qqqTwr * PERCENT_POINTS, RETURN_PERCENT_DIGITS),
         headline: period.bookTwrQuality
           ? {
               amount: null,
