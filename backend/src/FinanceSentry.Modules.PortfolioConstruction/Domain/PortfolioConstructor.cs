@@ -62,6 +62,13 @@ public static class PortfolioConstructor
         }
 
         var notes = new List<string>();
+        var universeSymbols = universe.Select(u => u.Symbol.Trim().ToUpperInvariant()).ToHashSet();
+        var unmatched = excluded.Where(e => !universeSymbols.Contains(e)).Order(StringComparer.Ordinal).ToList();
+        if (unmatched.Count > 0)
+        {
+            notes.Add($"IPS exclusions not applied: no sector data ({string.Join(", ", unmatched)} match no ticker in the universe).");
+        }
+
         var reasons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var eligible = new List<UniverseScorecard>();
         foreach (var card in universe)

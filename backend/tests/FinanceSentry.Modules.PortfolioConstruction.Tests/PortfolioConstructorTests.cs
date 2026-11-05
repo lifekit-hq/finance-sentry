@@ -96,6 +96,28 @@ public sealed class PortfolioConstructorTests
     }
 
     [Fact]
+    public void IpsExclusions_MatchingNoTicker_AreNamedAsNotApplied()
+    {
+        var outcome = Build(
+            [Cards.Scored("AAA", structure: 95), Cards.Scored("BBB", structure: 80)],
+            new ConstructionPolicy(["aaa", " Energy ", "tobacco"], null, null, null));
+
+        outcome.Entries["AAA"].Reason.Should().Be("Excluded by your IPS.");
+        outcome.Notes.Should().ContainSingle(n => n.Contains("not applied: no sector data"))
+            .Which.Should().Contain("ENERGY, TOBACCO").And.NotContain("AAA");
+    }
+
+    [Fact]
+    public void IpsExclusions_AllMatchingTickers_AddNoNotAppliedNote()
+    {
+        var outcome = Build(
+            [Cards.Scored("AAA"), Cards.Scored("BBB")],
+            new ConstructionPolicy(["AAA"], null, null, null));
+
+        outcome.Notes.Should().NotContain(n => n.Contains("not applied"));
+    }
+
+    [Fact]
     public void IpsSleeves_SetTheEquitiesWeight_AndOtherSleevesStayAtTarget()
     {
         var policy = new ConstructionPolicy(
