@@ -1,0 +1,35 @@
+<div
+  #host
+  [style.height.px]="heightPx"
+  [attr.aria-label]="label()"
+  (keydown)="onKeydown($event)"
+  class="w-full"
+  data-testid="price-chart-canvas"
+  role="img"
+  tabindex="0"
+></div>
+
+<!-- Takes the pointer only while Measure is armed, so a drag selects a span instead of panning the chart. -->
+<div
+  [class.cursor-crosshair]="isMeasuring()"
+  [class.pointer-events-none]="!isMeasuring()"
+  [style.touch-action]="isMeasuring() ? 'none' : null"
+  (pointerdown)="onOverlayPointerDown($event)"
+  (pointermove)="onOverlayPointerMove($event)"
+  (pointerup)="onOverlayPointerUp()"
+  (pointercancel)="onOverlayPointerUp()"
+  aria-hidden="true"
+  class="absolute inset-0 z-10"
+  data-testid="price-chart-overlay"
+>
+  @if (selection(); as box) {
+    <div
+      [style.left.px]="box.left"
+      [style.width.px]="box.width"
+      [style.background]="selectionStyle()['background']"
+      [style.border-color]="selectionStyle()['border-color']"
+      class="pointer-events-none absolute inset-y-0 border-x"
+      data-testid="price-chart-selection"
+    ></div>
+  }
+</div>

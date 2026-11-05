@@ -1,0 +1,155 @@
+<cmn-card
+  [id]="sectionId.interactiveChart"
+  class="block scroll-mt-20"
+  data-testid="interactive-price-chart"
+>
+  <div class="flex flex-wrap items-start justify-between gap-cmn-3">
+    <div>
+      <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Price chart</h2>
+      @if (store.visibleReadout(); as readout) {
+        <p
+          class="mt-cmn-1 text-cmn-xs text-text-secondary"
+          aria-live="polite"
+          data-testid="visible-change"
+        >
+          In view
+          <span [class]="readout.isGain ? gainClass : lossClass" class="font-medium tabular-nums">{{
+            readout.text
+          }}</span>
+        </p>
+      }
+    </div>
+    <lk-segmented
+      [options]="kinds"
+      [value]="store.kind()"
+      (lk-segmented-change)="onKindChange($event)"
+      data-testid="chart-kind"
+      label="Chart type"
+    />
+  </div>
+
+  <lk-chip-row
+    [options]="periods"
+    [selected]="[store.period()]"
+    (lk-chip-row-change)="onPeriodChange($event)"
+    class="mt-cmn-3 block"
+    data-testid="chart-periods"
+    label="Chart period"
+  />
+  <lk-chip-row
+    [options]="store.intervalOptions()"
+    [selected]="store.interval() ? [store.interval()!] : []"
+    (lk-chip-row-change)="onIntervalChange($event)"
+    class="mt-cmn-1 block"
+    data-testid="chart-intervals"
+    label="Candle size"
+  />
+  <div class="mt-cmn-1 flex flex-wrap items-center gap-x-cmn-3">
+    <lk-chip-row
+      [options]="store.averageOptions()"
+      [selected]="store.movingAverages()"
+      (lk-chip-row-change)="onAverageChange($event)"
+      class="block min-w-0 flex-1"
+      data-testid="chart-averages"
+      label="Moving averages"
+      mode="multi"
+    />
+    <lk-chip-row
+      [options]="measureOptions"
+      [selected]="store.isMeasuring() ? ['measure'] : []"
+      (lk-chip-row-change)="onMeasureChange($event)"
+      data-testid="chart-measure-toggle"
+      label="Measure tool"
+      mode="multi"
+    />
+  </div>
+
+  <cmn-async-state
+    [status]="store.asyncStatus()"
+    [errorMessage]="store.barsErrorMessage()"
+    [isEmpty]="store.isEmpty()"
+    [emptyMessage]="noHistoryMessage"
+    [skeletonHeight]="skeletonHeight"
+    [skeletonRows]="1"
+    [keepContent]="false"
+    (retry)="store.reload()"
+    emptySubMessage="Pick another period, or check back after the next price update."
+    class="mt-cmn-3 block"
+    retryable
+  >
+    @if (store.bars(); as bars) {
+      @if (store.legend(); as legend) {
+        <p
+          class="flex flex-wrap items-center gap-x-cmn-3 gap-y-cmn-1 text-cmn-xs text-text-secondary tabular-nums"
+          data-testid="chart-legend"
+        >
+          <span>{{ legend.time }}</span>
+          <span>O {{ legend.open }}</span>
+          <span>H {{ legend.high }}</span>
+          <span>L {{ legend.low }}</span>
+          <span>C {{ legend.close }}</span>
+          @if (legend.volume; as volume) {
+            <span>Vol {{ volume }}</span>
+          }
+          @for (line of store.lines(); track line.spec.id) {
+            <span class="flex items-center gap-cmn-1" data-testid="chart-average-key">
+              <span
+                [style.background]="swatch(line.spec.colour)"
+                class="h-0.5 w-3 rounded-full"
+              ></span>
+              {{ line.spec.label }}
+            </span>
+          }
+        </p>
+      }
+      <div
+        [class.opacity-60]="store.isReloading()"
+        [attr.aria-busy]="store.isReloading()"
+        class="mt-cmn-2"
+      >
+        <fns-price-chart-canvas
+          [bars]="bars"
+          [kind]="store.kind()"
+          [lines]="store.lines()"
+          [isMeasuring]="store.isMeasuring()"
+          [measuredSpan]="store.measured()"
+          [label]="store.summary()"
+          (visibleChange)="onVisibleChange($event)"
+          (hoverChange)="store.setHoverTime($event)"
+          (measured)="store.setMeasured($event)"
+        />
+      </div>
+      @if (store.measureReadout(); as measure) {
+        <p
+          class="mt-cmn-2 flex flex-wrap items-center gap-x-cmn-2 text-cmn-sm text-text-primary"
+          aria-live="polite"
+          data-testid="measure-readout"
+        >
+          Measured
+          <span [class]="measure.isGain ? gainClass : lossClass" class="font-medium tabular-nums">{{
+            measure.text
+          }}</span>
+          <cmn-button (clicked)="store.setMeasured(null)" size="sm" variant="secondary"
+            >Clear</cmn-button
+          >
+        </p>
+      }
+      <div class="mt-cmn-2 space-y-cmn-1 text-cmn-xs text-text-secondary" data-testid="chart-notes">
+        @if (store.weekRangeText(); as week) {
+          <p data-testid="chart-week-range">{{ week }}</p>
+        }
+        @if (store.truncatedNote(); as note) {
+          <p data-testid="chart-truncated">{{ note }}</p>
+        }
+        @if (store.gapNote(); as gap) {
+          <p data-testid="chart-average-gap">{{ gap }}</p>
+        }
+        @if (store.averageHint(); as hint) {
+          <p>{{ hint }}</p>
+        }
+        <p>{{ intervalReason }}</p>
+        <p>{{ measureHint }}</p>
+      </div>
+    }
+  </cmn-async-state>
+</cmn-card>

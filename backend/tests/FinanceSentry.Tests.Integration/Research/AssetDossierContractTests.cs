@@ -300,6 +300,7 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
     public Mock<ILedgerNarrator> NarratorMock { get; } = new(MockBehavior.Loose);
     public Mock<IAgentConversationService> AgentConversationMock { get; } = new(MockBehavior.Loose);
     public Mock<IPriceHistoryService> PriceHistoryMock { get; } = new(MockBehavior.Loose);
+    public Mock<IPriceBarService> PriceBarsMock { get; } = new(MockBehavior.Loose);
     public Mock<IPositionLedgerSource> PositionLedgerMock { get; } = new(MockBehavior.Loose);
     public Mock<IPositionCapSource> PositionCapMock { get; } = new(MockBehavior.Loose);
     public Mock<IFundamentalsService> FundamentalsMock { get; } = new(MockBehavior.Loose);
@@ -326,6 +327,7 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             ReplaceService(services, NarratorMock.Object);
             ReplaceService(services, AgentConversationMock.Object);
             ReplaceService(services, PriceHistoryMock.Object);
+            ReplaceService(services, PriceBarsMock.Object);
             ReplaceService(services, PositionLedgerMock.Object);
             ReplaceService(services, PositionCapMock.Object);
             ReplaceService(services, FundamentalsMock.Object);
@@ -360,6 +362,9 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             PriceHistoryMock
                 .Setup(s => s.GetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(PriceHistory.Empty);
+            PriceBarsMock
+                .Setup(s => s.GetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(PriceBarSeries.Empty);
             PositionLedgerMock
                 .Setup(s => s.ReadForSymbolAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(PositionLedger.Empty);

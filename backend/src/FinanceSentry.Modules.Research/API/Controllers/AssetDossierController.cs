@@ -18,6 +18,7 @@ public class AssetDossierController(
     IQueryHandler<GetAssetLedgerReadQuery, AssetLedgerReadResult> ledgerReadHandler,
     ICommandHandler<GenerateAssetLedgerReadCommand, AssetLedgerReadResult> generateHandler,
     IQueryHandler<GetAssetChartQuery, AssetChartResult> chartHandler,
+    IQueryHandler<GetAssetPriceBarsQuery, AssetPriceBarsResult> barsHandler,
     ICommandHandler<SetAssetPriceTargetCommand, DossierUserTarget> setTargetHandler,
     ICommandHandler<ClearAssetPriceTargetCommand, bool> clearTargetHandler,
     IAuthorizationService authorization) : ControllerBase
@@ -62,6 +63,15 @@ public class AssetDossierController(
         var canonical = range is null ? ChartRange.OneYear : ChartRange.Normalize(range)
             ?? throw new InvalidChartRangeException(range);
         var result = await chartHandler.Handle(new GetAssetChartQuery(User.RequireUserId(), symbol, canonical), ct);
+        return Ok(result);
+    }
+
+    /// <summary>OHLCV bars for the interactive chart: <c>period</c> (1D...ALL, default 1Y) at a candle <c>interval</c> that period offers (default per period), plus the 52-week range.</summary>
+    [HttpGet("{symbol}/bars")]
+    public async Task<IActionResult> GetBars(
+        string symbol, [FromQuery] string? period, [FromQuery] string? interval, CancellationToken ct)
+    {
+        var result = await barsHandler.Handle(new GetAssetPriceBarsQuery(User.RequireUserId(), symbol, period, interval), ct);
         return Ok(result);
     }
 

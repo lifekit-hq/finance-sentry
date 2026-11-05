@@ -95,6 +95,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'Another proposal on this ticker arrived at the same time. Reload and try again.',
   RECOMMENDATION_NOT_FOUND: 'That proposal no longer exists.',
   INVALID_CHART_RANGE: 'That chart range is not available. Pick 1M, 6M, YTD, 1Y, 5Y or Max.',
+  INVALID_PRICE_BAR_REQUEST: 'That period or candle size is not available for this chart.',
   INVALID_DATE_RANGE: 'That date range is not allowed. Check the from/to dates and try again.',
   INVALID_AMOUNT_RANGE:
     'That amount range is not allowed. Check the min/max amounts and try again.',

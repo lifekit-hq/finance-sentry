@@ -630,6 +630,150 @@ function chartFor(shape: {symbol: string; first: number; last: number; withTrade
   };
 }
 
+// Synthetic OHLCV bars for the interactive chart: a drift with swings, weekdays only, ending on the dossier date.
+const BARS_SHAPE = {
+  endUtc: Date.parse('2026-09-01T00:00:00Z'),
+  dayMs: 86_400_000,
+  daySeconds: 86_400,
+  history: 1_900,
+  warmup: 200,
+  intradayBars: 78,
+  intradayStepSeconds: 300,
+  sessionOpenSeconds: 48_600,
+  msPerSecond: 1_000,
+  saturday: 6,
+  openRatio: 0.99,
+  closeSkew: 1.7,
+  halfSpread: 2,
+  volumeSwing: 0.5,
+  volumeSkew: 0.9,
+  waveCycles: 9,
+  waveAmplitude: 0.05,
+  spread: 0.012,
+  digits: 2,
+  baseVolume: 1_500_000,
+  periodDays: {
+    '1M': 30,
+    '3M': 91,
+    '6M': 182,
+    YTD: 243,
+    '1Y': 365,
+    '5Y': 1826,
+    ALL: 1_900,
+  } satisfies Record<string, number> as Record<string, number>,
+  intervalsByPeriod: {
+    '1D': ['5m', '15m', '1h'],
+    '5D': ['15m', '1h', '1d'],
+    '1M': ['1h', '1d'],
+    '3M': ['1d', '1w'],
+    '6M': ['1d', '1w'],
+    YTD: ['1d', '1w'],
+    '1Y': ['1d', '1w'],
+    '5Y': ['1d', '1w', '1mo'],
+    ALL: ['1w', '1mo'],
+  } satisfies Record<string, string[]> as Record<string, string[]>,
+  tradingDaysInYear: 252,
+  isoDate: 10,
+};
+
+function barAt(index: number, first: number, last: number, total: number, time: number) {
+  const b = BARS_SHAPE;
+  const t = index / (total - 1);
+  const mid =
+    (first + (last - first) * t) * (1 + Math.sin(t * Math.PI * b.waveCycles) * b.waveAmplitude);
+  const open = mid * (1 - b.spread * Math.sin(index));
+  const close = mid * (1 + b.spread * Math.cos(index * b.closeSkew));
+  const high = Math.max(open, close) * (1 + b.spread / b.halfSpread);
+  const low = Math.min(open, close) * (1 - b.spread / b.halfSpread);
+  const volume = Math.round(b.baseVolume * (1 + b.volumeSwing * Math.sin(index * b.volumeSkew)));
+  const r = (n: number) => +n.toFixed(b.digits);
+  return {time, open: r(open), high: r(high), low: r(low), close: r(close), volume};
+}
+
+function dailyBars(first: number, last: number) {
+  const b = BARS_SHAPE;
+  const days: number[] = [];
+  for (let i = b.history; i >= 0; i--) {
+    const at = b.endUtc - i * b.dayMs;
+    const weekday = new Date(at).getUTCDay();
+    if (weekday !== 0 && weekday !== b.saturday) {
+      days.push(at / b.msPerSecond);
+    }
+  }
+  return days.map((time, i) => barAt(i, first, last, days.length, time + b.sessionOpenSeconds));
+}
+
+// The shape of GET /research/assets/{symbol}/bars for the symbols the specs open; any other symbol has no history.
+export function barsFor(
+  symbol: string,
+  period: string,
+  interval: string | null
+): Record<string, unknown> {
+  const b = BARS_SHAPE;
+  const shape =
+    symbol === 'BTC'
+      ? {first: 42400, last: 60000}
+      : symbol === 'AAPL'
+        ? {first: 143, last: 175}
+        : null;
+  const intervals = b.intervalsByPeriod[period] ?? b.intervalsByPeriod['1Y'];
+  const chosen =
+    interval && intervals.includes(interval)
+      ? interval
+      : intervals[0] === '5m'
+        ? '5m'
+        : intervals.includes('1d')
+          ? '1d'
+          : intervals[0];
+  const base = {
+    symbol,
+    period,
+    interval: chosen,
+    intervals,
+    currency: 'USD',
+    timeZone: 'America/New_York',
+    truncated: false,
+    source: 'yahoo:chart',
+    retrievedAt: '2026-09-01T08:00:00Z',
+  };
+  if (!shape) {
+    return {...base, bars: [], windowStart: 0, weekRange: null};
+  }
+  const all = dailyBars(shape.first, shape.last);
+  const lastYear = all.slice(-b.tradingDaysInYear);
+  const weekRange = {
+    high: Math.max(...lastYear.map(bar => bar.high)),
+    low: Math.min(...lastYear.map(bar => bar.low)),
+    from: new Date(lastYear[0].time * b.msPerSecond).toISOString().slice(0, b.isoDate),
+    coversYear: true,
+  };
+  if (period === '1D') {
+    const open = b.endUtc / b.msPerSecond + b.sessionOpenSeconds;
+    const bars = Array.from({length: b.intradayBars}, (_, i) =>
+      barAt(
+        i,
+        shape.last * b.openRatio,
+        shape.last,
+        b.intradayBars,
+        open + i * b.intradayStepSeconds
+      )
+    );
+    return {...base, bars, windowStart: bars[0].time, weekRange};
+  }
+  const lastTime = all[all.length - 1].time;
+  const windowStart = lastTime - b.periodDays[period ?? '1Y'] * b.daySeconds;
+  const firstIndex = Math.max(
+    0,
+    all.findIndex(bar => bar.time >= windowStart)
+  );
+  return {
+    ...base,
+    bars: all.slice(Math.max(0, firstIndex - b.warmup)),
+    windowStart: all[firstIndex].time,
+    weekRange,
+  };
+}
+
 export const CHART_AAPL = chartFor({symbol: 'AAPL', first: 143, last: 175, withTrades: true});
 export const CHART_BTC = chartFor({symbol: 'BTC', first: 42400, last: 60000, withTrades: false});
 
@@ -728,6 +872,17 @@ export async function mockApis(page: Page): Promise<void> {
       contentType: 'application/json',
       body: JSON.stringify(
         chart ? {...chart, range} : {...CHART_AAPL, symbol, points: [], trades: []}
+      ),
+    });
+  });
+  await page.route(`${API}/research/assets/*/bars**`, route => {
+    const url = new URL(route.request().url());
+    const symbol = /assets\/([^/]+)\/bars/.exec(url.pathname)?.[1] ?? '';
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        barsFor(symbol, url.searchParams.get('period') ?? '1Y', url.searchParams.get('interval'))
       ),
     });
   });
