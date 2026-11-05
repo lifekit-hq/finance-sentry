@@ -69,10 +69,10 @@ the brokerage holdings reader.
 | FR-001 | Partial: the universe is built per request from the viewer's holdings, watchlist and a configured curated list, and one scorecard per symbol is shared through the cache; it is not yet a persisted shared scoring run. | `GetUniverseScreenQuery`, `ResearchUniverseScorecardAdapter` |
 | FR-002 | Covered: rows come from the existing scorecard read; no parallel formula. | `IScorecardSnapshotReader` |
 | FR-003 | Covered: the universe is capped (`MaxUniverseSize`, 40) and no index-wide structure scan runs. Shortlist members (OQ-1) are not included. | `PortfolioConstructionOptions` |
-| FR-012 | Covered: archetypes `growth` and `balanced` are configuration (gate per axis, ordering, name count, cap, sleeves, cash floor). | `Archetype`, `PortfolioConstructionOptions` |
+| FR-012 | Covered: archetypes `growth` and `balanced` are configuration (gate per axis, ordering, name count, cap, sleeves, cash floor); a list or dictionary a configured archetype names replaces the shipped one rather than merging into it. | `Archetype`, `PortfolioConstructionOptions` |
 | FR-013 | Covered: pure, deterministic constructor (gate, lexicographic order, top N, equal weight, cap, remainder to cash), property-tested. | `PortfolioConstructor` |
 | FR-014 | Covered: the stricter of archetype and risk-rule position cap / cash floor is applied, and each limit shows its source ("archetype default", "your risk rules", "your IPS"). | `PortfolioConstructor`, `ConstructionPolicyAdapter` |
-| FR-015 | Covered: IPS exclusions are honoured; IPS sleeve targets set the sleeve weights (a shortfall under 100% goes to cash, over 100% refuses, OQ-10). | `PortfolioConstructor` |
+| FR-015 | Covered: IPS exclusions are honoured by ticker (an entry matching no universe ticker, such as a sector, is listed in a note as "not applied: no sector data"; sector filtering needs a sector data source and is a follow-up); IPS sleeve targets set the sleeve weights (a shortfall under 100% goes to cash, over 100% refuses, OQ-10). | `PortfolioConstructor` |
 | FR-016 | Covered: every name carries a reason (gate, verdict, rank, weight and cap), and the row opens into the fired rule and rules version. | `UniverseRowDto.Reason` |
 | FR-007 / FR-008 | Covered: no composite number; a missing axis reads "no data" and fails its gate. | `UniverseScreenResult` shape test |
 | FR-017 | Not built: the constructor enforces the position cap and cash floor by construction, but the proposed book is not run through Risk's evaluator (`IProposedBookEvaluator`). | - |
