@@ -7,6 +7,7 @@ import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {PriceChartComponent} from '../../components/price-chart/price-chart.component';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -15,6 +16,7 @@ import {
   type ValuationSnapshotDto,
 } from '../../models/dossier/dossier.model';
 import {DossierStore} from '../../store/dossier.store';
+import {PriceChartStore} from '../../store/price-chart.store';
 import {AssetDossierComponent} from './asset-dossier.component';
 import {
   buildMockStore,
@@ -44,6 +46,10 @@ describe('AssetDossierComponent', () => {
     })
       .overrideComponent(AssetDossierComponent, {
         set: {providers: [{provide: DossierStore, useValue: mockStore}]},
+      })
+      // The interactive chart has its own store, canvas and specs: this page only has to place it.
+      .overrideComponent(PriceChartComponent, {
+        set: {template: '', providers: [{provide: PriceChartStore, useValue: {}}], imports: []},
       })
       .compileComponents();
 

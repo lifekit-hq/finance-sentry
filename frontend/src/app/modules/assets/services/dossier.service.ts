@@ -11,6 +11,11 @@ import {
   type DossierUserTargetDto,
   type SetPriceTargetRequest,
 } from '../models/dossier/dossier.model';
+import {
+  type AssetPriceBarsDto,
+  type PriceIntervalId,
+  type PricePeriodId,
+} from '../models/price-chart/price-chart.model';
 
 @Injectable({providedIn: 'root'})
 export class DossierService extends ApiService {
@@ -43,6 +48,18 @@ export class DossierService extends ApiService {
   /** Daily closes for `range` with the S&P 500 rebased onto them, the user's fills and average cost. */
   public getChart(symbol: string, range: ChartRangeId): Observable<AssetChartDto> {
     return this.get<AssetChartDto>(`research/assets/${encodeURIComponent(symbol)}/chart`, {range});
+  }
+
+  /** OHLCV bars for the interactive chart; an omitted `interval` is the period's default candle size. */
+  public getBars(
+    symbol: string,
+    period: PricePeriodId,
+    interval: PriceIntervalId | null
+  ): Observable<AssetPriceBarsDto> {
+    return this.get<AssetPriceBarsDto>(
+      `research/assets/${encodeURIComponent(symbol)}/bars`,
+      interval === null ? {period} : {period, interval}
+    );
   }
 
   /** Sets (or replaces) the user's own price target for the symbol. */

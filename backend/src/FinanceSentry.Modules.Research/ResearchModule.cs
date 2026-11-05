@@ -399,6 +399,7 @@ public static class ResearchModule
 
         services.AddScoped<IMarketDataService, YahooMarketDataService>();
         services.AddSingleton<IPriceHistoryService, YahooPriceHistoryService>();
+        services.AddSingleton<IPriceBarService, YahooPriceBarService>();
         services.AddScoped<PositionReturnsReader>();
         services.AddScoped<IMarketNewsService, RssMarketNewsService>();
         services.AddScoped<IMacroCalendarService, MacroCalendarService>();

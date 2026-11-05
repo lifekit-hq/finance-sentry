@@ -4,6 +4,7 @@ import {type DossierSectionChip} from '../../models/dossier/dossier.model';
 export const DOSSIER_SECTION_ID = {
   checks: 'checks',
   chart: 'price-chart',
+  interactiveChart: 'interactive-chart',
   returns: 'returns',
   valuation: 'valuation',
   analysts: 'analyst-coverage',

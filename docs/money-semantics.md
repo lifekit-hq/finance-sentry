@@ -259,6 +259,14 @@ window; the 52-week high and low are closing values, not intraday extremes; "fro
 close over that high minus 1. Trade markers are the ingested fills inside the window, each at its own
 trade price and currency.
 
+**Interactive price chart** (`GET /research/assets/{symbol}/bars`, `YahooPriceBarService`, `PriceBarPlan`). OHLCV
+bars from the same Yahoo chart source, in the asset's own quote currency, never converted, with the same
+minor-unit normalisation as above (`MinorUnitCurrency`: prices divided by 100, currency relabelled). Unlike the
+strip's closing-based figures, the response's `WeekRange` is the **highest high and lowest low** (intraday
+extremes) of the 52 weeks ending at the last daily bar; when the series is younger than a year it is the range
+since `From` (`CoversYear` false). Bars come with up to 200 extra bars before the window so a moving average is
+defined from the window's first bar; `Truncated` means the asset's history starts after the period does.
+
 **Notable moves** (`AssetDossierResult.NotableMoves`, `NotableMoveLinker`, `NotableMoveOptions`, config section
 `NotableMoves`, #1218). A day is a notable move when its close-to-close return against the previous close in the
 same Yahoo series (own quote currency, no conversion; skipped when the previous close is not above 0) is, rounded

@@ -55,6 +55,7 @@
     "@ngrx/signals": "^22.0.1",
     "chart.js": "^4.6.1",
     "deep-chat": "^2.5.1",
+    "lightweight-charts": "^5.2.1",
     "lit": "^3.3.3",
     "lucide-angular": "^1.0.0",
     "rxjs": "^7.8.0",
