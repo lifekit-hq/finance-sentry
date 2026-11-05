@@ -151,6 +151,7 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerageConnectionStatusReader, BrokerageConnectionStatusReader>();
         services.AddScoped<IAccountScopeChangeReader, BrokerageScopeChangeReader>();
         services.AddScoped<IBrokerageFlowReader, BrokerageFlowReader>();
+        services.AddScoped<IBrokeragePnlReader, BrokeragePnlReader>();
 
         services.AddSingleton<IbkrFailureClassifier>();
         services.AddSingleton<IbkrFlexFailureClassifier>();

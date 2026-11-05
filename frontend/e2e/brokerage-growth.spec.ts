@@ -1,6 +1,6 @@
 import {expect, test} from '@playwright/test';
 
-import {BROKERAGE_GROWTH} from './support/accounts-mocks';
+import {BROKERAGE_GROWTH, BROKERAGE_PNL} from './support/accounts-mocks';
 import {mockHome} from './support/home-mocks';
 import {mockGet} from './support/visual-baseline';
 
@@ -56,6 +56,58 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     const line = page.getByTestId('brokerage-growth').getByTestId('book-vs-spy');
     await expect(line).toContainText(/since 14 Sept? 2025/);
     await expect(page.getByTestId('book-vs-spy-returns')).toHaveText('+12.5% vs +15.3%');
+  });
+
+  test('adds QQQ over the same dates to the book against SPY line', async ({page}) => {
+    await mockHome(page);
+    await page.goto('/accounts/list');
+
+    await expect(page.getByTestId('book-vs-qqq-returns')).toHaveText('QQQ +18.7%');
+  });
+
+  test('puts realized and unrealized P&L on the capital in the window, with the honest label for a partial basis', async ({
+    page,
+  }) => {
+    await mockHome(page);
+    await page.goto('/accounts/list');
+
+    await expect(page.getByTestId('brokerage-pnl-net-deposited-amount')).toHaveText('$35,200.00');
+    await expect(page.getByTestId('brokerage-pnl-net-deposited')).toContainText('Capital in the window');
+    await expect(page.getByTestId('brokerage-pnl-net-deposited-detail')).toContainText(
+      'already includes earlier market gains'
+    );
+    await expect(page.getByTestId('brokerage-pnl-realized-amount')).toContainText('+$1,240.00');
+    await expect(page.getByTestId('brokerage-pnl-realized-amount')).toContainText('+3.5%');
+    const unrealized = page.getByTestId('brokerage-pnl-unrealized');
+    await expect(unrealized).toContainText('+$2,310.00');
+    await expect(unrealized).toContainText('Partial: 2 of 3 · 78% of value');
+    await expect(page.getByTestId('brokerage-pnl-unrealized-detail')).toContainText(
+      'KYIV is left out'
+    );
+    await expect(page.getByTestId('brokerage-pnl-unrealized-amount')).not.toContainText('%');
+  });
+
+  test('shows "Basis unavailable" for unrealized instead of a number when no basis is verified', async ({
+    page,
+  }) => {
+    await mockHome(page);
+    await mockGet(page, 'wealth/brokerage/pnl', {
+      ...BROKERAGE_PNL,
+      unrealized: {
+        usd: null,
+        percentOfNetDeposited: null,
+        status: 'UNAVAILABLE',
+        measured: 0,
+        total: 3,
+        coverage: null,
+        unavailableSymbols: ['AAA', 'BBB', 'KYIV'],
+      },
+    });
+    await page.goto('/accounts/list');
+
+    await expect(page.getByTestId('brokerage-pnl-unrealized-amount')).toHaveText(
+      'Basis unavailable'
+    );
   });
 
   test('says no contributions are recorded yet instead of reading every deposit as growth', async ({

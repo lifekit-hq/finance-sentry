@@ -21,6 +21,11 @@
         <span class="tabular-nums text-text-primary" data-testid="book-vs-spy-returns">
           {{ comparison.bookReturn }} vs {{ comparison.benchmarkReturn }}
         </span>
+        @if (comparison.qqqReturn; as qqqReturn) {
+          <span class="tabular-nums text-text-secondary" data-testid="book-vs-qqq-returns">
+            QQQ {{ qqqReturn }}
+          </span>
+        }
       </span>
     </cmn-list-item-row>
   }

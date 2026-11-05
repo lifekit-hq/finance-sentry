@@ -60,6 +60,13 @@ describe('BookPerformanceStore', () => {
     expect(comparison?.from).toBe('2025-10-19');
     expect(comparison?.bookReturn).toBe('+12.0%');
     expect(comparison?.benchmarkReturn).toBe('+10.0%');
+    expect(comparison?.qqqReturn).toBeNull();
+  });
+
+  it('reads QQQ over the same window when it was measured', () => {
+    const store = create(performance([period({qqqTwr: 0.145, qqqDelta: -0.025})]));
+
+    expect(store.comparison()?.qqqReturn).toBe('+14.5%');
   });
 
   it('skips a window where SPY was not measured over the book dates', () => {

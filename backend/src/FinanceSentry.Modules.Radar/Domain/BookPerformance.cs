@@ -32,6 +32,11 @@ public enum BookPerformancePeriod
 /// <c>HoldingsBasedMissingPriceSymbols</c> names the positions.
 /// </para>
 /// <para>
+/// <c>QqqTwr</c> is QQQ's adjusted-close return over the same window as <c>SpyTwr</c> (<c>BookTwrFrom</c> to
+/// <c>BookTwrTo</c>) and <c>QqqDelta</c> the book's excess over it. Both are null with no measurable book window or
+/// no QQQ bars on both dates: QQQ has no fallback window, so it is never compared over different dates.
+/// </para>
+/// <para>
 /// <c>Book</c> names the invested value's change as a typed <see cref="Headline"/> (VALUE_CHANGE over START_VALUE
 /// on <c>invested_brokerage</c>, USD; deposits included): its amount is the dollar change, its percent the same
 /// change in percentage points, and its quality and reasons carry the end rows' stale, reconstructed and FX flags,
@@ -54,7 +59,9 @@ public sealed record PeriodTwr(
     DateOnly? BookTwrFrom = null,
     DateOnly? BookTwrTo = null,
     IReadOnlyList<HeadlineReason>? BookTwrReasons = null,
-    HeadlineQuality? BookTwrQuality = null);
+    HeadlineQuality? BookTwrQuality = null,
+    decimal? QqqTwr = null,
+    decimal? QqqDelta = null);
 
 /// <summary>
 /// Book-vs-SPY time-weighted scoreboard across the four standard lookback windows.

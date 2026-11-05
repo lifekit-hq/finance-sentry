@@ -23,6 +23,8 @@ public sealed class BookPerformanceServiceTests
 
     public BookPerformanceServiceTests()
     {
+        // A ticker a test does not set up has no bars (a later, more specific setup wins).
+        _bars.Setup(r => r.GetSinceAsync(It.IsAny<string>(), It.IsAny<DateOnly>(), default)).ReturnsAsync([]);
         _portfolio.Setup(p => p.GetAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), default))
             .ReturnsAsync([]);
         _holdings.Setup(h => h.GetBrokerageCapturesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
@@ -49,6 +51,42 @@ public sealed class BookPerformanceServiceTests
         AdjClose = adjClose,
         Volume = 1_000_000,
     };
+
+    [Fact]
+    public async Task GetAsync_MeasuresQqqOverTheBooksOwnWindow()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        _bars.Setup(r => r.GetSinceAsync("QQQ", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("QQQ", since, 300m), Bar("QQQ", today, 309m)]); // +3% QQQ
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([Day(since, 100_000m), Day(today, 105_000m)]); // +5% book
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.QqqTwr.Should().BeApproximately(0.03m, 0.0001m);
+        period.QqqDelta.Should().BeApproximately(0.02m, 0.0001m);
+        period.SpyTwr.Should().BeApproximately(0.01m, 0.0001m);
+    }
+
+    [Fact]
+    public async Task GetAsync_LeavesQqqNull_WhenItHasNoBars_InsteadOfComparingOtherDates()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([Day(since, 100_000m), Day(today, 105_000m)]);
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.QqqTwr.Should().BeNull();
+        period.QqqDelta.Should().BeNull();
+        period.SpyTwr.Should().NotBeNull();
+    }
 
     [Fact]
     public async Task GetAsync_ReturnsOutperform_WhenBookBeatsSpy()

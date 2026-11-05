@@ -1,0 +1,47 @@
+<cmn-async-state
+  [status]="store.status()"
+  [errorMessage]="store.errorMessage()"
+  [keepContent]="false"
+  (retry)="store.load()"
+  emptySubMessage="Capital in the window, realized and unrealized P&L show once the book has history."
+  retryable
+>
+  <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="1rem" width="70%" />
+
+  <div data-testid="brokerage-pnl">
+    @for (row of store.rows(); track row.key) {
+      <cmn-list-item-row
+        [label]="row.label"
+        [sublabel]="row.note"
+        [attr.data-testid]="'brokerage-pnl-' + row.key"
+      >
+        <span
+          [attr.data-testid]="'brokerage-pnl-' + row.key + '-amount'"
+          [class.text-gain]="row.tone === 'gain'"
+          [class.text-loss]="row.tone === 'loss'"
+          amount
+          class="tabular-nums text-cmn-sm text-text-primary"
+        >
+          @if (row.unavailable === null) {
+            {{ row.amount | money: store.currency() : {signed: row.signed} }}
+            @if (row.percentLabel; as percentLabel) {
+              <span class="ml-cmn-1 text-cmn-xs">{{ percentLabel }}</span>
+            }
+          } @else {
+            <span class="text-text-secondary">{{ row.unavailable }}</span>
+          }
+        </span>
+      </cmn-list-item-row>
+    }
+    @for (row of store.rows(); track row.key) {
+      @if (row.detail; as detail) {
+        <p
+          [attr.data-testid]="'brokerage-pnl-' + row.key + '-detail'"
+          class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+        >
+          {{ detail }}
+        </p>
+      }
+    }
+  </div>
+</cmn-async-state>

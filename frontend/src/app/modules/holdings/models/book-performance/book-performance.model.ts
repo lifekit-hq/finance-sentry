@@ -16,6 +16,9 @@ export interface BookPerformancePeriod {
   spyTwr: Nullable<number>;
   /** Book minus SPY; null unless SPY was measured over the book's own window. */
   delta: Nullable<number>;
+  /** QQQ's adjusted-close return over the same window as `spyTwr`; null without a measured book window or QQQ bars. */
+  qqqTwr?: Nullable<number>;
+  qqqDelta?: Nullable<number>;
   bookTwrFrom?: Nullable<string>;
   bookTwrTo?: Nullable<string>;
   bookTwrReasons?: Nullable<HeadlineReason[]>;
@@ -33,6 +36,8 @@ export interface BookVsSpy {
   from: string;
   bookReturn: string;
   benchmarkReturn: string;
+  /** QQQ over the same dates as the book and SPY; null when it was not measured over them. */
+  qqqReturn: Nullable<string>;
   /** The book TWR's quality, for its badge. */
   headline: Nullable<Headline>;
 }

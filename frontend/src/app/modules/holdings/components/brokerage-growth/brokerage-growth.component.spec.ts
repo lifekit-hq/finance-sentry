@@ -15,6 +15,7 @@ import {
 } from '../../models/brokerage-growth/brokerage-growth.model';
 import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
+import {BrokeragePnlService} from '../../services/brokerage-pnl.service';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {BrokerageGrowthComponent} from './brokerage-growth.component';
 
@@ -98,7 +99,10 @@ describe('BrokerageGrowthComponent', () => {
     };
     await TestBed.configureTestingModule({
       imports: [BrokerageGrowthComponent],
-      providers: [{provide: BookPerformanceService, useValue: {getPerformance: () => NEVER}}],
+      providers: [
+        {provide: BookPerformanceService, useValue: {getPerformance: () => NEVER}},
+        {provide: BrokeragePnlService, useValue: {getPnl: () => NEVER}},
+      ],
     })
       .overrideComponent(BrokerageGrowthComponent, {
         set: {providers: [{provide: BrokerageGrowthStore, useValue: store}]},
@@ -165,6 +169,14 @@ describe('BrokerageGrowthComponent', () => {
 
   it('draws the book against SPY row under the brokerage rows', () => {
     expect(render().querySelector('fns-book-vs-spy')).not.toBeNull();
+  });
+
+  it('draws the capital in the window, realized and unrealized rows above the book against SPY', () => {
+    const el = render();
+    const pnl = el.querySelector('fns-brokerage-pnl');
+
+    expect(pnl).not.toBeNull();
+    expect(pnl?.nextElementSibling?.tagName.toLowerCase()).toBe('fns-book-vs-spy');
   });
 
   it('leaves the newly linked line out when nothing was linked', () => {
@@ -238,6 +250,7 @@ describe('BrokerageGrowthComponent', () => {
     expect(getGrowth).toHaveBeenCalledWith('crypto');
     expect(text(el, 'crypto-growth-since')).toBe('· since 30 Jun 2026');
     expect(el.querySelector('fns-book-vs-spy')).toBeNull();
+    expect(el.querySelector('fns-brokerage-pnl')).toBeNull();
     expect(el.querySelector('[data-testid="brokerage-growth"]')).toBeNull();
   });
 });

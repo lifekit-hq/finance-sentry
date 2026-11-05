@@ -46,8 +46,8 @@ public sealed class RadarOptions
     /// <summary>Hour of day (UTC) the compute job runs (shortly after ingestion).</summary>
     public int ComputeHourUtc { get; set; } = 23;
 
-    /// <summary>Seed benchmark tickers.</summary>
-    public string[] BenchmarkTickers { get; set; } = ["SPY"];
+    /// <summary>Seed benchmark tickers (SPY, and QQQ for the book-vs-index comparison on the portfolio header).</summary>
+    public string[] BenchmarkTickers { get; set; } = ["SPY", "QQQ"];
 
     /// <summary>Seed sector-ETF tickers (11 SPDR sectors).</summary>
     public string[] SectorTickers { get; set; } =

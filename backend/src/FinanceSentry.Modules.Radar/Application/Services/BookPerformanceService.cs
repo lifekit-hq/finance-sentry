@@ -29,6 +29,8 @@ public sealed class BookPerformanceService(
 {
     private const string BenchmarkTicker = "SPY";
 
+    private const string SecondBenchmarkTicker = "QQQ";
+
     private const decimal OutperformThreshold = 0.001m;
 
     private const decimal EdgeGapPeriodRatio = 0.1m;
@@ -48,6 +50,7 @@ public sealed class BookPerformanceService(
         var earliest = periods.Select(p => StartDate(today, p)).Min();
 
         var spyBars = await bars.GetSinceAsync(BenchmarkTicker, earliest.AddDays(-SpyLookbackDays), ct);
+        var qqqBars = await bars.GetSinceAsync(SecondBenchmarkTicker, earliest.AddDays(-SpyLookbackDays), ct);
         var portfolioSnapshots = await portfolioValues.GetAsync(userId, earliest, today, ct);
         var captures = await holdingsHistory.GetBrokerageCapturesAsync(userId, earliest, ct);
         var flows = await brokerageFlows.ReadAsync(userId, earliest, ct);
@@ -56,7 +59,7 @@ public sealed class BookPerformanceService(
         foreach (var period in periods)
         {
             var since = StartDate(today, period);
-            var periodTwr = ComputePeriod(period, since, today, spyBars, portfolioSnapshots, captures, flows);
+            var periodTwr = ComputePeriod(period, since, today, spyBars, qqqBars, portfolioSnapshots, captures, flows);
             if (periodTwr is not null)
             {
                 results.Add(periodTwr);
@@ -71,6 +74,7 @@ public sealed class BookPerformanceService(
         DateOnly since,
         DateOnly today,
         IReadOnlyList<Domain.DailyBar> spyBars,
+        IReadOnlyList<Domain.DailyBar> qqqBars,
         IReadOnlyList<DailyPortfolioValue> portfolioSnapshots,
         IReadOnlyList<HoldingsCapture> captures,
         SleeveFlowReading flows)
@@ -78,11 +82,16 @@ public sealed class BookPerformanceService(
         var book = ComputeBookTwr(portfolioSnapshots, flows, since, today);
         var bookTwr = Round(book?.Twr.Return.Value);
         // SPY over the book's own window when there is one (M9), else from the period's first bar with no delta.
-        var spy = book is { } measured ? SpyOver(spyBars, measured.Twr) : null;
+        var spy = book is { } measured ? BenchmarkOver(spyBars, measured.Twr) : null;
         var spyTwr = spy is null ? ComputeSpyTwr(spyBars, since) : Round(spy.BenchmarkReturn.Value);
         decimal? delta = spy is not null && bookTwr is not null && spyTwr is not null
             ? Math.Round(bookTwr.Value - spyTwr.Value, 4)
             : null;
+
+        // QQQ is only ever compared over the book's own window.
+        var qqq = book is { } measuredForQqq ? BenchmarkOver(qqqBars, measuredForQqq.Twr) : null;
+        var qqqTwr = qqq is null ? null : Round(qqq.BenchmarkReturn.Value);
+        decimal? qqqDelta = qqqTwr is not null && bookTwr is not null ? Math.Round(bookTwr.Value - qqqTwr.Value, 4) : null;
 
         var splitDays = portfolioSnapshots
             .Where(s => s.BrokerageInvestedUsd is not null)
@@ -129,7 +138,9 @@ public sealed class BookPerformanceService(
             book?.Twr.From,
             book?.Twr.To,
             book?.Reasons,
-            book?.Quality);
+            book?.Quality,
+            qqqTwr,
+            qqqDelta);
     }
 
     // M3 over the cash-inclusive brokerage totals inside [since, today], with link days bridged. Null when the
@@ -190,7 +201,7 @@ public sealed class BookPerformanceService(
     // SPY's adjusted close at the book's own opening and closing dates (the last bar on or before each, so a
     // weekend snapshot reads Friday's close), as M9 compares them. Null when either date has no bar within the
     // lookback.
-    private static ExcessReturnResult? SpyOver(IReadOnlyList<Domain.DailyBar> spyBars, TimeWeightedResult book)
+    private static ExcessReturnResult? BenchmarkOver(IReadOnlyList<Domain.DailyBar> spyBars, TimeWeightedResult book)
     {
         var opening = spyBars.LastOrDefault(b => b.Date <= book.From);
         var closing = spyBars.LastOrDefault(b => b.Date <= book.To);
