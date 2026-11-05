@@ -4,6 +4,7 @@ import {PercentUtils} from '../../../shared/utils/percent.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {
   BASIS_UNAVAILABLE,
+  CAPITAL_IN_WINDOW_DETAIL,
   COVERAGE_PERCENT,
   MAX_SYMBOLS_LISTED,
   PNL_PERCENT_DIGITS,
@@ -33,15 +34,17 @@ export class BrokeragePnlUtils {
     const missing = pnl.sourcesWithoutFlows.map(slug => ProviderUtils.label(slug)).join(' and ');
     const hasAmount = pnl.netDepositedUsd != null;
     let detail: Nullable<string> = null;
-    if (!hasAmount && missing !== '') {
-      detail = `Net deposited: no deposits or withdrawals recorded yet for ${missing}, so none is stated.`;
+    if (hasAmount) {
+      detail = CAPITAL_IN_WINDOW_DETAIL;
+    } else if (missing !== '') {
+      detail = `Capital in the window: no deposits or withdrawals recorded yet for ${missing}, so none is stated.`;
     }
     return {
       key: 'net-deposited',
-      label: 'Net deposited',
+      label: 'Capital in the window',
       amount: pnl.netDepositedUsd,
       percentLabel: null,
-      note: hasAmount ? 'Deposits less withdrawals' : 'Not measured yet',
+      note: hasAmount ? 'Opening value + deposits less withdrawals' : 'Not measured yet',
       detail,
       unavailable: hasAmount ? null : 'Not measured',
       tone: 'neutral',

@@ -65,13 +65,17 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await expect(page.getByTestId('book-vs-qqq-returns')).toHaveText('QQQ +18.7%');
   });
 
-  test('puts realized and unrealized P&L on the net deposited, with the honest label for a partial basis', async ({
+  test('puts realized and unrealized P&L on the capital in the window, with the honest label for a partial basis', async ({
     page,
   }) => {
     await mockHome(page);
     await page.goto('/accounts/list');
 
     await expect(page.getByTestId('brokerage-pnl-net-deposited-amount')).toHaveText('$35,200.00');
+    await expect(page.getByTestId('brokerage-pnl-net-deposited')).toContainText('Capital in the window');
+    await expect(page.getByTestId('brokerage-pnl-net-deposited-detail')).toContainText(
+      'already includes earlier market gains'
+    );
     await expect(page.getByTestId('brokerage-pnl-realized-amount')).toContainText('+$1,240.00');
     await expect(page.getByTestId('brokerage-pnl-realized-amount')).toContainText('+3.5%');
     const unrealized = page.getByTestId('brokerage-pnl-unrealized');

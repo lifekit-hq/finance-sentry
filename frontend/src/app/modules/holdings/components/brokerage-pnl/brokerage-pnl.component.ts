@@ -5,8 +5,8 @@ import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {BrokeragePnlStore} from '../../store/brokerage-pnl/brokerage-pnl.store';
 
 /**
- * The brokerage book's money-in and what it earned (issue 982): net deposited, realized P&L and unrealized P&L,
- * each a plain row like the performance panel's. Realized and unrealized are put over the net deposited when the
+ * The brokerage book's money-in and what it earned (issue 982): capital in the window, realized P&L and unrealized P&L,
+ * each a plain row like the performance panel's. Realized and unrealized are put over the capital in the window when the
  * figure is complete; a partial or unverifiable one says what it covers or "Basis unavailable", never a zero
  * and never a guessed number.
  */

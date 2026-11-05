@@ -20,7 +20,7 @@ export interface PnlFigure {
 }
 
 /**
- * The brokerage sleeve's realized and unrealized P&L on its net deposited, over the growth split's window.
+ * The brokerage sleeve's realized and unrealized P&L on its capital in the window, over the growth split's window.
  * `netDepositedUsd` is null while a provider's deposits are unknown (`sourcesWithoutFlows` names it).
  */
 export interface BrokeragePnl {
@@ -41,7 +41,7 @@ export interface PnlRow {
   label: string;
   /** The amount in `currency`; null renders the `unavailable` text instead. */
   amount: Nullable<number>;
-  /** Signed percent of the net deposited, e.g. "+10.9%"; null unless the figure is complete. */
+  /** Signed percent of the capital in the window, e.g. "+10.9%"; null unless the figure is complete. */
   percentLabel: Nullable<string>;
   /** A few words under the label: what the figure rests on (short enough for a phone row). */
   note: string;

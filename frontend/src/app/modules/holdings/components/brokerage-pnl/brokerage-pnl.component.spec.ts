@@ -11,10 +11,10 @@ import {BrokeragePnlComponent} from './brokerage-pnl.component';
 const ROWS: PnlRow[] = [
   {
     key: 'net-deposited',
-    label: 'Net deposited',
+    label: 'Capital in the window',
     amount: 1500,
     percentLabel: null,
-    note: 'Deposits less withdrawals',
+    note: 'Opening value + deposits less withdrawals',
     detail: null,
     unavailable: null,
     tone: 'neutral',
@@ -77,7 +77,7 @@ describe('BrokeragePnlComponent', () => {
       .compileComponents();
   });
 
-  it('shows net deposited, a signed gain with its percent, and the reason a figure is missing', () => {
+  it('shows the capital in the window, a signed gain with its percent, and the reason a figure is missing', () => {
     const el = render();
 
     expect(text(el, 'brokerage-pnl-net-deposited-amount')).toBe('$1,500.00');

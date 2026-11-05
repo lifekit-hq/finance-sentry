@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
-/// The brokerage sleeve's realized and unrealized P&amp;L on its net deposited, the portfolio header's gain figures
+/// The brokerage sleeve's realized and unrealized P&amp;L on its capital in the window, the portfolio header's gain figures
 /// (issue 982): <c>GET /api/v1/wealth/brokerage/pnl</c>. Computed in USD; shown in the profile's base currency at
 /// today's rate, as the growth split is.
 /// </summary>

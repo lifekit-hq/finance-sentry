@@ -164,7 +164,7 @@ export const BROKERAGE_GROWTH = {
 };
 
 /**
- * The brokerage sleeve's net deposited with its realized and unrealized P&L: realized is complete, unrealized
+ * The brokerage sleeve's capital in the window with its realized and unrealized P&L: realized is complete, unrealized
  * covers 2 of 3 positions (one has no verified basis), so it keeps its amount, drops its percent and names the rest.
  */
 export const BROKERAGE_PNL = {

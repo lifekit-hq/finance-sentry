@@ -49,13 +49,24 @@ public class RealizedPnlWalkTests
     }
 
     [Fact]
-    public void OnlySellsOnOrAfterFrom_AreCounted_ButEarlierOnesStillMoveTheCost()
+    public void OnlySellsAfterFrom_AreCounted_ButEarlierOnesStillMoveTheCost()
     {
         var fills = new[] { Fill(10m, 100m, 0), Fill(-5m, 120m, 5), Fill(-5m, 130m, 20) };
 
         var result = RealizedPnlWalk.Walk(fills, heldQuantity: 0m, from: DateOnly.FromDateTime(T0.AddDays(10)));
 
         result.RealizedUsd.Should().Be(150m); // only the day-20 sell: 5 x (130 - 100)
+    }
+
+    [Fact]
+    public void ASellOnTheFromDay_IsNotCounted_BecauseTheOpeningValueIncludesIt()
+    {
+        var fills = new[] { Fill(10m, 100m, 0), Fill(-5m, 120m, 10), Fill(-5m, 130m, 11) };
+
+        var result = RealizedPnlWalk.Walk(fills, heldQuantity: 0m, from: DateOnly.FromDateTime(T0.AddDays(10)));
+
+        result.RealizedUsd.Should().Be(150m); // the day-10 sell is the opening day's; only the day-11 sell: 5 x (130 - 100)
+        result.SoldInWindow.Should().BeTrue();
     }
 
     [Fact]

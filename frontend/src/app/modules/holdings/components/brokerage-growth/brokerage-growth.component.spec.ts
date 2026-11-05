@@ -171,7 +171,7 @@ describe('BrokerageGrowthComponent', () => {
     expect(render().querySelector('fns-book-vs-spy')).not.toBeNull();
   });
 
-  it('draws the net deposited, realized and unrealized rows above the book against SPY', () => {
+  it('draws the capital in the window, realized and unrealized rows above the book against SPY', () => {
     const el = render();
     const pnl = el.querySelector('fns-brokerage-pnl');
 

@@ -38,7 +38,7 @@ const row = (data: BrokeragePnl, key: string): PnlRow => {
 };
 
 describe('BrokeragePnlUtils.rows', () => {
-  it('lists net deposited, realized and unrealized in reading order', () => {
+  it('lists capital in the window, realized and unrealized in reading order', () => {
     expect(BrokeragePnlUtils.rows(pnl()).map(r => r.key)).toEqual([
       'net-deposited',
       'realized',
@@ -46,7 +46,7 @@ describe('BrokeragePnlUtils.rows', () => {
     ]);
   });
 
-  it('puts a complete gain over the net deposited with its sign and tone', () => {
+  it('puts a complete gain over the capital in the window with its sign and tone', () => {
     const realized = row(pnl(), 'realized');
 
     expect(realized.amount).toBe(150);
@@ -204,14 +204,17 @@ describe('BrokeragePnlUtils.rows', () => {
     );
   });
 
-  it('shows the net deposited when it is known', () => {
+  it('shows the capital in the window when it is known', () => {
     const deposited = row(pnl(), 'net-deposited');
 
     expect(deposited.amount).toBe(1500);
     expect(deposited.signed).toBe(false);
     expect(deposited.unavailable).toBeNull();
-    expect(deposited.note).toBe('Deposits less withdrawals');
-    expect(deposited.detail).toBeNull();
+    expect(deposited.label).toBe('Capital in the window');
+    expect(deposited.note).toBe('Opening value + deposits less withdrawals');
+    expect(deposited.detail).toBe(
+      'Capital in the window is the opening value, plus providers linked in the window, plus deposits less withdrawals. When the history opens after the account was funded, the opening value already includes earlier market gains.'
+    );
   });
 
   it('names the provider whose deposits are unknown instead of showing a number', () => {
@@ -224,7 +227,7 @@ describe('BrokeragePnlUtils.rows', () => {
     expect(deposited.unavailable).toBe('Not measured');
     expect(deposited.note).toBe('Not measured yet');
     expect(deposited.detail).toBe(
-      'Net deposited: no deposits or withdrawals recorded yet for Interactive Brokers, so none is stated.'
+      'Capital in the window: no deposits or withdrawals recorded yet for Interactive Brokers, so none is stated.'
     );
   });
 

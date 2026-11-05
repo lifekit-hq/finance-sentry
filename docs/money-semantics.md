@@ -1135,22 +1135,23 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Brokerage realized and unrealized P&L on net deposited** (issue 982; `GET /api/v1/wealth/brokerage/pnl`, the
-  Accounts brokerage panel's three rows above "Book vs SPY"): the gain figures on the capital that went in, over
-  the growth split's window (`from` to `to`). **Net deposited** = the window's opening value + value of providers
+- **Brokerage realized and unrealized P&L on capital in the window** (issue 982; `GET /api/v1/wealth/brokerage/pnl`, the
+  Accounts brokerage panel's three rows above "Book vs SPY"): the gain figures on the capital in the window, over
+  the growth split's window (`from` to `to`). **Capital in the window** (the API's `netDepositedUsd`; the row reads "Capital in the window", not "net deposited") = the window's opening market value + value of providers
   linked inside it + deposits less withdrawals (`GetSleeveGrowthQuery`'s `startValue` + `newlyLinked` +
-  `contributed`); it is null, with `sourcesWithoutFlows` naming why, while a provider's flows are unknown.
+  `contributed`). The opening value is market value, so when the series opens after the account was funded it
+  already includes earlier market gains: this is the base the percentages divide by, not strictly money put in. It is null, with `sourcesWithoutFlows` naming why, while a provider's flows are unknown.
   **Realized** is the average-cost walk over the persisted fills (the `BrokerageCostBasisReconciler` convention:
   a buy costs `quantity x price - commission`, a sell gains `quantity x price + commission` over the released
-  average cost; each fill converted once through `CurrencyConverter`), summed over the sells dated on or after
-  `from`, closed positions included, cash and currency-conversion trades excluded. A symbol whose fills do not
+  average cost; each fill converted once through `CurrencyConverter`), summed over the sells dated strictly after
+  `from` (the opening day; the opening value already includes that day's activity, as `MeasureWindow.FlowsWithin` counts flows), closed positions included, cash and currency-conversion trades excluded. A symbol whose fills do not
   explain its history (a sell with nothing open, or an open quantity that is not the held quantity) is left out and
   named in `unavailableSymbols`, never estimated: the figure is then PARTIAL (no percent) or, with nothing
   measurable, UNAVAILABLE ("Basis unavailable"); no fills at all is UNAVAILABLE, fills with no sell in the window is
   a real zero. **Unrealized** is value minus cost over the positions whose basis the fills verify (the
   `Verified` basis state); the broker's own average cost is not used. PARTIAL carries `measured` / `total`
   positions, `coverage` (the share of value that is verified) and the unverified symbols, and no percent; only a
-  COMPLETE figure with a known net deposited carries `percentOfNetDeposited`. The two figures are parts of a gain
+  COMPLETE figure with a known capital in the window carries `percentOfNetDeposited`. The two figures are parts of a gain
   on cost, not the change in value over the window (unrealized is a point in time against cost). Computed in USD,
   converted to the base currency at today's rate by the controller.
 - **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, the Accounts crypto section's "Crypto performance"

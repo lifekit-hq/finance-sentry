@@ -11,7 +11,7 @@ public sealed record UnavailableRealizedSymbol(string Provider, string Symbol);
 
 /// <summary>
 /// The realized gain the brokerage sleeve's persisted fills lock in (average cost, commissions in), summed over the
-/// sells dated on or after the reading's <c>from</c>, in USD. Only symbols whose fills explain their whole history
+/// sells dated after the reading's <c>from</c> day, in USD. Only symbols whose fills explain their whole history
 /// are summed; a symbol that sold in the window but whose history the fills do not explain is listed in
 /// <see cref="UnavailableSymbols"/> and left out, never estimated. <see cref="HasFills"/> says whether any fill is
 /// ingested at all (no fills is "not measurable", not a zero).
@@ -48,6 +48,6 @@ public sealed record BrokeragePnlReading(RealizedPnlReading Realized, Unrealized
 public interface IBrokeragePnlReader
 {
     /// <param name="userId">The person whose sleeve is read.</param>
-    /// <param name="realizedFrom">Sells dated before this day are not counted; null counts every ingested sell.</param>
+    /// <param name="realizedFrom">Sells dated on or before this day are not counted; null counts every ingested sell.</param>
     Task<BrokeragePnlReading> ReadAsync(Guid userId, DateOnly? realizedFrom, CancellationToken ct = default);
 }

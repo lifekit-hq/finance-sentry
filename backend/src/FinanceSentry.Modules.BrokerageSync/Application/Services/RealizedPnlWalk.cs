@@ -7,7 +7,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain;
 /// One symbol's average-cost walk over its persisted fills (issue 982). <see cref="Explained"/> is false when the
 /// fills do not account for the symbol's history: a sell found nothing open to match, or the quantity the fills
 /// leave open is not the quantity held, so the cost a sell released cannot be stated. <see cref="RealizedUsd"/> is the
-/// gain of the sells dated on or after the walk's <c>from</c>; <see cref="SoldInWindow"/> says whether there were any.
+/// gain of the sells dated after the walk's <c>from</c> day; <see cref="SoldInWindow"/> says whether there were any.
 /// </summary>
 public sealed record RealizedWalkResult(bool Explained, decimal RealizedUsd, bool SoldInWindow, FxStatus Fx);
 
@@ -26,7 +26,7 @@ public static class RealizedPnlWalk
 
     /// <param name="fills">One symbol's fills at one provider, any order.</param>
     /// <param name="heldQuantity">Units held now (0 for a symbol no longer held).</param>
-    /// <param name="from">Sells dated before this day are not counted; null counts them all.</param>
+    /// <param name="from">Sells dated on or before this day are not counted (the opening close already includes that day); null counts them all.</param>
     public static RealizedWalkResult Walk(IEnumerable<BrokerageTrade> fills, decimal heldQuantity, DateOnly? from)
     {
         ArgumentNullException.ThrowIfNull(fills);
@@ -81,7 +81,7 @@ public static class RealizedPnlWalk
                 // gross is quantity (negative) x price: the proceeds are its magnitude for the matched units.
                 var proceeds = -gross.Amount * (matched / sold);
                 var gain = proceeds + commission.Amount * (matched / sold) - released;
-                if (from is not { } start || DateOnly.FromDateTime(fill.TradeDateTime) >= start)
+                if (from is not { } start || DateOnly.FromDateTime(fill.TradeDateTime) > start)
                 {
                     realizedUsd += gain;
                     soldInWindow = true;

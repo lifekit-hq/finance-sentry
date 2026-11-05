@@ -16,7 +16,7 @@ import {BrokeragePnlComponent} from '../brokerage-pnl/brokerage-pnl.component';
 /**
  * One performance panel per sleeve, as plain rows like the account rows above it: value now, contributed,
  * growth with its money-weighted return (finance-framework M2, M4), from the day the daily value history
- * starts, and for the brokerage the net deposited with its realized and unrealized P&L (issue 982) and the
+ * starts, and for the brokerage the capital in the window with its realized and unrealized P&L (issue 982) and the
  * book against SPY and QQQ. While a provider has never reported a
  * deposit the split is withheld and the panel says so, instead of reading every deposit as growth.
  */

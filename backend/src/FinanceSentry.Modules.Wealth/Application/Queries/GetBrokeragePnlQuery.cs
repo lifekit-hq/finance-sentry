@@ -24,7 +24,7 @@ public enum PnlStatus
 
 /// <summary>
 /// One side of the split. <see cref="Usd"/> is the measured amount (null when <see cref="Status"/> is UNAVAILABLE);
-/// <see cref="PercentOfNetDeposited"/> is a percentage-points figure over the net deposited, only for a COMPLETE
+/// <see cref="PercentOfNetDeposited"/> is a percentage-points figure over the capital in the window, only for a COMPLETE
 /// figure with a known denominator (a partial gain is never put over the whole book's capital).
 /// <see cref="Measured"/> / <see cref="Total"/> count what is covered (positions for unrealized, symbols that sold
 /// in the window for realized), <see cref="Coverage"/> is the measured share of value (unrealized only), and
@@ -40,12 +40,13 @@ public sealed record PnlFigure(
     IReadOnlyList<string> UnavailableSymbols);
 
 /// <summary>
-/// The brokerage sleeve's realized and unrealized P&amp;L on its net deposited (issue 982), over the window
+/// The brokerage sleeve's realized and unrealized P&amp;L on its capital in the window (issue 982), over the window
 /// <see cref="From"/> to <see cref="To"/> of the sleeve's growth split. <see cref="NetDepositedUsd"/> is the capital
-/// that entered the sleeve in that window: its opening value, the value of providers linked inside it, and the deposits
-/// less the withdrawals the brokers report. It is null, with <see cref="SourcesWithoutFlows"/> naming why, while a
-/// provider's deposits and withdrawals are unknown (they would read as return). Realized counts the sells dated in
-/// the window; unrealized is the open positions' gain over their verified cost basis today (a point in time, so
+/// the percentages are put over: the window's opening market value, the value of providers linked inside it, and the
+/// deposits less the withdrawals the brokers report. When the series opens after the account was funded, the opening
+/// value already includes earlier market gains. It is null, with <see cref="SourcesWithoutFlows"/> naming why, while a
+/// provider's deposits and withdrawals are unknown (they would read as return). Realized counts the sells dated after the
+/// opening day; unrealized is the open positions' gain over their verified cost basis today (a point in time, so
 /// <see cref="Realized"/> and <see cref="Unrealized"/> are two parts of a gain on cost, not a change in value over the
 /// window). <see cref="Fx"/> is the worst conversion status of the fills behind the realized figure.
 /// </summary>

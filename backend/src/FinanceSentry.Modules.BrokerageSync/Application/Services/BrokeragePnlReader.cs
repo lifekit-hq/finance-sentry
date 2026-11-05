@@ -113,7 +113,7 @@ public sealed class BrokeragePnlReader(BrokerageSyncDbContext db, IBrokerageHold
 
     private static bool HasSellInWindow(IEnumerable<BrokerageTrade> fills, DateOnly? from)
         => fills.Any(f => f.Quantity < 0m && f.Price > 0m
-            && (from is not { } start || DateOnly.FromDateTime(f.TradeDateTime) >= start));
+            && (from is not { } start || DateOnly.FromDateTime(f.TradeDateTime) > start));
 
     private static string Key(string provider, string symbol)
         => provider.ToLowerInvariant() + "|" + symbol.Trim().ToUpperInvariant();
