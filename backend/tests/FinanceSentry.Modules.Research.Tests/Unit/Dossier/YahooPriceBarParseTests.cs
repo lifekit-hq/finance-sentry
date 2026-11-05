@@ -17,7 +17,8 @@ public class YahooPriceBarParseTests
     {
         var series = YahooPriceBarService.Parse(Chart(
             "usd", NewYorkOffset, [Open + Day, Open],
-            open: ["11", "10"], high: ["12", "11"], low: ["10.5", "9.5"], close: ["11.5", "10.5"], volume: ["2000", "1000"]));
+            open: ["11", "10"], high: ["12", "11"], low: ["10.5", "9.5"], close: ["11.5", "10.5"], volume: ["2000", "1000"],
+            zone: "America/New_York"));
 
         series.Currency.Should().Be("USD");
         series.TimeZone.Should().Be("America/New_York");
@@ -32,9 +33,34 @@ public class YahooPriceBarParseTests
     {
         // 2026-10-13 09:00 in Tokyo is 00:00 UTC; 2026-10-13 10:00 in Sydney is 23:00 UTC the day before.
         const long sydneyOpen = 1791846000;   // 2026-10-12 23:00 UTC
-        var series = YahooPriceBarService.Parse(Chart("aud", 39_600, [sydneyOpen], ["1"], ["1"], ["1"], ["1"], ["1"]));
+        var series = YahooPriceBarService.Parse(Chart("aud", 39_600, [sydneyOpen], ["1"], ["1"], ["1"], ["1"], ["1"], zone: "Australia/Sydney"));
 
         series.Bars.Single().Date.Should().Be(new DateOnly(2026, 10, 13));
+    }
+
+    [Fact]
+    public void Parse_BarsAcrossADstChange_EachReadTheExchangeClockOfItsOwnDay()
+    {
+        // US DST ended 2026-11-01. Yahoo reports only today's offset (UTC-5); a 09:30 New York open is
+        // 13:30 UTC (EDT) on Fri 2026-10-30 and 14:30 UTC (EST) on Mon 2026-11-02.
+        var beforeChange = new DateTimeOffset(2026, 10, 30, 13, 30, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        var afterChange = new DateTimeOffset(2026, 11, 2, 14, 30, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+
+        var series = YahooPriceBarService.Parse(Chart(
+            "usd", -18_000, [beforeChange, afterChange], ["1", "1"], ["1", "1"], ["1", "1"], ["1", "1"], ["1", "1"],
+            zone: "America/New_York"));
+
+        series.Bars.Select(b => DateTimeOffset.FromUnixTimeSeconds(b.Time).UtcDateTime)
+            .Should().Equal(new DateTime(2026, 10, 30, 9, 30, 0), new DateTime(2026, 11, 2, 9, 30, 0));
+    }
+
+    [Fact]
+    public void Parse_UnknownZone_FallsBackToTheReportedOffset()
+    {
+        var series = YahooPriceBarService.Parse(Chart(
+            "usd", NewYorkOffset, [Open], ["1"], ["1"], ["1"], ["1"], ["1"], zone: "Nowhere/Atlantis"));
+
+        series.Bars.Single().Time.Should().Be(Open + NewYorkOffset);
     }
 
     [Fact]
@@ -86,12 +112,13 @@ public class YahooPriceBarParseTests
 
     private static JsonElement Chart(
         string currency, int gmtOffset, long[] timestamps,
-        string[] open, string[] high, string[] low, string[] close, string[] volume)
+        string[] open, string[] high, string[] low, string[] close, string[] volume,
+        string? zone = null)
     {
         string Join(string[] values) => string.Join(",", values);
         var json =
             "{\"chart\":{\"result\":[{" +
-            $"\"meta\":{{\"currency\":\"{currency}\",\"gmtoffset\":{gmtOffset},\"exchangeTimezoneName\":\"America/New_York\"}}," +
+            $"\"meta\":{{\"currency\":\"{currency}\",\"gmtoffset\":{gmtOffset}" + (zone is null ? string.Empty : $",\"exchangeTimezoneName\":\"{zone}\"") + "}," +
             $"\"timestamp\":[{string.Join(",", timestamps)}]," +
             "\"indicators\":{\"quote\":[{" +
             $"\"open\":[{Join(open)}],\"high\":[{Join(high)}],\"low\":[{Join(low)}]," +

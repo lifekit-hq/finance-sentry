@@ -58,15 +58,16 @@ public sealed class YahooPriceBarService(
         var result = results[0];
         string? quoted = null;
         string? timeZone = null;
-        long offset = 0;
+        long currentOffset = 0;
         if (result.TryGetProperty("meta", out var meta))
         {
             quoted = ReadString(meta, "currency");
             timeZone = ReadString(meta, "exchangeTimezoneName");
-            offset = meta.TryGetProperty("gmtoffset", out var gmt) && gmt.TryGetInt64(out var seconds) ? seconds : 0;
+            currentOffset = meta.TryGetProperty("gmtoffset", out var gmt) && gmt.TryGetInt64(out var seconds) ? seconds : 0;
         }
 
         var (currency, divisor) = MinorUnitCurrency.Normalize(quoted);
+        var zone = FindZone(timeZone);
 
         if (!result.TryGetProperty("timestamp", out var timestamps) ||
             timestamps.ValueKind is not JsonValueKind.Array ||
@@ -95,6 +96,7 @@ public sealed class YahooPriceBarService(
             }
 
             var volume = Read(quote, "volume", i) is decimal traded ? (long)traded : 0L;
+            var offset = zone is null ? currentOffset : (long)zone.GetUtcOffset(DateTimeOffset.FromUnixTimeSeconds(epoch)).TotalSeconds;
             bars.Add(new PriceBar(epoch + offset, open / divisor, high / divisor, low / divisor, close / divisor, volume));
         }
 
@@ -105,6 +107,23 @@ public sealed class YahooPriceBarService(
             .OrderBy(b => b.Time)
             .ToList();
         return new PriceBarSeries(currency, timeZone, ordered);
+    }
+
+    private static TimeZoneInfo? FindZone(string? id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return null;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return null;
+        }
     }
 
     private static decimal? Read(JsonElement quote, string name, int index)

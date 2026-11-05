@@ -11,7 +11,7 @@ public interface IPriceBarService
 }
 
 /// <summary>
-/// One bar. <see cref="Time"/> is the bar's start in epoch seconds shifted by the exchange's UTC offset (its
+/// One bar. <see cref="Time"/> is the bar's start in epoch seconds shifted by the exchange's UTC offset at that bar (its
 /// wall-clock reads as UTC), so a daily bar's date is the exchange's own trading date whatever the time zone.
 /// </summary>
 public sealed record PriceBar(long Time, decimal Open, decimal High, decimal Low, decimal Close, long Volume)
