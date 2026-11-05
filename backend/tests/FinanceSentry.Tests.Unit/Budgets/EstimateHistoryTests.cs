@@ -13,9 +13,8 @@ public sealed class EstimateHistoryTests
     private static readonly DateOnly Jan2020 = new(2020, 1, 1);
     private static readonly Guid Account = Guid.NewGuid();
 
-    // The configured defaults (September and October 2026 excluded) get their own tests; every other test reads a
-    // window with nothing excluded, so a month list means what it says.
-    private static BudgetEstimateOptions NoExclusions => new() { ExcludedMonths = [] };
+    // Nothing is excluded unless a test configures it, so a month list means what it says.
+    private static BudgetEstimateOptions NoExclusions => new();
 
     private static EstimateHistory Resolve(
         DateOnly month,
@@ -51,38 +50,16 @@ public sealed class EstimateHistoryTests
     }
 
     [Fact]
-    public void DefaultExclusionWindow_LeavesOutSeptemberAndOctober2026_AndSaysSo()
+    public void Default_ExcludesNothing_SoSeptemberAndOctober2026AreUsedForAnyone()
     {
-        // Read in November 2026: the six months back are May..October.
         var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions());
 
-        Assert.Equal(["2026-05", "2026-06", "2026-07", "2026-08"], history.UsedMonths);
-        Assert.Equal(
-            [new SkippedMonth("2026-09", SkipReasons.Excluded), new SkippedMonth("2026-10", SkipReasons.Excluded)],
-            history.Skipped);
-    }
-
-    [Fact]
-    public void ExclusionWindow_IsNotTheCoverageRule_ItAppliesWithoutAnyHole()
-    {
-        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions(), holes: []);
-
-        Assert.DoesNotContain("2026-09", history.UsedMonths);
-        Assert.DoesNotContain("2026-10", history.UsedMonths);
-    }
-
-    [Fact]
-    public void ExclusionWindow_AfterIt_ThoseMonthsAreNoLongerInAnyWindow_OnceTheyFallOutOfTheLookback()
-    {
-        // In May 2027 the lookback is Nov 2026..Apr 2027: the excluded months are behind it, nothing to skip.
-        var history = Resolve(new DateOnly(2027, 5, 1), new DateOnly(2027, 5, 1), options: new BudgetEstimateOptions());
-
+        Assert.Equal(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"], history.UsedMonths);
         Assert.Empty(history.Skipped);
-        Assert.Equal(6, history.UsedMonths.Count);
     }
 
     [Fact]
-    public void ConfiguredExclusion_ReplacesTheDefault()
+    public void ConfiguredExclusion_LeavesOutOnlyThoseMonths()
     {
         var options = new BudgetEstimateOptions { ExcludedMonths = ["2026-07"] };
 
@@ -90,17 +67,6 @@ public sealed class EstimateHistoryTests
 
         Assert.Equal(["2026-05", "2026-06", "2026-08", "2026-09", "2026-10"], history.UsedMonths);
         Assert.Equal([new SkippedMonth("2026-07", SkipReasons.Excluded)], history.Skipped);
-    }
-
-    [Fact]
-    public void EmptyConfiguredExclusion_ExcludesNothing()
-    {
-        var options = new BudgetEstimateOptions { ExcludedMonths = [] };
-
-        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: options);
-
-        Assert.Equal(6, history.UsedMonths.Count);
-        Assert.Empty(history.Skipped);
     }
 
     [Fact]
@@ -134,7 +100,7 @@ public sealed class EstimateHistoryTests
     {
         var hole = new CoverageHoleSpan(Account, new DateOnly(2026, 9, 7), null);
 
-        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions(), holes: hole);
+        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] }, holes: hole);
 
         Assert.Equal(
             [new SkippedMonth("2026-09", SkipReasons.Excluded), new SkippedMonth("2026-10", SkipReasons.Excluded)],
@@ -182,7 +148,7 @@ public sealed class EstimateHistoryTests
     {
         var hole = new CoverageHoleSpan(Account, new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 31));
 
-        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions(), holes: hole);
+        var history = Resolve(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), options: new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] }, holes: hole);
 
         Assert.Equal(["2026-05", "2026-08"], history.UsedMonths);
         Assert.False(history.IsEnough);

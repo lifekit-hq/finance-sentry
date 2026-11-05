@@ -1685,12 +1685,13 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   the six before itself, the current or a future month from the six before the current one. Months before the
   person's first transaction are "no data", not zero. A line with no spend in a usable month counts that month as
   zero: a quiet month is information, a missing one is not.
-- **Left out, not zero.** A month is skipped (never counted as 0) when (1) it is on the exclusion list
-  (`Budgets:Estimates:ExcludedMonths`; default 2026-09 and 2026-10, because card spend moved to a Revolut card the
-  bank link does not expose; setting the key replaces the list, an empty list lifts it) or (2) a coverage hole
-  (section 9) overlaps it, open holes included. The page names the skipped months in plain words (an excluded month is "left out of these estimates", with no
-  claim about where the spending went, since the list is the same for every person; a coverage-hole month says the bank
-  link has a gap there).
+- **Left out, not zero.** A month is skipped (never counted as 0) when (1) a coverage hole (section 9) of that person
+  overlaps it, open holes included, or (2) it is on the optional exclusion list (`Budgets:Estimates:ExcludedMonths`,
+  empty by default; it applies to every user of the deployment, so it is for a gap that hits all of them, never one
+  person's). The Sep/Oct 2026 default that once sat there is gone: the owner's card gap is found per person from
+  `coverage_holes`, and another user's Sep/Oct history is used. The page names the skipped months in plain words (a
+  coverage-hole month says the bank link has a gap there; a configured month is "left out of these estimates", with no
+  claim about where the spending went).
 - **Estimate.** The median of the usable months per line (`Projection.Median`). Below
   `Projection.MinCompleteMonths` (3) usable months nothing is suggested from history; the page says how many months it
   has. Lines with a zero median and no spend this month are hidden; a line with spend and no estimate shows as spend.

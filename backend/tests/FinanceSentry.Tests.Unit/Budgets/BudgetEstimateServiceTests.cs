@@ -25,6 +25,7 @@ public sealed class BudgetEstimateServiceTests
     private readonly List<CommitmentOnLine> _endedCommitments = [];
     private readonly List<CoverageHoleSpan> _holeSpans = [];
     private BudgetEstimateOptions _options = new();
+    private static readonly Guid OtherUserId = Guid.NewGuid();
     private DateOnly? _firstDataDay = FirstData;
 
     public BudgetEstimateServiceTests()
@@ -33,6 +34,10 @@ public sealed class BudgetEstimateServiceTests
             .ReturnsAsync(() => new MonthlyCategorySpend(_firstDataDay, [.. _rows], [.. _commitments], [.. _endedCommitments]));
         _holes.Setup(h => h.GetHolesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => [.. _holeSpans]);
+        _spend.Setup(s => s.GetAsync(OtherUserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new MonthlyCategorySpend(_firstDataDay, [.. _rows], [.. _commitments], [.. _endedCommitments]));
+        _holes.Setup(h => h.GetHolesAsync(OtherUserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private BudgetEstimateService Service() =>
@@ -61,8 +66,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task Estimate_IsTheMedianOfTheUsableMonths()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        string[] months = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"];
+                string[] months = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"];
         foreach (var (m, v) in months.Zip<string, decimal>([300m, 310m, 320m, 330m, 340m, 900m]))
             Spend(m, "FOOD_AND_DRINK", v);
 
@@ -93,12 +97,12 @@ public sealed class BudgetEstimateServiceTests
         Assert.Empty(summary.Items);
     }
 
-    // -- the exclusion window (September and October 2026) --------------------------------------------------
+    // -- the configured exclusion list ------------------------------------------------------------------------
 
     [Fact]
-    public async Task ExclusionWindow_SeptemberAndOctober2026_NeverReachTheEstimate()
+    public async Task ExclusionWindow_ConfiguredMonths_NeverReachTheEstimate()
     {
-        // The card moved off the bank link in the autumn: food reads as nearly nothing in those two months.
+        _options = new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] };
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-05", "2026-06", "2026-07", "2026-08");
         SpendEveryMonth("FOOD_AND_DRINK", 5m, "2026-09", "2026-10");
 
@@ -115,6 +119,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task ExclusionWindow_ExcludedMonthsAreSkippedNotZero_SoTheMedianIsNotDraggedDown()
     {
+        _options = new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] };
         // Counted as zeros, 4 real months (400) and 2 empty ones would give a median of 400 only by luck; with
         // three real months and two skipped ones the zeros would win. The skipped months must not count at all.
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-06", "2026-07", "2026-08");
@@ -127,6 +132,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task ExclusionWindow_LeavesTooLittleHistory_SoNoEstimateIsInvented()
     {
+        _options = new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] };
         _firstDataDay = new DateOnly(2026, 7, 1);
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-07", "2026-08");
         SpendEveryMonth("FOOD_AND_DRINK", 5m, "2026-09", "2026-10");
@@ -139,9 +145,8 @@ public sealed class BudgetEstimateServiceTests
     }
 
     [Fact]
-    public async Task ExclusionWindow_CanBeLifted_ByConfiguration()
+    public async Task ExclusionWindow_IsEmptyByDefault_SoNoMonthIsLeftOutForAnyone()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-05", "2026-06", "2026-07", "2026-08");
         SpendEveryMonth("FOOD_AND_DRINK", 100m, "2026-09", "2026-10");
 
@@ -155,6 +160,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task ExclusionWindow_StillShowsWhatIsSpentInThoseMonthsWhenTheyAreViewed()
     {
+        _options = new BudgetEstimateOptions { ExcludedMonths = ["2026-09", "2026-10"] };
         // Viewing October itself: its spend is shown as spend; only the learning skips it.
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-04", "2026-05", "2026-06", "2026-07", "2026-08");
         Spend("2026-10", "FOOD_AND_DRINK", 5m);
@@ -169,10 +175,34 @@ public sealed class BudgetEstimateServiceTests
     // -- the coverage-hole rule -----------------------------------------------------------------------------
 
     [Fact]
+    public async Task CoverageHole_IsPerPerson_TheOwnersGapNeverSkipsAnotherUsersMonths()
+    {
+        // May is as cheap as the autumn months, so a median that keeps September and October differs from one that
+        // drops them. Only the first person has a hole over the autumn; the second spends on the same ledger shape.
+        Spend("2026-05", "FOOD_AND_DRINK", 5m);
+        SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-06", "2026-07", "2026-08");
+        SpendEveryMonth("FOOD_AND_DRINK", 5m, "2026-09", "2026-10");
+        _holeSpans.Add(new CoverageHoleSpan(Account, new DateOnly(2026, 9, 7), null));
+        var asOf = new DateTime(2026, 11, 15);
+
+        var service = Service();
+        var holder = await service.ComputeAsync(UserId, 2026, 11, asOf, []);
+        var other = await service.ComputeAsync(OtherUserId, 2026, 11, asOf, []);
+
+        Assert.Equal(["2026-09", "2026-10"], holder.SkippedMonths.Select(s => s.Month));
+        Assert.All(holder.SkippedMonths, s => Assert.Equal(SkipReasons.CoverageGap, s.Reason));
+        Assert.Equal(4, holder.HistoryMonthsUsed);
+        Assert.Equal(400m, Assert.Single(holder.Items).Estimate);
+
+        Assert.Empty(other.SkippedMonths);
+        Assert.Equal(6, other.HistoryMonthsUsed);
+        Assert.NotEqual(400m, Assert.Single(other.Items).Estimate);
+    }
+
+    [Fact]
     public async Task CoverageHole_MonthIsSkippedNotZero_SoAQuietPeriodIsNotReadAsFrugal()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-01", "2027-02", "2027-04", "2027-05");
+                SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-01", "2027-02", "2027-04", "2027-05");
         // March is quiet because of the hole: counted as a zero it would drag the median down.
         _holeSpans.Add(new CoverageHoleSpan(Account, new DateOnly(2027, 3, 8), new DateOnly(2027, 3, 28)));
 
@@ -188,8 +218,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task CoverageHole_OpenHoleSkipsEveryLaterMonth()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-12", "2027-01", "2027-02", "2027-03");
+                SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-12", "2027-01", "2027-02", "2027-03");
         _holeSpans.Add(new CoverageHoleSpan(Account, new DateOnly(2027, 4, 5), null));
 
         var summary = await Month(2027, 6);
@@ -201,8 +230,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task CoverageHole_AMonthOfRealZeroSpendOutsideAnyHoleStillCountsAsZero()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        // Travel in 1 of 6 months, no hole: the median is 0.
+                // Travel in 1 of 6 months, no hole: the median is 0.
         Spend("2027-01", "TRAVEL", 900m);
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
 
@@ -214,8 +242,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task MonthsBeforeTheFirstData_AreNoData_NotZero()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        _firstDataDay = new DateOnly(2027, 2, 1);
+                _firstDataDay = new DateOnly(2027, 2, 1);
         SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-02", "2027-03", "2027-04");
 
         var summary = await Month(2027, 5);
@@ -229,8 +256,7 @@ public sealed class BudgetEstimateServiceTests
 
     private void SixMonthsOfFood(decimal usd)
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("FOOD_AND_DRINK", usd, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("FOOD_AND_DRINK", usd, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
     }
 
     [Fact]
@@ -346,8 +372,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task Commitment_ReplacesTheMedianOnACommittedLine_ForTheCurrentMonth()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("LOAN_PAYMENTS", 226m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("LOAN_PAYMENTS", 226m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
         _commitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 182m, null));
 
         var summary = await Month(2027, 6);
@@ -360,8 +385,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task CommittedLine_WhoseInstallmentWasPaidOff_GetsNoSuggestion_NotTheMedianOfTheFinishedPayments()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
         _endedCommitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 5, 1)));
 
         var summary = await Month(2027, 6);
@@ -374,8 +398,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task CommittedLine_WhoseRentStopped_GetsNoSuggestion()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
         _endedCommitments.Add(new CommitmentOnLine("RENT_AND_UTILITIES", 900m, null));
 
         var summary = await Month(2027, 6);
@@ -387,8 +410,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task CommittedLine_ThatNeverHadACommitment_KeepsTheMedian()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("RENT_AND_UTILITIES", 900m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
 
         var summary = await Month(2027, 6);
 
@@ -400,8 +422,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task EndedCommitment_DoesNotSuppressThePastMonthsOwnMedian()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("LOAN_PAYMENTS", 200m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
         _endedCommitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 200m, new DateOnly(2027, 5, 1)));
 
         var summary = await Service().ComputeAsync(UserId, 2027, 4, new DateTime(2027, 6, 15), []);
@@ -412,8 +433,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task Commitment_DoesNotRewriteAPastMonth()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("LOAN_PAYMENTS", 226m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("LOAN_PAYMENTS", 226m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
         _commitments.Add(new CommitmentOnLine("LOAN_PAYMENTS", 182m, null));
 
         var summary = await Service().ComputeAsync(UserId, 2027, 4, new DateTime(2027, 6, 15), []);
@@ -439,8 +459,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task MonthEnd_OfAPastMonth_IsWhatWasSpent()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-01", "2027-02", "2027-03");
+                SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-01", "2027-02", "2027-03");
         Spend("2027-04", "FOOD_AND_DRINK", 380m);
 
         var summary = await Service().ComputeAsync(UserId, 2027, 4, new DateTime(2027, 6, 15), []);
@@ -464,8 +483,7 @@ public sealed class BudgetEstimateServiceTests
     [Fact]
     public async Task HouseholdLine_IsALineOfItsOwn_WithAReadableLabel()
     {
-        _options = new BudgetEstimateOptions { ExcludedMonths = [] };
-        SpendEveryMonth("HOUSEHOLD", 330m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
+                SpendEveryMonth("HOUSEHOLD", 330m, "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05");
 
         var summary = await Month(2027, 6);
 
