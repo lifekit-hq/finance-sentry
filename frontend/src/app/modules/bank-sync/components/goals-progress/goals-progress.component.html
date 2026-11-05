@@ -1,0 +1,81 @@
+<cmn-card data-testid="goals-progress">
+  <div class="space-y-cmn-3">
+    <span class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary">
+      Goals
+    </span>
+
+    <!-- The host's own spacing lays out the children; the keep-content wrapper would put them in one box. -->
+    <cmn-async-state
+      [status]="store.view().status"
+      [errorMessage]="store.view().errorMessage"
+      [isEmpty]="store.isEmpty()"
+      [emptyMessage]="emptyMessage"
+      [emptySubMessage]="emptySubMessage"
+      [keepContent]="false"
+      (retry)="store.load()"
+      class="block space-y-cmn-3"
+      errorPlacement="above"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-3">
+        @for (_ of skeletonRows; track $index) {
+          <cmn-skeleton height="3.5rem" />
+        }
+      </div>
+
+      @if (store.rows().length > 0) {
+        <ul class="space-y-cmn-3" data-testid="goals-list">
+          @for (row of store.rows(); track $index) {
+            <li class="space-y-cmn-1" data-testid="goal-row">
+              <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+                <span class="font-headline text-cmn-md font-semibold text-text-primary">
+                  {{ row.label }}
+                </span>
+                <cmn-tag [variant]="row.trackVariant" data-testid="goal-track">
+                  {{ row.trackLabel }}
+                </cmn-tag>
+              </div>
+              <p class="text-cmn-sm text-text-secondary" data-testid="goal-target">
+                {{ row.target }}
+                @if (row.monthsLeft) {
+                  · <span data-testid="goal-months-left">{{ row.monthsLeft }}</span>
+                }
+                · {{ row.priority }}
+              </p>
+              @if (row.required) {
+                <p class="text-cmn-sm text-text-primary" data-testid="goal-required">
+                  {{ row.required }}
+                </p>
+              }
+              @if (row.projected) {
+                <p class="text-cmn-xs text-text-secondary" data-testid="goal-projected">
+                  {{ row.projected }}
+                </p>
+              }
+              @if (row.note) {
+                <p class="text-cmn-xs text-text-secondary" data-testid="goal-note">
+                  {{ row.note }}
+                </p>
+              }
+            </li>
+          }
+        </ul>
+
+        @if (store.plan(); as plan) {
+          <p class="text-cmn-sm text-text-secondary" data-testid="goals-plan">{{ plan }}</p>
+        }
+
+        @if (store.hasStaleSleeves()) {
+          <cmn-alert variant="warning" data-testid="goals-stale"
+            >Some account data is stale — carried forward from the last successful sync, so these
+            figures are an estimate.</cmn-alert
+          >
+        }
+
+        <p class="text-cmn-xs leading-relaxed text-text-secondary" data-testid="goals-assumptions">
+          {{ store.assumptions() }}
+        </p>
+      }
+    </cmn-async-state>
+  </div>
+</cmn-card>

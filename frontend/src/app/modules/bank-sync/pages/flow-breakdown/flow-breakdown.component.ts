@@ -29,6 +29,7 @@ import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.p
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {CashflowProfileComponent} from '../../components/cashflow-profile/cashflow-profile.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
+import {GoalsProgressComponent} from '../../components/goals-progress/goals-progress.component';
 import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
 import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
 import {NetWorthProjectionComponent} from '../../components/net-worth-projection/net-worth-projection.component';
@@ -59,6 +60,7 @@ const DRAWER_WIDTH = '480px';
     DecimalPipe,
     EmptyStateComponent,
     FireTileComponent,
+    GoalsProgressComponent,
     PaydayTransferTileComponent,
     ListItemRowComponent,
     MonthStepperComponent,

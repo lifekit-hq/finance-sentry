@@ -101,6 +101,33 @@ const CASHFLOW_PROFILE = {
   disclosure: 'Context only.',
 };
 
+const GOALS = {
+  status: 'Shown',
+  currentNetWorth: 100_000,
+  monthlySavings: 1_000,
+  completeMonths: 6,
+  goals: [
+    {
+      label: 'House deposit',
+      targetAmount: 130_000,
+      targetDate: '2028-09-26',
+      priority: 'high',
+      monthsLeft: 24,
+      requiredMonthlySaving: {low: 700, central: 785, high: 900},
+      projectedAtTargetDate: {low: 132_000, central: 135_000, high: 138_000},
+      alreadyReached: false,
+      onTrack: 'OnTrack',
+      reason: null,
+    },
+  ],
+  contributionPlan: null,
+  realAnnualReturnRange: {low: 0.02, central: 0.05, high: 0.08},
+  hasStaleSleeves: false,
+  baseCurrency: 'USD',
+  basis: 'Goals are measured against your whole net worth plus your savings.',
+  disclosure: 'Hypothetical, not a guarantee.',
+};
+
 const FIRE = {
   status: 'Projected',
   target: 930_000,
@@ -131,6 +158,7 @@ describeVisualBaseline({
     await mockGet(page, 'wealth/income-lens', INCOME_LENS);
     await mockGet(page, 'wealth/fire', FIRE);
     await mockGet(page, 'wealth/cashflow-profile', CASHFLOW_PROFILE);
+    await mockGet(page, 'wealth/goals', GOALS);
   },
   ready: async page => {
     await expect(page.getByText('Tesco Groceries').locator('visible=true').first()).toBeVisible();
@@ -138,5 +166,6 @@ describeVisualBaseline({
     await expect(page.getByTestId('net-worth-projection')).toBeVisible();
     await expect(page.getByTestId('fire-assumptions')).toBeVisible();
     await expect(page.getByTestId('cashflow-assumptions')).toBeVisible();
+    await expect(page.getByTestId('goals-assumptions')).toBeVisible();
   },
 });
