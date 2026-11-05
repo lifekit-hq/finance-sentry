@@ -23,6 +23,7 @@ using Xunit;
 /// with their data download (export) - and nobody else's do.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(PostgresClusterStateCollection.Name)]
 public sealed class AuditTrailTests : IAsyncLifetime
 {
     private readonly Guid _personA = Guid.NewGuid();
@@ -181,11 +182,15 @@ public sealed class AuditTrailTests : IAsyncLifetime
         const int batchSize = 5;
         const int pageSize = 2;
         var fields = Enumerable.Range(0, batchSize).Select(i => $"Field{i}").ToArray();
-        await RecordAsync(fields.Select(field => Entry(_personA, [field])).ToArray());
 
-        await using var factory = new PostgresApiFactory(_database!.ConnectionString);
+        // The API migrates the database itself, so it gets a fresh one rather than the EnsureCreated database above.
+        await using var apiDatabase = await PostgresServer.Postgres14.CreateDatabaseAsync(resetsClusterRoles: true);
+        await using var factory = new PostgresApiFactory(apiDatabase.ConnectionString);
         factory.CreateClient().Dispose();
         await factory.CreateAccountAsync(_personA, AuthRoles.Member);
+        using (var scope = factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IAuditTrail>()
+                .RecordAsync(fields.Select(field => Entry(_personA, [field])).ToArray());
         using var client = await factory.ClientForAsync(_personA);
 
         var seen = new List<string>();
