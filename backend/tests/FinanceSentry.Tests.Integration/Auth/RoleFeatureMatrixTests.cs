@@ -32,6 +32,7 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
     private const string Scorecard = "scorecard";
     private const string ScorecardVerdicts = "scorecard-verdicts";
     private const string Decisions = "decisions";
+    private const string UniverseScreen = "universe-screen";
 
     /// <summary>Feature, permission it needs, and the request that reaches it.</summary>
     private static readonly Dictionary<string, (string Permission, HttpMethod Method, string Path)> Features = new()
@@ -46,6 +47,8 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
         // The Accounts chips' batch read of the same words: the same gate, never a word for a Member.
         [ScorecardVerdicts] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/scorecards/verdicts?symbols=AAPL,MSFT"),
         [Decisions] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/recommendations"),
+        // The ranked universe screen carries a verdict word and a suggested weight per name: the same gate.
+        [UniverseScreen] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/portfolio-construction/universe"),
     };
 
     public static TheoryData<string> AllFeatures() => [.. Features.Keys];

@@ -57,12 +57,16 @@ describe('MorePageComponent', () => {
       '/subscriptions',
       '/events',
       '/watchlist',
+      '/construction',
       '/ledger',
     ]);
   });
 
-  it('leaves out Ledger without the AI permission, as the sidebar does', () => {
-    expect(navLinks(render([]))).not.toContain('/ledger');
+  it('leaves out Ledger and Construction without the AI permission, as the sidebar does', () => {
+    const links = navLinks(render([]));
+
+    expect(links).not.toContain('/ledger');
+    expect(links).not.toContain('/construction');
   });
 
   it('keeps Settings out of the nav list and reaches it from the account card', () => {

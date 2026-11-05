@@ -138,6 +138,12 @@ The dossier header adoption of the strip is #824's own slice.
 fixture (`VerdictRulesTests`); calibrating against stored `CandidateScore` rows stays open, as do steps 2-6. See the
 spec's [Build status](./spec.md#build-status-verdict-only-slice).
 
+**Built ahead of this shape (2026-11-05)**: the first part of steps 3 and 5 without steps 2 and 4: the
+`PortfolioConstruction` module (archetype config, pure constructor, read-time universe with scorecards cached per
+symbol, no migration) and the owner-only `/construction` universe screen. Persisted universe scorecards, the
+evaluator, the IPS archetype field, MCP and gap mode remain. See the spec's
+[Build status](./spec.md#build-status-universe-screen-and-constructor-slice).
+
 ## Risks
 
 - **Verdict is a trade call.** The owner chose `STRONG BUY / BUY / WAIT / AVOID` (spec OQ-3). Mitigated by the

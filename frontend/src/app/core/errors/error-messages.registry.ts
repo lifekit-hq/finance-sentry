@@ -10,6 +10,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   ACCOUNT_NOT_INVITED: 'This sign-in has no access to Finance Sentry. Ask the owner for access.',
   ACCOUNT_UNAVAILABLE:
     'This account is locked or has been revoked. Try again later or ask the owner.',
+  UNKNOWN_ARCHETYPE: 'That archetype does not exist. Pick one from the list.',
   OIDC_FAILED: 'Sign-in failed. Please try again.',
   CANNOT_REVOKE_SELF: 'You cannot revoke your own access.',
   CANNOT_REVOKE_OWNER: "The owner's access cannot be revoked.",
