@@ -32,6 +32,15 @@ describe('PrivacyComponent', () => {
     expect(root.textContent).toContain('has not had legal review');
   });
 
+  it('discloses the access record for declared profile data, fields only and never values', () => {
+    const {root} = setup(false);
+    const text = (root.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(text).toContain('An access record for the personal details you declare');
+    expect(text).toContain('never the values themselves');
+    expect(text).toContain('the access record after about 13 months');
+  });
+
   it('names the data export and account closure as the reader’s choices', () => {
     const {root} = setup(false);
 

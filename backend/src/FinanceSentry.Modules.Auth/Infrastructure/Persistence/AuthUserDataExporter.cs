@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 
 /// <summary>
 /// Exports the person's account: the profile and preferences on the Identity user, their roles and their per-person
-/// permission grants. Never the password hash or security stamps, the sign-in links to the identity provider, or any
+/// permission grants, and the audit events about their declared data (ids and field names). Never the password hash or security stamps, the sign-in links to the identity provider, or any
 /// refresh token, MCP code or MCP service token (the credential rows <see cref="AuthUserDataEraser"/> deletes): those
 /// let the holder act as the person, they are not data about them. Written column by column, not by serialising the
 /// Identity entity, so a column Identity adds later is not exported by accident.
@@ -62,5 +63,24 @@ internal sealed class AuthUserDataExporter(AuthDbContext db) : IUserDataExporter
             .ToListAsync(ct);
         writer.WritePropertyName("permissionGrants");
         OwnedRowExporter.WriteJson(writer, grants, grants.GetType(), ExportJson.Options);
+
+        // The trail of access to their own declared data: ids and field names, as stored. Never other people's events.
+        var auditEvents = await db.AuditEvents.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(e => e.SubjectUserId == userId)
+            .OrderBy(e => e.OccurredAt)
+            .Select(e => new
+            {
+                e.Id,
+                e.OccurredAt,
+                ActorKind = e.ActorKind.ToString(),
+                Action = e.Action.ToString(),
+                e.ResourceType,
+                e.ResourceId,
+                e.FieldNames,
+                e.TraceId,
+            })
+            .ToListAsync(ct);
+        writer.WritePropertyName("audit_events");
+        OwnedRowExporter.WriteJson(writer, auditEvents, auditEvents.GetType(), ExportJson.Options);
     }
 }

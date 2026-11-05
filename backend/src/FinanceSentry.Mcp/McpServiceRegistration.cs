@@ -1,12 +1,15 @@
 using System.Reflection;
+using FinanceSentry.Core.Auditing;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Integration;
 using FinanceSentry.Mcp.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp;
@@ -72,6 +75,15 @@ public static class McpServiceRegistration
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
         services.AddScoped<ICurrentUser, IdentityResolverCurrentUser>();
+
+        // The audit trail's actor on this host is the kind of MCP token the call came in on (stdio is the person's own).
+        services.Replace(ServiceDescriptor.Scoped<IAuditActor>(sp =>
+        {
+            var http = sp.GetRequiredService<IHttpContextAccessor>();
+            return new AuditActor(sp.GetRequiredService<ICurrentUser>(), () => FinanceSentry.Mcp.Authentication.McpAuthenticationExtensions.IsServiceToken(http.HttpContext?.User)
+                ? AuditActorKind.McpService
+                : AuditActorKind.McpPersonal);
+        }));
 
         foreach (var toolType in McpAssembly.GetTypes()
             .Where(t => !t.IsAbstract && !t.IsInterface && t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null))

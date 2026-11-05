@@ -102,6 +102,7 @@ public sealed class RetentionPolicyRegistryTests
     // The governed growing tables the generic engine actively purges (research D9).
     [InlineData("bank_sync", "SyncJobs", "CreatedAt")]
     [InlineData("analytics", "query_audit", "CreatedAt")]
+    [InlineData("auth", "audit_events", "OccurredAt")]
     [InlineData("companion", "companion_events", "CapturedAt")]
     [InlineData("companion", "push_deliveries", "CreatedAt")]
     [InlineData("research", "candidate_scores", "ScoredAt")]
@@ -119,7 +120,7 @@ public sealed class RetentionPolicyRegistryTests
     public void Generic_purge_set_matches_expected_count()
     {
         // Guards against accidental additions/removals to the actively-purged set.
-        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(14);
+        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(15);
     }
 
     [Fact]

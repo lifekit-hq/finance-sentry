@@ -46,6 +46,13 @@ Provider credentials are encrypted in the application (AES-256-GCM, `Encryption:
 database**; a restored database without them cannot decrypt stored credentials. To rotate, add the new key version,
 bump `CurrentKeyVersion`, and keep every old version until all rows are re-encrypted. Never commit keys.
 
+Declared profile data (income, goals, career amounts) is encrypted per field with the same service and keys, into one
+text column of the form `v{keyVersion}.{iv}.{tag}.{ciphertext}` (`EncryptedField`; `IsEncrypted(...)` on the property).
+The key version travels with the value, and `EncryptedFieldRotationTarget<TContext>` re-seals every such column of a
+context under the current key at startup, like the credential stores. Transactions and balances are **not**
+field-encrypted: salary credits sit in plaintext in `transactions`, so an encrypted declared income is defence in depth
+against a narrower leak (a partial dump, a log line), not a confidentiality boundary for income as a fact.
+
 ## Erasure
 
 Do not delete rows by hand. Account closure (Settings → Danger zone) starts a grace period and the `account-purge`
