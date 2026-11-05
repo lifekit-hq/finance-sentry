@@ -78,6 +78,8 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   MACRO_STATUS_INVALID: 'Unknown macro event status. Use scheduled or released.',
   BUDGET_NOT_FOUND: 'Budget not found.',
   MANUAL_HOLDING_NOT_FOUND: 'That value is no longer there. Refresh to see your current list.',
+  INCOME_SOURCE_NOT_FOUND:
+    'That income source is no longer there. Refresh to see your current list.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'That budget category is not recognized. Pick one from the list.',
   BUDGET_INVALID_LIMIT: 'Budget limit must be greater than zero.',

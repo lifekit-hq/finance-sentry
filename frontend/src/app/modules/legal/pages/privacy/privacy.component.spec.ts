@@ -41,6 +41,14 @@ describe('PrivacyComponent', () => {
     expect(text).toContain('the access record after about 13 months');
   });
 
+  it('discloses the declared income, with its name and amount stored encrypted', () => {
+    const {root} = setup(false);
+    const text = (root.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(text).toContain('The income you declare in Settings');
+    expect(text).toContain('The name and amount are stored encrypted');
+  });
+
   it('names the data export and account closure as the reader’s choices', () => {
     const {root} = setup(false);
 

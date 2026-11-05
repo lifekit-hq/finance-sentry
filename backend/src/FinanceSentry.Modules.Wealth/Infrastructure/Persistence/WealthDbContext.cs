@@ -1,14 +1,34 @@
 namespace FinanceSentry.Modules.Wealth.Infrastructure.Persistence;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Wealth.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
-public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrentUser currentUser)
-    : OwnerScopedDbContext(options, currentUser)
+/// <summary>
+/// The encryption service is the process's credential service, which only the worker host (the API) holds. A host
+/// without it (the MCP host, issue #613) passes none, and the encrypted columns of <see cref="IncomeSource"/> are bound
+/// to <see cref="KeylessFieldEncryption"/>: the model is the same, reading or writing one of them throws, and a query that
+/// projects the plain columns works.
+/// </summary>
+public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
 {
+    private readonly ICredentialEncryptionService? _encryption;
+
+    /// <summary>A host without the key: the one DI picks when no encryption service is registered.</summary>
+    public WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrentUser currentUser)
+        : this(options, currentUser, null)
+    {
+    }
+
+    public WealthDbContext(
+        DbContextOptions<WealthDbContext> options, ICurrentUser currentUser, ICredentialEncryptionService? encryption)
+        : base(options, currentUser)
+        => _encryption = encryption;
+
     /// <summary>Name of the soft-delete filter on <see cref="ManualHolding"/>; the scope-change reader opts out by name.</summary>
     public const string ManualHoldingActiveFilterName = "NotRemoved";
 
@@ -20,6 +40,21 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
     public DbSet<NetWorthSnapshotSource> NetWorthSnapshotSources { get; set; } = null!;
 
     public DbSet<ManualHolding> ManualHoldings { get; set; } = null!;
+
+    public DbSet<IncomeSource> IncomeSources { get; set; } = null!;
+
+    public ICredentialEncryptionService Encryption => _encryption ?? KeylessFieldEncryption.Instance;
+
+    /// <summary>Whether this host holds the key to the encrypted columns.</summary>
+    public bool HoldsEncryptionKey => _encryption is not null;
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+
+        // The encrypted columns' converter binds the encryption service when the model is built; keep one model per service.
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, FieldEncryptionModelCacheKeyFactory>();
+    }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -98,5 +133,25 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         manual.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         manual.Property(x => x.RemovedAt).HasColumnName("removed_at");
         manual.HasIndex(x => x.UserId).HasDatabaseName("idx_manual_holdings_user");
+
+        // Declared income (#454 S4). Label and Amount are field-encrypted into one text column each (the property stays
+        // plaintext in code); the shape columns stay readable so a host without the key can still describe the sources.
+        // Kind, cadence and basis are stored by name (the enum convention).
+        var income = modelBuilder.Entity<IncomeSource>();
+        income.ToTable("income_sources");
+        income.HasKey(x => x.Id);
+        income.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+        income.Property(x => x.Kind).HasColumnName("kind").IsRequired().HasMaxLength(16);
+        income.Property(x => x.Label).HasColumnName("label").IsRequired().IsEncrypted(Encryption);
+        income.Property(x => x.Amount).HasColumnName("amount").IsRequired().IsEncrypted(Encryption);
+        income.Property(x => x.Currency).HasColumnName("currency").IsRequired().HasMaxLength(3);
+        income.Property(x => x.Cadence).HasColumnName("cadence").IsRequired().HasMaxLength(16);
+        income.Property(x => x.GrossOrNet).HasColumnName("gross_or_net").IsRequired().HasMaxLength(16);
+        income.Property(x => x.StartDate).HasColumnName("start_date");
+        income.Property(x => x.EndDate).HasColumnName("end_date");
+        income.Property(x => x.CreatedAt).HasColumnName("created_at");
+        income.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        income.Ignore(x => x.MonthlyEquivalent);
+        income.HasIndex(x => x.UserId).HasDatabaseName("idx_income_sources_user");
     }
 }

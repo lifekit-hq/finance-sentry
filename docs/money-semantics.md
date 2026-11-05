@@ -1883,3 +1883,31 @@ under the position card). Computed on read; it stores nothing and needs no migra
 - **Boundaries.** Context for the person's own planning, never advice or a tax return: every context carries the
   refer-to-Revenue/adviser line, and the MCP description says the same and tells the agent not to estimate tax itself for a
   withheld position. No tax identifier or tax profile is stored; the annual tax pack (#435) is out of scope.
+
+## 18. Declared income (#454 S4)
+
+What the person says they receive, next to what landed. Stored (`wealth.income_sources`, `IncomeSource`, Wealth;
+`GET/POST /wealth/income-sources`, `PUT/DELETE /wealth/income-sources/{id}`, `POST .../{id}/retire`; Settings →
+Money profile; MCP `get_income_profile`), unlike the computed reads before it. **It is context: a declared figure never
+replaces the observed income (§15) in any projection, goal or runway.**
+
+- **Fields.** `kind` (Salary, Side, Other), `label` and `amount` (both field-encrypted at rest), `currency`, `cadence`
+  (Monthly, Weekly, Fortnightly, Annual, Irregular), `grossOrNet`, `startDate`, `endDate` (null while it continues).
+  The amount is **per cadence, in the source's own currency**; the person types what the payslip or invoice says.
+- **Monthly equivalent** = amount × (12 / 12 monthly, 52 / 12 weekly, 26 / 12 fortnightly, 1 / 12 annual), rounded to
+  two decimals. An **irregular** source has none (null): a guess would pass as a fact. The DTO carries it in the
+  source's currency; the MCP read converts it **once, at the read**, with `CurrencyConverter.ToUsd` and sums the USD.
+- **Active** means `startDate <= today <= endDate` (a null end is open). A retired source (`endDate` set to today, or
+  to its start date if it has not started) stays listed as history and adds nothing to the declared total.
+- **`declaredMonthlyUsd`** = the sum of the active, non-irregular sources' USD monthly equivalents, with `declaredBasis`
+  `Net`, `Gross` or `Mixed`. Null when there is nothing to sum.
+- **Variance** against `observedMonthlyUsd` (the cashflow profile's `incomeMonthlyMedian`, §15): `Matches` when
+  observed is within 10% of declared, otherwise `ObservedLower` / `ObservedHigher`. Resolved in this order:
+  `NoDeclared` (no active source), `NoObserved` (the cashflow profile withheld its income), `NotComparable` (the
+  declared total is not a pure **Net** figure: observed income is what landed after tax, so a gross or mixed
+  declaration, or only irregular sources, is shown but not held against it), then the comparison. `DeclaredUnreadable`
+  replaces all of them on a host that holds no encryption key.
+- **No key on the MCP host.** The MCP host holds no encryption key (#613), so it cannot decrypt `label` or `amount`.
+  There the read returns each source's plain columns only (kind, currency, cadence, basis, dates, active), no label,
+  amount or monthly equivalent, and `DeclaredUnreadable`. The in-app agent runs the same tool in the API host and
+  gets the full read. Decrypting on the MCP host would mean distributing the key to a second host, which is a separate decision.

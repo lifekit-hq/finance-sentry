@@ -1,0 +1,74 @@
+<div class="space-y-cmn-3" data-testid="money-profile">
+  @if (store.saveErrorMessage()) {
+    <cmn-alert variant="error">{{ store.saveErrorMessage() }}</cmn-alert>
+  }
+  @if (store.actionErrorMessage()) {
+    <cmn-alert variant="error">{{ store.actionErrorMessage() }}</cmn-alert>
+  }
+
+  <cmn-async-state
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
+    [isEmpty]="store.rows().length === 0"
+    [keepContent]="false"
+    (retry)="store.load()"
+    emptyMessage="No income declared yet"
+    emptySubMessage="Add what you expect to earn, so planning does not rely only on what landed last month."
+    errorPlacement="above"
+    retryable
+  >
+    <cmn-card skeleton padding="none">
+      <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+    </cmn-card>
+
+    <cmn-card padding="none">
+      @for (row of store.rows(); track row.id) {
+        <div
+          class="relative flex items-center border-t border-border-default pr-cmn-2 first:border-t-0"
+          data-testid="income-source-row"
+        >
+          <cmn-list-item-row
+            [label]="row.label"
+            [sublabel]="row.sublabel"
+            [dimmed]="!row.active"
+            class="min-w-0 flex-1"
+          >
+            <span amount class="flex shrink-0 flex-col items-end">
+              <span
+                class="text-cmn-sm tabular-nums text-text-primary"
+                data-testid="income-amount"
+                >{{ row.amount | money: row.currency }}</span
+              >
+              <span
+                class="text-cmn-xs tabular-nums text-text-secondary"
+                data-testid="income-monthly"
+              >
+                @if (row.monthlyEquivalent !== null) {
+                  {{ row.monthlyEquivalent | money: row.currency }} / month
+                } @else {
+                  Irregular
+                }
+              </span>
+            </span>
+          </cmn-list-item-row>
+          <cmn-menu
+            [items]="row.active ? activeMenu : retiredMenu"
+            [ariaLabel]="'Actions for ' + row.label"
+            (itemSelect)="onAction(row, $event.id)"
+          >
+            <cmn-icon name="Ellipsis" />
+          </cmn-menu>
+        </div>
+      }
+    </cmn-card>
+  </cmn-async-state>
+
+  <cmn-button
+    [loading]="store.isSaveLoading()"
+    (clicked)="openSource()"
+    variant="secondary"
+    icon="Plus"
+    data-testid="add-income-source"
+    >Add an income source</cmn-button
+  >
+</div>

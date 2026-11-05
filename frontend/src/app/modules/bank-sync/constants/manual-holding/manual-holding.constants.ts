@@ -9,14 +9,6 @@ export const MANUAL_HOLDING_MIN_AMOUNT = 0.01;
 
 export const MANUAL_HOLDING_DEFAULT_CURRENCY = 'USD';
 
-/** The currencies the backend has a rate for; an unknown one is refused rather than counted 1:1. */
-export const MANUAL_HOLDING_CURRENCY_OPTIONS: SelectOption[] = [
-  {value: 'USD', label: 'USD — US Dollar'},
-  {value: 'EUR', label: 'EUR — Euro'},
-  {value: 'GBP', label: 'GBP — British Pound'},
-  {value: 'UAH', label: 'UAH — Ukrainian Hryvnia'},
-];
-
 /** Short words for a row's sublabel. */
 export const CONVERTIBILITY_LABEL: ReadonlyMap<Convertibility, string> = new Map([
   ['Cash', 'Spendable anywhere'],
