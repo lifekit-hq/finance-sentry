@@ -69,6 +69,7 @@ public class GetAssetDossierNextEarningsTests
             Mock.Of<IAssetPriceTargetRepository>(),
             Mock.Of<IRecommendationRepository>(),
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
+            new DisposalTaxContextReader(Mock.Of<IInstrumentTaxRegimeSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new ScorecardReader(
                 Mock.Of<IMarketStructureReader>(),
                 Mock.Of<IFundamentalsService>(),

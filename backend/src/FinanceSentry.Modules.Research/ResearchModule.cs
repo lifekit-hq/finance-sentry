@@ -401,6 +401,7 @@ public static class ResearchModule
         services.AddSingleton<IPriceHistoryService, YahooPriceHistoryService>();
         services.AddSingleton<IPriceBarService, YahooPriceBarService>();
         services.AddScoped<PositionReturnsReader>();
+        services.AddScoped<DisposalTaxContextReader>();
         services.AddScoped<IMarketNewsService, RssMarketNewsService>();
         services.AddScoped<IMacroCalendarService, MacroCalendarService>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();

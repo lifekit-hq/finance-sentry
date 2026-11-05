@@ -46,6 +46,7 @@ import {AuthStore} from '../../../auth/store/auth.store';
 import {RecommendationCardComponent} from '../../../decisions/components/recommendation-card/recommendation-card.component';
 import {DECISION_RECORDED_TITLE} from '../../../decisions/constants/recommendation/recommendation.constants';
 import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation.pipe';
+import {DisposalTaxComponent} from '../../components/disposal-tax/disposal-tax.component';
 import {PriceChartComponent} from '../../components/price-chart/price-chart.component';
 import {VerdictBlockComponent} from '../../components/verdict-block/verdict-block.component';
 import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
@@ -99,6 +100,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     CoverageLabelPipe,
     DatePipe,
     DecimalPipe,
+    DisposalTaxComponent,
     InstitutionAvatarComponent,
     MarkdownPipe,
     MoneyPipe,

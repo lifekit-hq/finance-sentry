@@ -30,6 +30,47 @@ export interface DossierPositionSection {
   positionCapPercent?: Nullable<number>;
   /** Where the return came from (money-semantics §1); null when the ledger could not be read. */
   returns?: Nullable<PositionReturnsDto>;
+  /** Irish disposal-tax context for a sale today (#454); null when it could not be read. */
+  disposalTax?: Nullable<DisposalTaxContextDto>;
+}
+
+export type DisposalTaxRegime = 'cgt' | 'exitTax';
+
+/** One open FIFO lot's share of a hypothetical full sale, in euro. `deemedDisposalOn` is exit tax only. */
+export interface DisposalTaxLotDto {
+  acquiredOn: string;
+  quantity: number;
+  costEur: number;
+  proceedsEur: number;
+  gainEur: number;
+  deemedDisposalOn: Nullable<string>;
+}
+
+/**
+ * "If you sold this today", in euro. `status` `withheld` carries `withheldReasons` and no figures:
+ * the data cannot support an estimate. `estimatedTaxEur` is before the CGT annual exemption.
+ */
+export interface DisposalTaxContextDto {
+  symbol: string;
+  status: 'shown' | 'withheld';
+  withheldReasons: string[];
+  regime: Nullable<DisposalTaxRegime>;
+  taxYear: Nullable<number>;
+  ratesCarriedForward: boolean;
+  currency: string;
+  rate: Nullable<number>;
+  annualExemptionEur: Nullable<number>;
+  proceedsEur: Nullable<number>;
+  costEur: Nullable<number>;
+  gainEur: Nullable<number>;
+  estimatedTaxEur: Nullable<number>;
+  taxAfterExemptionEur: Nullable<number>;
+  deemedDisposalYears: Nullable<number>;
+  nextDeemedDisposalOn: Nullable<string>;
+  lots: DisposalTaxLotDto[];
+  method: string;
+  ratesSource: string;
+  disclaimer: string;
 }
 
 /** `complete` = the ingested fills explain the whole holding; `partial` / `unavailable` = they do not. */

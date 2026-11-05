@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Domain.Dossier;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Positions;
+using FinanceSentry.Modules.Research.Domain.Tax;
 
 /// <summary>
 /// Aggregate per-ticker dossier returned by GET /research/assets/{symbol}/dossier (feature 421).
@@ -42,6 +43,8 @@ public sealed record DossierUserTarget(decimal TargetPrice, string? Currency, Da
 /// denominator as the holdings weights); null when the book total is not positive.
 /// PositionCapPercent: the IPS single-position cap in percent; null when unset.
 /// Returns: the return decomposition from the ingested fills and dividends; null when it could not be read.
+/// DisposalTax: the Irish disposal-tax context for a sale today (#454 S6), withheld with reason codes when the
+/// data cannot support it; null when it could not be read.
 /// </summary>
 public sealed record DossierPositionSection(
     string Provider,
@@ -54,7 +57,8 @@ public sealed record DossierPositionSection(
     IReadOnlyList<DossierTaxLotEntry> TaxLots,
     decimal? ShareOfBookPercent = null,
     decimal? PositionCapPercent = null,
-    PositionReturns? Returns = null);
+    PositionReturns? Returns = null,
+    DisposalTaxContext? DisposalTax = null);
 
 /// <summary>Analyst actions + consensus trend for the ticker.</summary>
 public sealed record DossierAnalystsSection(

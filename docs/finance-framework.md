@@ -338,6 +338,16 @@ the surface says so. `Behind` and `OnTrack` are context for the person's own pla
 the projections' "Hypothetical, not a guarantee." disclosure. It stores nothing and adds no goal entity, so the §3.6
 headline contract does not apply yet (like the projections, §11).
 
+**Disposal-tax context (a derived read over the position ledger, not an eleventh measure).**
+`DisposalTaxContextReader` (money-semantics §17) answers "if I sold this position today, which Irish regime applies and
+roughly what would it cost" for a position whose data supports it, and **withholds with a reason code** otherwise (not
+held at IBKR, the fills do not explain the holding, no tax classification, cost basis not Verified, a buy and a sell
+within four weeks for an ordinary share, a fund lot past its 8-year deemed disposal). It is a first-in-first-out lot
+walk, not the average-cost walk of M6, because Irish matching is not average cost. Amounts are euro, each cost converted
+on its purchase date; rates come from a versioned reference table keyed by tax year (`IrishTaxReference`, re-checked each
+tax year, a year without a row reads the latest earlier row and says so). It stores nothing and carries a refer-to-Revenue
+line; it is context, never advice or a tax return, and it has no headline record (§3.6).
+
 ### 3.5 Worked example (fictional numbers)
 
 | Date | Event | Value |

@@ -27,6 +27,7 @@ public sealed class ToolNameContractTests
         "get_family_clearing_statement",
         "get_fundamentals",
         "get_goals_progress",
+        "get_disposal_tax_context",
         "get_ips",
         "get_ips_diff",
         "get_policy_review",

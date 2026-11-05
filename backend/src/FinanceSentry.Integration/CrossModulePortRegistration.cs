@@ -45,6 +45,8 @@ public static class CrossModulePortRegistration
         services.AddScoped<IAssetSignalReader, AssetSignalAdapter>();
         // Asset dossier chart markers and return decomposition — BrokerageSync fills and dividends → Research.
         services.AddScoped<IPositionLedgerSource, PositionLedgerAdapter>();
+        // #454 S6: the human-set tax classification of an instrument - BrokerageSync -> Research disposal-tax context.
+        services.AddScoped<IInstrumentTaxRegimeSource, InstrumentTaxRegimeAdapter>();
         // #1069: a Hold recommendation answers a fired event - Companion outbox → Research.
         services.AddScoped<IFiredEventSource, ResearchFiredEventAdapter>();
         // 414: thesis track record — bridges Research → Radar's weekly performance brief.
