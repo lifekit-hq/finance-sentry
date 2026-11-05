@@ -24,6 +24,7 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     gross_or_net = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     start_date = table.Column<DateOnly>(type: "date", nullable: false),
                     end_date = table.Column<DateOnly>(type: "date", nullable: true),
+                    retired_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },

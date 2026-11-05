@@ -182,9 +182,9 @@ public sealed class IncomeSourcePersistenceTests : IAsyncLifetime
 
         trail.Entries.Select(e => e.Action).Should().Equal(AuditAction.Create, AuditAction.Update, AuditAction.Update, AuditAction.Delete);
         trail.Entries.Should().OnlyContain(e => e.ResourceType == "income_source" && e.ResourceId == id && e.SubjectUserId == _personA);
-        trail.Entries[0].FieldNames.Should().Equal("Amount", "Cadence", "Currency", "EndDate", "GrossOrNet", "Kind", "Label", "StartDate");
+        trail.Entries[0].FieldNames.Should().Equal("Amount", "Cadence", "Currency", "EndDate", "GrossOrNet", "Kind", "Label", "RetiredAt", "StartDate");
         trail.Entries[1].FieldNames.Should().Equal("Amount");
-        trail.Entries[2].FieldNames.Should().Equal("EndDate");
+        trail.Entries[2].FieldNames.Should().Equal("EndDate", "RetiredAt");
         trail.Entries[3].FieldNames.Should().BeEmpty();
     }
 

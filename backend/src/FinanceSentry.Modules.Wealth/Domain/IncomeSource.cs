@@ -67,6 +67,9 @@ public sealed class IncomeSource : IHasUpdatedAt, IUserOwned
     /// <summary>Null while the income continues; the last day it is received once it stops.</summary>
     public DateOnly? EndDate { get; private set; }
 
+    /// <summary>When the person retired the source; cleared by an edit, which restates the dates. Null if never retired.</summary>
+    public DateTimeOffset? RetiredAt { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -99,6 +102,7 @@ public sealed class IncomeSource : IHasUpdatedAt, IUserOwned
         GrossOrNet = grossOrNet;
         StartDate = startDate;
         EndDate = endDate;
+        RetiredAt = null;
     }
 
     /// <summary>Ends the income today (or on its start date, if it has not started): kept as history, no longer counted.</summary>
@@ -108,10 +112,16 @@ public sealed class IncomeSource : IHasUpdatedAt, IUserOwned
             return;
 
         EndDate = today < StartDate ? StartDate : today;
+        RetiredAt = new DateTimeOffset(today.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
     }
 
-    /// <summary>Whether the income is declared as running on <paramref name="day"/>.</summary>
-    public bool IsActiveOn(DateOnly day) => StartDate <= day && (EndDate is null || EndDate.Value >= day);
+    /// <summary>
+    /// Whether the income is declared as running on <paramref name="day"/>. A source retired before it started never runs:
+    /// its end date is clamped to the start date only so the dates stay valid.
+    /// </summary>
+    public bool IsActiveOn(DateOnly day) =>
+        StartDate <= day && (EndDate is null || EndDate.Value >= day)
+        && !(RetiredAt is { } retired && DateOnly.FromDateTime(retired.UtcDateTime) < StartDate);
 
     /// <summary>The amount per month, or null when the cadence is irregular (a guess would pass as a fact).</summary>
     public decimal? MonthlyEquivalent => IncomeCadenceMath.MonthlyEquivalent(Amount, Cadence);

@@ -72,6 +72,10 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasColumnType("text")
                         .HasColumnName("label");
 
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date")
                         .HasColumnName("start_date");

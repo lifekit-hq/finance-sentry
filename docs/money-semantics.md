@@ -1898,7 +1898,9 @@ replaces the observed income (§15) in any projection, goal or runway.**
   two decimals. An **irregular** source has none (null): a guess would pass as a fact. The DTO carries it in the
   source's currency; the MCP read converts it **once, at the read**, with `CurrencyConverter.ToUsd` and sums the USD.
 - **Active** means `startDate <= today <= endDate` (a null end is open). A retired source (`endDate` set to today, or
-  to its start date if it has not started) stays listed as history and adds nothing to the declared total.
+  to its start date if it has not started, with `retired_at` recording when) stays listed as history and adds nothing
+  to the declared total; one retired before its start date is never active, even on that start date. Editing a source
+  restates its dates and clears `retired_at`.
 - **`declaredMonthlyUsd`** = the sum of the active, non-irregular sources' USD monthly equivalents, with `declaredBasis`
   `Net`, `Gross` or `Mixed`. Null when there is nothing to sum.
 - **Variance** against `observedMonthlyUsd` (the cashflow profile's `incomeMonthlyMedian`, §15): `Matches` when

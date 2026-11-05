@@ -109,6 +109,24 @@ public sealed class GetIncomeProfileQueryHandlerTests
     }
 
     [Fact]
+    public async Task ASourceRetiredBeforeItStarted_NeverCountsInTheDeclaredTotal()
+    {
+        var start = new DateOnly(2026, 12, 1);
+        var notStarted = IncomeSource.Create(UserId, IncomeKind.Salary, "Next job", 9_000m, "USD", IncomeCadence.Monthly, IncomeBasis.Net, start, null);
+        notStarted.Retire(new DateOnly(2026, 11, 5));
+        Declared(Source(4_000m), notStarted);
+        Observed(4_000m);
+
+        var profile = await new GetIncomeProfileQueryHandler(_sources.Object, _cashflow.Object, new FixedClock(new DateTimeOffset(2026, 12, 1, 12, 0, 0, TimeSpan.Zero)))
+            .Handle(new GetIncomeProfileQuery(UserId), CancellationToken.None);
+
+        profile.Sources.Should().HaveCount(2);
+        profile.Sources.Single(s => s.Label == "Next job").Active.Should().BeFalse();
+        profile.ActiveSources.Should().Be(1);
+        profile.DeclaredMonthlyUsd.Should().Be(4_000m);
+    }
+
+    [Fact]
     public async Task AGrossDeclaration_IsNotComparableWithIncomeThatLandedAfterTax()
     {
         Declared(Source(5_000m, basis: IncomeBasis.Gross));

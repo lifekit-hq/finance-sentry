@@ -149,6 +149,7 @@ public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
         income.Property(x => x.GrossOrNet).HasColumnName("gross_or_net").IsRequired().HasMaxLength(16);
         income.Property(x => x.StartDate).HasColumnName("start_date");
         income.Property(x => x.EndDate).HasColumnName("end_date");
+        income.Property(x => x.RetiredAt).HasColumnName("retired_at");
         income.Property(x => x.CreatedAt).HasColumnName("created_at");
         income.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         income.Ignore(x => x.MonthlyEquivalent);

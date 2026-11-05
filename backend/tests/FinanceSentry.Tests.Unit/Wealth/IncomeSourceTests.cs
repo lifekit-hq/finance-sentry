@@ -72,13 +72,39 @@ public sealed class IncomeSourceTests
     }
 
     [Fact]
-    public void Retire_OfAnIncomeThatHasNotStarted_EndsItOnItsStartDate()
+    public void Retire_OfAnIncomeThatHasNotStarted_KeepsTheDatesValid_ButItNeverRuns()
     {
-        var source = Source(start: Today.AddMonths(2));
+        var start = new DateOnly(2026, 12, 1);
+        var source = Source(start: start);
+
+        source.Retire(new DateOnly(2026, 11, 5));
+
+        source.EndDate.Should().Be(start, "an end date before the start would be refused on the next edit");
+        source.IsActiveOn(start).Should().BeFalse("it was retired before it ever started");
+    }
+
+    [Fact]
+    public void Retire_OnTheStartDate_StillRunsThatDay()
+    {
+        var source = Source(start: Today);
 
         source.Retire(Today);
 
-        source.EndDate.Should().Be(source.StartDate, "an end date before the start would be refused on the next edit");
+        source.IsActiveOn(Today).Should().BeTrue();
+        source.IsActiveOn(Today.AddDays(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Update_OfARetiredBeforeStartSource_RestatesTheDatesAndRunsAgain()
+    {
+        var start = new DateOnly(2026, 12, 1);
+        var source = Source(start: start);
+        source.Retire(new DateOnly(2026, 11, 5));
+
+        source.Update(IncomeKind.Salary, "Day job", 3_000m, "EUR", IncomeCadence.Monthly, IncomeBasis.Net, start, null);
+
+        source.RetiredAt.Should().BeNull();
+        source.IsActiveOn(start).Should().BeTrue();
     }
 }
 
