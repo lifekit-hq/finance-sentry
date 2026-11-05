@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Auth;
 
+using FinanceSentry.Core.Auditing;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Auth.API.Authentication;
@@ -48,6 +49,9 @@ public static class AuthModule
         services.AddScoped<IUserDataExporter, AuthUserDataExporter>();
         services.AddScoped<AccountDataExportWriter>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IAuditTrail, AuditTrail>();
+        // The default actor is the signed-in person; the MCP host replaces it with one that reads the token's kind.
+        services.TryAddScoped<IAuditActor>(sp => new AuditActor(sp.GetRequiredService<ICurrentUser>(), () => AuditActorKind.OwnerSession));
         services.AddScoped<AccountPurgeJob>();
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

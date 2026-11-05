@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -62,5 +63,24 @@ internal sealed class AuthUserDataExporter(AuthDbContext db) : IUserDataExporter
             .ToListAsync(ct);
         writer.WritePropertyName("permissionGrants");
         OwnedRowExporter.WriteJson(writer, grants, grants.GetType(), ExportJson.Options);
+
+        // The trail of access to their own declared data: ids and field names, as stored. Never other people's events.
+        var auditEvents = await db.AuditEvents.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(e => e.SubjectUserId == userId)
+            .OrderBy(e => e.OccurredAt)
+            .Select(e => new
+            {
+                e.Id,
+                e.OccurredAt,
+                ActorKind = e.ActorKind.ToString(),
+                Action = e.Action.ToString(),
+                e.ResourceType,
+                e.ResourceId,
+                e.FieldNames,
+                e.TraceId,
+            })
+            .ToListAsync(ct);
+        writer.WritePropertyName("audit_events");
+        OwnedRowExporter.WriteJson(writer, auditEvents, auditEvents.GetType(), ExportJson.Options);
     }
 }

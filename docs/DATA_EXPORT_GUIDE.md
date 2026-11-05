@@ -39,7 +39,10 @@ people across the whole schema and asserts nothing of the other person reaches t
   scores are written).
 
 Account-closure records are not part of the export: they are the operator's record of the closure, not the person's
-data.
+data. The person's own **audit events** are (`audit_events` in the Auth module): when their declared profile data was
+written, or read through MCP or the in-app agent, by whom (actor kind), which resource id and which field names - never
+a value. A field-encrypted column of an owned entity is exported decrypted: it is the person's own data, and it is a
+text column, not a dropped `byte[]`.
 
 ## Other ways to get or remove your data
 

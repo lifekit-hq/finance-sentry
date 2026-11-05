@@ -20,6 +20,10 @@
 - HTTP clients refresh through the MCP token endpoint using dedicated MCP refresh tokens.
 - The browser-based `auth login` flow is intended for a host-run `stdio` MCP process. Containerized clients should prefer HTTP MCP.
 
+## Audit trail for profile reads
+
+A tool that returns declared profile data (income, goals, career events) carries `[SensitiveProfile("FieldName", ...)]` (`FinanceSentry.Mcp.Auditing`), on the method or its class. Marking it is all a tool does: the MCP host's call-tool filter (`WithSensitiveReadAudit`, part of `WithFinanceSentryTools`) and the in-app agent's `McpToolBridge` both record the call on `auth.audit_events` **before** the tool runs - the tool's name, whose data, the actor kind (`McpPersonal`, `McpService` or `InAppAgent`), and the field names it can disclose; never a value. If the trail cannot be written the call is refused. No tool is marked yet; the profile slices that store the data mark theirs. Pinned by `SensitiveProfileReadAuditTests`.
+
 ## Tool Surface
 
 The current runtime surface contains 77 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.

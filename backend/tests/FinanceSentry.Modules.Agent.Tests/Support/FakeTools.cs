@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Agent.Tests.Support;
 
 using System.ComponentModel;
+using FinanceSentry.Mcp.Auditing;
 using ModelContextProtocol.Server;
 
 /// <summary>A stand-in identity the fake tool reads its user id from (mirrors <c>IIdentityResolver</c>).</summary>
@@ -40,4 +41,26 @@ public sealed class FakeThrowingTool
     [Description("Always throws.")]
     public Task<string> ExecuteAsync(CancellationToken cancellationToken = default)
         => throw new InvalidOperationException("boom");
+}
+
+/// <summary>
+/// A tool that returns declared profile data: marked <c>[SensitiveProfile]</c>, so the bridge must put the call on the
+/// audit trail before it runs. It counts its runs so a test can tell a refused call from a served one.
+/// </summary>
+[McpServerToolType]
+public sealed class FakeProfileTool(IFakeIdentity identity, FakeProfileToolProbe probe)
+{
+    [McpServerTool(Name = "fake_profile")]
+    [SensitiveProfile("Amount", "Cadence")]
+    [Description("Returns declared profile data.")]
+    public Task<string> ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        probe.Runs++;
+        return Task.FromResult($"profile of {identity.UserId}");
+    }
+}
+
+public sealed class FakeProfileToolProbe
+{
+    public int Runs { get; set; }
 }

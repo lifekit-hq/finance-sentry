@@ -34,7 +34,8 @@ public static class McpToolErrorSurfacing
     /// still the blanket string, or tools without the primer that explains their numbers.
     /// </summary>
     public static IMcpServerBuilder WithFinanceSentryTools(this IMcpServerBuilder builder, Assembly toolAssembly)
-        => builder.WithToolErrorSurfacing().WithToolsFromAssembly(toolAssembly).WithResourcesFromAssembly(toolAssembly);
+        => builder.WithToolErrorSurfacing().WithSensitiveReadAudit(toolAssembly)
+            .WithToolsFromAssembly(toolAssembly).WithResourcesFromAssembly(toolAssembly);
 
     public static IMcpServerBuilder WithToolErrorSurfacing(this IMcpServerBuilder builder)
     {

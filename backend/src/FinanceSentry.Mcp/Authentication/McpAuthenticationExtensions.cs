@@ -71,6 +71,9 @@ public static class McpAuthenticationExtensions
         });
     }
 
+    /// <summary>True for a principal that came in on a long-lived service token (the marker kept on the rebuilt principal).</summary>
+    public static bool IsServiceToken(ClaimsPrincipal? user) => user?.HasClaim(ScopeClaim, ServiceTokenScope) == true;
+
     private static bool IsServiceToken(TokenValidatedContext context)
     {
         var scopes = context.Principal?.FindFirst(ScopeClaim)?.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);

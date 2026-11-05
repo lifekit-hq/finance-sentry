@@ -42,9 +42,11 @@ public sealed class McpToolErrorSurfacingTests
         var services = new ServiceCollection();
         services.AddMcpServer().WithFinanceSentryTools(McpServiceRegistration.McpAssembly);
 
-        FiltersOf(services).Should().ContainSingle(
+        FiltersOf(services).Should().HaveCount(
+            2,
             "both transports register tools through WithFinanceSentryTools precisely so a "
-            + "transport cannot serve tools whose failures are still the SDK's blanket string");
+            + "transport cannot serve tools whose failures are still the SDK's blanket string - "
+            + "or sensitive reads that skip the audit trail (the second filter)");
 
         services.BuildServiceProvider()
             .GetRequiredService<IOptions<McpServerOptions>>()

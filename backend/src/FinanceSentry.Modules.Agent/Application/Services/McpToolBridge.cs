@@ -6,7 +6,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
 using System.Text.Json.Serialization.Metadata;
+using FinanceSentry.Core.Auditing;
 using FinanceSentry.Mcp;
+using FinanceSentry.Mcp.Auditing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,6 +74,23 @@ public sealed class McpToolBridge
         {
             _logger.LogWarning("Agent requested unknown tool {Tool}.", name);
             return new LlmToolResultBlock(toolUseId, $"Unknown tool '{name}'.", IsError: true);
+        }
+
+        // Everything the model's tool call does is the in-app agent acting for the person - a write a tool makes is
+        // audited as the agent's, and a read of profile data is recorded below before the tool is allowed to run.
+        using var asAgent = scope.GetService<IAuditActor>()?.Use(AuditActorKind.InAppAgent);
+
+        if (entry.Sensitive is { } sensitive)
+        {
+            try
+            {
+                await SensitiveProfileReads.RecordReadAsync(scope, name, sensitive, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Could not record the agent's read via {Tool} on the audit trail; the call was refused.", name);
+                return new LlmToolResultBlock(toolUseId, $"Tool '{name}' was not run: the read could not be recorded on the audit trail.", IsError: true);
+            }
         }
 
         try
@@ -163,7 +182,7 @@ public sealed class McpToolBridge
 
                 var schema = BuildInputSchema(exposed);
                 tools.Add(new LlmTool(name, description, schema));
-                catalog[name] = new ToolEntry(toolType, method, method.GetParameters());
+                catalog[name] = new ToolEntry(toolType, method, method.GetParameters(), SensitiveProfileReads.Find(method));
             }
         }
 
@@ -298,7 +317,8 @@ public sealed class McpToolBridge
         return raw;
     }
 
-    private sealed record ToolEntry(Type DeclaringType, MethodInfo Method, ParameterInfo[] Parameters);
+    private sealed record ToolEntry(
+        Type DeclaringType, MethodInfo Method, ParameterInfo[] Parameters, SensitiveProfileAttribute? Sensitive);
 
     private sealed class ToolArgumentException(string message) : Exception(message);
 }

@@ -57,6 +57,9 @@ public static class RetentionPolicyRegistry
         Purge(Research, "recommendation_trends", "IngestedAt", 365, "Monthly consensus; stale once a ticker stops being covered."),
         Purge(Research, "benchmark_relative_records", "AsOf", 365, "Weekly benchmark-relative runs; derived from thesis_events, only the latest two are read."),
         Purge(Risk, "holding_snapshots", "CapturedAt", 180, "Risk holding time-series."),
+        // Auth: the audit trail of access to declared profile data (ids and field names, never values). 13 months
+        // covers a year of review plus a month of slack; the account purge erases a person's rows sooner.
+        Purge(Auth, "audit_events", "OccurredAt", 395, "Audit trail of writes to and MCP/agent reads of declared profile data."),
         // Events (049): the reader's verdict on a fired event outlives the 90d companion row it points at.
         Purge(Events, "event_verdicts", "RecordedAt", 365, "Reader verdicts on fired events; the alert they explain purges at 90d."),
         // The retention module governs its own run-record tables (one row per run; drill rows aren't

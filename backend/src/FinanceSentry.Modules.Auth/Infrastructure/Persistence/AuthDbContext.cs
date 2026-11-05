@@ -11,7 +11,8 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 // tables (users, roles, user claims/roles/logins/tokens) stay unfiltered: sign-in, token refresh, invite acceptance,
 // the per-request principal load and the role seed read them before a person is in scope, and managing people reads
 // them across users. McpServiceToken is not filtered yet: its revocation check runs while the MCP host is still
-// authenticating, before a person is in scope. AccountClosure is the closure audit record, read by the purge job and by
+// authenticating, before a person is in scope. AuditEvent is filtered to the person it concerns for reads; the trail
+// writes through its own context and the purge job opts out. AccountClosure is the closure audit record, read by the purge job and by
 // Owners managing people, never by the person it describes, so it is unfiltered. DataProtectionKeys is the platform's key ring, shared by every
 // instance and read by the key manager with no person in scope, so it is unfiltered too.
 public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser currentUser)
@@ -22,11 +23,15 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<McpServiceToken> McpServiceTokens => Set<McpServiceToken>();
     public DbSet<AccountClosure> AccountClosures => Set<AccountClosure>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     // Read by the Owner query filter on every query this context runs. Identity user ids are strings holding
     // Guid.ToString() (lower-case "D" format), so the acting person's id is compared in that same form; null (no
     // person in scope) matches no row.
     private string? CurrentUserKey => currentUser.UserId?.ToString();
+
+    // The same person as a Guid, for the audit trail's subject column.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     // Not an OwnerScopedDbContext: it derives from IdentityDbContext<ApplicationUser>, and the person is keyed by string
     // (Identity's id), not the Guid that base scopes. The Owner filters above stay hand-written; the column conventions
@@ -84,6 +89,25 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
             entity.HasIndex(c => c.PurgeDueAt);
             entity.Property(c => c.CredentialRevocation).HasColumnType("jsonb");
             entity.Property(c => c.ErasedRows).HasColumnType("jsonb");
+        });
+
+        // Append-only: nothing updates a row. Filtered to the person the event concerns, so a request never lists
+        // someone else's; the eraser opts out and names the subject. No foreign key to the user for the same reason as
+        // AccountClosure. ResourceType and TraceId are identifiers, never values (AuditEntry guarantees the former).
+        builder.Entity<AuditEvent>(entity =>
+        {
+            entity.ToTable("audit_events");
+            entity.HasKey(e => e.Id);
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.SubjectUserId == CurrentUserId);
+            // The column is the person key every module's export and erasure walk (and their tests) look for: UserId.
+            entity.Property(e => e.SubjectUserId).HasColumnName("UserId");
+            entity.HasIndex(e => new { e.SubjectUserId, e.OccurredAt });
+            entity.HasIndex(e => e.OccurredAt);
+            entity.Property(e => e.ActorKind).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Action).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.ResourceType).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.FieldNames).HasColumnType("text[]");
+            entity.Property(e => e.TraceId).HasMaxLength(64).IsRequired();
         });
 
         builder.Entity<ApplicationUser>(entity =>
