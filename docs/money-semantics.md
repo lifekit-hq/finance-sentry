@@ -9,7 +9,7 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-11-05 (§14 exchange-rate insight); 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
+Last verified: 2026-11-05 (§15 cashflow profile, §14 exchange-rate insight); 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
 2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
 2026-10-15.
 
@@ -1742,3 +1742,47 @@ currency, so only its cost in the base currency moves. A display insight over th
 - **Sparkline.** The quote monthly from the signing date to today, ending on the latest published rate.
 - **Setting.** Whether the device shows the insight is a per-device preference (localStorage, on by default); it is
   not an account setting and the server never sees it.
+
+## 15. Cashflow profile: burn, savings rate and runway (#454 S1)
+
+How much a person spends in a typical month, what share of income they keep, and how many months of that spending
+their cash covers. A computed, context-only read (`GetCashflowProfileQueryHandler`, Wealth;
+`GET /api/v1/wealth/cashflow-profile`; MCP `get_cashflow_profile`; the Flow Breakdown card
+`fns-cashflow-profile`). It stores nothing, takes no declared income and adds no entity: every input is one §11
+already reads, through the same `ProjectionInputsReader`.
+
+- **Window.** The complete months in the trailing six (`Projection.LookbackMonths`); the in-progress month is
+  dropped, exactly as for the projections (§11). The response names the months it covers (`fromMonth`, `toMonth`)
+  and how many (`completeMonths`). Fewer than three (`Projection.MinCompleteMonths`) gives `InsufficientHistory` with
+  reason `INSUFFICIENT_MONTHS` and no figure.
+- **Income** = a month's `NetUsd + OutflowUsd` (net is inflow less outflow, so this is the month's honest inflow:
+  counterparty and transfer corrected, §5). `incomeMonthlyMedian` is the median over the window
+  (`Projection.Median`).
+- **Burn** = `burnMonthlyMedian`, the median of the months' honest `OutflowUsd`. It is the figure FIRE multiplies by
+  twelve for its annual spend (§11), so the two cannot disagree.
+- **Savings rate** is **pooled**: the sum of the months' `NetUsd` over the sum of their income, a fraction rounded to
+  four decimals (0.25 is 25%). It is negative while spending exceeds income (dissaving). A **per-month ratio is never
+  returned**, and there is no chart of it: the per-month savings-rate chart was removed after it read -500,000% in a
+  month whose income was near zero (§7), and pooling is what keeps one thin month from doing that. When the pooled
+  income is zero or negative there is no base, so the whole profile is withheld (`InsufficientHistory`, reason
+  `NO_POSITIVE_INCOME`).
+- **Runway** = the latest snapshot's `CashTotal` (§8: every source's cash, card debt netted in, idle broker cash,
+  venue fiat) ÷ `burnMonthlyMedian`, in months, rounded to one decimal. It is a duration at typical spending, not a
+  forecast, and it ignores income. It is null, with `runwayReason`, when: there is no snapshot (`NO_SNAPSHOT`); the
+  snapshot has no cash split, so cash was never measured and is unknown rather than zero (`NO_CASH_SPLIT`); typical
+  spending is zero (`NO_BURN`); or cash is zero or negative (`NO_CASH`, which also sets `status` to `NoCash`, the one
+  state where history is fine but the runway has nothing to stand on; burn, income and the rate are still returned).
+- **Committed share** (`committedShare`): the window's pooled committed outflow ÷ pooled outflow, from
+  `HonestMonthlyFlow.CommittedOutflowUsd` (§5a). It is a floor, not a measure, because the committed-outflow policy
+  under-counts (§5a coverage note, still below the 40% bar #538 set for charting the split), so the card does not show
+  it; it is on the API and the MCP tool. Null when any month lacks the split or nothing was spent.
+- **Stale sources.** `hasStaleSleeves` is the §11 flag: a source of the snapshot the runway reads was carried forward.
+- **Currency.** The handler computes in USD; `WealthController` re-expresses `incomeMonthlyMedian` and
+  `burnMonthlyMedian` in the profile base currency and returns `baseCurrency` (§3). The rate, months, runway and share
+  are not converted. The MCP tool speaks USD, like its siblings.
+- **Status.** `Shown`, `InsufficientHistory` or `NoCash`, serialized by name.
+- **Context only.** Every response carries a `disclosure` ("Context for your own planning, never a trading signal or
+  advice. Computed from past complete months; not a forecast.") and the MCP description says the same. There is no
+  signal wording, no goal and no link to the IPS.
+- **Not here.** No declared income, no contribution-plan comparison and no per-goal figure: those are other slices of
+  #454. Burn here is total honest outflow; the committed / discretionary split is §5a's.

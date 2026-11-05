@@ -90,7 +90,7 @@ settle it.
 | Question | Tools | Meaning |
 |---|---|---|
 | What do I have? | `get_portfolio_snapshot`, `get_account_summary`, `get_net_worth_history` | money-semantics §1, §8 |
-| Where did money go? | `get_cashflow_report`, `list_transactions`, `get_budget_status` | money-semantics §5, §6 |
+| Where did money go, what do I burn, how long does cash last? | `get_cashflow_report`, `get_cashflow_profile`, `list_transactions`, `get_budget_status` | money-semantics §5, §6, §15 |
 | How is the book doing? | `get_book_performance`, `get_benchmark_track_record`, `get_track_record` | money-semantics §10 |
 | Are the proposals beating the S&P 500? | `get_ledger_scoreboard`, `list_recommendations` | money-semantics §10 |
 | What is it in, and is it within policy? | `get_allocation_vs_target`, `get_ips`, `check_risk_rules` | finance-framework §3.4 (M7, M8) |

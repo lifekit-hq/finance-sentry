@@ -17,6 +17,7 @@ public sealed class ToolNameContractTests
         "get_allocation_vs_target",
         "get_book_performance",
         "get_budget_status",
+        "get_cashflow_profile",
         "get_cashflow_report",
         "get_crypto_pnl_detail",
         "get_analyst_actions",

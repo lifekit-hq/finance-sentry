@@ -20,8 +20,10 @@ public class WealthController(
     IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> sleeveGrowthHandler,
     IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> netWorthProjectionHandler,
     IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> monthlyIncomeLensHandler,
+    IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse> cashflowProfileHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse> _cashflowProfileHandler = cashflowProfileHandler ?? throw new ArgumentNullException(nameof(cashflowProfileHandler));
     private readonly IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> _monthlyIncomeLensHandler = monthlyIncomeLensHandler ?? throw new ArgumentNullException(nameof(monthlyIncomeLensHandler));
     private readonly IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> _netWorthProjectionHandler = netWorthProjectionHandler ?? throw new ArgumentNullException(nameof(netWorthProjectionHandler));
     private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
@@ -189,6 +191,34 @@ public class WealthController(
         {
             NetWorth = Fx(lens.NetWorth),
             MonthlyIncome = lens.MonthlyIncome is { } income ? Fx(income) : null,
+            BaseCurrency = baseCurrency,
+        };
+    }
+
+    /// <summary>
+    /// Burn, savings rate and runway over the trailing complete months (#454 S1), context only:
+    /// <c>GET /api/v1/wealth/cashflow-profile</c>.
+    /// </summary>
+    [HttpGet("cashflow-profile")]
+    public async Task<IActionResult> GetCashflowProfile(CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _cashflowProfileHandler.Handle(new GetCashflowProfileQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // The rate, the shares and the month counts are untouched; only the two monthly amounts are re-expressed.
+    private static CashflowProfileResponse InBaseCurrency(CashflowProfileResponse profile, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return profile with { BaseCurrency = baseCurrency };
+
+        decimal? Fx(decimal? usd) => usd is { } v ? CurrencyConverter.FromUsd(v, baseCurrency) : null;
+        return profile with
+        {
+            IncomeMonthlyMedian = Fx(profile.IncomeMonthlyMedian),
+            BurnMonthlyMedian = Fx(profile.BurnMonthlyMedian),
             BaseCurrency = baseCurrency,
         };
     }

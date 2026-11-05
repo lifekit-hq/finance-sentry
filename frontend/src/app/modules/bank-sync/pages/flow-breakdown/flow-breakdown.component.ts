@@ -27,6 +27,7 @@ import {
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {CashflowProfileComponent} from '../../components/cashflow-profile/cashflow-profile.component';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {MonthlyIncomeLensComponent} from '../../components/monthly-income-lens/monthly-income-lens.component';
 import {NetWorthBridgeComponent} from '../../components/net-worth-bridge/net-worth-bridge.component';
@@ -53,6 +54,7 @@ const DRAWER_WIDTH = '480px';
     PageScrollComponent,
     AsyncStateComponent,
     CardComponent,
+    CashflowProfileComponent,
     DatePipe,
     DecimalPipe,
     EmptyStateComponent,

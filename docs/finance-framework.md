@@ -320,6 +320,16 @@ Each projection shows its range and its assumptions in words next to it, ending 
 guarantee." `ProjectionTests` checks the range ordering, the zero-return, short-history and negative-net-worth
 guards, and both figures against a month-by-month simulation.
 
+**Cashflow profile (a derived read over M10's inputs, not an eleventh measure).** Burn, savings rate and runway
+(`GetCashflowProfileQueryHandler`, money-semantics §15) answer "what do I spend, what share of income do I keep, how
+long does my cash last" from the complete months `ProjectionInputsReader` already reads and the latest snapshot's
+cash. Burn is the median complete month's honest outflow (the figure FIRE multiplies by twelve); the savings rate is
+**pooled** (sum of net ÷ sum of income over the window, negative while dissaving), never a per-month ratio; runway is
+cash ÷ burn, withheld when the snapshot has no cash split (`NO_CASH_SPLIT`). Under three complete months, or with no
+income across them, nothing is shown. It is context for the person's own planning: the response and the MCP tool say
+so, there is no signal wording, and it adds no goal or IPS link. It takes a scope of the whole umbrella and states its
+window in months, so the §3.6 headline contract does not apply yet (like the projections, §11).
+
 ### 3.5 Worked example (fictional numbers)
 
 | Date | Event | Value |

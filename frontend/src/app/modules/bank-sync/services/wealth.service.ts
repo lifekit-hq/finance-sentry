@@ -3,6 +3,7 @@ import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
 import {type WealthSummaryResponse} from '../../../shared/models/wealth/wealth.model';
+import {type CashflowProfile} from '../models/cashflow-profile/cashflow-profile.model';
 import {type FireProjection} from '../models/fire/fire.model';
 import {type MonthlyIncomeLens} from '../models/income-lens/income-lens.model';
 import {
@@ -33,6 +34,10 @@ export class WealthService extends ApiService {
 
   public getMonthlyIncomeLens(): Observable<MonthlyIncomeLens> {
     return this.get<MonthlyIncomeLens>('income-lens');
+  }
+
+  public getCashflowProfile(): Observable<CashflowProfile> {
+    return this.get<CashflowProfile>('cashflow-profile');
   }
 
   public getManualHoldings(): Observable<ManualHolding[]> {

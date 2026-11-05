@@ -24,5 +24,10 @@ public interface IHonestMonthlyFlowReader
     Task<decimal> GetWindowNetAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default);
 }
 
-/// <summary>One calendar month's honest outflow and net savings, USD, "yyyy-MM" keyed.</summary>
-public sealed record HonestMonthlyFlow(string Month, decimal OutflowUsd, decimal NetUsd);
+/// <summary>
+/// One calendar month's honest outflow and net savings, USD, "yyyy-MM" keyed. <paramref name="CommittedOutflowUsd"/>
+/// is the part of <paramref name="OutflowUsd"/> the committed-outflow policy claims (money-semantics §5a); null when
+/// the reader behind the port did not supply it.
+/// </summary>
+public sealed record HonestMonthlyFlow(
+    string Month, decimal OutflowUsd, decimal NetUsd, decimal? CommittedOutflowUsd = null);

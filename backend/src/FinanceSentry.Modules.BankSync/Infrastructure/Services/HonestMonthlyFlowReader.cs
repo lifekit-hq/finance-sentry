@@ -34,7 +34,8 @@ public class HonestMonthlyFlowReader(
 
         return flows
             .GroupBy(f => f.Month)
-            .Select(g => new HonestMonthlyFlow(g.Key, g.Sum(f => f.OutflowUsd), g.Sum(f => f.NetUsd)))
+            .Select(g => new HonestMonthlyFlow(
+                g.Key, g.Sum(f => f.OutflowUsd), g.Sum(f => f.NetUsd), g.Sum(f => f.CommittedOutflowUsd)))
             .OrderBy(f => f.Month)
             .ToList();
     }

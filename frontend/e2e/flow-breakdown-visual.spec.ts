@@ -84,6 +84,23 @@ const INCOME_LENS = {
   baseCurrency: 'USD',
 };
 
+const CASHFLOW_PROFILE = {
+  status: 'Shown',
+  completeMonths: 6,
+  fromMonth: '2026-03',
+  toMonth: '2026-08',
+  incomeMonthlyMedian: 4_000,
+  burnMonthlyMedian: 3_000,
+  savingsRate: 0.25,
+  runwayMonths: 6,
+  runwayReason: null,
+  committedShare: 0.2,
+  hasStaleSleeves: false,
+  reason: null,
+  baseCurrency: 'USD',
+  disclosure: 'Context only.',
+};
+
 const FIRE = {
   status: 'Projected',
   target: 930_000,
@@ -113,11 +130,13 @@ describeVisualBaseline({
     await mockGet(page, 'wealth/projection', PROJECTION);
     await mockGet(page, 'wealth/income-lens', INCOME_LENS);
     await mockGet(page, 'wealth/fire', FIRE);
+    await mockGet(page, 'wealth/cashflow-profile', CASHFLOW_PROFILE);
   },
   ready: async page => {
     await expect(page.getByText('Tesco Groceries').locator('visible=true').first()).toBeVisible();
     await expect(page.getByTestId('net-worth-bridge-end')).toBeVisible();
     await expect(page.getByTestId('net-worth-projection')).toBeVisible();
     await expect(page.getByTestId('fire-assumptions')).toBeVisible();
+    await expect(page.getByTestId('cashflow-assumptions')).toBeVisible();
   },
 });
