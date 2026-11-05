@@ -226,6 +226,16 @@ async function mockApis(page: Page, count: number): Promise<void> {
       })
     )
   );
+  // The list glob above also matches this path; no foreign-currency plan keeps the insight off the page.
+  await page.route(`${API}/subscriptions/fx-impact`, route =>
+    route.fulfill(
+      json({
+        baseCurrency: 'USD',
+        plans: [],
+        totals: {paidSaving: 0, remainingSaving: 0, totalSaving: 0, hasUnknownRemainder: false},
+      })
+    )
+  );
   await page.route(`${API}/research/recommendations`, route =>
     route.fulfill(
       json({

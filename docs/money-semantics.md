@@ -9,7 +9,7 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
+Last verified: 2026-11-05 (§14 exchange-rate insight); 2026-10-19 (§11 projections, one engine for the twelve-month figure and FIRE); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
 2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
 2026-10-15.
 
@@ -1693,3 +1693,33 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   category, so no ledger category filter matches their spend: their cards offer no "View transactions" and the title is
   plain text, and a breach alert on either opens the Budgets page (`AlertAppPath.ForBudgetBreach`) instead of a
   category filter.
+
+## 14. Exchange-rate insight (Subscriptions, #1226)
+
+What a rate move did to a plan billed in a currency the person does not report in: the payment is fixed in its own
+currency, so only its cost in the base currency moves. A display insight over the plan list, not a wealth measure
+(`GetFxImpactQueryHandler`, Subscriptions; `GET /api/v1/subscriptions/fx-impact`, shown on the Subscriptions page as
+`fns-fx-impact-widget`). It adds no measure to the finance framework.
+
+- **Which plans.** Active rows of any kind (installment, split payment, subscription) whose currency is not USD, not
+  EUR and not the person's base currency (`IsForeign`). A plan with no published rate history is left out rather than
+  priced from today's live table, and so is every plan when the base currency itself has none. An empty plan list is
+  the widget's data gate: the widget and its settings toggle render only when it is non-empty.
+- **Rates.** Only rates a feed published (`GetPublishedSeriesAsync`, nearest earlier day within 7 days for weekends
+  and holidays; never the gap-filled series). Base units per plan-currency unit on a date is
+  `usdPerUnit(plan currency) / usdPerUnit(base)`, with USD as 1; quotes are shown inverted, plan units per 1 base
+  unit (UAH per EUR).
+- **Signing date.** The user-set `StartDate` when there is one, else the first charge detection saw
+  (`LastChargeDate` minus the payments counted, stepped by cadence), flagged `SigningDateIsObserved`: detection sees
+  about 13 months, so for an older plan without a start date the baseline understates the move.
+- **Figures, in the base currency.** One payment at the signing rate and at today's rate, with the percent change.
+  Remaining payments (`RemainingPayments`; null for an open-ended plan) at today's rate against the signing rate, the
+  difference being `RemainingSaving`. `PaidSaving` is, over the payments already made (months from `StartDate` to the
+  last charge, else the charges counted), `payment * (signing rate - rate on that payment's date)`; a payment date with
+  no published rate near it is skipped, so a gap understates the saving and never invents one.
+- **Sign.** Savings are positive when the plan got cheaper in the base currency than at the signing rate and negative
+  when dearer; the page words them as saved or extra cost. The aggregate line sums `PaidSaving` and `RemainingSaving`
+  across plans; plans with no known remainder add nothing to `RemainingSaving` and `HasUnknownRemainder` says so.
+- **Sparkline.** The quote monthly from the signing date to today, ending on the latest published rate.
+- **Setting.** Whether the device shows the insight is a per-device preference (localStorage, on by default); it is
+  not an account setting and the server never sees it.

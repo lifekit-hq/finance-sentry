@@ -38,6 +38,7 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
+import {FxImpactWidgetComponent} from '../../components/fx-impact-widget/fx-impact-widget.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
 import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
 import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
@@ -86,6 +87,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
 @Component({
   selector: 'fns-subscriptions',
   imports: [
+    FxImpactWidgetComponent,
     PageContainerComponent,
     PageScrollComponent,
     ButtonComponent,

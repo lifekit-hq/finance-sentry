@@ -75,6 +75,14 @@ const SUMMARY = {
   currency: 'USD',
 };
 
+// The list mock's glob (`subscriptions?**`) also matches this path, so it needs its own: no foreign-currency
+// plan, which keeps the insight off the baseline.
+const FX_IMPACT = {
+  baseCurrency: 'USD',
+  plans: [],
+  totals: {paidSaving: 0, remainingSaving: 0, totalSaving: 0, hasUnknownRemainder: false},
+};
+
 describeVisualBaseline({
   name: 'subscriptions',
   title: 'Subscriptions',
@@ -82,6 +90,7 @@ describeVisualBaseline({
   mocks: async page => {
     await mockGet(page, 'subscriptions?**', LIST);
     await mockGet(page, 'subscriptions/summary', SUMMARY);
+    await mockGet(page, 'subscriptions/fx-impact', FX_IMPACT);
   },
   ready: async page => {
     await expect(page.getByText('Netflix').first()).toBeVisible();

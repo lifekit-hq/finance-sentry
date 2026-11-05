@@ -16,7 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 public class SubscriptionsController(
     IQueryHandler<GetSubscriptionsQuery, SubscriptionsListResponse> getSubscriptions,
     IQueryHandler<GetSubscriptionSummaryQuery, SubscriptionSummaryResponse> getSummary,
-    IQueryHandler<GetInstallmentFxImpactQuery, InstallmentFxImpactResponse> getFxImpact,
+    IQueryHandler<GetFxImpactQuery, FxImpactResponse> getFxImpact,
     IQueryHandler<GetCommitmentAnchorQuery, CommitmentAnchorResponse> getCommitmentAnchor,
     ICommandHandler<DismissSubscriptionCommand, bool> dismiss,
     ICommandHandler<RestoreSubscriptionCommand, bool> restore,
@@ -61,14 +61,14 @@ public class SubscriptionsController(
     }
 
     /// <summary>
-    /// How exchange-rate movement has changed what foreign-currency installments cost —
-    /// the native payment is fixed, its cost in the base currency is not.
+    /// How exchange-rate movement has changed what plans billed in a currency other than USD, EUR or the
+    /// base currency cost — the native payment is fixed, its cost in the base currency is not. An empty
+    /// plan list means the insight does not apply to this person.
     /// </summary>
-    [HttpGet("installments/fx-impact")]
+    [HttpGet("fx-impact")]
     public async Task<IActionResult> GetFxImpact(CancellationToken ct = default)
     {
-        var result = await getFxImpact.Handle(
-            new GetInstallmentFxImpactQuery(User.RequireUserId().ToString()), ct);
+        var result = await getFxImpact.Handle(new GetFxImpactQuery(User.RequireUserId()), ct);
         return Ok(result);
     }
 

@@ -2,11 +2,14 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {ASYNC_STATE_SHOW_DELAY_MS, CmnDialogService} from '@lifekit-hq/ui';
+import {of} from 'rxjs';
 import {onTestFinished} from 'vitest';
 
 import {environment} from '../../../../../environments/environment';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {type FxImpact} from '../../models/fx-impact/fx-impact.model';
 import {type Subscription} from '../../models/subscription/subscription.model';
+import {SubscriptionsService} from '../../services/subscriptions.service';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionsComponent} from './subscriptions.component';
 import {NO_ACTIVE_SUBSCRIPTIONS_COPY} from './subscriptions.constants';
@@ -119,6 +122,12 @@ describe('SubscriptionsComponent', () => {
   });
 });
 
+const NO_FX_IMPACT: FxImpact = {
+  baseCurrency: 'EUR',
+  plans: [],
+  totals: {paidSaving: 0, remainingSaving: 0, totalSaving: 0, hasUnknownRemainder: false},
+};
+
 describe('SubscriptionsComponent async states', () => {
   const NETFLIX = {
     id: 's1',
@@ -142,6 +151,7 @@ describe('SubscriptionsComponent async states', () => {
       hasInsufficientHistory?: boolean;
       offline?: boolean;
       installments?: Subscription[];
+      fxImpact?: FxImpact;
     } = {}
   ) {
     const subscriptions = overrides.subscriptions ?? [];
@@ -169,6 +179,10 @@ describe('SubscriptionsComponent async states', () => {
         provideRouter([]),
         {provide: CmnDialogService, useValue: {open: vi.fn()}},
         {provide: ConnectivityService, useValue: {offline: signal(overrides.offline ?? false)}},
+        {
+          provide: SubscriptionsService,
+          useValue: {getFxImpact: () => of(overrides.fxImpact ?? NO_FX_IMPACT)},
+        },
       ],
     });
     TestBed.overrideComponent(SubscriptionsComponent, {
@@ -295,6 +309,59 @@ describe('SubscriptionsComponent async states', () => {
     expect(host.textContent).toContain('Netflix');
     expect(host.querySelector('[data-testid="subscriptions-skeleton"]')).toBeNull();
     expect(host.textContent).not.toContain('No active subscriptions yet');
+  });
+
+  describe('exchange-rate insight', () => {
+    const FX_PLAN: FxImpact = {
+      baseCurrency: 'EUR',
+      plans: [
+        {
+          id: 'i1',
+          merchant: 'Mortgage',
+          kind: 'installment',
+          currency: 'UAH',
+          paymentNative: 14060.96,
+          signingDate: '2024-05-01',
+          signingDateIsObserved: false,
+          signingUnitsPerBase: 39.52,
+          currentUnitsPerBase: 44.54,
+          paymentCostAtSigning: 355.84,
+          paymentCostNow: 315.68,
+          costChangePercent: -11.29,
+          paymentsMade: 28,
+          paymentsRemaining: 20,
+          remainingCostAtSigningRate: 7116.8,
+          remainingCostAtTodayRate: 6313.6,
+          remainingSaving: 803.2,
+          paidSaving: 321.4,
+          rates: [
+            {date: '2024-05-01', unitsPerBase: 39.52},
+            {date: '2026-11-05', unitsPerBase: 44.54},
+          ],
+        },
+      ],
+      totals: {
+        paidSaving: 321.4,
+        remainingSaving: 803.2,
+        totalSaving: 1124.6,
+        hasUnknownRemainder: false,
+      },
+    };
+
+    it('appears, with its toggle, when a foreign-currency plan exists', () => {
+      const {host} = render({subscriptions: [NETFLIX], fxImpact: FX_PLAN});
+
+      expect(host.querySelector('[data-testid="fx-impact-widget"]')).not.toBeNull();
+      expect(host.querySelector('[data-testid="fx-impact-toggle"]')).not.toBeNull();
+      expect(host.querySelectorAll('[data-testid="fx-impact-plan"]')).toHaveLength(1);
+    });
+
+    it('leaves the page untouched, toggle included, when no such plan exists', () => {
+      const {host} = render({subscriptions: [NETFLIX]});
+
+      expect(host.querySelector('[data-testid="fx-impact-widget"]')).toBeNull();
+      expect(host.querySelector('[data-testid="fx-impact-toggle"]')).toBeNull();
+    });
   });
 
   describe('row avatar', () => {

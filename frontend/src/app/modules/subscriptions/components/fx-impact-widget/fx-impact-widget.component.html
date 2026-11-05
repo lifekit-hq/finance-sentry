@@ -1,0 +1,113 @@
+@if (store.available()) {
+  <cmn-card data-testid="fx-impact-widget">
+    <div class="space-y-cmn-4">
+      <div class="flex items-center justify-between gap-cmn-3">
+        <div class="min-w-0">
+          <span
+            class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+          >
+            Exchange rate
+          </span>
+          @if (!store.enabled()) {
+            <p class="text-cmn-xs text-text-secondary">
+              What rate moves do to your foreign-currency plans.
+            </p>
+          }
+        </div>
+        <cmn-toggle
+          [checked]="store.enabled()"
+          (toggled)="store.toggleEnabled($event)"
+          data-testid="fx-impact-toggle"
+          label="Show exchange-rate insight"
+        />
+      </div>
+
+      @if (store.showInsight()) {
+        <p class="text-cmn-sm text-text-primary" data-testid="fx-impact-summary">
+          {{ store.summary() }}
+        </p>
+
+        <ul class="divide-y divide-border-subtle">
+          @for (view of store.planViews(); track view.plan.id) {
+            @let plan = view.plan;
+            <li class="space-y-cmn-2 py-cmn-3 first:pt-0 last:pb-0" data-testid="fx-impact-plan">
+              <div class="flex items-center justify-between gap-cmn-3">
+                <div class="min-w-0">
+                  <p class="truncate text-cmn-sm font-semibold text-text-primary">
+                    {{ plan.merchant || 'Unknown' }}
+                  </p>
+                  <p class="text-cmn-xs text-text-secondary">
+                    {{ plan.currency }} per {{ store.baseCurrency() }} · since
+                    {{ plan.signingDate | date: 'MMM y'
+                    }}{{ plan.signingDateIsObserved ? ' (first charge seen)' : '' }}
+                  </p>
+                </div>
+                <cmn-line-chart
+                  [data]="view.chart"
+                  [compact]="true"
+                  [label]="plan.currency + ' per ' + store.baseCurrency()"
+                  class="block h-10 w-24 shrink-0"
+                  valueFormat="number"
+                  xSpacing="time"
+                />
+              </div>
+
+              <dl class="space-y-cmn-1 text-cmn-sm">
+                <div class="flex justify-between gap-cmn-3">
+                  <dt class="text-text-secondary">Rate</dt>
+                  <dd class="tabular-nums text-text-primary" data-testid="fx-impact-rate">
+                    {{ plan.signingUnitsPerBase | number: rateFormat }} →
+                    {{ plan.currentUnitsPerBase | number: rateFormat }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-cmn-3">
+                  <dt class="text-text-secondary">One payment</dt>
+                  <dd class="tabular-nums text-text-primary" data-testid="fx-impact-payment">
+                    {{ plan.paymentCostAtSigning | money: store.baseCurrency() }} →
+                    {{ plan.paymentCostNow | money: store.baseCurrency() }}
+                    <span class="text-text-secondary"
+                      >({{ plan.costChangePercent | number: '1.1-1' }}%)</span
+                    >
+                  </dd>
+                </div>
+                @if (plan.paymentsRemaining !== null && view.remainingAmount !== null) {
+                  <div class="flex justify-between gap-cmn-3">
+                    <dt class="text-text-secondary">{{ plan.paymentsRemaining }} payments left</dt>
+                    <dd class="tabular-nums text-text-primary" data-testid="fx-impact-remaining">
+                      {{ plan.remainingCostAtTodayRate | money: store.baseCurrency() }}
+                      <span class="text-text-secondary"
+                        >vs {{ plan.remainingCostAtSigningRate | money: store.baseCurrency() }} at
+                        signing · {{ view.remainingSaved ? 'saves' : 'costs' }}
+                        {{ view.remainingAmount | money: store.baseCurrency()
+                        }}{{ view.remainingSaved ? '' : ' more' }}</span
+                      >
+                    </dd>
+                  </div>
+                }
+                <div class="flex justify-between gap-cmn-3">
+                  <dt class="text-text-secondary">
+                    {{ view.paidSaved ? 'Saved so far' : 'Extra cost so far' }}
+                  </dt>
+                  <dd
+                    [class.text-status-success]="view.paidSaved"
+                    [class.text-status-warning]="!view.paidSaved"
+                    class="tabular-nums font-semibold"
+                    data-testid="fx-impact-paid"
+                  >
+                    {{ view.paidAmount | money: store.baseCurrency() }}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          }
+        </ul>
+
+        @if (store.hasUnknownRemainder()) {
+          <p class="text-cmn-xs text-text-secondary">
+            Plans without a term set are left out of the payments-left figure.
+          </p>
+        }
+      }
+    </div>
+  </cmn-card>
+}

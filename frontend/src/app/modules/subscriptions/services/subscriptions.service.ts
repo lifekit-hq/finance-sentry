@@ -4,6 +4,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {type Observable} from 'rxjs';
 
 import {type CommitmentAnchor} from '../models/commitment-candidate/commitment-candidate.model';
+import {type FxImpact} from '../models/fx-impact/fx-impact.model';
 import {
   type AddCommitmentRequest,
   type LinkCommitmentRequest,
@@ -27,6 +28,10 @@ export class SubscriptionsService extends ApiService {
 
   public getSummary(): Observable<SubscriptionSummary> {
     return this.get<SubscriptionSummary>('summary');
+  }
+
+  public getFxImpact(): Observable<FxImpact> {
+    return this.get<FxImpact>('fx-impact');
   }
 
   public getCommitmentAnchor(
