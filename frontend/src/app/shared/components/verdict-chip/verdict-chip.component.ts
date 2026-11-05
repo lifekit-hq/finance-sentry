@@ -1,6 +1,7 @@
 import {ChangeDetectionStrategy, Component, input} from '@angular/core';
 import {TagComponent} from '@lifekit-hq/ui';
 
+import {NOT_ADVICE_NOTICE} from '../../constants/legal/legal.constants';
 import {
   VERDICT_WORD_LABEL,
   VERDICT_WORD_VARIANT,
@@ -21,6 +22,7 @@ import {type VerdictWord} from '../../models/scorecard/scorecard.model';
 export class VerdictChipComponent {
   public readonly word = input.required<VerdictWord>();
 
+  public readonly notAdvice = NOT_ADVICE_NOTICE;
   public readonly wordLabel = VERDICT_WORD_LABEL;
   public readonly wordVariant = VERDICT_WORD_VARIANT;
 }
