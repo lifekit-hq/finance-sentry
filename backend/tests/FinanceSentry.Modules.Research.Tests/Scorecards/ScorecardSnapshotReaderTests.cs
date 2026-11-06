@@ -35,6 +35,19 @@ public sealed class ScorecardSnapshotReaderTests
     }
 
     [Fact]
+    public async Task Snapshot_OfAScorecardWithNoSectorOrIndustry_HasNullSectorAndIndustry()
+    {
+        var handler = new Mock<IQueryHandler<GetScorecardQuery, ScorecardResult>>();
+        handler.Setup(h => h.Handle(new GetScorecardQuery("AAA"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Card() with { Sector = null, Industry = null });
+
+        var snapshot = await new ScorecardSnapshotReader(handler.Object).GetAsync("AAA");
+
+        snapshot.Sector.Should().BeNull();
+        snapshot.Industry.Should().BeNull();
+    }
+
+    [Fact]
     public void Snapshot_CarriesNoCompositeNumber()
     {
         var names = typeof(FinanceSentry.Modules.Research.Domain.Ports.ScorecardSnapshot).GetProperties().Select(p => p.Name);
