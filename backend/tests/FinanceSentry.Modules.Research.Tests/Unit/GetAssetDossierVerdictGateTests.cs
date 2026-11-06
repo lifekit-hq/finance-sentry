@@ -41,6 +41,34 @@ public class GetAssetDossierVerdictGateTests
     }
 
     [Fact]
+    public async Task IncludeVerdicts_CarriesTheValuationProfileSectorAndIndustryOnTheScorecard()
+    {
+        var valuation = new Mock<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>();
+        valuation
+            .Setup(v => v.Handle(It.IsAny<GetValuationSnapshotQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValuationSnapshotResult(
+                Symbol,
+                NotApplicable: false,
+                Price: 10m,
+                IsStale: false,
+                new ValuationMetricsDto(new MetricValue(null), new MetricValue(null), new MetricValue(null), new MetricValue(null)),
+                ConsensusTarget: null,
+                ImpliedUpsidePct: null,
+                PeerSet: null,
+                Sources: [],
+                RetrievedAt: DateTimeOffset.UtcNow,
+                Sector: "Technology",
+                Industry: "Software"));
+
+        var dossier = await HandleAsync(
+            new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), PendingRecommendationFor(Symbol), valuation.Object);
+
+        dossier.Scorecard.Should().NotBeNull();
+        dossier.Scorecard!.Sector.Should().Be("Technology");
+        dossier.Scorecard.Industry.Should().Be("Software");
+    }
+
+    [Fact]
     public async Task WithoutVerdicts_ReturnsNeitherAndNeverReadsThePendingRecommendation()
     {
         var recommendations = PendingRecommendationFor(Symbol);
@@ -74,7 +102,9 @@ public class GetAssetDossierVerdictGateTests
     }
 
     private static Task<AssetDossierResult> HandleAsync(
-        GetAssetDossierQuery query, Mock<IRecommendationRepository> recommendations)
+        GetAssetDossierQuery query,
+        Mock<IRecommendationRepository> recommendations,
+        IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>? valuation = null)
     {
         var fundamentals = new Mock<IFundamentalsService>();
         fundamentals
@@ -86,7 +116,7 @@ public class GetAssetDossierVerdictGateTests
             Mock.Of<IHoldingTaxLotsReader>(),
             Mock.Of<IAssetSignalReader>(),
             Mock.Of<IQueryHandler<GetThesesQuery, IReadOnlyList<ThesisDto>>>(),
-            Mock.Of<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>(),
+            valuation ?? Mock.Of<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>(),
             Mock.Of<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>(),
             Mock.Of<IQueryHandler<GetNewsForTickerQuery, IReadOnlyList<NewsArticleDto>>>(),
             Mock.Of<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>(),
