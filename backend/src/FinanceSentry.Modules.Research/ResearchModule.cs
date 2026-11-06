@@ -251,6 +251,8 @@ public static class ResearchModule
         services.AddScoped<IScorecardSnapshotReader, ScorecardSnapshotReader>();
         services.AddScoped<IRiskToleranceReader, RiskToleranceReader>();
         services.AddScoped<IGoalsReader, GoalsReader>();
+        services.AddScoped<IRiskProfileReader, RiskProfileReader>();
+        services.AddScoped<IDisposalTaxSummaryReader, DisposalTaxSummaryReader>();
         services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
         services.AddScoped<ITrackRecordReader, TrackRecordReader>();
         services.AddScoped<ILedgerScoreboardReader, LedgerScoreboardReader>();

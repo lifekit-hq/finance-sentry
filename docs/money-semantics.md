@@ -1968,3 +1968,49 @@ the default figure everywhere.**
 - **Currency.** The handlers compute in USD; `WealthController` re-expresses the scenario's amounts in the profile base currency
   with the baseline's (§3). Months and dates are untouched.
 
+## 20. Financial profile and capacity indicator (#454 S7)
+
+One agent-readable map of what is on file about the person, and a **suggested** band for the quarterly risk re-measurement.
+Computed on read from the readers behind §15, §16, §17, §18 and §19; nothing is stored (`GetFinancialProfileQueryHandler`; MCP
+`get_financial_profile`, and the indicator again in `record_risk_remeasurement`'s response). Every figure is context for the
+person's own planning, never a trading signal: nothing here produces a buy, sell or hold call.
+
+- **Sections and data quality.** `cashflow` (§15), `goals` (§16), `income` (§18), `career` (§19), `disposalTax` (§17 across the held
+  positions) and `risk` (the current IPS's risk fields), each `{dataQuality, reasons, data}` with `asOf` on the whole.
+  `Complete`: everything the section is meant to say is present. `Partial`: some is, and `reasons` names what is not. `Missing`:
+  nothing usable (`missingSections` lists them), so the reader states what it does not know instead of guessing. A section whose
+  read throws is `Missing` with `SECTION_UNAVAILABLE`; the rest still returns. Rules: cashflow is `Missing` under three
+  complete months, `Partial` with no runway or stale sources; goals `Missing` with no goals, `Partial` when a goal lacks a target
+  or date or has no history; income `Missing` with nothing declared, `Partial` when the declared figure is unreadable, not
+  comparable or has no observed income to meet; career `Missing` with no events, `Partial` when unreadable; disposal tax `Missing`
+  with no positions or all withheld, `Partial` when some are withheld; risk `Missing` with no IPS, `Partial` with capacity or
+  drawdown unset or a re-measurement due. **Missing is not zero**: a person with no declared income has not told us their income.
+- **Summaries, not copies.** The income and career sections carry counts and the declared and observed monthly figures, never a
+  source's or event's label, amount or note; the goals section carries each goal's standing without the return ranges (§16 has
+  those). The disposal-tax section adds the shown positions' estimates **before the CGT annual exemption** (the year's disposals
+  share it), in EUR, and counts the withheld positions by their typed reason; a venue holding is counted without reading its fills.
+- **No key on the MCP host.** The MCP host holds no encryption key (§18, §19), so there the income and career sections are
+  `Partial` (`DECLARED_UNREADABLE`, `CAREER_UNREADABLE`) and an unreadable declared income is **not** read as "no income". The
+  in-app agent runs the tool in the API host and gets the full read.
+- **Audit.** The tool aggregates declared profile data, so it is `[SensitiveProfile]`: every call, from an MCP client or the in-app
+  agent, is on the audit trail by tool name and field names (never values). `record_risk_remeasurement` is marked too, because its
+  response carries the indicator.
+- **The capacity indicator** (`CapacityIndicator.Suggest`, a pure function in `Core/Measures`). Capacity is what the person can afford
+  to lose; tolerance, what they would sit through, is never inferred. Each input **caps** the band the answer can reach, and the
+  suggestion is the lowest cap, so one weak input holds it down however strong the others are:
+
+  | Input | Cap |
+  |---|---|
+  | Runway (latest cash ÷ burn, §15; no cash is 0 months) | below 3 months: 1; below 6: 2; below 12: 3; below 24: 4; otherwise 5 |
+  | Spending ÷ income in the typical complete month | at or above 1.0: 2 |
+  | Income steadiness: (largest - smallest) ÷ median of the complete months' income | above 0.5: 4; above 1.0: 3 |
+  | Observed income below declared income (§18 `ObservedLower`) | 4 |
+  | Months to the nearest dated goal still ahead (§16) | below 12: 2; below 36: 3; below 60: 4 |
+
+  The runway is the one input every suggestion stands on: without it the status is `Insufficient`, no band is suggested and
+  `RUNWAY_UNKNOWN` is named. Any other input that is not known is left out of the answer and listed in `missing`, never filled in.
+  The response lists every input read (`factors`: code, value, the highest band it allows, a plain-words note) and the capacity on
+  the IPS today (`recordedCapacity`) with `differsFromRecorded`. It is a rubric, not a measurement: the thresholds are named
+  constants on `CapacityIndicator` and are judgement, not a standard. **It never writes the IPS**: the owner says the number and
+  records it with `record_risk_remeasurement`, which stores exactly what was passed; the suggestion is read before that write and
+  is shown beside it.

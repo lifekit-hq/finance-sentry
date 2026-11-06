@@ -355,6 +355,14 @@ on its purchase date; rates come from a versioned reference table keyed by tax y
 tax year, a year without a row reads the latest earlier row and says so). It stores nothing and carries a refer-to-Revenue
 line; it is context, never advice or a tax return, and it has no headline record (§3.6).
 
+**Financial profile and capacity indicator (a derived read over the reads above, not an eleventh measure).**
+`GetFinancialProfileQueryHandler` (money-semantics §20) lays the cashflow, goal, income, career, disposal-tax and IPS-risk
+summaries side by side with a `dataQuality` each (`Complete`, `Partial`, `Missing`), so a reader states what is missing instead
+of guessing; a missing section is never zero. `CapacityIndicator.Suggest` turns the runway, spending against income, income
+steadiness, declared against observed income and the nearest dated goal into a **suggested** capacity band 1-5, the lowest cap
+of its inputs, listed in full. It reads capacity, never tolerance, never writes the IPS and is shown beside the number the
+owner records at the re-measurement. Stores nothing, so the §3.6 headline contract does not apply (like the projections, §11).
+
 ### 3.5 Worked example (fictional numbers)
 
 | Date | Event | Value |
