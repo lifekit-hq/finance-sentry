@@ -12,15 +12,13 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// fewer than <see cref="Projection.MinCompleteMonths"/> complete months, and then nothing is projected.
 /// <paramref name="CompleteMonths"/> leaves out the months a coverage hole touches (money-semantics section 9): spend that
 /// never reached the app is missing data, not a cheap month, so it must not feed a median or a savings path.
-/// <paramref name="CoverageGapMonths"/> names those months, "yyyy-MM", oldest first.
 /// </summary>
 public sealed record ProjectionInputs(
     ProjectionAssumptions Assumptions,
     NetWorthSnapshot? Snapshot,
     IReadOnlyList<HonestMonthlyFlow> CompleteMonths,
     SavingsPath? SavingsPath,
-    bool HasStaleSleeves,
-    IReadOnlyList<string> CoverageGapMonths);
+    bool HasStaleSleeves);
 
 /// <summary>
 /// The one reader of a projection's inputs, so the twelve-month projection and the financial-independence
@@ -64,9 +62,7 @@ public class ProjectionInputsReader(
             ? null
             : Projection.SavingsPathOf([.. completeMonths.Select(f => f.NetUsd)]);
 
-        return new ProjectionInputs(
-            assumptionSet, snapshot, completeMonths, savingsPath, hasStaleSleeves,
-            [.. complete.Select(f => f.Month).Where(gapMonths.Contains)]);
+        return new ProjectionInputs(assumptionSet, snapshot, completeMonths, savingsPath, hasStaleSleeves);
     }
 
     // The months any of the person's holes (open ones included) overlaps. A month is left out whole, as the budget

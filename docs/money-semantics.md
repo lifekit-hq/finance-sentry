@@ -1420,7 +1420,7 @@ holdings-based current drawdown of section 5b is a separate measurement of the i
       `spendIncomplete` when a hole touches it, so its spend reads as what reached the app, not as thrift;
     - `ProjectionInputsReader`, the one reader behind the 12-month projection, the FIRE projection, goals progress, the
       cashflow profile, the monthly income lens and the financial profile, drops those months from the complete months
-      its medians and savings path are taken over (`CoverageGapMonths` names them); with fewer than three months left
+      its medians and savings path are taken over; with fewer than three months left
       there is no savings path and nothing is projected, which is the honest answer while the card is unseen;
     - the MCP `get_cashflow_report` marks such a month `coverageGap` and its outflow is incomplete.
 

@@ -62,17 +62,7 @@ public sealed class GetCashflowReportTool(
             return [];
         }
 
-        // Unreadable holes never hide the report: without them no month is flagged.
-        IReadOnlyList<CoverageHoleSpan> holes;
-        try
-        {
-            holes = await _coverageHoles.GetHolesAsync(userIdVal, from, to, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Coverage holes unavailable for user {UserId}; the cashflow report flags no month.", userIdVal);
-            holes = [];
-        }
+        var holes = await _coverageHoles.GetHolesAsync(userIdVal, from, to, cancellationToken);
 
         // Each month has one row per currency (transfers and counterparty-matched transactions
         // already excluded upstream) plus at most one synthetic USD row carrying that month's

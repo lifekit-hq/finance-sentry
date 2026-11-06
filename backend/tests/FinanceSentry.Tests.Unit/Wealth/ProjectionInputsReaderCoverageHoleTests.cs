@@ -61,7 +61,6 @@ public class ProjectionInputsReaderCoverageHoleTests
         var inputs = await Reader().ReadAsync(UserId, CancellationToken.None);
 
         inputs.CompleteMonths.Select(m => m.Month).Should().Equal("2026-04", "2026-05", "2026-06", "2026-07", "2026-08");
-        inputs.CoverageGapMonths.Should().BeEmpty();
     }
 
     [Fact]
@@ -73,7 +72,6 @@ public class ProjectionInputsReaderCoverageHoleTests
         var inputs = await Reader().ReadAsync(UserId, CancellationToken.None);
 
         inputs.CompleteMonths.Select(m => m.Month).Should().Equal("2026-04", "2026-05", "2026-06");
-        inputs.CoverageGapMonths.Should().Equal("2026-07", "2026-08");
         inputs.SavingsPath.Should().NotBeNull();
     }
 
@@ -85,7 +83,6 @@ public class ProjectionInputsReaderCoverageHoleTests
         var inputs = await Reader().ReadAsync(UserId, CancellationToken.None);
 
         inputs.CompleteMonths.Select(m => m.Month).Should().Equal("2026-04", "2026-05", "2026-06", "2026-07", "2026-08");
-        inputs.CoverageGapMonths.Should().BeEmpty();
     }
 
     [Fact]

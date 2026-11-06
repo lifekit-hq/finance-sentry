@@ -138,18 +138,18 @@ public sealed class GetCashflowReportToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_StillReports_WhenTheCoverageHolesCannotBeRead()
+    public async Task ExecuteAsync_FailsTheCall_WhenTheCoverageHolesCannotBeRead()
     {
         SetupHandler(Flow("2024-01", "USD", inflowUsd: 2000m, outflowUsd: 900m));
         _holes
             .Setup(h => h.GetHolesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(
+        var act = () => CreateSut().ExecuteAsync(
             fromDate: new DateOnly(2024, 1, 1),
             toDate: new DateOnly(2024, 1, 31));
 
-        result.Should().ContainSingle().Which.CoverageGap.Should().BeFalse();
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
