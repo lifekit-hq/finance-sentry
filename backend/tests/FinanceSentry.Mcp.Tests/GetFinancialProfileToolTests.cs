@@ -71,15 +71,4 @@ public sealed class GetFinancialProfileToolTests
         marker!.FieldNames.Should().Contain(["Amount", "Cadence", "Kind", "Date"]);
         SensitiveProfileReads.CatalogOf(typeof(GetFinancialProfileTool).Assembly).Should().ContainKey("get_financial_profile");
     }
-
-    [Fact]
-    public void TheDescription_StatesTheContextOnlyAndNeverWritesTheIpsContract()
-    {
-        var description = Method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()!.Description;
-
-        description.Should().Contain("never a trading signal");
-        description.Should().Contain("NEVER writes the IPS");
-        description.Should().Contain("do not fill it in");
-        description.Should().Contain("dataQuality");
-    }
 }

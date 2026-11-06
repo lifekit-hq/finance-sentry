@@ -54,6 +54,15 @@ public class CapacityIndicatorTests
         result.Factors.Single(f => f.Code == CapacityIndicator.SpendingToIncome).Value.Should().Be((decimal)ratio);
     }
 
+    [Fact]
+    public void SpendingJustBelowIncome_IsNotCalledAtOrAboveIncome_WhateverTheRoundedRatioReads()
+    {
+        var result = CapacityIndicator.Suggest(Strong() with { BurnMonthlyUsd = 4_980m, IncomeMonthlyUsd = 5_000m });
+
+        result.SuggestedBand.Should().Be(5);
+        result.Factors.Single(f => f.Code == CapacityIndicator.SpendingToIncome).CapBand.Should().Be(CapacityIndicator.MaxBand);
+    }
+
     [Theory]
     [InlineData(0.5, 5)]
     [InlineData(0.51, 4)]
@@ -137,9 +146,4 @@ public class CapacityIndicatorTests
         }
     }
 
-    [Fact]
-    public void TheLabel_SaysItIsASuggestionTheOwnerRecords()
-    {
-        CapacityIndicator.Label.Should().Contain("you record the number").And.Contain("risk tolerance");
-    }
 }

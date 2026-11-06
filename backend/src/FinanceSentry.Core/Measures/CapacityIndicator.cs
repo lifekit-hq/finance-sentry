@@ -114,10 +114,11 @@ public static class CapacityIndicator
 
         if (inputs.BurnMonthlyUsd is { } burn && inputs.IncomeMonthlyUsd is { } income && income > 0m)
         {
-            var ratio = Math.Round(burn / income, 2);
+            var ratio = burn / income;
+            var shown = Math.Round(ratio, 2);
             factors.Add(ratio >= SpendingToIncomeCeiling
-                ? new CapacityFactor(SpendingToIncome, ratio, 2, "Spending is at or above income in the typical month.")
-                : new CapacityFactor(SpendingToIncome, ratio, MaxBand, "Spending is below income in the typical month."));
+                ? new CapacityFactor(SpendingToIncome, shown, 2, "Spending is at or above income in the typical month.")
+                : new CapacityFactor(SpendingToIncome, shown, MaxBand, "Spending is below income in the typical month."));
         }
 
         if (inputs.IncomeSpread is { } spread)
