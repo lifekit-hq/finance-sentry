@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Composes the Radar universe: seed members (benchmark + sectors + industry) ∪ equity holdings
-/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ — when
+/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ thesis tickers ∪ — when
 /// <see cref="RadarOptions.BroadUniverseEnabled"/> is set — the stage-1 scan shortlist (#558).
 /// Membership is persisted and auto-synced; departed tickers are de-activated (history retained).
 ///
@@ -19,6 +19,7 @@ public sealed class RadarUniverseService(
     IRadarUniverseRepository universe,
     IBrokerageHoldingsReader brokerageReader,
     IWatchlistReader watchlistReader,
+    IThesisTickerReader thesisReader,
     IBankingTotalsReader bankingTotals,
     IOptions<RadarOptions> options,
     IScanShortlistSource? shortlistSource = null) : IRadarUniverseService
@@ -52,6 +53,12 @@ public sealed class RadarUniverseService(
             foreach (var ticker in watchlist)
             {
                 Add(resolved, ticker, UniverseKind.Watchlist, UniverseSource.Auto);
+            }
+
+            // After holdings and watchlist so an owned or watched name keeps its ownership kind.
+            foreach (var ticker in await thesisReader.ListTickersAsync(userId, ct))
+            {
+                Add(resolved, ticker, UniverseKind.Thesis, UniverseSource.Auto);
             }
         }
 

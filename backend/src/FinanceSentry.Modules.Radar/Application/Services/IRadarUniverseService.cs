@@ -5,7 +5,7 @@ using FinanceSentry.Modules.Radar.Domain;
 public interface IRadarUniverseService
 {
     /// <summary>
-    /// Resolves the universe = seed ∪ equity holdings ∪ watchlist, persists membership
+    /// Resolves the universe = seed ∪ equity holdings ∪ watchlist ∪ thesis tickers, persists membership
     /// (upsert + reactivate), and de-activates tickers that have left. Returns the active members.
     /// </summary>
     Task<IReadOnlyList<RadarUniverseMember>> SyncAsync(CancellationToken ct = default);

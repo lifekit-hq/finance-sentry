@@ -10,6 +10,12 @@ public enum UniverseKind
     Watchlist,
 
     /// <summary>
+    /// A symbol the user carries an investment thesis on that is neither held nor watched. Without
+    /// it the thesis monitor and the verdict would read bars no ingestion run refreshes.
+    /// </summary>
+    Thesis,
+
+    /// <summary>
     /// Broad-market index member the stage-1 scan shortlist picked up, carried for breadth rather
     /// than because it is owned or watched — so membership churns run to run as the shortlist does.
     /// The name persists as a string in <c>radar_universe.kind</c>; it stays <c>IndexConstituent</c>

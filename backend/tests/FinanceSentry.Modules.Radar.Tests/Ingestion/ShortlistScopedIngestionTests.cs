@@ -113,7 +113,8 @@ public sealed class ShortlistScopedIngestionTests
             var source = new FakeShortlistSource { Tickers = shortlist };
 
             var universeService = new RadarUniverseService(
-                new InMemoryRadarUniverseRepository(db), brokerage.Object, watchlist.Object, banking.Object, options, source);
+                new InMemoryRadarUniverseRepository(db), brokerage.Object, watchlist.Object,
+                NoThesisTickers(), banking.Object, options, source);
 
             var handler = new IngestDailyBarsCommandHandler(
                 universeService,
@@ -129,5 +130,12 @@ public sealed class ShortlistScopedIngestionTests
             => handler.Handle(new IngestDailyBarsCommand(), CancellationToken.None);
 
         public ValueTask DisposeAsync() => db.DisposeAsync();
+    }
+
+    private static IThesisTickerReader NoThesisTickers()
+    {
+        var thesis = new Mock<IThesisTickerReader>();
+        thesis.Setup(t => t.ListTickersAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        return thesis.Object;
     }
 }

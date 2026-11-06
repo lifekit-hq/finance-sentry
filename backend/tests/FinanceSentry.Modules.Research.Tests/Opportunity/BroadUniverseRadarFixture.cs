@@ -139,7 +139,8 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
             "the fixture's whole claim is that this name entered through stage 1, and the decoys did not");
 
         var universeService = new RadarUniverseService(
-            universeRepo, brokerage.Object, watchlist.Object, banking.Object, radarOptions, shortlistSource);
+            universeRepo, brokerage.Object, watchlist.Object, NoThesisTickers(), banking.Object,
+            radarOptions, shortlistSource);
         var members = await universeService.SyncAsync(CancellationToken.None);
 
         members.Single(m => m.Ticker == Constituent).Kind.Should().Be(
@@ -243,5 +244,12 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
         }
 
         return bars;
+    }
+
+    private static IThesisTickerReader NoThesisTickers()
+    {
+        var thesis = new Mock<IThesisTickerReader>();
+        thesis.Setup(t => t.ListTickersAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        return thesis.Object;
     }
 }
