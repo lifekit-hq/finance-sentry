@@ -163,6 +163,32 @@ public sealed class GetFinancialProfileQueryHandlerTests
     }
 
     [Fact]
+    public async Task AUserWithNoDataAtAll_HasEverySectionMissing_AndTheIndicatorSuggestsNothing()
+    {
+        Cashflow(NoHistory());
+        Goals(new GoalsProgressResponse(
+            GoalsProgressStatus.NoGoals, 100_000m, 1_500m, 6, [], null, new ProjectionRange(0.02m, 0.05m, 0.08m), false));
+        Income(IncomeWith(IncomeVariance.NoDeclared));
+        Career(new CareerTimelineResponse(true, [], 0));
+        Tax(new DisposalTaxSummary(0, 0, 0, null, null, new Dictionary<string, int>()));
+        Risk(null);
+
+        var profile = await Read();
+
+        profile.Cashflow.DataQuality.Should().Be(DataQuality.Missing);
+        profile.Goals.DataQuality.Should().Be(DataQuality.Missing);
+        profile.Income.DataQuality.Should().Be(DataQuality.Missing);
+        profile.Career.DataQuality.Should().Be(DataQuality.Missing);
+        profile.DisposalTax.DataQuality.Should().Be(DataQuality.Missing);
+        profile.Risk.DataQuality.Should().Be(DataQuality.Missing);
+        profile.MissingSections.Should().Equal("cashflow", "goals", "income", "career", "disposalTax", "risk");
+        profile.AsOf.Should().Be(Now);
+        profile.Disclosure.Should().Be(FinancialProfileText.Disclosure);
+        profile.CapacityIndicator.Status.Should().Be(CapacityStatus.Insufficient);
+        profile.CapacityIndicator.SuggestedBand.Should().BeNull();
+    }
+
+    [Fact]
     public async Task UnderThreeCompleteMonths_TheCashflowSectionIsMissing_WithItsOwnReason()
     {
         Cashflow(NoHistory());
