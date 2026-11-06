@@ -4,20 +4,17 @@ import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {
   AlertComponent,
   AsyncStateComponent,
-  type AsyncStateStatus,
   ButtonComponent,
   DialogActionsComponent,
   FormFieldComponent,
   InputComponent,
-  type Nullable,
   SelectableCardComponent,
 } from '@lifekit-hq/ui';
-import {finalize, type Subscription} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {type TrueLayerProvider} from '../../models/truelayer/truelayer.model';
-import {BankSyncService} from '../../services/bank-sync.service';
 import {ConnectStore} from '../../store/connect/connect.store';
+import {TrueLayerPickerStore} from '../../store/truelayer-picker/truelayer-picker.store';
 import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
 import {TRUELAYER_COUNTRIES} from './connect-modal.constants';
 
@@ -37,46 +34,36 @@ import {TRUELAYER_COUNTRIES} from './connect-modal.constants';
     SelectableCardComponent,
   ],
   templateUrl: './truelayer-picker.component.html',
+  providers: [TrueLayerPickerStore],
 })
 export class TrueLayerPickerComponent {
-  private readonly bankSync = inject(BankSyncService);
   private readonly strategy = inject(CONNECT_STRATEGY);
   private readonly searchTerm = signal<string>('');
-  private providersSub: Nullable<Subscription> = null;
 
   public readonly store = inject(ConnectStore);
 
   public readonly countries = TRUELAYER_COUNTRIES;
+  public readonly picker = inject(TrueLayerPickerStore);
 
   public readonly selectedCountry = signal<string>('ie');
-  public readonly providers = signal<readonly TrueLayerProvider[]>([]);
-  public readonly isLoading = signal<boolean>(false);
-  public readonly loadError = signal<Nullable<string>>(null);
-
-  public readonly listStatus = computed<AsyncStateStatus>(() => {
-    if (this.isLoading()) {
-      return 'loading';
-    }
-    return this.loadError() ? 'error' : 'success';
-  });
 
   public readonly searchControl = new FormControl<string>('', {nonNullable: true});
 
   public readonly filteredProviders = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
-    const list = this.providers();
+    const list = this.picker.providers();
     return term ? list.filter(p => p.displayName.toLowerCase().includes(term)) : list;
   });
 
   constructor() {
+    this.picker.loadProviders(this.selectedCountry());
     this.searchControl.valueChanges.subscribe(value => this.searchTerm.set(value ?? ''));
-    this.loadProviders('ie');
   }
 
   public onCountryChange(country: string): void {
     this.selectedCountry.set(country);
+    this.picker.loadProviders(country);
     this.searchControl.setValue('');
-    this.loadProviders(country);
   }
 
   public select(provider: TrueLayerProvider): void {
@@ -87,23 +74,6 @@ export class TrueLayerPickerComponent {
   }
 
   public back(): void {
-    this.providersSub?.unsubscribe();
     this.store.setModalStep('provider-picker');
-  }
-
-  private loadProviders(country: string): void {
-    this.providersSub?.unsubscribe();
-    this.isLoading.set(true);
-    this.loadError.set(null);
-    this.providersSub = this.bankSync
-      .listTrueLayerProviders(country)
-      .pipe(finalize(() => this.isLoading.set(false)))
-      .subscribe({
-        next: list => this.providers.set(list),
-        error: () =>
-          this.loadError.set(
-            'Failed to load bank list. Check that the backend is configured with TrueLayer credentials.'
-          ),
-      });
   }
 }
