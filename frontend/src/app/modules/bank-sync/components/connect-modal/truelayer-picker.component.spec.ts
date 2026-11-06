@@ -52,14 +52,14 @@ describe('TrueLayerPickerComponent', () => {
     await fixture.whenStable();
 
     expect(list).toHaveBeenCalledWith('ie');
-    expect(cmp.picker.status()).toBe('success');
+    expect(cmp.status()).toBe('success');
     expect(cmp.filteredProviders()).toEqual([AIB, BOI]);
   });
 
   it('is loading until the list answers', () => {
     const {cmp} = setup(vi.fn().mockReturnValue(new Subject<TrueLayerProvider[]>()));
 
-    expect(cmp.picker.status()).toBe('loading');
+    expect(cmp.status()).toBe('loading');
   });
 
   it('reloads for the chosen country and clears the search', async () => {
@@ -76,18 +76,20 @@ describe('TrueLayerPickerComponent', () => {
     expect(cmp.searchControl.value).toBe('');
   });
 
-  it('drops the in-flight request when the country changes', () => {
+  it('drops the in-flight request when the country changes', async () => {
     const ie = new Subject<TrueLayerProvider[]>();
     const uk = new Subject<TrueLayerProvider[]>();
     const list = vi.fn((country: string) => (country === 'ie' ? ie : uk));
-    const {cmp} = setup(list);
+    const {fixture, cmp} = setup(list);
 
     cmp.onCountryChange('uk');
+    fixture.detectChanges();
     ie.next([AIB]);
     uk.next([BOI]);
+    await fixture.whenStable();
 
     expect(cmp.filteredProviders()).toEqual([BOI]);
-    expect(cmp.picker.status()).toBe('success');
+    expect(cmp.status()).toBe('success');
   });
 
   it('filters the list by the search term, ignoring case', async () => {
@@ -105,8 +107,8 @@ describe('TrueLayerPickerComponent', () => {
     );
     await fixture.whenStable();
 
-    expect(cmp.picker.status()).toBe('error');
-    expect(cmp.picker.errorMessage()).toBe(LOAD_PROVIDERS_ERROR);
+    expect(cmp.status()).toBe('error');
+    expect(cmp.errorMessage()).toBe(LOAD_PROVIDERS_ERROR);
     expect(cmp.filteredProviders()).toEqual([]);
   });
 });
