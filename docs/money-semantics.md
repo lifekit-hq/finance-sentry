@@ -1928,6 +1928,8 @@ the default figure everywhere.**
   and `note` are field-encrypted at rest; kind, dates and currency stay readable so a host without the key can still count
   events. Every write is on the audit trail by field name (the context's interceptor). Not stored: payslips, a structured
   employer, tax identifiers.
+  A `date` and a leave's `endDate` may each be at most 50 years ahead (`CareerEventLimits.MaxYearsAhead`; the validator and
+  the dialog enforce it), so a stored end can never overflow the month arithmetic.
 - **Kinds and signs.** `IncomeStep`: income changes from `date` on by a **signed monthly** amount (a raise positive, a cut
   negative, never zero). `OneOffIn` / `OneOffOut`: a single positive amount received / spent in the month of `date`. `Leave`:
   income falls by a **positive monthly** amount from `date` through `endDate`, inclusive. Amounts are in the event's own
