@@ -18,7 +18,7 @@ export interface CareerEvent {
   amount: number;
   currency: string;
   note: Nullable<string>;
-  /** Whether the scenario applies it: not retired and dated after today. */
+  /** Whether the scenario applies it: not retired, and either dated after today or a leave still running. */
   counted: boolean;
   retired: boolean;
   updatedAt: string;

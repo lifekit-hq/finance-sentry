@@ -325,7 +325,7 @@ to the savings path (`ScenarioPath.MonthlyDeltas`, from the person's career even
 add the future value of the changes (linear, so the baseline arithmetic is untouched), and `FinancialIndependence` walks the
 months because a changing saving has no closed form. The baseline (the median of the complete months) stays the default on every
 surface; the scenario is a labelled second line, "a scenario you entered, not a forecast", on the same assumption set and range
-(money-semantics §19). Events dated today or earlier never count, since the baseline's history already holds them.
+(money-semantics §19). A leave that has started but not ended counts the months it still has ahead; any other event dated today or earlier never counts, since the baseline's history already holds it.
 
 **Cashflow profile (a derived read over M10's inputs, not an eleventh measure).** Burn, savings rate and runway
 (`GetCashflowProfileQueryHandler`, money-semantics §15) answer "what do I spend, what share of income do I keep, how
