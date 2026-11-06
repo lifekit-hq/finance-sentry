@@ -13,6 +13,22 @@ describeVisualBaseline({
     await mockGet(page, 'notifications/push/subscriptions', []);
     await mockGet(page, 'notifications/push/preferences', {pushEnabled: false});
     await mockGet(page, 'account/closure', {canClose: true, reason: null, graceDays: 30});
+    await mockGet(page, 'wealth/income-sources', [
+      {
+        id: 'a1',
+        kind: 'Salary',
+        label: 'Day job',
+        amount: 600,
+        currency: 'EUR',
+        cadence: 'Weekly',
+        grossOrNet: 'Net',
+        startDate: '2025-01-01',
+        endDate: null,
+        monthlyEquivalent: 2600,
+        active: true,
+        updatedAt: '2026-09-01T10:00:00Z',
+      },
+    ]);
   },
   ready: async page => {
     await expect(page.getByRole('heading', {name: 'Appearance'})).toBeVisible();
