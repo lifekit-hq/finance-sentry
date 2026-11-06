@@ -26,6 +26,7 @@ public sealed class ToolNameContractTests
         "get_event_calendar",
         "get_career_timeline",
         "get_family_clearing_statement",
+        "get_financial_profile",
         "get_fundamentals",
         "get_goals_progress",
         "get_income_profile",
