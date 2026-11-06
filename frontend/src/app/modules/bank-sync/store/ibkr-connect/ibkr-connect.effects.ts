@@ -9,24 +9,34 @@ import {type ConnectIbkrFlexRequest} from '../../models/ibkr/ibkr.model';
 import {IBKRService} from '../../services/ibkr.service';
 import {type IbkrConnectState} from './ibkr-connect.state';
 
+interface EffectsStore extends WritableStateSource<IbkrConnectState> {
+  setLoading: () => void;
+  setSuccess: () => void;
+  setError: (errorCode: Nullable<string>) => void;
+}
+
 function extractCode(err: unknown): Nullable<string> {
   const direct = (err as {errorCode?: string}).errorCode;
   return direct ?? extractErrorCode(err);
 }
 
-export function ibkrConnectEffects(store: WritableStateSource<IbkrConnectState>) {
+export function ibkrConnectEffects(store: EffectsStore) {
   const ibkr = inject(IBKRService);
 
   const validate = rxMethod<ConnectIbkrFlexRequest>(
     pipe(
-      tap(() =>
-        patchState(store, {validationStatus: 'validating', preview: null, errorCode: null})
-      ),
+      tap(() => {
+        patchState(store, {preview: null});
+        store.setLoading();
+      }),
       switchMap(request =>
         ibkr.validateFlex(request).pipe(
-          tap(preview => patchState(store, {validationStatus: 'validated', preview})),
+          tap(preview => {
+            patchState(store, {preview});
+            store.setSuccess();
+          }),
           catchError((err: unknown) => {
-            patchState(store, {validationStatus: 'error', errorCode: extractCode(err)});
+            store.setError(extractCode(err));
             return EMPTY;
           })
         )

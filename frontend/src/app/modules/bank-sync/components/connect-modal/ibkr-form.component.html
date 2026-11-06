@@ -87,8 +87,8 @@
         />
       </cmn-form-field>
 
-      @if (ibkr.validationErrorMessage()) {
-        <cmn-alert variant="error">{{ ibkr.validationErrorMessage() }}</cmn-alert>
+      @if (ibkr.errorMessage()) {
+        <cmn-alert variant="error">{{ ibkr.errorMessage() }}</cmn-alert>
       }
 
       <details class="rounded-cmn-md border border-cmn-border px-cmn-4 py-cmn-3">
@@ -107,8 +107,8 @@
       <cmn-dialog-actions align="between">
         <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
         <cmn-button
-          [loading]="ibkr.isValidating()"
-          [disabled]="ibkr.isValidating()"
+          [loading]="ibkr.isLoading()"
+          [disabled]="ibkr.isLoading()"
           variant="primary"
           type="submit"
         >

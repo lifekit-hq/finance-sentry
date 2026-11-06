@@ -24,7 +24,9 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     setReturnUrl: vi.fn(),
     setFlashMessage: vi.fn((message: Nullable<FlashMessage>) => flashMessage.set(message)),
     setSignInMethods: vi.fn(),
-    setSignInMethodsStatus: vi.fn(),
+    setSignInMethodsLoading: vi.fn(),
+    setSignInMethodsSuccess: vi.fn(),
+    setSignInMethodsError: vi.fn(),
     loadSignInMethods: vi.fn(),
     isAuthenticated: signal(overrides.isAuthenticated ?? false),
     returnUrl: signal<Nullable<string>>(overrides.returnUrl ?? null),
@@ -242,7 +244,9 @@ describe('authEffects', () => {
 
       TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
 
+      expect(store.setSignInMethodsLoading).toHaveBeenCalledOnce();
       expect(store.setSignInMethods).toHaveBeenCalledWith(methods);
+      expect(store.setSignInMethodsSuccess).toHaveBeenCalledOnce();
     });
 
     it('reports the failure instead of guessing a method set', () => {
@@ -253,8 +257,9 @@ describe('authEffects', () => {
 
       TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
 
-      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('loading');
-      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('error');
+      expect(store.setSignInMethodsLoading).toHaveBeenCalledOnce();
+      expect(store.setSignInMethodsError).toHaveBeenCalledOnce();
+      expect(store.setSignInMethodsSuccess).not.toHaveBeenCalled();
       expect(store.setSignInMethods).not.toHaveBeenCalled();
     });
   });

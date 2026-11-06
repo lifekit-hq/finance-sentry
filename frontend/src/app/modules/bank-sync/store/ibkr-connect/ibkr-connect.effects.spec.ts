@@ -59,7 +59,7 @@ describe('IbkrConnectStore', () => {
     store.validate(REQUEST);
 
     expect(store.hasPreview()).toBe(false);
-    expect(store.validationErrorMessage()).toBe('Bad token.');
+    expect(store.errorMessage()).toBe('Bad token.');
   });
 
   it('validate() falls back to a generic message for an unregistered code', () => {
@@ -68,7 +68,7 @@ describe('IbkrConnectStore', () => {
 
     store.validate(REQUEST);
 
-    expect(store.validationErrorMessage()).toContain("Couldn't check your Flex query");
+    expect(store.errorMessage()).toContain("Couldn't check your Flex query");
   });
 
   it('flags the sections that returned nothing', () => {
@@ -89,7 +89,7 @@ describe('IbkrConnectStore', () => {
 
     expect(store.hasPreview()).toBe(false);
     expect(store.preview()).toBeNull();
-    expect(store.validationErrorMessage()).toBe('');
+    expect(store.errorMessage()).toBe('');
   });
 
   it('setPath() records which connect path the user used', () => {

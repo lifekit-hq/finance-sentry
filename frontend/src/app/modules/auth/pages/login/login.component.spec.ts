@@ -1,14 +1,14 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {describe, expect, it, vi} from 'vitest';
 
 import {type SignInMethods} from '../../models/auth/auth.model';
-import {type SignInMethodsStatus} from '../../store/auth.state';
 import {AuthStore} from '../../store/auth.store';
 import {LoginComponent} from './login.component';
 
-function setup(status: SignInMethodsStatus, methods: SignInMethods | null = null) {
+function setup(status: AsyncStatus, methods: SignInMethods | null = null) {
   const store = {
     signInMethods: signal(methods),
     signInMethodsStatus: signal(status),

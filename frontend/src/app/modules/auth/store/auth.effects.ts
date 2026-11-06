@@ -1,7 +1,7 @@
 import {DOCUMENT} from '@angular/common';
 import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {ErrorMessageService, extractErrorCode} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
@@ -15,7 +15,7 @@ import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
 import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {AuthUtils} from '../utils/auth.utils';
-import {type FlashMessage, type SignInMethodsStatus} from './auth.state';
+import {type FlashMessage} from './auth.state';
 
 interface EffectsStore {
   applyAuthResponse: (res: AuthResponse) => void;
@@ -23,7 +23,9 @@ interface EffectsStore {
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   setSignInMethods: (signInMethods: SignInMethods) => void;
-  setSignInMethodsStatus: (status: SignInMethodsStatus) => void;
+  setSignInMethodsLoading: () => void;
+  setSignInMethodsSuccess: () => void;
+  setSignInMethodsError: (errorCode: Nullable<string>) => void;
   isAuthenticated: Signal<boolean>;
   returnUrl: Signal<Nullable<string>>;
 }
@@ -78,13 +80,16 @@ export function authEffects(store: EffectsStore) {
     },
     loadSignInMethods: rxMethod<void>(
       pipe(
-        tap(() => store.setSignInMethodsStatus('loading')),
+        tap(() => store.setSignInMethodsLoading()),
         switchMap(() =>
           authService.getSignInMethods().pipe(
-            tap(methods => store.setSignInMethods(methods)),
+            tap(methods => {
+              store.setSignInMethods(methods);
+              store.setSignInMethodsSuccess();
+            }),
             // No guessed fallback set: the login page shows the failure with a Retry.
-            catchError(() => {
-              store.setSignInMethodsStatus('error');
+            catchError((err: unknown) => {
+              store.setSignInMethodsError(extractErrorCode(err));
               return EMPTY;
             })
           )

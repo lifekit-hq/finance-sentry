@@ -16,6 +16,9 @@ export const PROVIDER_PICKER_PROMPT: Readonly<Record<InstitutionType, string>> =
   broker: 'Choose your broker.',
 };
 
+export const LOAD_PROVIDERS_ERROR =
+  'Failed to load bank list. Check that the backend is configured with TrueLayer credentials.';
+
 export interface TrueLayerCountry {
   readonly code: string;
   readonly name: string;
