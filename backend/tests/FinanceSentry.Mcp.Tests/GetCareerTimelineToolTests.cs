@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Reflection;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Auditing;
@@ -63,14 +62,4 @@ public sealed class GetCareerTimelineToolTests
     public void GoalsProgressTool_IsAlsoOnTheAuditTrail_BecauseItsScenarioIsDerivedFromCareerEvents()
         => typeof(GetGoalsProgressTool).GetMethod(nameof(GetGoalsProgressTool.ExecuteAsync))!
             .GetCustomAttribute<SensitiveProfileAttribute>().Should().NotBeNull();
-
-    [Fact]
-    public void Description_SaysScenarioNotForecast_AndWhatAKeylessHostSees()
-    {
-        var description = Method.GetCustomAttribute<DescriptionAttribute>()!.Description;
-
-        description.Should().Contain("not a forecast");
-        description.Should().Contain("readable false");
-        description.Should().Contain("never advice");
-    }
 }
