@@ -6,7 +6,10 @@ using FinanceSentry.Modules.Research.Domain.Scoring;
 /// One symbol's scorecard as the four axes and the verdict word they map to, with every fact behind
 /// each axis and the whole rule table (spec 726 US2, FR-005/FR-006). Computed at read time by the
 /// unchanged 019 scorers; nothing here is stored. There is no composite, weighted or overall number
-/// (019 FR-007, spec 726 FR-007, SC-003). Enums cross as their names.
+/// (019 FR-007, spec 726 FR-007, SC-003). Enums cross as their names. <see cref="Sector"/> and
+/// <see cref="Industry"/> are the company profile Yahoo returns with the valuation metrics already read for
+/// this scorecard (spec 726 FR-015): a fact about the name, not an axis, so neither feeds the verdict. Null
+/// when the source gave none (or the name is not an equity); never guessed.
 /// </summary>
 public sealed record ScorecardResult(
     string Symbol,
@@ -16,7 +19,9 @@ public sealed record ScorecardResult(
     ScorecardFundamentalsAxis Fundamentals,
     ScorecardCrowdingAxis Crowding,
     ScorecardValuationAxis Valuation,
-    VerdictDto Verdict);
+    VerdictDto Verdict,
+    string? Sector = null,
+    string? Industry = null);
 
 /// <summary>
 /// Structure: the raw 0-100 score and, beside it, the regime-adjusted one the verdict reads (spec 726

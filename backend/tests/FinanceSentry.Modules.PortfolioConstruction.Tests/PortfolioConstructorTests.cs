@@ -96,25 +96,76 @@ public sealed class PortfolioConstructorTests
     }
 
     [Fact]
-    public void IpsExclusions_MatchingNoTicker_AreNamedAsNotApplied()
+    public void IpsSectorExclusion_DropsEveryNameInThatSector_AndSaysWhich()
     {
         var outcome = Build(
-            [Cards.Scored("AAA", structure: 95), Cards.Scored("BBB", structure: 80)],
+            [
+                Cards.Scored("AAA", structure: 95, sector: "Energy"),
+                Cards.Scored("BBB", structure: 90, sector: "Technology"),
+                Cards.Scored("CCC", structure: 80, sector: "energy "),
+            ],
+            new ConstructionPolicy([" ENERGY"], null, null, null));
+
+        outcome.Entries["AAA"].WeightPct.Should().BeNull();
+        outcome.Entries["AAA"].Reason.Should().Be("Excluded by your IPS: sector Energy.");
+        outcome.Entries["CCC"].WeightPct.Should().BeNull();
+        outcome.Entries["CCC"].Reason.Should().Be("Excluded by your IPS: sector energy.");
+        outcome.Entries["BBB"].WeightPct.Should().BePositive();
+        outcome.Notes.Should().NotContain(n => n.Contains("match no ticker"));
+    }
+
+    [Fact]
+    public void IpsIndustryExclusion_DropsTheNamesInThatIndustry()
+    {
+        var outcome = Build(
+            [
+                Cards.Scored("AAA", structure: 95, sector: "Consumer Defensive", industry: "Tobacco"),
+                Cards.Scored("BBB", structure: 90, sector: "Consumer Defensive", industry: "Beverages - Non-Alcoholic"),
+            ],
+            new ConstructionPolicy(["tobacco"], null, null, null));
+
+        outcome.Entries["AAA"].Reason.Should().Be("Excluded by your IPS: industry Tobacco.");
+        outcome.Entries["BBB"].WeightPct.Should().BePositive();
+    }
+
+    [Fact]
+    public void IpsExclusions_MatchingNothingInTheUniverse_AreNamed()
+    {
+        var outcome = Build(
+            [Cards.Scored("AAA", structure: 95, sector: "Technology"), Cards.Scored("BBB", structure: 80, sector: "Technology")],
             new ConstructionPolicy(["aaa", " Energy ", "tobacco"], null, null, null));
 
         outcome.Entries["AAA"].Reason.Should().Be("Excluded by your IPS.");
-        outcome.Notes.Should().ContainSingle(n => n.Contains("not applied: no sector data"))
+        outcome.Entries["BBB"].WeightPct.Should().BePositive();
+        outcome.Notes.Should().ContainSingle(n => n.Contains("match no ticker, sector or industry"))
             .Which.Should().Contain("ENERGY, TOBACCO").And.NotContain("AAA");
     }
 
     [Fact]
-    public void IpsExclusions_AllMatchingTickers_AddNoNotAppliedNote()
+    public void IpsSectorExclusion_NamesTheScoredEquitiesWhoseSectorIsMissing()
+    {
+        var outcome = Build(
+            [
+                Cards.Scored("AAA", structure: 95, sector: "Energy"),
+                Cards.Scored("BBB", structure: 80),
+                Cards.Scored("ETF", structure: 70, notApplicable: true),
+                UniverseScorecard.Failed("DDD", "the scorecard could not be read"),
+            ],
+            new ConstructionPolicy(["Energy"], null, null, null));
+
+        outcome.Entries["AAA"].WeightPct.Should().BeNull();
+        outcome.Notes.Should().ContainSingle(n => n.Contains("could not be checked"))
+            .Which.Should().Contain("BBB").And.NotContain("ETF").And.NotContain("DDD");
+    }
+
+    [Fact]
+    public void IpsExclusions_AllTickers_AddNoSectorNotes()
     {
         var outcome = Build(
             [Cards.Scored("AAA"), Cards.Scored("BBB")],
             new ConstructionPolicy(["AAA"], null, null, null));
 
-        outcome.Notes.Should().NotContain(n => n.Contains("not applied"));
+        outcome.Notes.Should().NotContain(n => n.Contains("match no ticker") || n.Contains("No sector"));
     }
 
     [Fact]

@@ -36,6 +36,8 @@ public sealed class ScorecardSnapshotReader(IQueryHandler<GetScorecardQuery, Sco
             card.Verdict.Word,
             card.Verdict.RulesVersion,
             card.Verdict.FiredRuleId,
-            fired?.Description);
+            fired?.Description,
+            card.Sector,
+            card.Industry);
     }
 }

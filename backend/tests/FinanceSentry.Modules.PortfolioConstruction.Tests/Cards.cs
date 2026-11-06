@@ -14,7 +14,9 @@ internal static class Cards
         int? fundamentals = 70,
         string? crowding = "Normal",
         bool stale = false,
-        bool notApplicable = false) =>
+        bool notApplicable = false,
+        string? sector = null,
+        string? industry = null) =>
         new(symbol, null, ScoredAt, structure, structure, "adjusted", [], fundamentals, [], crowding, 0.04m,
-            notApplicable, 28m, 24m, 16.7m, 9.1m, null, stale, word, 1, "buy", "Adjusted structure at least 50 and fundamentals at least 50.");
+            notApplicable, 28m, 24m, 16.7m, 9.1m, null, stale, word, 1, "buy", "Adjusted structure at least 50 and fundamentals at least 50.", sector, industry);
 }

@@ -173,12 +173,14 @@ public sealed class GetUniverseScreenQueryHandler(
         if (!card.Scored)
         {
             return new UniverseRowDto(
-                card.Symbol, sources, card.FailureReason, null, null, null, null, null, null, null, null, reason);
+                card.Symbol, sources, null, null, card.FailureReason, null, null, null, null, null, null, null, null, reason);
         }
 
         return new UniverseRowDto(
             card.Symbol,
             sources,
+            card.Sector,
+            card.Industry,
             null,
             card.ScoredAt,
             new RowVerdictDto(card.VerdictWord ?? "NotScored", card.VerdictRulesVersion, card.FiredRuleId, card.FiredRuleDescription),

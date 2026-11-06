@@ -43,10 +43,12 @@ public sealed record AppliedConstraintDto(string Key, string Label, decimal Valu
 
 public sealed record SleeveDto(string AssetClass, decimal WeightPct, bool BuiltFromUniverse, string? Note);
 
-/// <summary>One symbol: the four axes as facts, the verdict with its rule, and its place in the suggested book.</summary>
+/// <summary>One symbol: its sector and industry (null when the source gave none), the four axes as facts, the verdict with its rule, and its place in the suggested book.</summary>
 public sealed record UniverseRowDto(
     string Symbol,
     IReadOnlyList<string> Sources,
+    string? Sector,
+    string? Industry,
     string? FailureReason,
     DateTimeOffset? ScoredAt,
     RowVerdictDto? Verdict,

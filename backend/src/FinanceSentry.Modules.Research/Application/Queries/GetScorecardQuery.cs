@@ -22,26 +22,28 @@ public sealed class GetScorecardQueryHandler(
     public async Task<ScorecardResult> Handle(GetScorecardQuery query, CancellationToken ct)
     {
         var symbol = query.Symbol.Trim().ToUpperInvariant();
-        var axis = await ReadValuationAsync(symbol, ct);
-        return await reader.ReadAsync(symbol, axis, null, ct);
+        var (axis, sector, industry) = await ReadValuationAsync(symbol, ct);
+        return await reader.ReadAsync(symbol, axis, null, ct, sector, industry);
     }
 
-    private async Task<ScorecardValuationAxis> ReadValuationAsync(string symbol, CancellationToken ct)
+    /// <summary>The valuation axis and, from the same Yahoo read, the company's sector and industry (null when unknown).</summary>
+    private async Task<(ScorecardValuationAxis Axis, string? Sector, string? Industry)> ReadValuationAsync(
+        string symbol, CancellationToken ct)
     {
         var current = await valuation.GetCurrentMetricsAsync(symbol, ct);
         if (current is null)
         {
-            return ScorecardValuationAxis.Unavailable;
+            return (ScorecardValuationAxis.Unavailable, null, null);
         }
 
         if (current.NotApplicable)
         {
-            return ScorecardValuationAxis.NotApplicableAxis;
+            return (ScorecardValuationAxis.NotApplicableAxis, null, null);
         }
 
         var trailing = await history.GetTrailingPeHistoryAsync(symbol, ct);
         var (currency, divisor) = MinorUnitCurrency.Normalize(current.Currency);
-        return ScorecardValuationAxis.From(
+        var axis = ScorecardValuationAxis.From(
             current.TrailingPe,
             trailing.FiveYearAvg,
             trailing.WindowYears,
@@ -50,5 +52,6 @@ public sealed class GetScorecardQueryHandler(
             current.ConsensusTarget / divisor,
             currency,
             current.IsStale);
+        return (axis, current.Sector, current.Industry);
     }
 }

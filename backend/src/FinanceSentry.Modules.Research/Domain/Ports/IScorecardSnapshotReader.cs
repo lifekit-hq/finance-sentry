@@ -15,6 +15,8 @@ public interface IScorecardSnapshotReader
 /// <summary>
 /// The four axes as facts and the verdict word with the rule that fired. Enums cross as their names
 /// (<see cref="VerdictWord"/> is <c>StrongBuy</c>, <c>Buy</c>, <c>Wait</c>, <c>Avoid</c> or <c>NotScored</c>).
+/// <see cref="Sector"/> and <see cref="Industry"/> are the company profile from the valuation read (null when the
+/// source gave none); they are facts beside the axes, never an input to the verdict.
 /// </summary>
 public sealed record ScorecardSnapshot(
     string Symbol,
@@ -37,4 +39,6 @@ public sealed record ScorecardSnapshot(
     string VerdictWord,
     int RulesVersion,
     string FiredRuleId,
-    string? FiredRuleDescription);
+    string? FiredRuleDescription,
+    string? Sector = null,
+    string? Industry = null);

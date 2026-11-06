@@ -30,6 +30,8 @@ public sealed class ScorecardSnapshotReaderTests
         snapshot.RulesVersion.Should().Be(1);
         snapshot.FiredRuleId.Should().Be("buy");
         snapshot.FiredRuleDescription.Should().Be("Structure and fundamentals clear the BUY bars.");
+        snapshot.Sector.Should().Be("Technology");
+        snapshot.Industry.Should().Be("Software - Infrastructure");
     }
 
     [Fact]
@@ -49,5 +51,7 @@ public sealed class ScorecardSnapshotReaderTests
         new VerdictDto(
             "Buy", 1, "buy", "adjusted",
             [new VerdictRuleDto("buy", "Buy", "Structure and fundamentals clear the BUY bars.", true, true, [])],
-            [], null));
+            [], null),
+        "Technology",
+        "Software - Infrastructure");
 }

@@ -133,6 +133,30 @@ public sealed class UniverseScreenQueryTests
     }
 
     [Fact]
+    public async Task SectorExclusion_FromThePolicySource_DropsTheNamesInThatSector_AndRowsShowSector()
+    {
+        _scorecards
+            .Setup(s => s.GetAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                Cards.Scored("AAA", sector: "Energy", industry: "Oil & Gas Integrated"),
+                Cards.Scored("BBB", sector: "Technology", industry: "Software - Infrastructure"),
+                Cards.Scored("CCC", sector: "Technology", industry: "Semiconductors"),
+            ]);
+        _policy.Setup(p => p.GetAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConstructionPolicy(["energy"], null, null, null));
+
+        var result = await Handler().Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
+
+        var energy = result.Rows.Single(r => r.Symbol == "AAA");
+        energy.Sector.Should().Be("Energy");
+        energy.Industry.Should().Be("Oil & Gas Integrated");
+        energy.SuggestedWeightPct.Should().BeNull();
+        energy.Reason.Should().Be("Excluded by your IPS: sector Energy.");
+        result.Rows.Single(r => r.Symbol == "BBB").SuggestedWeightPct.Should().BePositive();
+        result.Construction.Notes.Should().NotContain(n => n.Contains("not applied"));
+    }
+
+    [Fact]
     public async Task AScoredCard_IsReusedAcrossReads_ButAFailedOneIsTriedAgain()
     {
         _scorecards
