@@ -62,7 +62,11 @@ public sealed class GetCashflowReportTool(
             return [];
         }
 
-        var holes = await _coverageHoles.GetHolesAsync(userIdVal, from, to, cancellationToken);
+        var holes = await _coverageHoles.GetHolesAsync(
+            userIdVal,
+            new DateOnly(from.Year, from.Month, 1),
+            new DateOnly(to.Year, to.Month, 1).AddMonths(1).AddDays(-1),
+            cancellationToken);
 
         // Each month has one row per currency (transfers and counterparty-matched transactions
         // already excluded upstream) plus at most one synthetic USD row carrying that month's

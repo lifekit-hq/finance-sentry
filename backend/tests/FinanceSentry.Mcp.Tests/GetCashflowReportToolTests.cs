@@ -138,6 +138,31 @@ public sealed class GetCashflowReportToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FlagsAnEdgeMonth_WhenTheHoleLiesOutsideTheRequestedDaysOfThatMonth()
+    {
+        SetupHandler(
+            Flow("2024-09", "USD", inflowUsd: 2000m, outflowUsd: 40m),
+            Flow("2024-10", "USD", inflowUsd: 2000m, outflowUsd: 900m),
+            Flow("2024-11", "USD", inflowUsd: 2000m, outflowUsd: 35m));
+        var holes = new[]
+        {
+            new CoverageHoleSpan(Guid.NewGuid(), new DateOnly(2024, 9, 1), new DateOnly(2024, 9, 10)),
+            new CoverageHoleSpan(Guid.NewGuid(), new DateOnly(2024, 11, 20), null),
+        };
+        _holes
+            .Setup(h => h.GetHolesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, DateOnly from, DateOnly to, CancellationToken _) =>
+                (IReadOnlyList<CoverageHoleSpan>)holes.Where(h => h.Overlaps(from, to)).ToList());
+
+        var result = await CreateSut().ExecuteAsync(
+            fromDate: new DateOnly(2024, 9, 20),
+            toDate: new DateOnly(2024, 11, 15));
+
+        result.Select(e => (e.Period, e.CoverageGap)).Should().Equal(
+            ("2024-09", true), ("2024-10", false), ("2024-11", true));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_FailsTheCall_WhenTheCoverageHolesCannotBeRead()
     {
         SetupHandler(Flow("2024-01", "USD", inflowUsd: 2000m, outflowUsd: 900m));
