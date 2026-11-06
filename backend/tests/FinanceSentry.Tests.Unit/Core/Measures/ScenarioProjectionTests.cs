@@ -73,6 +73,14 @@ public sealed class ScenarioProjectionTests
         ScenarioPath.MonthlyDeltas([leave], Today, 3).Should().Equal(-3_000m, 0m, 0m);
     }
 
+    [Fact]
+    public void MonthlyDeltas_ALeaveEndingAtTheLastDateOnTheCalendar_FillsTheHorizonWithoutThrowing()
+    {
+        var leave = new ScenarioEvent(ScenarioEventKind.Leave, Today.AddDays(1), DateOnly.MaxValue, 3_000m);
+
+        ScenarioPath.MonthlyDeltas([leave], Today, 3).Should().Equal(-3_000m, -3_000m, -3_000m);
+    }
+
     [Theory]
     [InlineData("2026-06-01", "2026-09-26")]
     [InlineData("2026-06-01", "2026-08-31")]

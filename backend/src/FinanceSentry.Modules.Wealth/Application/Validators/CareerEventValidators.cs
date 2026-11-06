@@ -54,7 +54,9 @@ public sealed class CareerEventInputValidator : AbstractValidator<CareerEventInp
             .Must((input, end) => input.Kind == CareerEventKind.Leave || end is null)
             .WithMessage("Only a leave has an end date.")
             .Must((input, end) => end is null || input.Date is null || end.Value >= input.Date.Value)
-            .WithMessage("End date cannot be before the date.");
+            .WithMessage("End date cannot be before the date.")
+            .Must(end => end is null || end.Value <= DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddYears(CareerEventLimits.MaxYearsAhead))
+            .WithMessage($"End date can be at most {CareerEventLimits.MaxYearsAhead} years ahead.");
     }
 }
 

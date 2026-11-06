@@ -7,6 +7,9 @@ export const CAREER_EVENT_LABEL_MAX_LENGTH = 100;
 export const CAREER_EVENT_NOTE_MAX_LENGTH = 500;
 export const CAREER_EVENT_NOTE_ROWS = 2;
 
+/** How far ahead an event, or the end of a leave, may be dated: the backend's `CareerEventLimits.MaxYearsAhead`. */
+export const CAREER_EVENT_MAX_YEARS_AHEAD = 50;
+
 export const CAREER_EVENT_DEFAULT_CURRENCY = 'USD';
 
 export const CAREER_EVENT_KIND_LABEL: ReadonlyMap<CareerEventKind, string> = new Map([

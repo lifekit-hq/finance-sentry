@@ -8,7 +8,7 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// <summary>
 /// One entry of the career timeline. <paramref name="Label"/>, <paramref name="Amount"/> and <paramref name="Note"/> are null
 /// when the host cannot read the encrypted fields; <paramref name="Counted"/> is whether the scenario applies the event
-/// (not retired, and dated after today).
+/// (not retired, and either dated after today or a leave still running).
 /// </summary>
 public record CareerTimelineEntry(
     Guid Id,

@@ -84,7 +84,7 @@ public static class ScenarioPath
     /// How many monthly savings a leave costs: its length in whole months, counting the end date itself, and at least one
     /// (a leave of three calendar months costs three, however the projection's months line up with the calendar).
     /// </summary>
-    public static int LeaveMonths(DateOnly start, DateOnly end) => Math.Max(1, WholeMonthsUntil(start, end.AddDays(1)));
+    public static int LeaveMonths(DateOnly start, DateOnly end) => Math.Max(1, WholeMonthsUntil(start, end == DateOnly.MaxValue ? end : end.AddDays(1)));
 
     /// <summary>Whole calendar months from <paramref name="from"/> to <paramref name="to"/>.</summary>
     public static int WholeMonthsUntil(DateOnly from, DateOnly to)

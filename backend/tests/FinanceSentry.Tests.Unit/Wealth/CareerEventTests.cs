@@ -159,6 +159,17 @@ public sealed class CareerEventTests
     }
 
     [Fact]
+    public void Validator_ALeaveMayNotEndPastTheHorizon_ButMayEndOnIt()
+    {
+        var leave = Valid(CareerEventKind.Leave);
+        var message = $"End date can be at most {CareerEventLimits.MaxYearsAhead} years ahead.";
+
+        Errors(leave with { EndDate = DateOnly.MaxValue }).Should().Contain(message);
+        Errors(leave with { EndDate = Today.AddYears(CareerEventLimits.MaxYearsAhead + 1) }).Should().Contain(message);
+        Errors(leave with { EndDate = Today.AddYears(CareerEventLimits.MaxYearsAhead) }).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Validator_BoundsTheDateTheLabelTheNoteAndTheCurrency()
     {
         Errors(Valid() with { Date = Today.AddYears(CareerEventLimits.MaxYearsAhead + 1) })
