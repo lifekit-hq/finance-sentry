@@ -9,6 +9,25 @@ export interface ProjectionRange {
   high: number;
 }
 
+/**
+ * Whether the person's career events shaped a scenario (#454 S5), written by name. `None` never reaches the client (the
+ * block is absent); `Unreadable` means events count but this host cannot read them, so no scenario figure exists.
+ */
+export type ScenarioStatus = 'None' | 'Applied' | 'Unreadable';
+
+/**
+ * The savings path with the person's career events applied, beside the baseline and never replacing it. `label` and
+ * `basis` are the words it must be shown with ("a scenario you entered, not a forecast").
+ */
+export interface NetWorthScenario {
+  status: ScenarioStatus;
+  eventCount: number;
+  /** The scenario's range on the baseline's horizon; null unless `status` is `Applied`. */
+  projectedNetWorth: Nullable<ProjectionRange>;
+  label: string;
+  basis: string;
+}
+
 /** Mirrors the backend's `NetWorthProjectionStatus`, written by name. */
 export type NetWorthProjectionStatus = 'Projected' | 'InsufficientHistory';
 
@@ -30,4 +49,6 @@ export interface NetWorthProjection {
   hasStaleSleeves: boolean;
   /** ISO code the amounts are expressed in: the profile base currency, USD when unset. */
   baseCurrency: string;
+  /** Present only when the person has career events that count. */
+  scenario?: Nullable<NetWorthScenario>;
 }

@@ -18,10 +18,14 @@ public class GetFireProjectionQueryHandlerTests
     private readonly Mock<INetWorthSnapshotRepository> _snapshots = new();
     private readonly Mock<IHonestMonthlyFlowReader> _monthlyFlow = new();
     private readonly Mock<IUserFireAssumptionsReader> _assumptions = new();
+    private readonly FakeCareerEventRepository _careerEvents = new();
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetFireProjectionQueryHandler CreateHandler() =>
-        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock), _clock);
+        new(
+            new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+            new ScenarioReader(_careerEvents, _clock),
+            _clock);
 
     private static NetWorthSnapshot Snapshot(decimal totalNetWorth, string? staleSleeves = null) => new()
     {
@@ -40,6 +44,89 @@ public class GetFireProjectionQueryHandlerTests
         new("2026-08", outflowUsd, netUsd),
         new("2026-09", outflowUsd, netUsd), // current month, excluded by the handler
     ];
+
+    private void Arrange(decimal netWorth, decimal outflowUsd, decimal netUsd)
+    {
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Snapshot(netWorth));
+        _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThreeCompleteMonths(outflowUsd, netUsd));
+        _assumptions.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync((FireAssumptions?)null);
+    }
+
+    private void AddEvent(CareerEventKind kind, DateOnly date, decimal amount, bool retired = false)
+    {
+        var career = CareerEvent.Create(UserId, kind, date, null, "Event", amount, "USD", null);
+        if (retired)
+            career.Retire(Now);
+        _careerEvents.Events.Add(career);
+    }
+
+    [Fact]
+    public async Task Handle_CareerEvents_GiveAScenarioDateBesideTheBaselineDate()
+    {
+        Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_500m);
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        var baseline = Projection.FinancialIndependence(36_000m, 100_000m, 1_000m, ProjectionAssumptions.Default);
+        result.MonthsToFire.Should().Be(baseline.MonthsToTarget!.Value.Central, "the baseline stays the default");
+        result.Scenario.Should().NotBeNull();
+        result.Scenario!.Status.Should().Be(ScenarioStatus.Applied);
+        result.Scenario.Outcome.Should().Be(FireProjectionStatus.Projected);
+        result.Scenario.MonthsToFire!.Value.Should().BeLessThan(result.MonthsToFire!.Value);
+        result.Scenario.ProjectedDate!.Value.Should().BeBefore(result.ProjectedDate!.Value);
+        result.Scenario.EarliestDate!.Value.Should().BeOnOrBefore(result.Scenario.LatestDate!.Value);
+        result.Scenario.Label.Should().Contain("not a forecast");
+    }
+
+    [Fact]
+    public async Task Handle_NoCareerEvents_HasNoScenario()
+    {
+        Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
+
+        (await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None)).Scenario.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ARetiredEvent_IsNotAScenario()
+    {
+        Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_500m, retired: true);
+
+        (await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None)).Scenario.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ACutThatEndsTheSaving_IsNotWithinTheHorizon_NotADate()
+    {
+        Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 11, 1), -5_000m);
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        result.Status.Should().Be(FireProjectionStatus.Projected, "the baseline is unchanged");
+        result.Scenario!.Outcome.Should().Be(FireProjectionStatus.NotWithinHorizon);
+        result.Scenario.ProjectedDate.Should().BeNull();
+        result.Scenario.MonthsToFire.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_OnAHostWithoutTheKey_SaysTheScenarioIsUnreadable()
+    {
+        Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
+        _careerEvents.CanReadEncryptedFields = false;
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_500m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.EventCount.Should().Be(2, "the events count even though they cannot be read");
+        result.Scenario.Outcome.Should().BeNull();
+        result.ProjectedDate.Should().NotBeNull();
+    }
 
     [Fact]
     public async Task Handle_UsesLatestSnapshot_AndFlagsStaleSleeves()

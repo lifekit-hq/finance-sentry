@@ -20,10 +20,12 @@ public class GetGoalsProgressQueryHandlerTests
     private readonly Mock<IHonestMonthlyFlowReader> _monthlyFlow = new();
     private readonly Mock<IUserFireAssumptionsReader> _assumptions = new();
     private readonly Mock<IGoalsReader> _goals = new();
+    private readonly FakeCareerEventRepository _careerEvents = new();
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetGoalsProgressQueryHandler CreateHandler() => new(
         new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+        new ScenarioReader(_careerEvents, _clock),
         _goals.Object,
         _clock);
 
@@ -63,6 +65,95 @@ public class GetGoalsProgressQueryHandlerTests
 
     private Task<GoalsProgressResponse> Run() =>
         CreateHandler().Handle(new GetGoalsProgressQuery(UserId), CancellationToken.None);
+
+    // --- career events: the scenario beside the baseline ------------------------------------------------------
+
+    private void AddEvent(CareerEventKind kind, DateOnly date, decimal amount, bool retired = false)
+    {
+        var career = CareerEvent.Create(UserId, kind, date, null, "Event", amount, "USD", null);
+        if (retired)
+            career.Retire(Now);
+        _careerEvents.Events.Add(career);
+    }
+
+    [Fact]
+    public async Task Handle_CareerEvents_PutAScenarioOnEachGoalWithMonthsLeft_BesideTheUnchangedBaseline()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m, 1_000m, 1_000m),
+            Goals(plan: null, Goal(145_000m, new DateOnly(2028, 9, 26))));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_000m);
+
+        var baselineOnly = await Run();
+        var goal = baselineOnly.Goals.Single();
+
+        var plain = Projection.ValueAfter(24, 100_000m, 1_000m, ProjectionAssumptions.Default);
+        goal.ProjectedAtTargetDate.Should().Be(plain, "the baseline stays the default");
+        goal.RequiredMonthlySaving.Should().Be(Projection.RequiredMonthlySaving(24, 145_000m, 100_000m, ProjectionAssumptions.Default));
+        goal.OnTrack.Should().Be(GoalTrack.Behind);
+
+        baselineOnly.Scenario!.Status.Should().Be(ScenarioStatus.Applied);
+        baselineOnly.Scenario.EventCount.Should().Be(1);
+        var withEvents = goal.Scenario!;
+        withEvents.ProjectedAtTargetDate.Central.Should().BeGreaterThan(plain.Central);
+        withEvents.RequiredMonthlySaving.Central.Should().BeLessThan(goal.RequiredMonthlySaving!.Value.Central);
+        withEvents.OnTrack.Should().Be(GoalTrack.OnTrack, "the raise is what gets this goal there");
+    }
+
+    [Fact]
+    public async Task Handle_NoCareerEvents_LeavesTheScenarioOffTheResponseAndTheGoals()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m, 1_000m, 1_000m),
+            Goals(plan: null, Goal(130_000m, new DateOnly(2028, 9, 26))));
+
+        var result = await Run();
+
+        result.Scenario.Should().BeNull();
+        result.Goals.Single().Scenario.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ARetiredEvent_IsNotAScenario()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m, 1_000m, 1_000m),
+            Goals(plan: null, Goal(130_000m, new DateOnly(2028, 9, 26))));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_000m, retired: true);
+
+        (await Run()).Scenario.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_AGoalWithNoMonthsLeftOrNoSavingsPath_HasNoScenarioFigure()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m),
+            Goals(plan: null, Goal(130_000m, new DateOnly(2028, 9, 26)), Goal(90_000m, new DateOnly(2026, 8, 1), "Past")));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_000m);
+
+        var result = await Run();
+
+        result.Goals.Should().OnlyContain(g => g.Scenario == null, "no savings pace and no months left both withhold the scenario");
+    }
+
+    [Fact]
+    public async Task Handle_OnAHostWithoutTheKey_SaysTheScenarioIsUnreadable_AndGivesNoGoalFigures()
+    {
+        Arrange(
+            100_000m, Months(1_000m, 1_000m, 1_000m, 1_000m),
+            Goals(plan: null, Goal(130_000m, new DateOnly(2028, 9, 26))));
+        _careerEvents.CanReadEncryptedFields = false;
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_000m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
+
+        var result = await Run();
+
+        result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.EventCount.Should().Be(2, "the events count even though they cannot be read");
+        result.Goals.Single().Scenario.Should().BeNull();
+        result.Goals.Single().ProjectedAtTargetDate.Should().NotBeNull("the baseline needs no key");
+    }
 
     // --- no goals --------------------------------------------------------------------------------------------
 

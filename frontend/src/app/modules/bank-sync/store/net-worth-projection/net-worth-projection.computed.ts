@@ -28,6 +28,10 @@ export function netWorthProjectionComputed(store: StateSignals) {
       const projection = store.projection();
       return projection ? ProjectionUtils.netWorthAssumptions(projection) : '';
     }),
+    scenario: computed(() => {
+      const projection = store.projection();
+      return projection ? ProjectionUtils.netWorthScenario(projection) : '';
+    }),
     hasStaleSleeves: computed(() => (store.projection()?.hasStaleSleeves ?? false) && visible()),
     horizonMonths: computed(() => store.projection()?.horizonMonths ?? 0),
   };

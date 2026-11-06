@@ -80,6 +80,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   MANUAL_HOLDING_NOT_FOUND: 'That value is no longer there. Refresh to see your current list.',
   INCOME_SOURCE_NOT_FOUND:
     'That income source is no longer there. Refresh to see your current list.',
+  CAREER_EVENT_NOT_FOUND: 'That career event is no longer there. Refresh to see your current list.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'That budget category is not recognized. Pick one from the list.',
   BUDGET_INVALID_LIMIT: 'Budget limit must be greater than zero.',

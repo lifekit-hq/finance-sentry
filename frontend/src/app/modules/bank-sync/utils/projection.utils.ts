@@ -39,6 +39,30 @@ export class ProjectionUtils {
       : '';
   }
 
+  /**
+   * The twelve-month figure with the person's career events applied, labelled as the scenario it is; empty when there is
+   * none (no events count, or this host cannot read them).
+   */
+  public static netWorthScenario(projection: NetWorthProjection): string {
+    const scenario = projection.scenario;
+    if (scenario?.status !== 'Applied' || !scenario.projectedNetWorth) {
+      return '';
+    }
+    const central = MoneyUtils.format(
+      scenario.projectedNetWorth.central,
+      projection.baseCurrency,
+      WHOLE_UNITS
+    );
+    const range = ProjectionUtils.moneyRange(scenario.projectedNetWorth, projection.baseCurrency);
+    const events = ProjectionUtils.eventsCount(scenario.eventCount);
+    return `With your ${events}: about ${central} (${range}). ${scenario.label}`;
+  }
+
+  /** "1 career event", "3 career events". */
+  public static eventsCount(count: number): string {
+    return `${count} career ${count === 1 ? 'event' : 'events'}`;
+  }
+
   /** Every input and the return assumption, spelled out next to the figure (C8). */
   public static netWorthAssumptions(projection: NetWorthProjection): string {
     const money = (amount: number): string =>

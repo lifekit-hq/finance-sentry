@@ -27,6 +27,10 @@ export function fireComputed(store: StateSignals) {
       const projection = store.projection();
       return projection ? FireTileUtils.runway(projection) : null;
     }),
+    scenario: computed(() => {
+      const projection = store.projection();
+      return projection ? FireTileUtils.scenario(projection) : null;
+    }),
     assumptions: computed(() => {
       const projection = store.projection();
       return projection ? FireTileUtils.assumptions(projection) : '';

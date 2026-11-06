@@ -37,6 +37,12 @@ public static class EncryptedFieldPropertyExtensions
     public static PropertyBuilder<string> IsEncrypted(this PropertyBuilder<string> property, ICredentialEncryptionService encryption)
         => property.HasConversion(new EncryptedStringConverter(encryption)).HasColumnType("text");
 
+    /// <summary>An optional text property: a null stays null in the column, a value is encrypted.</summary>
+    public static PropertyBuilder<string?> IsEncryptedOptional(this PropertyBuilder<string?> property, ICredentialEncryptionService encryption)
+        // EF never runs a converter on a null (no ConvertsNulls), so the non-null string converter is safe for a nullable
+        // property; the null-forgiving operator only bridges the converter's type argument's nullability annotation.
+        => property.HasConversion(new EncryptedStringConverter(encryption)!).HasColumnType("text");
+
     public static PropertyBuilder<decimal> IsEncrypted(this PropertyBuilder<decimal> property, ICredentialEncryptionService encryption)
         => property.HasConversion(new EncryptedDecimalConverter(encryption)).HasColumnType("text");
 

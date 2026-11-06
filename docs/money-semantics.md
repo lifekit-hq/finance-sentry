@@ -1914,3 +1914,57 @@ replaces the observed income (§15) in any projection, goal or runway.**
   There the read returns each source's plain columns only (kind, currency, cadence, basis, dates, active), no label,
   amount or monthly equivalent, and `DeclaredUnreadable`. The in-app agent runs the same tool in the API host and
   gets the full read. Decrypting on the MCP host would mean distributing the key to a second host, which is a separate decision.
+
+## 19. Career timeline and scenario projection (#454 S5)
+
+Dated life-money events the person enters ("a raise on a date", a bonus, a leave), and a **scenario**: the savings path of §11
+with those events applied, shown **next to** the baseline and never replacing it. Stored (`wealth.career_events`,
+`CareerEvent`, Wealth; `GET/POST /wealth/career-events`, `PUT/DELETE /wealth/career-events/{id}`, `POST .../{id}/retire`;
+Settings → Money profile → Career timeline; MCP `get_career_timeline`, and the scenario in `get_goals_progress`). **A scenario
+is one the person entered, not a forecast: every surface says so, and the baseline (the median of the complete months, §11) stays
+the default figure everywhere.**
+
+- **Fields.** `kind`, `date`, `endDate` (a leave only), `label`, `amount`, `currency`, `note`, `retired_at`. `label`, `amount`
+  and `note` are field-encrypted at rest; kind, dates and currency stay readable so a host without the key can still count
+  events. Every write is on the audit trail by field name (the context's interceptor). Not stored: payslips, a structured
+  employer, tax identifiers.
+  A `date` and a leave's `endDate` may each be at most 50 years ahead (`CareerEventLimits.MaxYearsAhead`; the validator and
+  the dialog enforce it), so a stored end can never overflow the month arithmetic.
+- **Kinds and signs.** `IncomeStep`: income changes from `date` on by a **signed monthly** amount (a raise positive, a cut
+  negative, never zero). `OneOffIn` / `OneOffOut`: a single positive amount received / spent in the month of `date`. `Leave`:
+  income falls by a **positive monthly** amount from `date` through `endDate`, inclusive. Amounts are in the event's own
+  currency and converted to USD once, at the read (`ScenarioReader`, `CurrencyConverter.ToUsd`, §3).
+- **What counts.** An event counts when it is **not retired** and dated **after today**, or is a **leave under way** (started on
+  or before today, end date after today): it counts the whole months left to its end date (end date counted, at least one),
+  from the first month on. Any other event dated today or earlier is part of the baseline's trailing complete months already (a
+  raise that happened, a leave that is over), so counting it again would double it: it stays listed as history and adds nothing.
+  A retired event never counts, and an edit un-retires it (it restates the event).
+- **Every change is a change to the monthly saving.** Spending is assumed not to move with income and tax is not modelled: an
+  income step of +500 raises the saving by 500. The person enters what changes what they can save.
+- **Month placement.** An event lands in month index `m` = the whole calendar months from today to its date (`ScenarioPath`):
+  an event ten days out is in the first month, one forty days out in the second. A step then applies to every month from `m` on, a
+  one-off to month `m` only, a leave to its length in whole months from `m` (end date counted, at least one; a leave already under way starts at month 0 and runs for the whole months left to its end date: a three-month leave costs three monthly savings however the projection's months line up with the calendar). Contributions land at the end of
+  their month, as the level monthly saving does, so the scenario value is exactly the baseline value plus the future value of
+  the changes (`Projection.ValueAfter` with deltas; at a zero return the changes simply add up).
+- **The scenario in each projection** (same assumption set, same low / central / high return range as the baseline, C8):
+  - *Twelve-month net worth*: `scenario.projectedNetWorth` on the baseline's 12-month horizon.
+  - *Financial independence*: a month-by-month walk (`Projection.FinancialIndependence` with deltas, at most 1,200 months, the
+    crossing month interpolated, because a changing saving has no closed form) at each of the three returns. The result is
+    `Projected` (months, date, earliest / latest), `AlreadyReached`, `NotSaving`, or `NotWithinHorizon` when the target is not
+    reached in 100 years (no date is invented; the whole range is withheld if any of the three returns never gets there).
+  - *Goals* (§16): per goal with months left and a savings path, `scenario.projectedAtTargetDate`, `scenario.onTrack`, and
+    `scenario.requiredMonthlySaving` = the level monthly saving still needed **once the events' future value is counted**
+    (`Projection.RequiredMonthlySaving` with deltas; zero when the events get there on their own). The goal's baseline fields are
+    untouched.
+  - No scenario block at all when no event counts. With no snapshot or under three complete months there is no baseline, so no
+    scenario either.
+- **No key on the MCP host.** The MCP host holds no encryption key (#613), so it cannot read `amount`. There `get_career_timeline`
+  returns each event's plain columns only (`readable: false`; no label, amount or note; `counted` and `retired` still work), and
+  the projections and goals carry `scenario.status: Unreadable` with **no figure** whenever an event would count. The in-app agent
+  runs the tools in the API host and gets everything. Because the goals scenario is derived from the encrypted amounts,
+  `get_goals_progress` is on the audit trail too (`[SensitiveProfile]`).
+- **No principal.** The monthly FIRE brief job reads the FIRE handler with no principal, so `ScenarioReader` uses the repository's
+  `…Unscoped…` reads keyed on the user id (the Owner filter would match nothing). The brief text is the baseline only.
+- **Currency.** The handlers compute in USD; `WealthController` re-expresses the scenario's amounts in the profile base currency
+  with the baseline's (§3). Months and dates are untouched.
+

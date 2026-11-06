@@ -62,6 +62,11 @@ public enum FireReachability
 
     /// <summary>Monthly savings are zero or negative: no rate of progress to project from.</summary>
     NotSaving,
+
+    /// <summary>
+    /// A savings path with dated changes (a scenario) never reaches the target inside <see cref="Projection.MaxScenarioMonths"/>.
+    /// </summary>
+    NotWithinHorizon,
 }
 
 /// <summary>
@@ -90,6 +95,9 @@ public static class Projection
     public const int LookbackMonths = 6;
 
     private const int MonthsPerYear = 12;
+
+    /// <summary>How far a scenario is simulated month by month (100 years); a target not reached by then is not claimed.</summary>
+    public const int MaxScenarioMonths = 1200;
 
     /// <summary>
     /// The savings path from the net saving of each complete month, or null below <see cref="MinCompleteMonths"/>.
@@ -130,6 +138,111 @@ public static class Projection
             FutureValue(currentUsd, monthlySavingsUsd, returns.High, months));
     }
 
+
+    /// <summary>
+    /// <see cref="ValueAfter(int, decimal, decimal, ProjectionAssumptions)"/> with dated changes to the monthly
+    /// saving: <paramref name="monthlyDeltasUsd"/>[i] is added to the saving of month i + 1 (a one-off is one slot, a
+    /// raise every slot from its month on). Contributions land at the end of their month, as the level ones do, so
+    /// the scenario value is the baseline value plus the future value of the deltas - the baseline stays the default
+    /// and the scenario is never blended into it. A delta past <paramref name="months"/> is ignored.
+    /// </summary>
+    public static ProjectionRange ValueAfter(
+        int months, decimal currentUsd, decimal monthlySavingsUsd, ProjectionAssumptions assumptions,
+        IReadOnlyList<decimal> monthlyDeltasUsd)
+    {
+        var returns = assumptions.RealAnnualReturns;
+        return ProjectionRange.Of(
+            FutureValue(currentUsd, monthlySavingsUsd, returns.Low, months) + DeltasFutureValue(monthlyDeltasUsd, returns.Low, months),
+            FutureValue(currentUsd, monthlySavingsUsd, returns.Central, months) + DeltasFutureValue(monthlyDeltasUsd, returns.Central, months),
+            FutureValue(currentUsd, monthlySavingsUsd, returns.High, months) + DeltasFutureValue(monthlyDeltasUsd, returns.High, months));
+    }
+
+    /// <summary>
+    /// <see cref="RequiredMonthlySaving(int, decimal, decimal, ProjectionAssumptions)"/> once the dated changes in
+    /// <paramref name="monthlyDeltasUsd"/> are counted: the level monthly saving that, with those changes on top,
+    /// reaches the target. A scenario that gets there on its own needs none (never negative).
+    /// </summary>
+    public static ProjectionRange RequiredMonthlySaving(
+        int months, decimal targetUsd, decimal currentUsd, ProjectionAssumptions assumptions,
+        IReadOnlyList<decimal> monthlyDeltasUsd)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(months, 1);
+
+        var returns = assumptions.RealAnnualReturns;
+        return ProjectionRange.Of(
+            SavingToReach(targetUsd - DeltasFutureValue(monthlyDeltasUsd, returns.Low, months), currentUsd, returns.Low, months),
+            SavingToReach(targetUsd - DeltasFutureValue(monthlyDeltasUsd, returns.Central, months), currentUsd, returns.Central, months),
+            SavingToReach(targetUsd - DeltasFutureValue(monthlyDeltasUsd, returns.High, months), currentUsd, returns.High, months));
+    }
+
+    /// <summary>
+    /// <see cref="FinancialIndependence(decimal, decimal, decimal, ProjectionAssumptions)"/> on a savings path with dated
+    /// changes. Solved by walking the months (at most <see cref="MaxScenarioMonths"/>), the crossing month
+    /// interpolated, because a changing contribution has no closed form. A path that never gets there is
+    /// <see cref="FireReachability.NotWithinHorizon"/>. A month past the end of
+    /// <paramref name="monthlyDeltasUsd"/> carries no change, so the list should span the horizon
+    /// (<see cref="ScenarioPath.MonthlyDeltas"/> with <see cref="MaxScenarioMonths"/> months does).
+    /// </summary>
+    public static FireProjectionResult FinancialIndependence(
+        decimal annualSpendUsd, decimal currentUsd, decimal monthlySavingsUsd, ProjectionAssumptions assumptions,
+        IReadOnlyList<decimal> monthlyDeltasUsd)
+    {
+        var target = assumptions.SafeWithdrawalRate <= 0m ? 0m : annualSpendUsd / assumptions.SafeWithdrawalRate;
+
+        if (currentUsd >= target)
+            return new FireProjectionResult(FireReachability.AlreadyReached, target, new ProjectionRange(0m, 0m, 0m));
+
+        var returns = assumptions.RealAnnualReturns;
+        var low = WalkToTarget(target, currentUsd, monthlySavingsUsd, returns.Low, monthlyDeltasUsd);
+        var central = WalkToTarget(target, currentUsd, monthlySavingsUsd, returns.Central, monthlyDeltasUsd);
+        var high = WalkToTarget(target, currentUsd, monthlySavingsUsd, returns.High, monthlyDeltasUsd);
+
+        // The central case decides whether a date is claimed; a bound that never arrives leaves the range open on that
+        // side, so the whole range is withheld rather than shown with an invented edge.
+        if (low is null || central is null || high is null)
+            return new FireProjectionResult(FireReachability.NotWithinHorizon, target, null);
+
+        return new FireProjectionResult(
+            FireReachability.Reachable, target, ProjectionRange.Of(low.Value, central.Value, high.Value));
+    }
+
+    /// <summary>Future value of month-indexed contributions at the end of <paramref name="months"/>: sum of d[i]·(1 + rm)^(months − 1 − i).</summary>
+    private static decimal DeltasFutureValue(IReadOnlyList<decimal> deltas, decimal realAnnualReturn, int months)
+    {
+        var monthlyReturn = MonthlyRateFromAnnual(realAnnualReturn);
+        var total = 0m;
+        for (var i = 0; i < months && i < deltas.Count; i++)
+        {
+            if (deltas[i] == 0m)
+                continue;
+            total += monthlyReturn == 0m
+                ? deltas[i]
+                : deltas[i] * (decimal)Math.Pow(1 + (double)monthlyReturn, months - 1 - i);
+        }
+
+        return total;
+    }
+
+    /// <summary>
+    /// Months until <paramref name="target"/> is first met when each month compounds the balance then adds the level saving
+    /// plus that month's delta; the crossing month is interpolated linearly. Null when not met within <see cref="MaxScenarioMonths"/>.
+    /// </summary>
+    private static decimal? WalkToTarget(
+        decimal target, decimal currentUsd, decimal monthlySavingsUsd, decimal realAnnualReturn, IReadOnlyList<decimal> deltas)
+    {
+        var monthlyReturn = MonthlyRateFromAnnual(realAnnualReturn);
+        var value = currentUsd;
+        for (var i = 0; i < MaxScenarioMonths; i++)
+        {
+            var next = value * (1 + monthlyReturn) + monthlySavingsUsd + (i < deltas.Count ? deltas[i] : 0m);
+            if (next >= target)
+                return i + (target - value) / (next - value);
+            value = next;
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Financial independence: the target is <paramref name="annualSpendUsd"/> ÷ the safe withdrawal rate (a
     /// non-positive rate is guarded to a zero target, which reads as already reached), and the months to it are
@@ -160,7 +273,7 @@ public static class Projection
     /// <summary>
     /// The level monthly saving that takes <paramref name="currentUsd"/> to <paramref name="targetUsd"/> in
     /// <paramref name="months"/>, at each of the three return assumptions - the same future-value arithmetic
-    /// <see cref="ValueAfter"/> runs, solved for the contribution. A higher return needs less, so the low return gives the
+    /// <see cref="ValueAfter(int, decimal, decimal, ProjectionAssumptions)"/> runs, solved for the contribution. A higher return needs less, so the low return gives the
     /// <c>High</c> bound. Never negative: a balance that compounds to the target on its own needs no saving.
     /// </summary>
     public static ProjectionRange RequiredMonthlySaving(

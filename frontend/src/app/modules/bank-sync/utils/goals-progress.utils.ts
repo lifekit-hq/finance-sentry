@@ -97,7 +97,29 @@ export class GoalsProgressUtils {
       required: GoalsProgressUtils.required(goal, progress.baseCurrency),
       projected: GoalsProgressUtils.projected(goal, progress.baseCurrency),
       note: GoalsProgressUtils.note(goal, progress),
+      scenario: GoalsProgressUtils.scenario(goal, progress),
     };
+  }
+
+  /** What the career events change for one goal, labelled as the scenario it is; null without one. */
+  private static scenario(goal: GoalProgress, progress: GoalsProgress): Nullable<string> {
+    const withEvents = goal.scenario;
+    if (progress.scenario?.status !== 'Applied' || !withEvents) {
+      return null;
+    }
+    const money = (amount: number): string =>
+      MoneyUtils.format(amount, progress.baseCurrency, WHOLE_UNITS);
+    const verdict = withEvents.onTrack === 'OnTrack' ? 'on track' : 'behind';
+    const needs =
+      withEvents.requiredMonthlySaving.high === 0
+        ? 'no further saving needed'
+        : `needs about ${money(withEvents.requiredMonthlySaving.central)} a month`;
+    return (
+      `With your ${ProjectionUtils.eventsCount(progress.scenario.eventCount)}: ${verdict}, ` +
+      `about ${money(withEvents.projectedAtTargetDate.central)} by then ` +
+      `(${ProjectionUtils.moneyRange(withEvents.projectedAtTargetDate, progress.baseCurrency)}), ` +
+      `${needs}. ${progress.scenario.label}`
+    );
   }
 
   private static target(goal: GoalProgress, currency: string): string {

@@ -1,0 +1,71 @@
+<div class="space-y-cmn-3" data-testid="career-timeline">
+  <p class="text-cmn-sm text-text-secondary" data-testid="career-timeline-disclosure">
+    {{ disclosure }}
+  </p>
+
+  @if (store.saveErrorMessage()) {
+    <cmn-alert variant="error">{{ store.saveErrorMessage() }}</cmn-alert>
+  }
+  @if (store.actionErrorMessage()) {
+    <cmn-alert variant="error">{{ store.actionErrorMessage() }}</cmn-alert>
+  }
+
+  <cmn-async-state
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
+    [isEmpty]="store.rows().length === 0"
+    [keepContent]="false"
+    (retry)="store.load()"
+    emptyMessage="No career events yet"
+    emptySubMessage="Add a raise, a bonus or a leave to see your savings path with it, next to the one you are on."
+    errorPlacement="above"
+    retryable
+  >
+    <cmn-card skeleton padding="none">
+      <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+    </cmn-card>
+
+    <cmn-card padding="none">
+      @for (row of store.rows(); track row.id) {
+        <div
+          class="relative flex items-center border-t border-border-default pr-cmn-2 first:border-t-0"
+          data-testid="career-event-row"
+        >
+          <cmn-list-item-row
+            [label]="row.label"
+            [sublabel]="row.sublabel"
+            [dimmed]="!row.counted"
+            class="min-w-0 flex-1"
+          >
+            <span amount class="flex shrink-0 flex-col items-end">
+              <span
+                class="text-cmn-sm tabular-nums text-text-primary"
+                data-testid="career-event-amount"
+                >{{ row.signedAmount | money: row.currency }}</span
+              >
+              @if (row.monthly) {
+                <span class="text-cmn-xs text-text-secondary">per month</span>
+              }
+            </span>
+          </cmn-list-item-row>
+          <cmn-menu
+            [items]="row.counted ? countedMenu : uncountedMenu"
+            [ariaLabel]="'Actions for ' + row.label"
+            (itemSelect)="onAction(row, $event.id)"
+          >
+            <cmn-icon name="Ellipsis" />
+          </cmn-menu>
+        </div>
+      }
+    </cmn-card>
+  </cmn-async-state>
+
+  <cmn-button
+    [loading]="store.isSaveLoading()"
+    (clicked)="openEvent()"
+    variant="secondary"
+    icon="Plus"
+    data-testid="add-career-event"
+    >Add a career event</cmn-button
+  >
+</div>

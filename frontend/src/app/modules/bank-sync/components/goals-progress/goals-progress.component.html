@@ -52,6 +52,11 @@
                   {{ row.projected }}
                 </p>
               }
+              @if (row.scenario) {
+                <p class="text-cmn-xs text-text-secondary" data-testid="goal-scenario">
+                  {{ row.scenario }}
+                </p>
+              }
               @if (row.note) {
                 <p class="text-cmn-xs text-text-secondary" data-testid="goal-note">
                   {{ row.note }}

@@ -94,6 +94,7 @@ settle it.
 | How is the book doing? | `get_book_performance`, `get_benchmark_track_record`, `get_track_record` | money-semantics §10 |
 | Are the proposals beating the S&P 500? | `get_ledger_scoreboard`, `list_recommendations` | money-semantics §10 |
 | Are my goals on track? | `get_goals_progress`, `get_ips` | money-semantics §11, §16 |
+| What would a raise, bonus or leave change? | `get_career_timeline`, `get_goals_progress` | money-semantics §19 |
 | What tax would a sale of this holding cost (Ireland)? | `get_disposal_tax_context`, `get_tax_lots` | money-semantics §1, §17 |
 | What is it in, and is it within policy? | `get_allocation_vs_target`, `get_ips`, `check_risk_rules` | finance-framework §3.4 (M7, M8) |
 | Can I trust the feeds? | `get_sync_health` | finance-framework §5.7 |

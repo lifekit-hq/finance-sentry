@@ -54,6 +54,17 @@ public static class GoalsProgressReasons
 }
 
 /// <summary>
+/// What the person's career events do to one goal (#454 S5), shown beside the baseline figures and never replacing them:
+/// the same range arithmetic with the events applied. <paramref name="RequiredMonthlySaving"/> is the level saving still needed
+/// once the events are counted (zero when they get there on their own). Present only when a scenario was applied and the goal
+/// has months left.
+/// </summary>
+public record GoalScenario(
+    GoalTrack OnTrack,
+    ProjectionRange RequiredMonthlySaving,
+    ProjectionRange ProjectedAtTargetDate);
+
+/// <summary>
 /// One IPS goal against the current net worth. <paramref name="MonthsLeft"/> counts whole months to the target
 /// date (at least 1 while the date is ahead) and is 0 once it has passed. <paramref name="RequiredMonthlySaving"/> is the level saving that reaches the
 /// target by then at the low / central / high return (zero when the balance gets there on its own; Low is the saving at the highest return, High at the lowest);
@@ -71,7 +82,8 @@ public record GoalProgress(
     ProjectionRange? ProjectedAtTargetDate,
     bool AlreadyReached,
     GoalTrack OnTrack,
-    string? Reason = null);
+    string? Reason = null,
+    GoalScenario? Scenario = null);
 
 /// <summary>
 /// The IPS contribution plan beside the measured savings path (#454 S2). <paramref name="PlannedAmount"/> is what the
@@ -107,7 +119,19 @@ public record GoalsProgressResponse(
     bool HasStaleSleeves,
     string BaseCurrency = "USD",
     string Basis = GoalsProgressText.Basis,
-    string Disclosure = GoalsProgressText.Disclosure);
+    string Disclosure = GoalsProgressText.Disclosure,
+    GoalsScenarioNote? Scenario = null);
+
+/// <summary>
+/// Whether the goals carry a scenario (#454 S5): <see cref="ScenarioStatus.Applied"/> puts a <see cref="GoalScenario"/> on each
+/// goal with months left, <see cref="ScenarioStatus.Unreadable"/> says events count but this host cannot read them. Absent when
+/// no event counts.
+/// </summary>
+public record GoalsScenarioNote(
+    ScenarioStatus Status,
+    int EventCount,
+    string Label = ScenarioText.Label,
+    string Basis = ScenarioText.Basis);
 
 /// <summary>The sentences every goals response and the MCP tool description carry.</summary>
 public static class GoalsProgressText
@@ -127,7 +151,8 @@ public record GetGoalsProgressQuery(Guid UserId) : IQuery<GoalsProgressResponse>
 /// twelve-month and financial-independence projections use, so a goal is measured on the same assumption set, savings
 /// path and latest snapshot - there is no second return assumption.
 /// </summary>
-public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsReader goals, TimeProvider clock)
+public class GetGoalsProgressQueryHandler(
+    ProjectionInputsReader inputs, ScenarioReader scenarios, IGoalsReader goals, TimeProvider clock)
     : IQueryHandler<GetGoalsProgressQuery, GoalsProgressResponse>
 {
     private const decimal WeeksPerYear = 52m;
@@ -136,6 +161,7 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
     private const int GoalHorizonMonths = 1200;
 
     private readonly ProjectionInputsReader _inputs = inputs;
+    private readonly ScenarioReader _scenarios = scenarios;
     private readonly IGoalsReader _goals = goals;
     private readonly TimeProvider _clock = clock;
 
@@ -161,7 +187,8 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
         }
 
         var today = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
-        var progress = plan.Goals.Select(g => Track(g, inputs, today)).ToList();
+        var scenario = await _scenarios.ReadAsync(query.UserId, cancellationToken);
+        var progress = plan.Goals.Select(g => Track(g, inputs, scenario, today)).ToList();
 
         return new GoalsProgressResponse(
             GoalsProgressStatus.Shown,
@@ -171,10 +198,13 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
             progress,
             plan.ContributionPlan is { } contribution ? Compare(contribution, savings) : null,
             returns,
-            inputs.HasStaleSleeves);
+            inputs.HasStaleSleeves,
+            Scenario: scenario.Status == ScenarioStatus.None
+                ? null
+                : new GoalsScenarioNote(scenario.Status, scenario.CountedEvents));
     }
 
-    private static GoalProgress Track(GoalTarget goal, ProjectionInputs inputs, DateOnly today)
+    private static GoalProgress Track(GoalTarget goal, ProjectionInputs inputs, ScenarioInputs scenario, DateOnly today)
     {
         GoalProgress Result(
             GoalTrack track,
@@ -182,8 +212,10 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
             int? monthsLeft = null,
             ProjectionRange? required = null,
             ProjectionRange? projected = null,
-            bool reached = false) => new(
-            goal.Label, goal.TargetAmountUsd, goal.TargetDate, goal.Priority, monthsLeft, required, projected, reached, track, reason);
+            bool reached = false,
+            GoalScenario? withEvents = null) => new(
+            goal.Label, goal.TargetAmountUsd, goal.TargetDate, goal.Priority, monthsLeft, required, projected, reached, track, reason,
+            withEvents);
 
         if (goal.TargetAmountUsd is not > 0m)
             return Result(GoalTrack.NoTargetAmount);
@@ -222,7 +254,20 @@ public class GetGoalsProgressQueryHandler(ProjectionInputsReader inputs, IGoalsR
         var projected = Projection.ValueAfter(monthsLeft, current, path.MonthlySavingsUsd, inputs.Assumptions);
         return Result(
             projected.Central >= target ? GoalTrack.OnTrack : GoalTrack.Behind,
-            monthsLeft: monthsLeft, required: required, projected: projected, reached: reached);
+            monthsLeft: monthsLeft, required: required, projected: projected, reached: reached,
+            withEvents: scenario.IsApplied ? Scenario(scenario, monthsLeft, target, current, path, inputs.Assumptions) : null);
+    }
+
+    // The same arithmetic with the person's events applied; the baseline figures beside it are untouched.
+    private static GoalScenario Scenario(
+        ScenarioInputs scenario, int monthsLeft, decimal target, decimal current, SavingsPath path, ProjectionAssumptions assumptions)
+    {
+        var deltas = scenario.Deltas(monthsLeft);
+        var projected = Projection.ValueAfter(monthsLeft, current, path.MonthlySavingsUsd, assumptions, deltas);
+        return new GoalScenario(
+            projected.Central >= target ? GoalTrack.OnTrack : GoalTrack.Behind,
+            Projection.RequiredMonthlySaving(monthsLeft, target, current, assumptions, deltas),
+            projected);
     }
 
     /// <summary>Whole calendar months from <paramref name="from"/> to <paramref name="to"/>.</summary>

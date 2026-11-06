@@ -85,6 +85,41 @@ export class FireTileUtils {
           `at a ${ProjectionUtils.returnRange(fire.realAnnualReturnRange)} return`;
   }
 
+  /**
+   * The date with the person's career events applied, one sentence, labelled as the scenario it is; null when no events
+   * count, this host cannot read them, or the baseline is already reached.
+   */
+  public static scenario(fire: FireProjection): Nullable<string> {
+    const scenario = fire.scenario;
+    if (scenario?.status !== 'Applied' || fire.status === 'AlreadyReached') {
+      return null;
+    }
+    const events = ProjectionUtils.eventsCount(scenario.eventCount);
+    let outcome: string;
+    switch (scenario.outcome) {
+      case 'Projected':
+        outcome = scenario.projectedDate
+          ? `financial independence around ${FireTileUtils.formatDate(scenario.projectedDate)}`
+          : 'no date available';
+        if (scenario.earliestDate && scenario.latestDate) {
+          const earliest = FireTileUtils.formatDate(scenario.earliestDate);
+          const latest = FireTileUtils.formatDate(scenario.latestDate);
+          outcome += earliest === latest ? '' : ` (between ${earliest} and ${latest})`;
+        }
+        break;
+      case 'AlreadyReached':
+        outcome = 'the target is already reached';
+        break;
+      case 'NotWithinHorizon':
+        outcome = 'the target is not reached within 100 years';
+        break;
+      default:
+        outcome = 'nothing is saved, so there is no date';
+        break;
+    }
+    return `With your ${events}: ${outcome}. ${scenario.label}`;
+  }
+
   /** Every input and both assumptions, spelled out so the reader can check the arithmetic. */
   public static assumptions(fire: FireProjection): string {
     const swr = PercentUtils.fromFraction(fire.safeWithdrawalRate);

@@ -29,6 +29,21 @@ describeVisualBaseline({
         updatedAt: '2026-09-01T10:00:00Z',
       },
     ]);
+    await mockGet(page, 'wealth/career-events', [
+      {
+        id: 'c1',
+        kind: 'IncomeStep',
+        date: '2099-03-01',
+        endDate: null,
+        label: 'Promotion',
+        amount: 500,
+        currency: 'EUR',
+        note: null,
+        counted: true,
+        retired: false,
+        updatedAt: '2026-09-01T10:00:00Z',
+      },
+    ]);
   },
   ready: async page => {
     await expect(page.getByRole('heading', {name: 'Appearance'})).toBeVisible();

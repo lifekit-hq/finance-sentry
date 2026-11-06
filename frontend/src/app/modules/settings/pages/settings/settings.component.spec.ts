@@ -10,6 +10,7 @@ import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
+import {CareerEventsService} from '../../services/career-events.service';
 import {IncomeSourcesService} from '../../services/income-sources.service';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -199,6 +200,7 @@ describe('SettingsComponent Save assumptions button', () => {
         {provide: AuthStore, useValue: {canManageUsers: signal(false)}},
         {provide: ToastService, useValue: {show: vi.fn()}},
         {provide: IncomeSourcesService, useValue: {list: () => NEVER}},
+        {provide: CareerEventsService, useValue: {list: () => NEVER}},
       ],
     });
     TestBed.overrideComponent(SettingsComponent, {
