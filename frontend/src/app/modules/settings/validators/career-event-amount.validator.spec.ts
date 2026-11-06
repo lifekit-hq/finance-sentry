@@ -4,8 +4,8 @@ import {describe, expect, it} from 'vitest';
 import {type CareerEventKind} from '../models/career-event/career-event.model';
 import {careerEventAmount} from './career-event-amount.validator';
 
-function check(kind: CareerEventKind, value: number | null) {
-  return careerEventAmount(() => kind)(new FormControl<number | null>(value));
+function check(kind: CareerEventKind, value: number | string | null) {
+  return careerEventAmount(() => kind)(new FormControl<number | string | null>(value));
 }
 
 describe('careerEventAmount', () => {
@@ -25,5 +25,15 @@ describe('careerEventAmount', () => {
     expect(check('Leave', 1000)).toBeNull();
     expect(check('OneOffIn', -1)).toEqual({min: {min: 0, actual: -1}});
     expect(check('Leave', 0)).toEqual({min: {min: 0, actual: 0}});
+  });
+
+  it('reads the text cmn-input emits as a number', () => {
+    expect(check('OneOffIn', '900')).toBeNull();
+    expect(check('OneOffIn', ' 12.5 ')).toBeNull();
+    expect(check('IncomeStep', '-300')).toBeNull();
+    expect(check('IncomeStep', '0')).toEqual({required: true});
+    expect(check('Leave', '-5')).toEqual({min: {min: 0, actual: -5}});
+    expect(check('OneOffIn', '')).toEqual({required: true});
+    expect(check('OneOffIn', 'abc')).toEqual({required: true});
   });
 });

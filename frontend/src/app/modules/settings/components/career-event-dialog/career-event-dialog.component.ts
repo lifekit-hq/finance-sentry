@@ -30,6 +30,7 @@ import {
   type CareerEventInput,
   type CareerEventKind,
 } from '../../models/career-event/career-event.model';
+import {provideCareerEventValidationMessages} from '../../providers/career-event-validation-messages.provider';
 import {careerEventAmount} from '../../validators/career-event-amount.validator';
 import {careerEventWhen} from '../../validators/career-event-when.validator';
 
@@ -47,6 +48,7 @@ import {careerEventWhen} from '../../validators/career-event-when.validator';
     SelectComponent,
     TextareaComponent,
   ],
+  providers: [provideCareerEventValidationMessages()],
   templateUrl: './career-event-dialog.component.html',
 })
 export class CareerEventDialogComponent {
