@@ -27,6 +27,12 @@
         </p>
       }
 
+      @if (store.scenario(); as scenario) {
+        <p class="font-label text-cmn-sm text-text-secondary" data-testid="fire-scenario">
+          {{ scenario }}
+        </p>
+      }
+
       <div
         [attr.aria-valuenow]="store.progressPercent()"
         aria-label="Progress toward the financial independence target"

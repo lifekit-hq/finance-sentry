@@ -18,10 +18,13 @@ public class GetNetWorthProjectionQueryHandlerTests
     private readonly Mock<INetWorthSnapshotRepository> _snapshots = new();
     private readonly Mock<IHonestMonthlyFlowReader> _monthlyFlow = new();
     private readonly Mock<IUserFireAssumptionsReader> _assumptions = new();
+    private readonly FakeCareerEventRepository _careerEvents = new();
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetNetWorthProjectionQueryHandler CreateHandler() =>
-        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock));
+        new(
+            new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+            new ScenarioReader(_careerEvents, _clock));
 
     private void Arrange(decimal? netWorth, IReadOnlyList<HonestMonthlyFlow> flows, FireAssumptions? assumptions = null)
     {
@@ -111,6 +114,89 @@ public class GetNetWorthProjectionQueryHandlerTests
 
         result.Status.Should().Be(NetWorthProjectionStatus.Projected);
         result.ProjectedNetWorth!.Value.Central.Should().Be(4_000m);
+    }
+
+    private void AddEvent(CareerEventKind kind, DateOnly date, decimal amount, DateOnly? end = null, bool retired = false)
+    {
+        var career = CareerEvent.Create(UserId, kind, date, end, "Event", amount, "USD", null);
+        if (retired)
+            career.Retire(Now);
+        _careerEvents.Events.Add(career);
+    }
+
+    [Fact]
+    public async Task Handle_NoCareerEvents_HasNoScenario_AndTheBaselineIsUnchanged()
+    {
+        Arrange(100_000m, Months(1_000m, 1_000m, 1_000m));
+
+        var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
+
+        result.Scenario.Should().BeNull();
+        result.ProjectedNetWorth.Should().Be(Projection.ValueAfter(12, 100_000m, 1_000m, ProjectionAssumptions.Default));
+    }
+
+    [Fact]
+    public async Task Handle_CareerEvents_AddALabelledScenarioBesideTheBaseline_NeverReplacingIt()
+    {
+        Arrange(100_000m, Months(1_000m, 1_000m, 1_000m));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 500m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
+
+        var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
+
+        var baseline = Projection.ValueAfter(12, 100_000m, 1_000m, ProjectionAssumptions.Default);
+        result.ProjectedNetWorth.Should().Be(baseline, "the baseline stays the default");
+        result.Scenario.Should().NotBeNull();
+        result.Scenario!.Status.Should().Be(ScenarioStatus.Applied);
+        result.Scenario.EventCount.Should().Be(2);
+        result.Scenario.Label.Should().Be("A scenario you entered, not a forecast.");
+        var deltas = ScenarioPath.MonthlyDeltas(
+            [
+                new ScenarioEvent(ScenarioEventKind.IncomeStep, new DateOnly(2026, 12, 1), null, 500m),
+                new ScenarioEvent(ScenarioEventKind.OneOffOut, new DateOnly(2027, 2, 10), null, 900m),
+            ],
+            new DateOnly(2026, 9, 26),
+            12);
+        result.Scenario.ProjectedNetWorth.Should().Be(Projection.ValueAfter(12, 100_000m, 1_000m, ProjectionAssumptions.Default, deltas));
+        result.Scenario.ProjectedNetWorth!.Value.Central.Should().BeGreaterThan(baseline.Central);
+    }
+
+    [Fact]
+    public async Task Handle_RetiredPastAndNotYetStartedEvents_NeverCount()
+    {
+        Arrange(100_000m, Months(1_000m, 1_000m, 1_000m));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 500m, retired: true);
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 6, 1), 700m);
+
+        var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
+
+        result.Scenario.Should().BeNull("a retired event and one already in the baseline's history are not a scenario");
+    }
+
+    [Fact]
+    public async Task Handle_OnAHostWithoutTheKey_SaysTheScenarioIsUnreadable_AndClaimsNoFigure()
+    {
+        Arrange(100_000m, Months(1_000m, 1_000m, 1_000m));
+        _careerEvents.CanReadEncryptedFields = false;
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 500m);
+
+        var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
+
+        result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.ProjectedNetWorth.Should().BeNull();
+        result.ProjectedNetWorth.Should().NotBeNull("the baseline needs no key");
+    }
+
+    [Fact]
+    public async Task Handle_WithoutEnoughHistory_HasNoScenarioEither()
+    {
+        Arrange(100_000m, Months(1_000m, 1_000m));
+        AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 500m);
+
+        var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
+
+        result.Status.Should().Be(NetWorthProjectionStatus.InsufficientHistory);
+        result.Scenario.Should().BeNull();
     }
 
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider

@@ -165,6 +165,14 @@ public class WealthController(
             ProjectedNetWorth = projection.ProjectedNetWorth is { } range
                 ? new ProjectionRange(Fx(range.Low), Fx(range.Central), Fx(range.High))
                 : null,
+            Scenario = projection.Scenario is { } scenario
+                ? scenario with
+                {
+                    ProjectedNetWorth = scenario.ProjectedNetWorth is { } withEvents
+                        ? new ProjectionRange(Fx(withEvents.Low), Fx(withEvents.Central), Fx(withEvents.High))
+                        : null,
+                }
+                : null,
             BaseCurrency = baseCurrency,
         };
     }
@@ -202,6 +210,13 @@ public class WealthController(
                 TargetAmount = Fx(g.TargetAmount),
                 RequiredMonthlySaving = FxRange(g.RequiredMonthlySaving),
                 ProjectedAtTargetDate = FxRange(g.ProjectedAtTargetDate),
+                Scenario = g.Scenario is { } withEvents
+                    ? withEvents with
+                    {
+                        RequiredMonthlySaving = FxRange(withEvents.RequiredMonthlySaving)!.Value,
+                        ProjectedAtTargetDate = FxRange(withEvents.ProjectedAtTargetDate)!.Value,
+                    }
+                    : null,
             })],
             ContributionPlan = goals.ContributionPlan is { } plan
                 ? plan with

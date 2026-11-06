@@ -22,6 +22,14 @@
   >
     {{ store.assumptions() }}
   </p>
+  @if (store.scenario(); as scenario) {
+    <p
+      class="mt-cmn-1 text-cmn-xs leading-4 text-text-secondary"
+      data-testid="net-worth-projection-scenario"
+    >
+      {{ scenario }}
+    </p>
+  }
   @if (store.hasStaleSleeves()) {
     <cmn-alert class="mt-cmn-1 block" variant="warning" data-testid="net-worth-projection-stale"
       >Some account data is stale — carried forward from the last successful sync, so this

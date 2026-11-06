@@ -73,3 +73,41 @@ describe('ProjectionUtils.netWorthAssumptions', () => {
     expect(text).toContain(PROJECTION_DISCLOSURE);
   });
 });
+
+describe('ProjectionUtils.netWorthScenario', () => {
+  const applied = {
+    status: 'Applied' as const,
+    eventCount: 2,
+    projectedNetWorth: {low: 24_000, central: 24_600, high: 25_100},
+    label: 'A scenario you entered, not a forecast.',
+    basis: 'basis',
+  };
+
+  it('writes the scenario figure with its range and the not-a-forecast label', () => {
+    const text = ProjectionUtils.netWorthScenario(projection({scenario: applied}));
+
+    expect(text).toBe(
+      'With your 2 career events: about $24,600 ($24,000 to $25,100). A scenario you entered, not a forecast.'
+    );
+  });
+
+  it('says "event" for one', () => {
+    expect(
+      ProjectionUtils.netWorthScenario(projection({scenario: {...applied, eventCount: 1}}))
+    ).toContain('With your 1 career event:');
+  });
+
+  it('is empty without a scenario, for an unreadable one, or without a figure', () => {
+    expect(ProjectionUtils.netWorthScenario(projection())).toBe('');
+    expect(
+      ProjectionUtils.netWorthScenario(
+        projection({scenario: {...applied, status: 'Unreadable', projectedNetWorth: null}})
+      )
+    ).toBe('');
+    expect(
+      ProjectionUtils.netWorthScenario(
+        projection({scenario: {...applied, projectedNetWorth: null}})
+      )
+    ).toBe('');
+  });
+});

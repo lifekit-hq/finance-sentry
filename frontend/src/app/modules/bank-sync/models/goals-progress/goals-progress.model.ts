@@ -1,6 +1,6 @@
 import {type Nullable, type TagVariant} from '@lifekit-hq/ui';
 
-import {type ProjectionRange} from '../projection/projection.model';
+import {type ProjectionRange, type ScenarioStatus} from '../projection/projection.model';
 
 /** Mirrors the backend's `GoalsProgressStatus`, written by name. */
 export type GoalsProgressStatus = 'Shown' | 'NoGoals';
@@ -8,6 +8,21 @@ export type GoalsProgressStatus = 'Shown' | 'NoGoals';
 /** Mirrors the backend's `GoalTrack`, written by name. */
 export type GoalTrack =
   'OnTrack' | 'Behind' | 'NoTargetDate' | 'NoTargetAmount' | 'InsufficientHistory';
+
+/** What the person's career events do to one goal (#454 S5): the same ranges with the events applied, beside the baseline. */
+export interface GoalScenario {
+  onTrack: GoalTrack;
+  requiredMonthlySaving: ProjectionRange;
+  projectedAtTargetDate: ProjectionRange;
+}
+
+/** Whether the goals carry a scenario: `Applied` puts a `GoalScenario` on each goal with months left. */
+export interface GoalsScenarioNote {
+  status: ScenarioStatus;
+  eventCount: number;
+  label: string;
+  basis: string;
+}
 
 /**
  * One IPS goal against the current net worth (#454 S2, money-semantics §16). Amounts are in the response's
@@ -28,6 +43,8 @@ export interface GoalProgress {
   onTrack: GoalTrack;
   /** Why the verdict or a figure is withheld; one of `GOALS_PROGRESS_REASONS`. */
   reason: Nullable<string>;
+  /** Present only when a scenario was applied and the goal has months left. */
+  scenario?: Nullable<GoalScenario>;
 }
 
 /** The IPS contribution plan beside the measured savings path. */
@@ -56,6 +73,8 @@ export interface GoalsProgress {
   baseCurrency: string;
   basis: string;
   disclosure: string;
+  /** Present only when the person has career events that count. */
+  scenario?: Nullable<GoalsScenarioNote>;
 }
 
 /** A goal as the card draws it: every line already written out. */
@@ -70,4 +89,6 @@ export interface GoalRowView {
   required: Nullable<string>;
   projected: Nullable<string>;
   note: Nullable<string>;
+  /** The same goal with the career events applied, written out; null without a scenario. */
+  scenario: Nullable<string>;
 }

@@ -341,3 +341,61 @@ describe('GoalsProgressUtils', () => {
     });
   });
 });
+
+describe('GoalsProgressUtils scenario line', () => {
+  const note = {
+    status: 'Applied' as const,
+    eventCount: 2,
+    label: 'A scenario you entered, not a forecast.',
+    basis: 'basis',
+  };
+  const withEvents = {
+    onTrack: 'OnTrack' as const,
+    requiredMonthlySaving: {low: 300, central: 380, high: 450},
+    projectedAtTargetDate: {low: 139_000, central: 142_000, high: 146_000},
+  };
+
+  it('has no scenario line without a scenario on the goal', () => {
+    const [row] = GoalsProgressUtils.rows(progress({scenario: note}));
+
+    expect(row.scenario).toBeNull();
+  });
+
+  it('writes the verdict, the figure and the saving needed with the events applied, labelled', () => {
+    const [row] = GoalsProgressUtils.rows(
+      progress({scenario: note, goals: [goal({scenario: withEvents})]})
+    );
+
+    expect(row.scenario).toBe(
+      'With your 2 career events: on track, about $142,000 by then ($139,000 to $146,000), needs about $380 a month. A scenario you entered, not a forecast.'
+    );
+    expect(row.required).toContain('Needs about $785 a month');
+  });
+
+  it('says behind, and that no further saving is needed when the events get there alone', () => {
+    const [behind] = GoalsProgressUtils.rows(
+      progress({scenario: note, goals: [goal({scenario: {...withEvents, onTrack: 'Behind'}})]})
+    );
+    const [easy] = GoalsProgressUtils.rows(
+      progress({
+        scenario: note,
+        goals: [
+          goal({
+            scenario: {...withEvents, requiredMonthlySaving: {low: 0, central: 0, high: 0}},
+          }),
+        ],
+      })
+    );
+
+    expect(behind.scenario).toContain(': behind,');
+    expect(easy.scenario).toContain('no further saving needed');
+  });
+
+  it('shows nothing when the scenario could not be read', () => {
+    const [row] = GoalsProgressUtils.rows(
+      progress({scenario: {...note, status: 'Unreadable'}, goals: [goal({scenario: withEvents})]})
+    );
+
+    expect(row.scenario).toBeNull();
+  });
+});

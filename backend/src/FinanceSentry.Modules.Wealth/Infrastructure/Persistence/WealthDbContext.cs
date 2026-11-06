@@ -43,6 +43,8 @@ public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
 
     public DbSet<IncomeSource> IncomeSources { get; set; } = null!;
 
+    public DbSet<CareerEvent> CareerEvents { get; set; } = null!;
+
     public ICredentialEncryptionService Encryption => _encryption ?? KeylessFieldEncryption.Instance;
 
     /// <summary>Whether this host holds the key to the encrypted columns.</summary>
@@ -154,5 +156,24 @@ public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
         income.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         income.Ignore(x => x.MonthlyEquivalent);
         income.HasIndex(x => x.UserId).HasDatabaseName("idx_income_sources_user");
+
+        // The career-money timeline (#454 S5). Label, Amount and Note are field-encrypted into one text column each; kind,
+        // dates and currency stay readable so a host without the key can still say how many events there are and when.
+        // Kind is stored by name (the enum convention).
+        var career = modelBuilder.Entity<CareerEvent>();
+        career.ToTable("career_events");
+        career.HasKey(x => x.Id);
+        career.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+        career.Property(x => x.Kind).HasColumnName("kind").IsRequired().HasMaxLength(16);
+        career.Property(x => x.Date).HasColumnName("date");
+        career.Property(x => x.EndDate).HasColumnName("end_date");
+        career.Property(x => x.Label).HasColumnName("label").IsRequired().IsEncrypted(Encryption);
+        career.Property(x => x.Amount).HasColumnName("amount").IsRequired().IsEncrypted(Encryption);
+        career.Property(x => x.Currency).HasColumnName("currency").IsRequired().HasMaxLength(3);
+        career.Property(x => x.Note).HasColumnName("note").IsEncryptedOptional(Encryption);
+        career.Property(x => x.RetiredAt).HasColumnName("retired_at");
+        career.Property(x => x.CreatedAt).HasColumnName("created_at");
+        career.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        career.HasIndex(x => x.UserId).HasDatabaseName("idx_career_events_user");
     }
 }

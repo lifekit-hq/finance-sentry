@@ -18,7 +18,28 @@ public enum FireProjectionStatus
     AlreadyReached,
     NotSaving,
     InsufficientHistory,
+
+    /// <summary>A scenario's savings path never reaches the target inside the simulated 100 years. Never a baseline status.</summary>
+    NotWithinHorizon,
 }
+
+/// <summary>
+/// The financial-independence date on the savings path with the person's career events applied, next to the baseline and never
+/// replacing it (#454 S5). <paramref name="Outcome"/> is how it resolved; the months and dates are null unless it is
+/// <see cref="FireProjectionStatus.Projected"/> (and zero months when already reached). The whole block is
+/// <see cref="ScenarioStatus.Unreadable"/> with no outcome when the events could not be read on this host.
+/// </summary>
+public record FireScenario(
+    ScenarioStatus Status,
+    int EventCount,
+    FireProjectionStatus? Outcome,
+    decimal? MonthsToFire,
+    DateOnly? ProjectedDate,
+    ProjectionRange? MonthsToFireRange,
+    DateOnly? EarliestDate,
+    DateOnly? LatestDate,
+    string Label = ScenarioText.Label,
+    string Basis = ScenarioText.Basis);
 
 /// <summary>
 /// Every field the tile needs to state its own arithmetic in words: the target and its two
@@ -50,17 +71,20 @@ public record FireProjectionResponse(
     ProjectionRange? MonthsToFireRange = null,
     DateOnly? EarliestDate = null,
     DateOnly? LatestDate = null,
-    int CompleteMonths = 0);
+    int CompleteMonths = 0,
+    FireScenario? Scenario = null);
 
 public record GetFireProjectionQuery(Guid UserId) : IQuery<FireProjectionResponse>;
 
 public class GetFireProjectionQueryHandler(
     ProjectionInputsReader inputs,
+    ScenarioReader scenarios,
     TimeProvider clock) : IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>
 {
     private const int MonthsPerYear = 12;
 
     private readonly ProjectionInputsReader _inputs = inputs;
+    private readonly ScenarioReader _scenarios = scenarios;
     private readonly TimeProvider _clock = clock;
 
     public async Task<FireProjectionResponse> Handle(GetFireProjectionQuery query, CancellationToken cancellationToken)
@@ -100,6 +124,8 @@ public class GetFireProjectionQueryHandler(
         };
 
         var months = calculation.MonthsToTarget;
+        var scenario = await ScenarioOf(
+            query.UserId, annualSpend, inputs.Snapshot.TotalNetWorth, monthlySavings, assumptions, cancellationToken);
         return new FireProjectionResponse(
             status,
             calculation.TargetUsd,
@@ -116,7 +142,32 @@ public class GetFireProjectionQueryHandler(
             months,
             DateAfter(months?.Low),
             DateAfter(months?.High),
-            inputs.SavingsPath.CompleteMonths);
+            inputs.SavingsPath.CompleteMonths,
+            scenario);
+    }
+
+    private async Task<FireScenario?> ScenarioOf(
+        Guid userId, decimal annualSpend, decimal current, decimal monthlySavings, ProjectionAssumptions assumptions, CancellationToken ct)
+    {
+        var scenario = await _scenarios.ReadAsync(userId, ct);
+        if (scenario.Status == ScenarioStatus.None)
+            return null;
+        if (!scenario.IsApplied)
+            return new FireScenario(scenario.Status, scenario.Events.Count, null, null, null, null, null, null);
+
+        var result = Projection.FinancialIndependence(
+            annualSpend, current, monthlySavings, assumptions, scenario.Deltas(Projection.MaxScenarioMonths));
+        var outcome = result.Status switch
+        {
+            FireReachability.AlreadyReached => FireProjectionStatus.AlreadyReached,
+            FireReachability.NotSaving => FireProjectionStatus.NotSaving,
+            FireReachability.NotWithinHorizon => FireProjectionStatus.NotWithinHorizon,
+            _ => FireProjectionStatus.Projected,
+        };
+        var range = result.MonthsToTarget;
+        return new FireScenario(
+            scenario.Status, scenario.Events.Count, outcome, range?.Central, DateAfter(range?.Central), range,
+            DateAfter(range?.Low), DateAfter(range?.High));
     }
 
     /// <summary>Today plus the months rounded up; null when there are no months.</summary>

@@ -154,3 +154,55 @@ describe('FireTileUtils.assumptions', () => {
     );
   });
 });
+
+describe('FireTileUtils.scenario', () => {
+  const applied = {
+    status: 'Applied' as const,
+    eventCount: 1,
+    outcome: 'Projected' as const,
+    monthsToFire: 120,
+    projectedDate: '2036-09-26',
+    monthsToFireRange: {low: 100, central: 120, high: 150},
+    earliestDate: '2035-01-26',
+    latestDate: '2039-03-26',
+    label: 'A scenario you entered, not a forecast.',
+    basis: 'basis',
+  };
+
+  it('is null without a scenario or while the baseline is already reached', () => {
+    expect(FireTileUtils.scenario(fire())).toBeNull();
+    expect(FireTileUtils.scenario(fire({status: 'AlreadyReached', scenario: applied}))).toBeNull();
+  });
+
+  it('is null for a scenario that could not be read', () => {
+    expect(
+      FireTileUtils.scenario(fire({scenario: {...applied, status: 'Unreadable', outcome: null}}))
+    ).toBeNull();
+  });
+
+  it('writes the scenario date and its range, labelled', () => {
+    expect(FireTileUtils.scenario(fire({scenario: applied}))).toBe(
+      'With your 1 career event: financial independence around Sept 2036 (between Jan 2035 and Mar 2039). A scenario you entered, not a forecast.'
+    );
+  });
+
+  it('drops the range when both ends are the same month', () => {
+    const text = FireTileUtils.scenario(
+      fire({scenario: {...applied, earliestDate: '2036-09-01', latestDate: '2036-09-30'}})
+    );
+
+    expect(text).not.toContain('between');
+  });
+
+  it('says plainly when the scenario never gets there or saves nothing', () => {
+    expect(
+      FireTileUtils.scenario(fire({scenario: {...applied, outcome: 'NotWithinHorizon'}}))
+    ).toContain('the target is not reached within 100 years');
+    expect(FireTileUtils.scenario(fire({scenario: {...applied, outcome: 'NotSaving'}}))).toContain(
+      'nothing is saved, so there is no date'
+    );
+    expect(
+      FireTileUtils.scenario(fire({scenario: {...applied, outcome: 'AlreadyReached'}}))
+    ).toContain('the target is already reached');
+  });
+});

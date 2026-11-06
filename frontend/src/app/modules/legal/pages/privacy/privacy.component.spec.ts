@@ -49,6 +49,14 @@ describe('PrivacyComponent', () => {
     expect(text).toContain('The name and amount are stored encrypted');
   });
 
+  it('discloses the career events, with their name, amount and note stored encrypted', () => {
+    const {root} = setup(false);
+    const text = (root.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(text).toContain('The career events you enter in Settings');
+    expect(text).toContain('The name, amount and note are stored encrypted');
+  });
+
   it('names the data export and account closure as the reader’s choices', () => {
     const {root} = setup(false);
 

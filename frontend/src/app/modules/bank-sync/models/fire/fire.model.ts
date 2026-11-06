@@ -1,10 +1,31 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {type ProjectionRange} from '../projection/projection.model';
+import {type ProjectionRange, type ScenarioStatus} from '../projection/projection.model';
 
 /** Mirrors the backend's `FireProjectionStatus`, written by name. */
 export type FireProjectionStatus =
   'Projected' | 'AlreadyReached' | 'NotSaving' | 'InsufficientHistory';
+
+/** How a scenario resolved: a baseline status, or `NotWithinHorizon` when the target is not reached in 100 years. */
+export type FireScenarioOutcome = FireProjectionStatus | 'NotWithinHorizon';
+
+/**
+ * The financial-independence date on the savings path with the person's career events applied, beside the baseline
+ * (#454 S5). `outcome` is how the scenario resolved (`NotWithinHorizon`: not reached in 100 years); it and the dates
+ * are null unless `status` is `Applied`.
+ */
+export interface FireScenario {
+  status: ScenarioStatus;
+  eventCount: number;
+  outcome: Nullable<FireScenarioOutcome>;
+  monthsToFire: Nullable<number>;
+  projectedDate: Nullable<string>;
+  monthsToFireRange: Nullable<ProjectionRange>;
+  earliestDate: Nullable<string>;
+  latestDate: Nullable<string>;
+  label: string;
+  basis: string;
+}
 
 /**
  * Everything the tile needs to state its own arithmetic in words. Rates are fractions
@@ -33,4 +54,6 @@ export interface FireProjection {
   latestDate: Nullable<string>;
   /** How many complete months the median spend and saving are taken over. */
   completeMonths: number;
+  /** Present only when the person has career events that count. */
+  scenario?: Nullable<FireScenario>;
 }
