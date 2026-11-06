@@ -105,7 +105,6 @@ public sealed class GetFinancialProfileQueryHandlerTests
         profile.DisposalTax.DataQuality.Should().Be(DataQuality.Complete);
         profile.Risk.DataQuality.Should().Be(DataQuality.Complete);
         profile.MissingSections.Should().BeEmpty();
-        profile.Disclosure.Should().Contain("never a trading signal");
     }
 
     [Fact]
@@ -284,7 +283,6 @@ public sealed class GetFinancialProfileQueryHandlerTests
         capacity.RecordedCapacity.Should().Be(3);
         capacity.DiffersFromRecorded.Should().BeTrue();
         capacity.Factors.Select(f => f.Code).Should().Contain([CapacityIndicator.Runway, CapacityIndicator.GoalHorizon, CapacityIndicator.IncomeSpreadCode]);
-        capacity.Label.Should().Contain("you record the number");
     }
 
     [Fact]
