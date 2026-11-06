@@ -30,6 +30,21 @@ public sealed class ScorecardSnapshotReaderTests
         snapshot.RulesVersion.Should().Be(1);
         snapshot.FiredRuleId.Should().Be("buy");
         snapshot.FiredRuleDescription.Should().Be("Structure and fundamentals clear the BUY bars.");
+        snapshot.Sector.Should().Be("Technology");
+        snapshot.Industry.Should().Be("Software - Infrastructure");
+    }
+
+    [Fact]
+    public async Task Snapshot_OfAScorecardWithNoSectorOrIndustry_HasNullSectorAndIndustry()
+    {
+        var handler = new Mock<IQueryHandler<GetScorecardQuery, ScorecardResult>>();
+        handler.Setup(h => h.Handle(new GetScorecardQuery("AAA"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Card() with { Sector = null, Industry = null });
+
+        var snapshot = await new ScorecardSnapshotReader(handler.Object).GetAsync("AAA");
+
+        snapshot.Sector.Should().BeNull();
+        snapshot.Industry.Should().BeNull();
     }
 
     [Fact]
@@ -49,5 +64,7 @@ public sealed class ScorecardSnapshotReaderTests
         new VerdictDto(
             "Buy", 1, "buy", "adjusted",
             [new VerdictRuleDto("buy", "Buy", "Structure and fundamentals clear the BUY bars.", true, true, [])],
-            [], null));
+            [], null),
+        "Technology",
+        "Software - Infrastructure");
 }

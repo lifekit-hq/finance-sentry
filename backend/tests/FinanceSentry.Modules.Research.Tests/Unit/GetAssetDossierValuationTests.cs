@@ -44,6 +44,19 @@ public class GetAssetDossierValuationTests
     }
 
     [Fact]
+    public async Task CryptoHolding_ScorecardCarriesNoSectorOrIndustryEvenWhenTheSourceReturnedOne()
+    {
+        var withProfile = Valuation(notApplicable: false) with { Sector = "Technology", Industry = "Software" };
+
+        var dossier = await HandleAsync(
+            Held(AssetClassNormalizer.Crypto), withProfile, new Mock<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>());
+
+        dossier.Scorecard.Should().NotBeNull();
+        dossier.Scorecard!.Sector.Should().BeNull();
+        dossier.Scorecard.Industry.Should().BeNull();
+    }
+
+    [Fact]
     public async Task UnheldNotApplicableSymbol_KeepsOnlyTheNotApplicableMarker()
     {
         var analystHandler = new Mock<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>();

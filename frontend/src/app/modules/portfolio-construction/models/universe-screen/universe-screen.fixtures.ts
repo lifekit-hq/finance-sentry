@@ -7,6 +7,8 @@ export class UniverseScreenFixtures {
     return {
       symbol: 'AAA',
       sources: ['curated'],
+      sector: 'Technology',
+      industry: 'Software - Infrastructure',
       failureReason: null,
       scoredAt: '2026-11-05T09:00:00Z',
       verdict: {
@@ -56,6 +58,8 @@ export class UniverseScreenFixtures {
     return {
       symbol,
       sources: ['watchlist'],
+      sector: null,
+      industry: null,
       failureReason: 'the scorecard could not be read',
       scoredAt: null,
       verdict: null,

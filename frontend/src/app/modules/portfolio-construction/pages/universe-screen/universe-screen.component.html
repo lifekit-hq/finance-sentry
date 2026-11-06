@@ -172,6 +172,14 @@
                           >Not scored</cmn-tag
                         >
                       }
+                      @if (row.sector; as sector) {
+                        <span
+                          [attr.title]="row.industry"
+                          class="text-cmn-xs text-text-secondary"
+                          data-testid="universe-sector"
+                          >{{ sector }}</span
+                        >
+                      }
                       @for (source of row.sources; track source) {
                         <span class="text-cmn-xs text-text-secondary">{{
                           sourceLabel[source]

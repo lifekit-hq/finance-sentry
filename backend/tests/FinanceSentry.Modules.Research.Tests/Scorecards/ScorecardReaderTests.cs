@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Tests.Scorecards;
 
 using System.Text.Json;
 using FinanceSentry.Modules.Research.API.Responses;
+using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
@@ -9,6 +10,7 @@ using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Tests.Opportunity;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Moq;
 using Xunit;
 
 public sealed class ScorecardReaderTests
@@ -32,6 +34,21 @@ public sealed class ScorecardReaderTests
         result.Crowding.Class.Should().BeNull();
         result.Crowding.NotEvaluableReason.Should().Be(ScorecardReader.NoExtensionData);
         result.Verdict.FiredRuleId.Should().Be(VerdictRules.Buy);
+    }
+
+    [Fact]
+    public void Build_CarriesTheCompanyProfile_AsFactsBesideTheAxes()
+    {
+        var composed = Composed(80, 80, 75, extension: 0.10m);
+
+        var withProfile = ScorecardReader.Build("MSFT", composed, FairValuation, Opportunity, VerdictTable, Now, "Technology", "Software - Infrastructure");
+        var without = ScorecardReader.Build("MSFT", composed, FairValuation, Opportunity, VerdictTable, Now);
+
+        withProfile.Sector.Should().Be("Technology");
+        withProfile.Industry.Should().Be("Software - Infrastructure");
+        without.Sector.Should().BeNull();
+        without.Industry.Should().BeNull();
+        withProfile.Verdict.Should().BeEquivalentTo(without.Verdict);
     }
 
     [Fact]
@@ -140,6 +157,42 @@ public sealed class ScorecardReaderTests
         result.Crowding.Class.Should().BeNull();
         result.Valuation.NotEvaluableReason.Should().Be(ScorecardValuationAxis.ReasonUnavailable);
         result.Verdict.FiredRuleId.Should().Be(VerdictRules.NoAxisData);
+    }
+
+    [Fact]
+    public async Task ScorecardQuery_ReadsSectorAndIndustry_FromTheValuationRead()
+    {
+        var valuation = new Mock<IValuationDataService>();
+        valuation.Setup(v => v.GetCurrentMetricsAsync("MSFT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValuationCurrentMetrics(
+                "MSFT", 100m, 26m, 22m, null, null, 120m, IsStale: false, NotApplicable: false, "Technology", "Software - Infrastructure"));
+        var history = new Mock<IValuationHistoryService>();
+        history.Setup(h => h.GetTrailingPeHistoryAsync("MSFT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrailingPeHistory(24m, 5));
+        var handler = new GetScorecardQueryHandler(valuation.Object, history.Object, Reader(new CountingFundamentalsService()));
+
+        var result = await handler.Handle(new GetScorecardQuery(" msft "), CancellationToken.None);
+
+        result.Symbol.Should().Be("MSFT");
+        result.Sector.Should().Be("Technology");
+        result.Industry.Should().Be("Software - Infrastructure");
+    }
+
+    [Fact]
+    public async Task ScorecardQuery_HasNoSector_WhenTheValuationIsUnavailableOrNotApplicable()
+    {
+        var valuation = new Mock<IValuationDataService>();
+        valuation.Setup(v => v.GetCurrentMetricsAsync("NOPE", It.IsAny<CancellationToken>())).ReturnsAsync((ValuationCurrentMetrics?)null);
+        valuation.Setup(v => v.GetCurrentMetricsAsync("BTC", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValuationCurrentMetrics("BTC", null, null, null, null, null, null, false, true, null, null));
+        var handler = new GetScorecardQueryHandler(valuation.Object, Mock.Of<IValuationHistoryService>(), Reader(new CountingFundamentalsService()));
+
+        foreach (var symbol in new[] { "NOPE", "BTC" })
+        {
+            var result = await handler.Handle(new GetScorecardQuery(symbol), CancellationToken.None);
+            result.Sector.Should().BeNull();
+            result.Industry.Should().BeNull();
+        }
     }
 
     [Fact]

@@ -32,7 +32,9 @@ public sealed class ScorecardReader(
         string symbol,
         ScorecardValuationAxis valuation,
         IReadOnlyList<FundamentalFact>? facts,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? sector = null,
+        string? industry = null)
     {
         var structure = await structureReader.GetStructureAsync(symbol, ct);
         facts ??= valuation.NotApplicable
@@ -41,7 +43,7 @@ public sealed class ScorecardReader(
         var regime = await regimeSource.GetLatestAsync(ct);
 
         var composed = ScorecardComposer.Compose(structure, facts, regime, opportunityOptions.Value);
-        return Build(symbol, composed, valuation, opportunityOptions.Value, verdictOptions.Value, DateTimeOffset.UtcNow);
+        return Build(symbol, composed, valuation, opportunityOptions.Value, verdictOptions.Value, DateTimeOffset.UtcNow, sector, industry);
     }
 
     /// <summary>Projects a composed scorecard and its valuation facts into the published shape and verdict.</summary>
@@ -51,7 +53,9 @@ public sealed class ScorecardReader(
         ScorecardValuationAxis valuation,
         OpportunityOptions opportunity,
         VerdictOptions verdictOptions,
-        DateTimeOffset generatedAt)
+        DateTimeOffset generatedAt,
+        string? sector = null,
+        string? industry = null)
     {
         var evidence = composed.Evidence;
         var regime = composed.Regime;
@@ -109,6 +113,8 @@ public sealed class ScorecardReader(
                 opportunity.ExtendedVolumeRatioThreshold,
                 crowding is null ? NoExtensionData : null),
             valuation,
-            VerdictDto.From(verdict, structureBasis));
+            VerdictDto.From(verdict, structureBasis),
+            sector,
+            industry);
     }
 }

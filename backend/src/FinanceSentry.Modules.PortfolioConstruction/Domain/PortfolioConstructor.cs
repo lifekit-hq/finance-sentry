@@ -62,12 +62,7 @@ public static class PortfolioConstructor
         }
 
         var notes = new List<string>();
-        var universeSymbols = universe.Select(u => u.Symbol.Trim().ToUpperInvariant()).ToHashSet();
-        var unmatched = excluded.Where(e => !universeSymbols.Contains(e)).Order(StringComparer.Ordinal).ToList();
-        if (unmatched.Count > 0)
-        {
-            notes.Add($"IPS exclusions not applied: no sector data ({string.Join(", ", unmatched)} match no ticker in the universe).");
-        }
+        notes.AddRange(ExclusionNotes(universe, excluded));
 
         var reasons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var eligible = new List<UniverseScorecard>();
@@ -170,6 +165,16 @@ public static class PortfolioConstructor
             return "Excluded by your IPS.";
         }
 
+        if (MatchesExclusion(card.Sector, excluded))
+        {
+            return $"Excluded by your IPS: sector {card.Sector!.Trim()}.";
+        }
+
+        if (MatchesExclusion(card.Industry, excluded))
+        {
+            return $"Excluded by your IPS: industry {card.Industry!.Trim()}.";
+        }
+
         if (!card.Scored)
         {
             return $"Not scored: {card.FailureReason}.";
@@ -205,6 +210,51 @@ public static class PortfolioConstructor
         }
 
         return null;
+    }
+
+    private static bool MatchesExclusion(string? label, HashSet<string> excluded) =>
+        !string.IsNullOrWhiteSpace(label) && excluded.Contains(label.Trim().ToUpperInvariant());
+
+    /// <summary>
+    /// What the screen must say about the IPS exclusions (spec 726 FR-015). An exclusion is a ticker, a sector or an
+    /// industry (exact name, any case). One that matches none of them in the universe is named, so a typo or a sector
+    /// the universe does not hold never reads as applied; and when an exclusion that is not a universe ticker could
+    /// apply to a name whose sector the source did not give, that name is listed, since the exclusion could not be
+    /// checked against it.
+    /// </summary>
+    private static List<string> ExclusionNotes(IReadOnlyList<UniverseScorecard> universe, HashSet<string> excluded)
+    {
+        var notes = new List<string>();
+        if (excluded.Count == 0)
+        {
+            return notes;
+        }
+
+        var universeSymbols = universe.Select(u => u.Symbol.Trim().ToUpperInvariant()).ToHashSet();
+        var matchable = universe
+            .SelectMany(u => new[] { u.Symbol, u.Sector, u.Industry })
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Select(label => label!.Trim().ToUpperInvariant())
+            .ToHashSet();
+
+        var unmatched = excluded.Where(e => !matchable.Contains(e)).Order(StringComparer.Ordinal).ToList();
+        if (unmatched.Count > 0)
+        {
+            notes.Add($"IPS exclusions that match no ticker, sector or industry in the universe: {string.Join(", ", unmatched)}.");
+        }
+
+        var couldBeSectors = excluded.Any(e => !universeSymbols.Contains(e));
+        var noSector = universe
+            .Where(u => u.Scored && !u.ValuationNotApplicable && string.IsNullOrWhiteSpace(u.Sector))
+            .Select(u => u.Symbol)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        if (couldBeSectors && noSector.Count > 0)
+        {
+            notes.Add($"No sector from the source for {string.Join(", ", noSector)}, so a sector exclusion could not be checked against them.");
+        }
+
+        return notes;
     }
 
     private static List<UniverseScorecard> Order(IEnumerable<UniverseScorecard> eligible, IReadOnlyList<string> ordering)

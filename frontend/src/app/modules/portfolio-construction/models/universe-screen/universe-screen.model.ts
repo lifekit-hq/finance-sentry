@@ -84,6 +84,9 @@ export interface RowValuation {
 export interface UniverseRow {
   symbol: string;
   sources: UniverseSource[];
+  /** The company's sector and industry from the valuation source; null when it gave none. IPS exclusions match on them. */
+  sector: Nullable<string>;
+  industry: Nullable<string>;
   failureReason: Nullable<string>;
   scoredAt: Nullable<string>;
   verdict: Nullable<RowVerdict>;

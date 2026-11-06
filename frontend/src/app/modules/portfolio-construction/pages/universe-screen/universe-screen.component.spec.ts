@@ -75,6 +75,18 @@ describe('UniverseScreenComponent', () => {
     expect(all(host, 'universe-weight')).toHaveLength(1);
   });
 
+  it('shows the sector of a name beside its symbol, and nothing for a name without one', async () => {
+    const host = await render();
+
+    expect(all(host, 'universe-sector').map(e => e.textContent?.trim())).toEqual([
+      'Technology',
+      'Technology',
+    ]);
+    expect(all(host, 'universe-sector')[0]?.getAttribute('title')).toBe(
+      'Software - Infrastructure'
+    );
+  });
+
   it('shows a name that failed to score with its reason and no verdict', async () => {
     const host = await render();
 

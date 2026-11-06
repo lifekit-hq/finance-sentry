@@ -3,7 +3,9 @@ namespace FinanceSentry.Modules.PortfolioConstruction.Domain.Ports;
 /// <summary>
 /// One symbol's scorecard as this module reads it: the four axes as facts and the verdict the rule table gave
 /// them. There is no composite number anywhere on it (019 FR-007 as amended, spec 726 FR-007). Axis values are
-/// null when the axis could not be evaluated, with the reasons beside them.
+/// null when the axis could not be evaluated, with the reasons beside them. <see cref="Sector"/> and
+/// <see cref="Industry"/> are the company profile (null when the source gave none): the IPS sector exclusions
+/// match on them (spec 726 FR-015), and they are never an input to a gate, an ordering or the verdict.
 /// </summary>
 public sealed record UniverseScorecard(
     string Symbol,
@@ -27,7 +29,9 @@ public sealed record UniverseScorecard(
     string? VerdictWord,
     int? VerdictRulesVersion,
     string? FiredRuleId,
-    string? FiredRuleDescription)
+    string? FiredRuleDescription,
+    string? Sector = null,
+    string? Industry = null)
 {
     public bool Scored => FailureReason is null;
 

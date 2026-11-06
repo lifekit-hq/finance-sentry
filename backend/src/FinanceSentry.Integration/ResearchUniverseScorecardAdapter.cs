@@ -66,5 +66,7 @@ public sealed class ResearchUniverseScorecardAdapter(
             s.VerdictWord,
             s.RulesVersion,
             s.FiredRuleId,
-            s.FiredRuleDescription);
+            s.FiredRuleDescription,
+            s.Sector,
+            s.Industry);
 }

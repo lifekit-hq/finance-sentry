@@ -32,6 +32,8 @@ public sealed class ResearchUniverseScorecardAdapterTests
         card.VerdictWord.Should().Be("Buy");
         card.FiredRuleId.Should().Be("buy");
         card.FiredRuleDescription.Should().Be("Structure and fundamentals clear the BUY bars.");
+        card.Sector.Should().Be("Technology");
+        card.Industry.Should().Be("Software - Infrastructure");
     }
 
     [Fact]
@@ -60,5 +62,5 @@ public sealed class ResearchUniverseScorecardAdapterTests
 
     private static ScorecardSnapshot Snapshot(string symbol) => new(
         symbol, Cards.ScoredAt, 64, 68, "adjusted", [], 72, [], "Normal", 0.04m, false, 28m, 24m, 16.7m, 9.1m, null, false,
-        "Buy", 1, "buy", "Structure and fundamentals clear the BUY bars.");
+        "Buy", 1, "buy", "Structure and fundamentals clear the BUY bars.", "Technology", "Software - Infrastructure");
 }
