@@ -16,7 +16,8 @@ using Microsoft.Extensions.Options;
 /// <para>
 /// Spend is the dashboard's honest figure (<see cref="IMonthlyCategorySpendReader"/>). The history it learns from skips
 /// the configured exclusion months and every month a coverage hole touches (<see cref="ICoverageHoleReader"/>), and
-/// months before the user's first data are no data rather than zero.
+/// months before the user's first data are no data rather than zero. The month being viewed is checked against the same
+/// holes: when one touches it, the response says its spend is incomplete instead of letting a low figure read as thrift.
 /// </para>
 /// </summary>
 public class BudgetEstimateService(
@@ -97,7 +98,8 @@ public class BudgetEstimateService(
             history.IsEnough,
             history.UsedMonths.Count,
             Projection.MinCompleteMonths,
-            [.. history.Skipped.Select(s => new SkippedEstimateMonthDto(s.Month, s.Reason))]);
+            [.. history.Skipped.Select(s => new SkippedEstimateMonthDto(s.Month, s.Reason))],
+            holes.Any(h => h.Overlaps(monthStart, monthEnd)));
     }
 
     private BudgetSummaryItemDto ToItem(

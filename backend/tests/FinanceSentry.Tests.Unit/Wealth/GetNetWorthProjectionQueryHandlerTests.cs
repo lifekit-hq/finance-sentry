@@ -23,7 +23,7 @@ public class GetNetWorthProjectionQueryHandlerTests
 
     private GetNetWorthProjectionQueryHandler CreateHandler() =>
         new(
-            new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+            new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock),
             new ScenarioReader(_careerEvents, _clock));
 
     private void Arrange(decimal? netWorth, IReadOnlyList<HonestMonthlyFlow> flows, FireAssumptions? assumptions = null)

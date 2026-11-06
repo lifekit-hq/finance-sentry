@@ -1400,10 +1400,32 @@ holdings-based current drawdown of section 5b is a separate measurement of the i
   at least $20 a week, a successful sync in the last 3 days) it raises a `CoverageGap` alert and records a
   `coverage_holes` row (`From` = Monday of the first quiet week, `To` null while open). The hole closes when two
   consecutive complete weeks are no longer quiet (at or above 20% of the opening baseline) and the account's sync is succeeding. A hole whose account (or its person) is closed ends with the latest complete week, and its alert
-  resolves. Budget and estimate readers can query `ICoverageHoleReader.GetHolesAsync` to skip the
-  period instead of reading it as frugal; the monthly estimates (section 13) are the first consumer, so a month a
-  hole touches is left out of what they learn from. The 12-month projection, FIRE and the other readers do not
-  consult it yet.
+  resolves.
+  - **Where a hole starts.** The same two-week rule decides both ends. The gap runs back from the latest complete week
+    over the quiet weeks, and a busy week inside it (a stray purchase) does not end it when two quiet weeks follow that
+    busy week; two busy weeks in a row do. The start is the earliest quiet week reached that way (judged against the
+    median of the 13 weeks before it), never a busy week, never before the account's first daily spend, at most 26
+    weeks back. Before this rule the run had to be unbroken, so one purchase week inside a long gap left the weeks
+    before it outside the hole and the estimates still trained on them.
+  - **Repairing a hole recorded late** (verb `repair-coverage-hole-start [--apply] [--account <guid>]`,
+    `scripts/repair-coverage-hole-start.sh`; `CoverageHoleStartRepairService`, one-off): for each open hole it walks
+    back from `From` with the hole's own stored baseline and the rule above, and moves `From` to the first quiet week
+    reached (only earlier; a closed hole and a hole already at its first quiet week are left alone). A dry run (the
+    default) prints old against new and writes nothing, not even the backup; `--apply` copies the original rows to
+    `bank_sync.coverage_holes_backup_start` (a row already backed up is never copied again), then moves the starts in
+    one transaction. A second apply changes nothing.
+  - **What reads holes (`ICoverageHoleReader.GetHolesAsync`).** A month a hole touches is *missing data*, never a
+    cheap month, wherever spend is read to learn something:
+    - the monthly estimates (section 13) skip it from the history they learn from, and the month being viewed carries
+      `spendIncomplete` when a hole touches it, so its spend reads as what reached the app, not as thrift;
+    - `ProjectionInputsReader`, the one reader behind the 12-month projection, the FIRE projection, goals progress, the
+      cashflow profile, the monthly income lens and the financial profile, drops those months from the complete months
+      its medians and savings path are taken over (`CoverageGapMonths` names them); with fewer than three months left
+      there is no savings path and nothing is projected, which is the honest answer while the card is unseen;
+    - the MCP `get_cashflow_report` marks such a month `coverageGap` and its outflow is incomplete.
+
+    The dashboard's own windows, the transaction ledger and the net-worth bridge's savings line report what was
+    recorded and do not consult holes.
 
 ## 10. Benchmark-relative track record
 
@@ -1691,7 +1713,9 @@ amount is only an override over one line. Nothing about the estimate is stored: 
   person's). The Sep/Oct 2026 default that once sat there is gone: the owner's card gap is found per person from
   `coverage_holes`, and another user's Sep/Oct history is used. The page names the skipped months in plain words (a
   coverage-hole month says the bank link has a gap there; a configured month is "left out of these estimates", with no
-  claim about where the spending went).
+  claim about where the spending went). The month being viewed is checked against the same holes: when one touches it
+  the summary carries `spendIncomplete` and the page says its spend is only what reached the app, so a thin month is
+  not read as a thrifty one.
 - **Estimate.** The median of the usable months per line (`Projection.Median`). Below
   `Projection.MinCompleteMonths` (3) usable months nothing is suggested from history; the page says how many months it
   has. Lines with a zero median and no spend this month are hidden; a line with spend and no estimate shows as spend.

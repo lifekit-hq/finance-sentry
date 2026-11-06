@@ -21,7 +21,7 @@ public class GetMonthlyIncomeLensQueryHandlerTests
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetMonthlyIncomeLensQueryHandler CreateHandler() =>
-        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock));
+        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock));
 
     private void Arrange(decimal? netWorth, FireAssumptions? assumptions = null)
     {

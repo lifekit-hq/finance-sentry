@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Utils;
 
 /// <summary>What the detector found: when the quiet run started, how long it is, and the weekly spend it fell from.</summary>
 public sealed record CoverageGapFinding(DateOnly QuietFrom, int QuietWeeks, decimal BaselineWeeklySpendUsd);
@@ -54,32 +55,93 @@ public static class CoverageGapDetector
         => weeklySpendUsd < baselineWeeklySpendUsd * QuietFraction;
 
     /// <summary>
-    /// The quiet run ending at <paramref name="latestCompleteWeek"/>, or null. <paramref name="weeklySpendUsd"/> is keyed by
+    /// The gap ending at <paramref name="latestCompleteWeek"/>, or null. <paramref name="weeklySpendUsd"/> is keyed by
     /// week-start Monday (a missing week is a zero week); <paramref name="firstSpendWeek"/> is the week of the account's
-    /// first daily spend. The run is the longest whose weeks are all quiet against the median of the
-    /// <see cref="BaselineWeeks"/> weeks before it, so the baseline never includes the quiet weeks themselves.
+    /// first daily spend. The gap reaches back to its first quiet week, judged against the median of the
+    /// <see cref="BaselineWeeks"/> weeks before that week, so the baseline never includes the gap's own weeks. A stray
+    /// busy week does not end the gap (see <see cref="IsContinuous"/>): the same two-week rule that closes a hole decides
+    /// where it began, so one purchase in a quiet stretch cannot push the start weeks past the spend actually missing.
     /// </summary>
     public static CoverageGapFinding? Detect(
         IReadOnlyDictionary<DateOnly, decimal> weeklySpendUsd, DateOnly firstSpendWeek, DateOnly latestCompleteWeek)
     {
         CoverageGapFinding? best = null;
 
-        for (var quietWeeks = MinQuietWeeks; quietWeeks <= MaxQuietWeeks; quietWeeks++)
+        for (var weeks = MinQuietWeeks; weeks <= MaxQuietWeeks; weeks++)
         {
-            var quietFrom = latestCompleteWeek.AddDays(-7 * (quietWeeks - 1));
-            var baseline = Baseline(weeklySpendUsd, firstSpendWeek, quietFrom);
+            var from = latestCompleteWeek.AddDays(-7 * (weeks - 1));
+            var baseline = Baseline(weeklySpendUsd, firstSpendWeek, from);
             if (baseline is null)
                 break;
 
-            var allQuiet = Enumerable.Range(0, quietWeeks)
-                .All(i => IsQuiet(Spend(weeklySpendUsd, quietFrom.AddDays(7 * i)), baseline.Value));
-            if (!allQuiet)
+            var quiet = Enumerable.Range(0, weeks)
+                .Select(i => IsQuiet(Spend(weeklySpendUsd, from.AddDays(7 * i)), baseline.Value))
+                .ToArray();
+            if (!IsContinuous(quiet))
                 break;
 
-            best = new CoverageGapFinding(quietFrom, quietWeeks, baseline.Value);
+            // A gap starts on a quiet week: a busy week at the edge is where the spend still flowed, not the gap.
+            if (quiet[0])
+                best = new CoverageGapFinding(from, weeks, baseline.Value);
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// Whether a run of weeks (oldest first, true = quiet) is one gap: it ends on <see cref="MinQuietWeeks"/> quiet weeks
+    /// (the gap is still going), and every busy week in it is followed by <see cref="MinQuietWeeks"/> quiet weeks. That is
+    /// the mirror of how a hole closes - it takes <see cref="MinQuietWeeks"/> consecutive weeks of normal spend to end
+    /// one, so a lone purchase week inside it does not.
+    /// </summary>
+    public static bool IsContinuous(IReadOnlyList<bool> quietWeeks)
+    {
+        if (quietWeeks.Count < MinQuietWeeks || quietWeeks.Skip(quietWeeks.Count - MinQuietWeeks).Any(q => !q))
+            return false;
+
+        for (var i = 0; i < quietWeeks.Count - MinQuietWeeks; i++)
+        {
+            if (!quietWeeks[i] && Enumerable.Range(i + 1, MinQuietWeeks).Any(j => !quietWeeks[j]))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Where an already-open hole that starts at <paramref name="holeFrom"/> really began: the first quiet week reached
+    /// walking back from it, against the hole's own <paramref name="baselineWeeklySpendUsd"/>, through the same rule as
+    /// <see cref="Detect"/>. Never later than <paramref name="holeFrom"/>, never before <paramref name="firstSpendWeek"/>
+    /// (earlier weeks are no data) and at most <see cref="MaxQuietWeeks"/> weeks back.
+    /// </summary>
+    public static DateOnly FirstQuietWeek(
+        IReadOnlyDictionary<DateOnly, decimal> weeklySpendUsd,
+        DateOnly firstSpendWeek,
+        DateOnly holeFrom,
+        decimal baselineWeeklySpendUsd)
+    {
+        var start = holeFrom;
+        var lowest = holeFrom.AddDays(-7 * MaxQuietWeeks);
+        if (lowest < firstSpendWeek)
+            lowest = firstSpendWeek;
+
+        for (var week = holeFrom.AddDays(-7); week >= lowest; week = week.AddDays(-7))
+        {
+            var quiet = IsQuiet(Spend(weeklySpendUsd, week), baselineWeeklySpendUsd);
+            if (quiet)
+            {
+                start = week;
+                continue;
+            }
+
+            // A busy week is a stray only when MinQuietWeeks quiet weeks follow it.
+            var followed = Enumerable.Range(1, MinQuietWeeks)
+                .All(i => IsQuiet(Spend(weeklySpendUsd, week.AddDays(7 * i)), baselineWeeklySpendUsd));
+            if (!followed)
+                break;
+        }
+
+        return start;
     }
 
     /// <summary>
@@ -102,6 +164,15 @@ public static class CoverageGapDetector
         var median = Median(weeks);
         return median >= MinBaselineWeeklySpendUsd ? median : null;
     }
+
+    /// <summary>
+    /// Weekly spend in USD by week-start Monday from an account's day-to-day debits; converted once here, where the
+    /// account's currency is in scope.
+    /// </summary>
+    public static Dictionary<DateOnly, decimal> WeeklySpendUsd(string currency, IEnumerable<(DateTime Date, decimal Amount)> debits)
+        => debits
+            .GroupBy(d => WeekStart(DateOnly.FromDateTime(d.Date)))
+            .ToDictionary(g => g.Key, g => g.Sum(d => CurrencyConverter.ToUsd(Math.Abs(d.Amount), currency)));
 
     public static decimal Spend(IReadOnlyDictionary<DateOnly, decimal> weeklySpendUsd, DateOnly week)
         => weeklySpendUsd.GetValueOrDefault(week);

@@ -22,7 +22,7 @@ public class GetCashflowProfileQueryHandlerTests
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetCashflowProfileQueryHandler CreateHandler() =>
-        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock));
+        new(new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock));
 
     private static NetWorthSnapshot Snapshot(decimal? cashTotal, string? staleSleeves = null) => new()
     {

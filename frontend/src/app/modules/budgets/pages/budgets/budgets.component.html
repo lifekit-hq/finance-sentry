@@ -62,6 +62,14 @@
           </cmn-alert>
         }
 
+        <!-- This month's own spend is partly unseen: a thin figure is missing data, not thrift -->
+        @if (store.spendIncomplete()) {
+          <cmn-alert variant="warning" class="block" data-testid="budgets-spend-incomplete">
+            The bank link has a gap this month, so the spending below is only what reached the app,
+            not everything you spent. A low figure here is missing data, not a cheap month.
+          </cmn-alert>
+        }
+
         @if (!store.hasEnoughHistory()) {
           <cmn-alert variant="info" class="block" data-testid="budgets-short-history">
             Not enough history to suggest amounts yet: {{ store.historyMonthsUsed() }} of the

@@ -70,6 +70,12 @@ describe('budgetsComputed', () => {
     expect(computedFor(SUMMARY).skippedNote()).toContain('October 2026 is left out');
   });
 
+  it('flags a month whose own spend is partly unseen', () => {
+    expect(computedFor(SUMMARY).spendIncomplete()).toBe(false);
+    expect(computedFor({...SUMMARY, spendIncomplete: true}).spendIncomplete()).toBe(true);
+    expect(computedFor(null).spendIncomplete()).toBe(false);
+  });
+
   it('is empty, with no note, before the first month arrives', () => {
     const c = computedFor(null);
 

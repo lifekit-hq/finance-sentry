@@ -59,6 +59,8 @@ export interface BudgetSummaryResponse {
   historyMonthsUsed: number;
   minHistoryMonths: number;
   skippedMonths: SkippedEstimateMonth[];
+  /** A coverage hole touches this month: its spend is only what reached the app (absent on older responses). */
+  spendIncomplete?: boolean;
 }
 
 /** Saving a hand edit: creates the override, or updates the one already there. */
