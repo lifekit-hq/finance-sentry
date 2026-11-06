@@ -1,6 +1,6 @@
 namespace FinanceSentry.Modules.Radar.Domain;
 
-/// <summary>A ticker in the Radar universe. De-activated (not deleted) when it leaves holdings/watchlist.</summary>
+/// <summary>A ticker in the Radar universe. De-activated (not deleted) when it leaves holdings/watchlist/theses.</summary>
 public sealed class RadarUniverseMember
 {
     public Guid Id { get; init; }

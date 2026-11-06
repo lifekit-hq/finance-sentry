@@ -89,7 +89,7 @@ public sealed class ShortlistStructureCostTests
             .ReturnsAsync([Watched]);
 
         var universeService = new RadarUniverseService(
-            universeRepo, brokerage.Object, watchlist.Object, banking.Object, options,
+            universeRepo, brokerage.Object, watchlist.Object, NoThesisTickers(), banking.Object, options,
             new FakeShortlistSource { Tickers = Shortlist });
         await universeService.SyncAsync(CancellationToken.None);
 
@@ -130,5 +130,12 @@ public sealed class ShortlistStructureCostTests
         }
 
         return bars;
+    }
+
+    private static IThesisTickerReader NoThesisTickers()
+    {
+        var thesis = new Mock<IThesisTickerReader>();
+        thesis.Setup(t => t.ListTickersAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        return thesis.Object;
     }
 }

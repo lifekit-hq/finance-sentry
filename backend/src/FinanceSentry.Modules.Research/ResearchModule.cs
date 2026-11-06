@@ -239,6 +239,7 @@ public static class ResearchModule
         services.AddScoped<IWatchlistReader, WatchlistReader>();
         services.AddScoped<IThesisRepository, ThesisRepository>();
         services.AddScoped<IBrokenThesisReader, BrokenThesisReader>();
+        services.AddScoped<IThesisTickerReader, ThesisTickerReader>();
 
         // #673: published read ports - the Integration adapters reach Research only through these.
         services.AddScoped<IEarningsCalendarReader, EarningsCalendarReader>();

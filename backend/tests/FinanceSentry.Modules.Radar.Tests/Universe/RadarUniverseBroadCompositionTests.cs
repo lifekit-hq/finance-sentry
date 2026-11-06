@@ -76,7 +76,34 @@ public sealed class RadarUniverseBroadCompositionTests
             ["NVDA"], "the shortlist churns daily, and a member it drops must leave the universe with it");
     }
 
-    private static Composition BuildService(bool broadEnabled, string[] shortlisted)
+    [Fact]
+    public async Task Sync_AddsAThesisSymbolOutsideEveryOtherSourceAsAThesisMember()
+    {
+        var (service, upserted, _, _) = BuildService(
+            broadEnabled: false, shortlisted: [], thesisTickers: [" tsm ", "TSM"]);
+
+        var active = await service.SyncAsync();
+
+        upserted.Should().ContainSingle(m => m.Ticker == "TSM")
+            .Which.Should().Match<RadarUniverseMember>(m =>
+                m.Kind == UniverseKind.Thesis && m.Source == UniverseSource.Auto && m.Active);
+        active.Select(m => m.Ticker).Should().Contain("TSM", "a thesis symbol must get fresh bars");
+    }
+
+    [Fact]
+    public async Task Sync_KeepsOwnershipKindForAThesisSymbolThatIsAlsoHeldOrWatched()
+    {
+        var (service, upserted, _, _) = BuildService(
+            broadEnabled: false, shortlisted: [], thesisTickers: ["AAPL", "TSLA", "SPY"]);
+
+        await service.SyncAsync();
+
+        upserted.Single(m => m.Ticker == "AAPL").Kind.Should().Be(UniverseKind.Holding);
+        upserted.Single(m => m.Ticker == "TSLA").Kind.Should().Be(UniverseKind.Watchlist);
+        upserted.Single(m => m.Ticker == "SPY").Kind.Should().Be(UniverseKind.Benchmark);
+    }
+
+    private static Composition BuildService(bool broadEnabled, string[] shortlisted, string[]? thesisTickers = null)
     {
         var upserted = new List<RadarUniverseMember>();
         var deactivated = new List<string>();
@@ -101,6 +128,10 @@ public sealed class RadarUniverseBroadCompositionTests
         watchlist.Setup(w => w.ListTickersAsync(User, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["TSLA"]);
 
+        var thesis = new Mock<IThesisTickerReader>();
+        thesis.Setup(t => t.ListTickersAsync(User, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(thesisTickers ?? []);
+
         var banking = new Mock<IBankingTotalsReader>();
         banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([User]);
@@ -109,7 +140,7 @@ public sealed class RadarUniverseBroadCompositionTests
 
         var options = TestSupport.Options(new RadarOptions { BroadUniverseEnabled = broadEnabled });
         var service = new RadarUniverseService(
-            repo.Object, brokerage.Object, watchlist.Object, banking.Object, options, source);
+            repo.Object, brokerage.Object, watchlist.Object, thesis.Object, banking.Object, options, source);
 
         return new Composition(service, upserted, source, deactivated);
     }

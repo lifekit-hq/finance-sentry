@@ -42,6 +42,31 @@ public sealed class FreshnessWatchdogScopeTests
     }
 
     [Fact]
+    public async Task StaleThesisSymbolRaisesTheAlertLikeABookMember()
+    {
+        var alerts = await RunAsync(Member("TSM", UniverseKind.Thesis));
+
+        alerts.Verify(
+            a => a.GenerateMarketStructureFreshnessAlertAsync(
+                User, It.IsAny<Guid>(), It.Is<string>(r => r.StartsWith("1 universe tickers")), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task FreshThesisSymbolRaisesNoAlert()
+    {
+        var alerts = await RunAsync([Member("TSM", UniverseKind.Thesis)], seedFreshBarFor: "TSM");
+
+        alerts.Verify(
+            a => a.GenerateMarketStructureFreshnessAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        alerts.Verify(
+            a => a.ResolveMarketStructureFreshnessAlertAsync(User, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task NoStaleMembers_ResolvesTheAlert()
     {
         var alerts = await RunAsync(
