@@ -1,5 +1,9 @@
 import {type Provider} from '@angular/core';
-import {DEFAULT_VALIDATION_MESSAGES, VALIDATION_MESSAGES, type ValidationMessageFn} from '@lifekit-hq/ui';
+import {
+  DEFAULT_VALIDATION_MESSAGES,
+  VALIDATION_MESSAGES,
+  type ValidationMessageFn,
+} from '@lifekit-hq/ui';
 
 interface MaxDateParams {
   max: string;
