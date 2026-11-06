@@ -1,8 +1,11 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {type TrueLayerProvider} from '../../models/truelayer/truelayer.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -28,6 +31,7 @@ function setup(listTrueLayerProviders: ReturnType<typeof vi.fn>) {
   const strategy: ConnectStrategy = {slug: 'truelayer', formComponent: class {}, submit: vi.fn()};
   TestBed.configureTestingModule({
     providers: [
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       {provide: BankSyncService, useValue: {listTrueLayerProviders}},
       {
         provide: ConnectStore,
@@ -52,14 +56,14 @@ describe('TrueLayerPickerComponent', () => {
     await fixture.whenStable();
 
     expect(list).toHaveBeenCalledWith('ie');
-    expect(cmp.picker.status()).toBe('success');
+    expect(cmp.status()).toBe('success');
     expect(cmp.filteredProviders()).toEqual([AIB, BOI]);
   });
 
   it('is loading until the list answers', () => {
     const {cmp} = setup(vi.fn().mockReturnValue(new Subject<TrueLayerProvider[]>()));
 
-    expect(cmp.picker.status()).toBe('loading');
+    expect(cmp.status()).toBe('loading');
   });
 
   it('reloads for the chosen country and clears the search', async () => {
@@ -76,18 +80,20 @@ describe('TrueLayerPickerComponent', () => {
     expect(cmp.searchControl.value).toBe('');
   });
 
-  it('drops the in-flight request when the country changes', () => {
+  it('drops the in-flight request when the country changes', async () => {
     const ie = new Subject<TrueLayerProvider[]>();
     const uk = new Subject<TrueLayerProvider[]>();
     const list = vi.fn((country: string) => (country === 'ie' ? ie : uk));
-    const {cmp} = setup(list);
+    const {fixture, cmp} = setup(list);
 
     cmp.onCountryChange('uk');
+    fixture.detectChanges();
     ie.next([AIB]);
     uk.next([BOI]);
+    await fixture.whenStable();
 
     expect(cmp.filteredProviders()).toEqual([BOI]);
-    expect(cmp.picker.status()).toBe('success');
+    expect(cmp.status()).toBe('success');
   });
 
   it('filters the list by the search term, ignoring case', async () => {
@@ -105,8 +111,18 @@ describe('TrueLayerPickerComponent', () => {
     );
     await fixture.whenStable();
 
-    expect(cmp.picker.status()).toBe('error');
-    expect(cmp.picker.errorMessage()).toBe(LOAD_PROVIDERS_ERROR);
+    expect(cmp.status()).toBe('error');
+    expect(cmp.errorMessage()).toBe(LOAD_PROVIDERS_ERROR);
     expect(cmp.filteredProviders()).toEqual([]);
+  });
+
+  it('shows the registry message for the backend error code of a failed load', async () => {
+    const errorCode = 'MONOBANK_RATE_LIMITED';
+    const failure = new HttpErrorResponse({status: 429, error: {errorCode}});
+    const {fixture, cmp} = setup(vi.fn().mockReturnValue(throwError(() => failure)));
+    await fixture.whenStable();
+
+    expect(cmp.status()).toBe('error');
+    expect(cmp.errorMessage()).toBe(ERROR_MESSAGES_REGISTRY[errorCode]);
   });
 });
