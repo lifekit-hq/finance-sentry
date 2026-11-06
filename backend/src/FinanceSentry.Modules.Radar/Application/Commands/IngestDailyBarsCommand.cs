@@ -78,7 +78,7 @@ public sealed class IngestDailyBarsCommandHandler(
     }
 
     /// <summary>
-    /// Book first: holdings, watchlist and the seed lenses are fetched before the stage-1 shortlist,
+    /// Book first: holdings, watchlist, thesis symbols and the seed lenses are fetched before the stage-1 shortlist,
     /// so an upstream rate limit costs breadth rather than the freshness of what is actually owned.
     /// The shortlist is tens of names (#558), so unlike the rotating index budget it replaced, every
     /// scheduled member is fetched in the same run.
