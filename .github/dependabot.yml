@@ -27,6 +27,20 @@ updates:
       day: monday
       time: "06:00"
     open-pull-requests-limit: 5
+    # Majors that cannot land yet; each holds the whole npm-dev-dependencies
+    # group red (#1247, PR #1310), so drop an entry once its blocker clears:
+    #  - typescript 7: @angular-devkit/build-angular peers typescript >=6.0 <6.1
+    #    (npm ci fails ERESOLVE).
+    #  - eslint 10: eslint-plugin-import (via @lifekit-hq/config) peers eslint <=9.
+    #  - tailwindcss 4: needs the v3 -> v4 migration (tailwind.config.js presets
+    #    @lifekit-hq/tokens' v3 preset; styles.scss uses the v3 directives).
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-angular-family:
         patterns:
