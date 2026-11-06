@@ -46,6 +46,7 @@ public sealed class ScenarioReaderTests
         scenario.Status.Should().Be(ScenarioStatus.Applied);
         scenario.Events.Should().ContainSingle().Which.Should().Be(
             new ScenarioEvent(ScenarioEventKind.IncomeStep, Today.AddDays(60), null, 500m));
+        scenario.CountedEvents.Should().Be(1);
     }
 
     [Fact]
@@ -102,10 +103,12 @@ public sealed class ScenarioReaderTests
     {
         _events.CanReadEncryptedFields = false;
         Add(CareerEventKind.IncomeStep, Today.AddDays(60), 500m);
+        Add(CareerEventKind.OneOffOut, Today.AddDays(90), 100m);
 
         var scenario = await Reader().ReadAsync(UserId, CancellationToken.None);
 
         scenario.Status.Should().Be(ScenarioStatus.Unreadable);
+        scenario.CountedEvents.Should().Be(2);
         scenario.Events.Should().BeEmpty("no scenario figure is claimed from events that cannot be read");
     }
 

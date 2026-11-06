@@ -32,9 +32,9 @@ public static class ScenarioText
 
 /// <summary>
 /// The counted events in USD, and the day they were counted against. <see cref="Events"/> is empty unless the status is
-/// <see cref="ScenarioStatus.Applied"/>.
+/// <see cref="ScenarioStatus.Applied"/>; <see cref="CountedEvents"/> is how many events count either way.
 /// </summary>
-public sealed record ScenarioInputs(ScenarioStatus Status, IReadOnlyList<ScenarioEvent> Events, DateOnly Today)
+public sealed record ScenarioInputs(ScenarioStatus Status, IReadOnlyList<ScenarioEvent> Events, int CountedEvents, DateOnly Today)
 {
     public bool IsApplied => Status == ScenarioStatus.Applied;
 
@@ -60,8 +60,9 @@ public class ScenarioReader(ICareerEventRepository events, TimeProvider clock)
         if (!_events.CanReadEncryptedFields)
         {
             var outlines = await _events.ListOutlinesUnscopedAsync(userId, ct);
+            var countedOutlines = outlines.Count(o => o.IsCounted(today));
             return new ScenarioInputs(
-                outlines.Any(o => o.IsCounted(today)) ? ScenarioStatus.Unreadable : ScenarioStatus.None, [], today);
+                countedOutlines > 0 ? ScenarioStatus.Unreadable : ScenarioStatus.None, [], countedOutlines, today);
         }
 
         var counted = (await _events.ListUnscopedAsync(userId, ct))
@@ -70,7 +71,7 @@ public class ScenarioReader(ICareerEventRepository events, TimeProvider clock)
                 KindOf(c.Kind), c.Date, c.EndDate, Math.Round(CurrencyConverter.ToUsd(c.Amount, c.Currency), MoneyDecimals)))
             .ToList();
 
-        return new ScenarioInputs(counted.Count == 0 ? ScenarioStatus.None : ScenarioStatus.Applied, counted, today);
+        return new ScenarioInputs(counted.Count == 0 ? ScenarioStatus.None : ScenarioStatus.Applied, counted, counted.Count, today);
     }
 
     private const int MoneyDecimals = 2;

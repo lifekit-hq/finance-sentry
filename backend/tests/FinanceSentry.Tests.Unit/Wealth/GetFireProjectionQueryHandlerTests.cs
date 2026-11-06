@@ -118,10 +118,12 @@ public class GetFireProjectionQueryHandlerTests
         Arrange(100_000m, outflowUsd: 3_000m, netUsd: 1_000m);
         _careerEvents.CanReadEncryptedFields = false;
         AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_500m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
 
         var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
 
         result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.EventCount.Should().Be(2, "the events count even though they cannot be read");
         result.Scenario.Outcome.Should().BeNull();
         result.ProjectedDate.Should().NotBeNull();
     }

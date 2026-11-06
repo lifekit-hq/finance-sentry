@@ -145,10 +145,12 @@ public class GetGoalsProgressQueryHandlerTests
             Goals(plan: null, Goal(130_000m, new DateOnly(2028, 9, 26))));
         _careerEvents.CanReadEncryptedFields = false;
         AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 1_000m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
 
         var result = await Run();
 
         result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.EventCount.Should().Be(2, "the events count even though they cannot be read");
         result.Goals.Single().Scenario.Should().BeNull();
         result.Goals.Single().ProjectedAtTargetDate.Should().NotBeNull("the baseline needs no key");
     }

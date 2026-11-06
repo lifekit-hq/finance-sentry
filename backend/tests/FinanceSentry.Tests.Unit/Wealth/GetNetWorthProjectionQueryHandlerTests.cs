@@ -179,10 +179,12 @@ public class GetNetWorthProjectionQueryHandlerTests
         Arrange(100_000m, Months(1_000m, 1_000m, 1_000m));
         _careerEvents.CanReadEncryptedFields = false;
         AddEvent(CareerEventKind.IncomeStep, new DateOnly(2026, 12, 1), 500m);
+        AddEvent(CareerEventKind.OneOffOut, new DateOnly(2027, 2, 10), 900m);
 
         var result = await CreateHandler().Handle(new GetNetWorthProjectionQuery(UserId), CancellationToken.None);
 
         result.Scenario!.Status.Should().Be(ScenarioStatus.Unreadable);
+        result.Scenario.EventCount.Should().Be(2, "the events count even though they cannot be read");
         result.Scenario.ProjectedNetWorth.Should().BeNull();
         result.ProjectedNetWorth.Should().NotBeNull("the baseline needs no key");
     }

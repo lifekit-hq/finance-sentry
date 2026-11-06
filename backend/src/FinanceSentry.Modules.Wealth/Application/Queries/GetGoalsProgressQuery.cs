@@ -201,7 +201,7 @@ public class GetGoalsProgressQueryHandler(
             inputs.HasStaleSleeves,
             Scenario: scenario.Status == ScenarioStatus.None
                 ? null
-                : new GoalsScenarioNote(scenario.Status, scenario.Events.Count));
+                : new GoalsScenarioNote(scenario.Status, scenario.CountedEvents));
     }
 
     private static GoalProgress Track(GoalTarget goal, ProjectionInputs inputs, ScenarioInputs scenario, DateOnly today)

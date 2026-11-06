@@ -153,7 +153,7 @@ public class GetFireProjectionQueryHandler(
         if (scenario.Status == ScenarioStatus.None)
             return null;
         if (!scenario.IsApplied)
-            return new FireScenario(scenario.Status, scenario.Events.Count, null, null, null, null, null, null);
+            return new FireScenario(scenario.Status, scenario.CountedEvents, null, null, null, null, null, null);
 
         var result = Projection.FinancialIndependence(
             annualSpend, current, monthlySavings, assumptions, scenario.Deltas(Projection.MaxScenarioMonths));
@@ -166,7 +166,7 @@ public class GetFireProjectionQueryHandler(
         };
         var range = result.MonthsToTarget;
         return new FireScenario(
-            scenario.Status, scenario.Events.Count, outcome, range?.Central, DateAfter(range?.Central), range,
+            scenario.Status, scenario.CountedEvents, outcome, range?.Central, DateAfter(range?.Central), range,
             DateAfter(range?.Low), DateAfter(range?.High));
     }
 

@@ -93,7 +93,7 @@ public class GetNetWorthProjectionQueryHandler(ProjectionInputsReader inputs, Sc
                 ? null
                 : new NetWorthScenario(
                     scenario.Status,
-                    scenario.Events.Count,
+                    scenario.CountedEvents,
                     scenario.IsApplied
                         ? Projection.ValueAfter(HorizonMonths, current, savings, inputs.Assumptions, scenario.Deltas(HorizonMonths))
                         : null));
