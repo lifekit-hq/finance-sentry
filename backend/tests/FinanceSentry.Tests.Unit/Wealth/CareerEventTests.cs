@@ -48,6 +48,30 @@ public sealed class CareerEventTests
     }
 
     [Fact]
+    public void IsCounted_ALeaveCountsUntilItsEndDateHasPassed()
+    {
+        Event(CareerEventKind.Leave, Today.AddDays(10), Today.AddDays(40)).IsCounted(Today).Should().BeTrue("not started");
+        Event(CareerEventKind.Leave, Today.AddDays(-14), Today.AddDays(150)).IsCounted(Today).Should().BeTrue("under way");
+        Event(CareerEventKind.Leave, Today.AddDays(-14), Today.AddDays(1)).IsCounted(Today).Should().BeTrue("ends tomorrow");
+        Event(CareerEventKind.Leave, Today.AddDays(-90), Today).IsCounted(Today).Should().BeFalse("ends today, in the baseline");
+        Event(CareerEventKind.Leave, Today.AddDays(-90), Today.AddDays(-10)).IsCounted(Today).Should().BeFalse("over");
+
+        var retired = Event(CareerEventKind.Leave, Today.AddDays(-14), Today.AddDays(150));
+        retired.Retire(DateTimeOffset.UtcNow);
+        retired.IsCounted(Today).Should().BeFalse("a retired leave never counts");
+    }
+
+    [Theory]
+    [InlineData(CareerEventKind.IncomeStep)]
+    [InlineData(CareerEventKind.OneOffIn)]
+    [InlineData(CareerEventKind.OneOffOut)]
+    public void IsCounted_OtherKindsDatedTodayOrEarlierAreBaselineHistory(CareerEventKind kind)
+    {
+        Event(kind, Today.AddDays(-14)).IsCounted(Today).Should().BeFalse();
+        Event(kind, Today).IsCounted(Today).Should().BeFalse();
+    }
+
+    [Fact]
     public void Retire_TakesTheEventOutOfTheScenario_AndKeepsTheFirstRetirement()
     {
         var career = Event(date: Today.AddDays(90));
@@ -83,6 +107,10 @@ public sealed class CareerEventTests
         retired.IsCounted(Today).Should().BeFalse();
         open.IsCounted(Today).Should().BeTrue();
         past.IsCounted(Today).Should().BeFalse();
+
+        var leaveUnderWay = open with { Kind = CareerEventKind.Leave, Date = Today.AddDays(-14), EndDate = Today.AddDays(60) };
+        leaveUnderWay.IsCounted(Today).Should().BeTrue();
+        (leaveUnderWay with { EndDate = Today }).IsCounted(Today).Should().BeFalse();
     }
 
     private static CareerEventInput Valid(CareerEventKind kind = CareerEventKind.IncomeStep) => new(

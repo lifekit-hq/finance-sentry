@@ -30,7 +30,7 @@ const INPUT: CareerEventInput = {
 const ROWS: CareerEventRow[] = [
   {
     ...PAST_BONUS,
-    sublabel: 'One-off in · Thu 15 Jan 2026 · already happened',
+    sublabel: 'One-off in · Thu 15 Jan 2026 · already happened, part of your baseline',
     signedAmount: 2000,
     monthly: false,
   },
@@ -81,7 +81,7 @@ describe('CareerTimelineComponent', () => {
       '[data-testid="career-timeline-disclosure"]'
     )?.textContent;
     expect(text).toContain('A scenario you entered, not a forecast.');
-    expect(text).toContain('not counted twice');
+    expect(text).toContain('part of your baseline');
   });
 
   it('lists each event with its signed amount, per month where it repeats', () => {

@@ -61,4 +61,4 @@ export const CAREER_EVENT_SKELETON_ROWS = 2;
 
 /** What the timeline says about itself under its heading. */
 export const CAREER_TIMELINE_DISCLOSURE =
-  'A scenario you entered, not a forecast. Each event changes what you save by its amount from its date; your spending is assumed not to move and tax is not modelled. Events already in the past are in your history and are not counted twice.';
+  'A scenario you entered, not a forecast. Each event changes what you save by its amount from its date; your spending is assumed not to move and tax is not modelled. A leave under way counts the months it still has ahead; any other event dated today or earlier is already part of your baseline and is not counted.';

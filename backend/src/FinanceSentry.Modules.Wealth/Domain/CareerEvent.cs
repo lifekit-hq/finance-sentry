@@ -106,12 +106,13 @@ public sealed class CareerEvent : IHasUpdatedAt, IUserOwned
     /// <summary>
     /// Whether the event still counts toward a scenario on <paramref name="today"/>: not retired, and not already in the
     /// past (an event that has happened is part of the baseline's history, counting it again would double it). A leave
-    /// counts only before it starts, for the same reason.
+    /// under way is the exception: it counts until its end date has passed, for the months still ahead.
     /// </summary>
-    public bool IsCounted(DateOnly today) => IsCounted(Date, RetiredAt, today);
+    public bool IsCounted(DateOnly today) => IsCounted(Kind, Date, EndDate, RetiredAt, today);
 
     /// <summary>The one rule behind <see cref="IsCounted(DateOnly)"/>, shared with the key-less outline read.</summary>
-    public static bool IsCounted(DateOnly date, DateTimeOffset? retiredAt, DateOnly today) => retiredAt is null && date > today;
+    public static bool IsCounted(CareerEventKind kind, DateOnly date, DateOnly? endDate, DateTimeOffset? retiredAt, DateOnly today) =>
+        retiredAt is null && (date > today || (kind == CareerEventKind.Leave && endDate > today));
 }
 
 /// <summary>The bounds a career event is validated against and stored in.</summary>

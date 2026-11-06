@@ -54,6 +54,41 @@ public sealed class ScenarioProjectionTests
         deltas.Should().Equal(0m, 0m, -1_200m, -1_200m, -1_200m, 0m, 0m, 0m);
     }
 
+    [Fact]
+    public void MonthlyDeltas_ALeaveUnderWay_LowersTheSavingForTheMonthsStillAhead()
+    {
+        // Started two weeks ago (12 Sep) and ends 11 Mar 2027: 26 Sep -> 12 Mar is five whole months left.
+        var leave = new ScenarioEvent(ScenarioEventKind.Leave, new DateOnly(2026, 9, 12), new DateOnly(2027, 3, 11), 3_000m);
+
+        var deltas = ScenarioPath.MonthlyDeltas([leave], Today, 8);
+
+        deltas.Should().Equal(-3_000m, -3_000m, -3_000m, -3_000m, -3_000m, 0m, 0m, 0m);
+    }
+
+    [Fact]
+    public void MonthlyDeltas_ALeaveUnderWayEndingInDays_StillCostsOneMonth()
+    {
+        var leave = new ScenarioEvent(ScenarioEventKind.Leave, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30), 3_000m);
+
+        ScenarioPath.MonthlyDeltas([leave], Today, 3).Should().Equal(-3_000m, 0m, 0m);
+    }
+
+    [Theory]
+    [InlineData("2026-06-01", "2026-09-26")]
+    [InlineData("2026-06-01", "2026-08-31")]
+    public void MonthlyDeltas_ALeaveThatHasEnded_AddsNothing(string start, string end)
+    {
+        var leave = new ScenarioEvent(ScenarioEventKind.Leave, DateOnly.Parse(start), DateOnly.Parse(end), 3_000m);
+
+        ScenarioPath.MonthlyDeltas([leave], Today, 4).Should().Equal(0m, 0m, 0m, 0m);
+    }
+
+    [Fact]
+    public void MonthlyDeltas_AnIncomeStepAlreadyBegun_StillAddsNothing()
+    {
+        ScenarioPath.MonthlyDeltas([Step(new DateOnly(2026, 9, 12), 500m)], Today, 3).Should().Equal(0m, 0m, 0m);
+    }
+
     [Theory]
     [InlineData("2026-12-01", "2026-12-20", 1)]
     [InlineData("2026-12-01", "2027-02-28", 3)]

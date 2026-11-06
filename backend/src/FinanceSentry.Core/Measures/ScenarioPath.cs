@@ -28,8 +28,9 @@ public sealed record ScenarioEvent(ScenarioEventKind Kind, DateOnly Date, DateOn
 /// <see cref="Projection"/> takes. Pure: no I/O, no clock.
 /// <para>
 /// An event dated on or before <c>today</c> is not applied: the baseline savings path is the median of the trailing complete
-/// months, so a raise or a leave that already happened is in it, and counting it again would double it. Every
-/// change is a change to the <b>saving</b>: spending is assumed not to move with it.
+/// months, so a raise that already happened is in it, and counting it again would double it. The one exception is a
+/// <see cref="ScenarioEventKind.Leave"/> that has started but not ended: the months of it still ahead are in no complete month,
+/// so they are applied from the first month on. Every change is a change to the <b>saving</b>: spending is assumed not to move with it.
 /// </para>
 /// </summary>
 public static class ScenarioPath
@@ -39,13 +40,25 @@ public static class ScenarioPath
     /// <summary>
     /// The change to the monthly saving for each of the next <paramref name="months"/> months (index i is the (i + 1)th month
     /// from <paramref name="today"/>, the one whose end the projection compounds; an event lands at the index of the whole
-    /// months from today to its date, so one 10 days out is index 0 and one 40 days out index 1). An event past the horizon, or a leave that ends before it starts, adds nothing.
+    /// months from today to its date, so one 10 days out is index 0 and one 40 days out index 1; a leave under way starts at index 0). An event past the horizon, a leave that ends before it starts, or a leave already over adds nothing.
     /// </summary>
     public static IReadOnlyList<decimal> MonthlyDeltas(IEnumerable<ScenarioEvent> events, DateOnly today, int months)
     {
         var deltas = new decimal[Math.Max(0, months)];
         foreach (var e in events)
         {
+            if (e.Kind == ScenarioEventKind.Leave)
+            {
+                if (e.EndDate is { } end && end >= e.Date && end > today)
+                {
+                    var from = e.Date > today ? e.Date : today;
+                    var start = WholeMonthsUntil(today, from);
+                    Add(deltas, start, start + LeaveMonths(from, end) - 1, -e.AmountUsd);
+                }
+
+                continue;
+            }
+
             if (e.Date <= today)
                 continue;
 
@@ -60,10 +73,6 @@ public static class ScenarioPath
                     break;
                 case ScenarioEventKind.OneOffOut:
                     Add(deltas, first, first, -e.AmountUsd);
-                    break;
-                case ScenarioEventKind.Leave:
-                    if (e.EndDate is { } end && end >= e.Date)
-                        Add(deltas, first, first + LeaveMonths(e.Date, end) - 1, -e.AmountUsd);
                     break;
             }
         }

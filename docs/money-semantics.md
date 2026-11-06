@@ -1932,15 +1932,16 @@ the default figure everywhere.**
   negative, never zero). `OneOffIn` / `OneOffOut`: a single positive amount received / spent in the month of `date`. `Leave`:
   income falls by a **positive monthly** amount from `date` through `endDate`, inclusive. Amounts are in the event's own
   currency and converted to USD once, at the read (`ScenarioReader`, `CurrencyConverter.ToUsd`, §3).
-- **What counts.** An event counts when it is **not retired** and dated **after today**. One dated today or earlier is in the
-  baseline's trailing complete months already (a raise that happened, a leave that is over), so counting it again would double it:
-  it stays listed as history and adds nothing. A retired event never counts, and an edit un-retires it (it restates the event).
-  A leave that has started is therefore not modelled either; its end is not applied. This is the documented limit of the rule.
+- **What counts.** An event counts when it is **not retired** and dated **after today**, or is a **leave under way** (started on
+  or before today, end date after today): it counts the whole months left to its end date (end date counted, at least one),
+  from the first month on. Any other event dated today or earlier is part of the baseline's trailing complete months already (a
+  raise that happened, a leave that is over), so counting it again would double it: it stays listed as history and adds nothing.
+  A retired event never counts, and an edit un-retires it (it restates the event).
 - **Every change is a change to the monthly saving.** Spending is assumed not to move with income and tax is not modelled: an
   income step of +500 raises the saving by 500. The person enters what changes what they can save.
 - **Month placement.** An event lands in month index `m` = the whole calendar months from today to its date (`ScenarioPath`):
   an event ten days out is in the first month, one forty days out in the second. A step then applies to every month from `m` on, a
-  one-off to month `m` only, a leave to its length in whole months from `m` (end date counted, at least one: a three-month leave costs three monthly savings however the projection's months line up with the calendar). Contributions land at the end of
+  one-off to month `m` only, a leave to its length in whole months from `m` (end date counted, at least one; a leave already under way starts at month 0 and runs for the whole months left to its end date: a three-month leave costs three monthly savings however the projection's months line up with the calendar). Contributions land at the end of
   their month, as the level monthly saving does, so the scenario value is exactly the baseline value plus the future value of
   the changes (`Projection.ValueAfter` with deltas; at a zero return the changes simply add up).
 - **The scenario in each projection** (same assumption set, same low / central / high return range as the baseline, C8):

@@ -41,6 +41,19 @@ public sealed class GetCareerTimelineQueryHandlerTests
     }
 
     [Fact]
+    public async Task ALeaveUnderWay_AppearsAsCounted_AndAnEndedOneDoesNot()
+    {
+        _events.Events.Add(CareerEvent.Create(UserId, CareerEventKind.Leave, Today.AddDays(-14), Today.AddDays(90), "Parental", 3_000m, "USD", null));
+        _events.Events.Add(CareerEvent.Create(UserId, CareerEventKind.Leave, Today.AddDays(-120), Today.AddDays(-30), "Sabbatical", 3_000m, "USD", null));
+
+        var result = await Handler().Handle(new GetCareerTimelineQuery(UserId), CancellationToken.None);
+
+        result.Events.Single(e => e.Label == "Parental").Counted.Should().BeTrue();
+        result.Events.Single(e => e.Label == "Sabbatical").Counted.Should().BeFalse();
+        result.CountedEvents.Should().Be(1);
+    }
+
+    [Fact]
     public async Task OnAHostWithoutTheKey_ReturnsOnlyThePlainColumns()
     {
         _events.CanReadEncryptedFields = false;

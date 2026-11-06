@@ -4,7 +4,7 @@ namespace FinanceSentry.Modules.Wealth.Domain.Repositories;
 public sealed record CareerEventOutline(
     Guid Id, CareerEventKind Kind, DateOnly Date, DateOnly? EndDate, string Currency, DateTimeOffset? RetiredAt)
 {
-    public bool IsCounted(DateOnly today) => CareerEvent.IsCounted(Date, RetiredAt, today);
+    public bool IsCounted(DateOnly today) => CareerEvent.IsCounted(Kind, Date, EndDate, RetiredAt, today);
 }
 
 public interface ICareerEventRepository

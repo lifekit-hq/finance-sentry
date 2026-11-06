@@ -25,7 +25,7 @@ function sublabel(event: CareerEvent): string {
   if (event.retired) {
     parts.push('retired');
   } else if (!event.counted) {
-    parts.push('already happened');
+    parts.push('already happened, part of your baseline');
   }
   return parts.join(' · ');
 }

@@ -49,6 +49,28 @@ public sealed class ScenarioReaderTests
     }
 
     [Fact]
+    public async Task ALeaveUnderWay_IsCounted_AndLowersTheSavingForTheMonthsStillAhead()
+    {
+        Add(CareerEventKind.Leave, Today.AddDays(-14), 3_000m, end: new DateOnly(2027, 3, 11));
+        Add(CareerEventKind.Leave, Today.AddDays(-90), 3_000m, end: Today);
+
+        var scenario = await Reader().ReadAsync(UserId, CancellationToken.None);
+
+        scenario.Status.Should().Be(ScenarioStatus.Applied);
+        scenario.Events.Should().ContainSingle().Which.EndDate.Should().Be(new DateOnly(2027, 3, 11));
+        scenario.Deltas(7).Should().Equal(-3_000m, -3_000m, -3_000m, -3_000m, -3_000m, 0m, 0m);
+    }
+
+    [Fact]
+    public async Task OnAHostWithoutTheKey_ALeaveUnderWayIsAnUnreadableScenario()
+    {
+        _events.CanReadEncryptedFields = false;
+        Add(CareerEventKind.Leave, Today.AddDays(-14), 3_000m, end: Today.AddDays(90));
+
+        (await Reader().ReadAsync(UserId, CancellationToken.None)).Status.Should().Be(ScenarioStatus.Unreadable);
+    }
+
+    [Fact]
     public async Task OnlyPastOrRetiredEvents_ClaimNoScenario()
     {
         Add(CareerEventKind.OneOffOut, Today.AddDays(-1), 100m);

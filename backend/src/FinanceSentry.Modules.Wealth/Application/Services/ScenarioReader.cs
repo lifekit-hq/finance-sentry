@@ -26,7 +26,7 @@ public static class ScenarioText
 
     public const string Basis =
         "Each event changes what you save by its amount from its date; your spending is assumed not to move with it and tax "
-        + "is not modelled. Events already in the past are in the baseline's history and are not counted twice. "
+        + "is not modelled. A leave under way counts the months it still has ahead; any other event dated today or earlier is part of the baseline and is not counted. "
         + "The baseline is unchanged.";
 }
 
