@@ -19,7 +19,8 @@ A signed-in person downloads their own data from **Settings → Your data → Do
 
 Each module holds one array per table, named for the table, with the person's rows as camelCase objects of their mapped
 columns (enums as names). A child row with no owner column of its own is nested in its parent (an Agent conversation
-carries its `messages`).
+carries its `messages`). `Auth` is the exception: it is written column by column, as `users` (profile and preferences),
+`roles` (role names), `permissionGrants` and `audit_events`.
 
 **Scope.** The person is taken from the signed-in principal only. The export reuses the per-module erasers' boundaries
 (`IUserDataExporter` mirrors `IUserDataEraser`; the owned-row sweep walks the same `IUserOwned` model walk and the same
