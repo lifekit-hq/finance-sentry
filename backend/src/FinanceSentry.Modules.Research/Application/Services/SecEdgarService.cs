@@ -37,12 +37,17 @@ public sealed class SecEdgarService(
     private const int MaxConcurrentConceptFetches = 4;
     private const int MaxCachedTickers = 5_000;
 
-    // Friendly name -> ordered us-gaap tags to try (first that returns data wins). Company taxonomies
-    // differ (e.g. some report Revenues, others RevenueFromContractWithCustomer...), hence fallbacks.
+    // Friendly name -> ordered us-gaap tags to try (every tag is read and merged; a later tag's row wins an
+    // overlapping period). Company taxonomies differ (e.g. some report Revenues, others
+    // RevenueFromContractWithCustomer...), hence fallbacks. CostOfRevenue exists so gross margin can be
+    // derived (revenue less cost) for filers that report no GrossProfit - see FundamentalMath.SelectPeriods.
+    // Its tags run narrowest to broadest because the later tag wins: a filer reporting both the total
+    // (CostOfRevenue) and a product-only line (CostOfGoodsSold) must keep the total, or the margin is inflated.
     private static readonly (string Concept, string[] Tags)[] CoreConcepts =
     [
         ("Revenue", ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"]),
         ("GrossProfit", ["GrossProfit"]),
+        ("CostOfRevenue", ["CostOfGoodsSold", "CostOfGoodsAndServicesSold", "CostOfRevenue"]),
         ("OperatingIncome", ["OperatingIncomeLoss"]),
         ("NetIncome", ["NetIncomeLoss"]),
         ("DilutedEPS", ["EarningsPerShareDiluted"]),
@@ -59,6 +64,7 @@ public sealed class SecEdgarService(
     [
         ("Revenue", ["RevenueFromContractsWithCustomers", "Revenue"]),
         ("GrossProfit", ["GrossProfit"]),
+        ("CostOfRevenue", ["CostOfSales"]),
         ("OperatingIncome", ["ProfitLossFromOperatingActivities"]),
         ("NetIncome", ["ProfitLossAttributableToOwnersOfParent"]),
         ("DilutedEPS", ["DilutedEarningsLossPerShare"]),

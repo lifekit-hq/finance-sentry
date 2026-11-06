@@ -180,6 +180,84 @@ public sealed class SecEdgarFundamentalsTests
         requestedPaths.Should().NotContain(p => p.Contains("/ifrs-full/", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(FundamentalFact.UsGaapTaxonomy, "Revenues", "CostOfRevenue", "10-K")]
+    [InlineData(FundamentalFact.UsGaapTaxonomy, "Revenues", "CostOfGoodsAndServicesSold", "10-K")]
+    [InlineData(FundamentalFact.UsGaapTaxonomy, "Revenues", "CostOfGoodsSold", "10-K")]
+    [InlineData(FundamentalFact.IfrsTaxonomy, "Revenue", "CostOfSales", "20-F")]
+    public async Task FilerWithNoGrossProfitTag_DerivesGrossMargin_FromEachCostOfRevenueTag(
+        string taxonomy, string revenueTag, string costTag, string form)
+    {
+        string Concept(string label, long fy2025, long fy2024) => $$$"""
+            {"label":"{{{label}}}","units":{"USD":[
+              {"start":"2024-01-01","end":"2024-12-31","val":{{{fy2024}}},"accn":"0000000000-25-000001","fy":2024,"fp":"FY","form":"{{{form}}}"},
+              {"start":"2025-01-01","end":"2025-12-31","val":{{{fy2025}}},"accn":"0000000000-26-000001","fy":2025,"fp":"FY","form":"{{{form}}}"}
+            ]}}
+            """;
+        var sut = CreateSut(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.RequestUri.Host == "www.sec.gov")
+            {
+                return Json(BabaTickerMap);
+            }
+
+            if (path.EndsWith($"/{taxonomy}/{revenueTag}.json", StringComparison.Ordinal))
+            {
+                return Json(Concept("Revenue", 1_000, 800));
+            }
+
+            return path.EndsWith($"/{taxonomy}/{costTag}.json", StringComparison.Ordinal)
+                ? Json(Concept("Cost", 600, 560))
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("BABA", taxonomy)).Facts;
+
+        facts.Select(f => f.Concept).Distinct().Should().BeEquivalentTo("Revenue", "CostOfRevenue");
+        var result = FundamentalsScorer.Evaluate(facts);
+        result.GrossMarginLatest.Should().Be(0.4m);
+        result.GrossMarginTrend.Should().Be(0.1m, "40% in FY2025 against 30% in FY2024");
+        result.NotEvaluableReasons.Should().NotContain("gross_margin_not_evaluable");
+    }
+
+    [Fact]
+    public async Task FilerReportingTotalAndNarrowerCostTags_DerivesGrossMargin_FromTheTotal()
+    {
+        string Concept(string label, long value) => $$$"""
+            {"label":"{{{label}}}","units":{"USD":[
+              {"start":"2025-01-01","end":"2025-12-31","val":{{{value}}},"accn":"0000000000-26-000001","fy":2025,"fp":"FY","form":"10-K"}
+            ]}}
+            """;
+        var sut = CreateSut(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.RequestUri.Host == "www.sec.gov")
+            {
+                return Json(BabaTickerMap);
+            }
+
+            if (path.EndsWith("/us-gaap/Revenues.json", StringComparison.Ordinal))
+            {
+                return Json(Concept("Revenue", 1_000));
+            }
+
+            if (path.EndsWith("/us-gaap/CostOfRevenue.json", StringComparison.Ordinal))
+            {
+                return Json(Concept("Total cost", 700));
+            }
+
+            return path.EndsWith("/us-gaap/CostOfGoodsSold.json", StringComparison.Ordinal)
+                ? Json(Concept("Product cost", 450))
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("BABA", FundamentalFact.UsGaapTaxonomy)).Facts;
+
+        facts.Single(f => f.Concept == "CostOfRevenue").Value.Should().Be(700m);
+        FundamentalsScorer.Evaluate(facts).GrossMarginLatest.Should().Be(0.3m, "(1000 - 700) / 1000, not the product-only 450");
+    }
+
     [Fact]
     public async Task EveryTagFailing_IsAFailure_NotNoData_AndIsNotCached()
     {
