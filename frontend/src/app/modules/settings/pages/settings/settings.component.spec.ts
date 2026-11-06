@@ -2,7 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {CmnDialogService, ToastService} from '@lifekit-hq/ui';
-import {of} from 'rxjs';
+import {NEVER, of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -10,6 +10,7 @@ import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
+import {IncomeSourcesService} from '../../services/income-sources.service';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {SettingsComponent} from './settings.component';
@@ -197,6 +198,7 @@ describe('SettingsComponent Save assumptions button', () => {
         provideRouter([]),
         {provide: AuthStore, useValue: {canManageUsers: signal(false)}},
         {provide: ToastService, useValue: {show: vi.fn()}},
+        {provide: IncomeSourcesService, useValue: {list: () => NEVER}},
       ],
     });
     TestBed.overrideComponent(SettingsComponent, {
@@ -230,6 +232,14 @@ describe('SettingsComponent Save assumptions button', () => {
     };
     return {store, fixture, saveButton, type};
   }
+
+  it('shows the Money profile section', () => {
+    const {fixture} = render();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('fns-money-profile')
+    ).not.toBeNull();
+  });
 
   it('is enabled while the assumptions are valid', () => {
     const {saveButton} = render();

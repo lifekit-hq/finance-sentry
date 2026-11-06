@@ -1,0 +1,71 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-3">
+  <cmn-form-field
+    [control]="form.controls.label"
+    label="Name"
+    hint="What you call it, e.g. Day job. Stored encrypted."
+  >
+    <cmn-input
+      formControlName="label"
+      autocomplete="off"
+      enterkeyhint="next"
+      placeholder="Day job"
+    />
+  </cmn-form-field>
+  <div>
+    <label
+      for="income-source-kind"
+      class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Kind
+    </label>
+    <cmn-select [options]="kindOptions" formControlName="kind" id="income-source-kind" />
+  </div>
+  <cmn-form-field
+    [control]="form.controls.amount"
+    label="Amount"
+    hint="Per payment, in the currency below. Stored encrypted."
+  >
+    <cmn-input
+      formControlName="amount"
+      type="number"
+      inputmode="decimal"
+      enterkeyhint="next"
+      placeholder="0.00"
+    />
+  </cmn-form-field>
+  <div>
+    <label
+      for="income-source-currency"
+      class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Currency
+    </label>
+    <cmn-select
+      [options]="currencyOptions"
+      formControlName="currency"
+      id="income-source-currency"
+    />
+  </div>
+  <div>
+    <label
+      for="income-source-cadence"
+      class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      How often
+    </label>
+    <cmn-select [options]="cadenceOptions" formControlName="cadence" id="income-source-cadence" />
+  </div>
+  <div>
+    <label
+      for="income-source-basis"
+      class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Before or after tax
+    </label>
+    <cmn-select [options]="basisOptions" formControlName="grossOrNet" id="income-source-basis" />
+  </div>
+  <cmn-dialog-actions align="end">
+    <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+    <cmn-button type="submit" variant="primary">{{ isEdit ? 'Save' : 'Add' }}</cmn-button>
+  </cmn-dialog-actions>
+</form>

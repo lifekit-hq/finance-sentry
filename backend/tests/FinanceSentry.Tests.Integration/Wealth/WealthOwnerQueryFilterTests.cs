@@ -82,7 +82,7 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         // Every entity type, not only those with a UserId: a source row has none and is filtered through its snapshot.
         var perUser = ctx.Model.GetEntityTypes().ToList();
 
-        perUser.Should().HaveCount(3);
+        perUser.Should().HaveCount(4);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");

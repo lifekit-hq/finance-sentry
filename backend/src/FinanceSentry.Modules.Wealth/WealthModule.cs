@@ -14,6 +14,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Auditing;
+using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Links;
 using FinanceSentry.Infrastructure.Persistence;
 
@@ -34,7 +36,12 @@ public static class WealthModule
     private sealed class WorkerRegistrar : IWorkerRegistrar
     {
         public void Register(IServiceCollection services, IConfiguration config)
-            => services.AddHostedService<NetWorthSnapshotCatchUpHostedService>();
+        {
+            services.AddHostedService<NetWorthSnapshotCatchUpHostedService>();
+
+            // Declared income is field-encrypted, so its key rotation runs where the key is held (the API host).
+            services.AddEncryptedFieldRotation<WealthDbContext>("wealth.income_sources");
+        }
     }
 
     private sealed class JobRegistrar : IJobRegistrar
@@ -60,14 +67,17 @@ public static class WealthModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddUpdatedAtStamping();
+        services.AddAuditedWrites();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddDbContext<WealthDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
+                b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp).UseAuditedWrites(sp));
         services.AddScoped<IUserDataEraser, WealthUserDataEraser>();
         services.AddScoped<IUserDataExporter, WealthUserDataExporter>();
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         services.AddScoped<IManualHoldingRepository, ManualHoldingRepository>();
+        services.AddScoped<IIncomeSourceRepository, IncomeSourceRepository>();
         // Values entered by hand join the book after the three sleeves (AddBookFigures is idempotent), so they read last.
         services.AddBookFigures();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IWealthSource, ManualWealthSource>());

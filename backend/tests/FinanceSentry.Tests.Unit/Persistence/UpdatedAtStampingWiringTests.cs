@@ -1,8 +1,10 @@
 namespace FinanceSentry.Tests.Unit.Persistence;
 
 using System.Runtime.CompilerServices;
+using FinanceSentry.Core.Auditing;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Infrastructure.Auditing;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Modules.Agent;
 using FinanceSentry.Modules.Agent.Infrastructure;
@@ -41,6 +43,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 /// <summary>
@@ -131,6 +134,10 @@ public sealed class UpdatedAtStampingWiringTests
         services.AddHttpContextAccessor();
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<ICurrentUser>(new NoPerson());
+        // A module holding audited profile data (Wealth) resolves the audit trail when its context is built; Auth, which
+        // owns the real one, registers over these.
+        services.TryAddScoped<IAuditTrail, NoTrail>();
+        services.TryAddScoped<IAuditActor>(sp => new AuditActor(sp.GetRequiredService<ICurrentUser>(), () => AuditActorKind.OwnerSession));
         Registrations[module].Register(services, config);
         return services.BuildServiceProvider();
     }
@@ -158,6 +165,25 @@ public sealed class UpdatedAtStampingWiringTests
 
     private static DateTimeOffset ToInstant(object value) =>
         value is DateTimeOffset offset ? offset : new DateTimeOffset(((DateTime)value).ToUniversalTime());
+
+    [Fact]
+    public void WealthContext_HasTheAuditedWriteInterceptorAttached_SoDeclaredIncomeIsAuditedWithoutHandlerCode()
+    {
+        using var provider = BuildProvider("Wealth");
+        using var scope = provider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<WealthDbContext>();
+
+        var interceptors = context.GetService<IDbContextOptions>()
+            .FindExtension<CoreOptionsExtension>()!.Interceptors!;
+
+        interceptors.OfType<AuditedWriteSaveChangesInterceptor>().Should().ContainSingle();
+    }
+
+    private sealed class NoTrail : IAuditTrail
+    {
+        public Task RecordAsync(IReadOnlyCollection<AuditEntry> entries, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+    }
 
     private sealed class NoPerson : ICurrentUser
     {

@@ -31,6 +31,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
+import {MoneyProfileComponent} from '../../components/money-profile/money-profile.component';
 import {APP_SEED} from '../../constants/appearance/appearance.constants';
 import {SMALL_BALANCE_THRESHOLD_MAX} from '../../constants/asset-visibility/asset-visibility.constants';
 import {
@@ -64,6 +65,7 @@ const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
     FormsModule,
     InputComponent,
     InputHintsDirective,
+    MoneyProfileComponent,
     PageContainerComponent,
     ReactiveFormsModule,
     RelativeTimePipe,

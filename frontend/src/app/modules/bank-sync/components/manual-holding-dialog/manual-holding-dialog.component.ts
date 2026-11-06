@@ -10,11 +10,11 @@ import {
   SelectComponent,
 } from '@lifekit-hq/ui';
 
+import {ENTRY_CURRENCY_OPTIONS} from '../../../../shared/constants/money/money.constants';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {DateUtils} from '../../../../shared/utils/date.utils';
 import {
   CONVERTIBILITY_OPTIONS,
-  MANUAL_HOLDING_CURRENCY_OPTIONS,
   MANUAL_HOLDING_DEFAULT_CURRENCY,
   MANUAL_HOLDING_LABEL_MAX_LENGTH,
   MANUAL_HOLDING_MIN_AMOUNT,
@@ -43,7 +43,7 @@ export class ManualHoldingDialogComponent {
   private readonly dialogRef = inject<DialogRef<ManualHoldingInput>>(DialogRef);
   private readonly holding = inject<ManualHoldingDialogData>(CMN_DIALOG_DATA).holding;
 
-  public readonly currencyOptions = MANUAL_HOLDING_CURRENCY_OPTIONS;
+  public readonly currencyOptions = ENTRY_CURRENCY_OPTIONS;
   public readonly convertibilityOptions = CONVERTIBILITY_OPTIONS;
   public readonly isEdit = this.holding !== null;
 
