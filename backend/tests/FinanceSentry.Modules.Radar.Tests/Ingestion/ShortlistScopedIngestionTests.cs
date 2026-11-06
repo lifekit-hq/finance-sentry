@@ -21,6 +21,7 @@ public sealed class ShortlistScopedIngestionTests
     private const string Watched = "WTCH";
     private const string Benchmark = "SPY";
     private const string Sector = "XLK";
+    private const string ThesisOnly = "TSM";
 
     private static readonly string[] Index =
         [.. Enumerable.Range(0, 200).Select(i => FormattableString.Invariant($"IDX{i:D3}"))];
@@ -76,6 +77,28 @@ public sealed class ShortlistScopedIngestionTests
         harness.Requested.Should().BeEquivalentTo(new[] { Benchmark, Sector, Held, Watched });
     }
 
+    [Fact]
+    public async Task AThesisOnlySymbolIsFetchedWithTheBook()
+    {
+        await using var harness = Harness.Create(broadEnabled: false, shortlist: [], thesisTickers: [ThesisOnly]);
+
+        await harness.IngestAsync();
+
+        harness.Requested.Should().BeEquivalentTo(
+            new[] { Benchmark, Sector, Held, Watched, ThesisOnly },
+            "a symbol the person wrote a thesis on is ingested although no other source names it");
+    }
+
+    [Fact]
+    public async Task WithoutAThesis_TheSameSymbolIsNeverFetched()
+    {
+        await using var harness = Harness.Create(broadEnabled: false, shortlist: [], thesisTickers: []);
+
+        await harness.IngestAsync();
+
+        harness.Requested.Should().NotContain(ThesisOnly);
+    }
+
     private sealed class Harness(
         RadarDbContext db,
         FakeHistorySource history,
@@ -86,7 +109,7 @@ public sealed class ShortlistScopedIngestionTests
 
         public int ShortlistReads => shortlist.Reads;
 
-        public static Harness Create(bool broadEnabled, string[] shortlist)
+        public static Harness Create(bool broadEnabled, string[] shortlist, string[]? thesisTickers = null)
         {
             var db = TestSupport.NewContext();
             var options = TestSupport.Options(new RadarOptions
@@ -108,13 +131,13 @@ public sealed class ShortlistScopedIngestionTests
                 .ReturnsAsync([Watched]);
 
             var history = new FakeHistorySource(
-                Index.Concat([Benchmark, Sector, Held, Watched, "AAAA"])
+                Index.Concat([Benchmark, Sector, Held, Watched, "AAAA", ThesisOnly])
                     .ToDictionary(t => t, _ => (IReadOnlyList<DailyBarData>)[]));
             var source = new FakeShortlistSource { Tickers = shortlist };
 
             var universeService = new RadarUniverseService(
                 new InMemoryRadarUniverseRepository(db), brokerage.Object, watchlist.Object,
-                NoThesisTickers(), banking.Object, options, source);
+                ThesisTickers(thesisTickers ?? []), banking.Object, options, source);
 
             var handler = new IngestDailyBarsCommandHandler(
                 universeService,
@@ -132,10 +155,10 @@ public sealed class ShortlistScopedIngestionTests
         public ValueTask DisposeAsync() => db.DisposeAsync();
     }
 
-    private static IThesisTickerReader NoThesisTickers()
+    private static IThesisTickerReader ThesisTickers(string[] tickers)
     {
         var thesis = new Mock<IThesisTickerReader>();
-        thesis.Setup(t => t.ListTickersAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        thesis.Setup(t => t.ListTickersAsync(BookOwner, It.IsAny<CancellationToken>())).ReturnsAsync(tickers);
         return thesis.Object;
     }
 }
