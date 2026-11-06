@@ -51,7 +51,7 @@ Provider credentials are encrypted in the application (AES-256-GCM, `Encryption:
 database**; a restored database without them cannot decrypt stored credentials. To rotate, add the new key version,
 bump `CurrentKeyVersion`, and keep every old version until all rows are re-encrypted. Never commit keys.
 
-Declared profile data (the label and amount of each income source and career event, in the Wealth module) is encrypted per field with the same service and keys, into one
+Declared profile data (the label and amount of each income source and career event, plus a career event's note, in the Wealth module) is encrypted per field with the same service and keys, into one
 text column of the form `v{keyVersion}.{iv}.{tag}.{ciphertext}` (`EncryptedField`; `IsEncrypted(...)` on the property).
 The key version travels with the value, and `EncryptedFieldRotationTarget<TContext>` re-seals every such column of a
 context under the current key at startup, like the credential stores (Wealth registers one for its context). Transactions and balances are **not**
