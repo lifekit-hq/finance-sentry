@@ -1,8 +1,11 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {type TrueLayerProvider} from '../../models/truelayer/truelayer.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -28,6 +31,7 @@ function setup(listTrueLayerProviders: ReturnType<typeof vi.fn>) {
   const strategy: ConnectStrategy = {slug: 'truelayer', formComponent: class {}, submit: vi.fn()};
   TestBed.configureTestingModule({
     providers: [
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       {provide: BankSyncService, useValue: {listTrueLayerProviders}},
       {
         provide: ConnectStore,
@@ -110,5 +114,15 @@ describe('TrueLayerPickerComponent', () => {
     expect(cmp.status()).toBe('error');
     expect(cmp.errorMessage()).toBe(LOAD_PROVIDERS_ERROR);
     expect(cmp.filteredProviders()).toEqual([]);
+  });
+
+  it('shows the registry message for the backend error code of a failed load', async () => {
+    const errorCode = 'MONOBANK_RATE_LIMITED';
+    const failure = new HttpErrorResponse({status: 429, error: {errorCode}});
+    const {fixture, cmp} = setup(vi.fn().mockReturnValue(throwError(() => failure)));
+    await fixture.whenStable();
+
+    expect(cmp.status()).toBe('error');
+    expect(cmp.errorMessage()).toBe(ERROR_MESSAGES_REGISTRY[errorCode]);
   });
 });

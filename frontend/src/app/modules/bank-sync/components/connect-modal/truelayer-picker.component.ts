@@ -71,12 +71,14 @@ export class TrueLayerPickerComponent {
     }
   });
 
-  public readonly errorMessage = computed(() =>
-    this.status() === 'error'
-      ? (this.errorMessages.resolve(extractErrorCode(this.providers.error())) ??
-        LOAD_PROVIDERS_ERROR)
-      : ''
-  );
+  public readonly errorMessage = computed(() => {
+    if (this.status() !== 'error') {
+      return '';
+    }
+    const failure = this.providers.error();
+    const cause = failure instanceof Error && failure.cause ? failure.cause : failure;
+    return this.errorMessages.resolve(extractErrorCode(cause)) ?? LOAD_PROVIDERS_ERROR;
+  });
 
   public readonly searchControl = new FormControl<string>('', {nonNullable: true});
 
