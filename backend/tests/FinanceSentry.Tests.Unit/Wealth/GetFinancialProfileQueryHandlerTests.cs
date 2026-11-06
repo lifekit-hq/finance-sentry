@@ -43,7 +43,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
 
     private GetFinancialProfileQueryHandler CreateHandler() => new(
         _cashflow.Object, _goals.Object, _income.Object, _career.Object,
-        new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+        new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock),
         _tax.Object, _risk.Object, _clock, NullLogger<GetFinancialProfileQueryHandler>.Instance);
 
     private Task<FinancialProfileResponse> Read() =>

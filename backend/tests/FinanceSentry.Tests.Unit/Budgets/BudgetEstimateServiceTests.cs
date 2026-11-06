@@ -228,6 +228,30 @@ public sealed class BudgetEstimateServiceTests
     }
 
     [Fact]
+    public async Task CoverageHole_TheViewedMonthItselfIsFlaggedIncomplete_SoAThinFigureIsNotReadAsThrift()
+    {
+        SpendEveryMonth("FOOD_AND_DRINK", 400m, "2027-01", "2027-02", "2027-03");
+        Spend("2027-04", "FOOD_AND_DRINK", 12m);
+        _holeSpans.Add(new CoverageHoleSpan(Account, new DateOnly(2027, 4, 5), null));
+
+        var inTheHole = await Month(2027, 4);
+        var before = await Month(2027, 3);
+
+        Assert.True(inTheHole.SpendIncomplete);
+        Assert.False(before.SpendIncomplete);
+    }
+
+    [Fact]
+    public async Task CoverageHole_AClosedHoleFlagsOnlyTheMonthsItOverlaps()
+    {
+        _holeSpans.Add(new CoverageHoleSpan(Account, new DateOnly(2027, 3, 8), new DateOnly(2027, 3, 28)));
+
+        Assert.False((await Month(2027, 2)).SpendIncomplete);
+        Assert.True((await Month(2027, 3)).SpendIncomplete);
+        Assert.False((await Month(2027, 4)).SpendIncomplete);
+    }
+
+    [Fact]
     public async Task CoverageHole_AMonthOfRealZeroSpendOutsideAnyHoleStillCountsAsZero()
     {
                 // Travel in 1 of 6 months, no hole: the median is 0.

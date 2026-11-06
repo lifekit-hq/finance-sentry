@@ -194,6 +194,7 @@ interface RenderOptions {
   hasEnoughHistory?: boolean;
   historyMonthsUsed?: number;
   skippedNote?: string | null;
+  spendIncomplete?: boolean;
   isCurrentMonth?: boolean;
 }
 
@@ -219,6 +220,7 @@ function render(options: RenderOptions = {}) {
     historyMonthsUsed: signal(options.historyMonthsUsed ?? 6),
     minHistoryMonths: signal(3),
     skippedNote: signal(options.skippedNote ?? null),
+    spendIncomplete: signal(options.spendIncomplete ?? false),
     isCurrentMonth: signal(options.isCurrentMonth ?? true),
   };
   TestBed.configureTestingModule({providers: [provideRouter([])]});
@@ -319,6 +321,21 @@ describe('BudgetsComponent months left out', () => {
   it('shows no note when no month is left out', () => {
     expect(
       render({items: [item()]}).host.querySelector('[data-testid="budgets-skipped-note"]')
+    ).toBeNull();
+  });
+});
+
+describe('BudgetsComponent month with a bank-link gap', () => {
+  it('says the month is partly unseen instead of letting a thin figure read as thrift', () => {
+    const {host} = render({items: [item({spent: 12})], spendIncomplete: true});
+    expect(host.querySelector('[data-testid="budgets-spend-incomplete"]')?.textContent).toContain(
+      'only what reached the app'
+    );
+  });
+
+  it('shows no such note when the month is whole', () => {
+    expect(
+      render({items: [item()]}).host.querySelector('[data-testid="budgets-spend-incomplete"]')
     ).toBeNull();
   });
 });

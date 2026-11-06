@@ -10,6 +10,8 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// the complete months of honest flow in the trailing <see cref="Projection.LookbackMonths"/>, and whether any
 /// of the snapshot's sources is stale. <paramref name="SavingsPath"/> is null when there is no snapshot or
 /// fewer than <see cref="Projection.MinCompleteMonths"/> complete months, and then nothing is projected.
+/// <paramref name="CompleteMonths"/> leaves out the months a coverage hole touches (money-semantics section 9): spend that
+/// never reached the app is missing data, not a cheap month, so it must not feed a median or a savings path.
 /// </summary>
 public sealed record ProjectionInputs(
     ProjectionAssumptions Assumptions,
@@ -26,11 +28,13 @@ public class ProjectionInputsReader(
     INetWorthSnapshotRepository snapshots,
     IHonestMonthlyFlowReader monthlyFlow,
     IUserFireAssumptionsReader assumptions,
+    ICoverageHoleReader coverageHoles,
     TimeProvider clock)
 {
     private readonly INetWorthSnapshotRepository _snapshots = snapshots;
     private readonly IHonestMonthlyFlowReader _monthlyFlow = monthlyFlow;
     private readonly IUserFireAssumptionsReader _assumptions = assumptions;
+    private readonly ICoverageHoleReader _coverageHoles = coverageHoles;
     private readonly TimeProvider _clock = clock;
 
     public async Task<ProjectionInputs> ReadAsync(Guid userId, CancellationToken ct)
@@ -46,7 +50,9 @@ public class ProjectionInputsReader(
         var flows = await _monthlyFlow.GetMonthlyFlowAsync(userId, Projection.LookbackMonths, ct);
 
         var currentMonthKey = _clock.GetUtcNow().ToString("yyyy-MM");
-        var completeMonths = flows.Where(f => f.Month != currentMonthKey).ToList();
+        var complete = flows.Where(f => f.Month != currentMonthKey).ToList();
+        var gapMonths = await CoverageGapMonthsAsync(userId, complete, ct);
+        var completeMonths = complete.Where(f => !gapMonths.Contains(f.Month)).ToList();
         // Stale when any of the snapshot's sources failed to read or was carried forward (per-source reasons).
         var hasStaleSleeves = snapshot is not null && SnapshotSources
             .Of(snapshot, await _snapshots.GetSourcesUnscopedAsync(userId, [snapshot.Id], ct))
@@ -58,4 +64,26 @@ public class ProjectionInputsReader(
 
         return new ProjectionInputs(assumptionSet, snapshot, completeMonths, savingsPath, hasStaleSleeves);
     }
+
+    // The months any of the person's holes (open ones included) overlaps. A month is left out whole, as the budget
+    // estimates do: a month with part of its spend missing is not a smaller month.
+    private async Task<HashSet<string>> CoverageGapMonthsAsync(
+        Guid userId, IReadOnlyList<HonestMonthlyFlow> months, CancellationToken ct)
+    {
+        var spans = months
+            .Select(m => (m.Month, Span: MonthSpan(m.Month)))
+            .Where(m => m.Span is not null)
+            .Select(m => (m.Month, From: m.Span!.Value.From, To: m.Span.Value.To))
+            .ToList();
+        if (spans.Count == 0)
+            return [];
+
+        var holes = await _coverageHoles.GetHolesAsync(userId, spans.Min(s => s.From), spans.Max(s => s.To), ct);
+        return [.. spans.Where(s => holes.Any(h => h.Overlaps(s.From, s.To))).Select(s => s.Month)];
+    }
+
+    private static (DateOnly From, DateOnly To)? MonthSpan(string month)
+        => DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var first)
+            ? (first, first.AddMonths(1).AddDays(-1))
+            : null;
 }

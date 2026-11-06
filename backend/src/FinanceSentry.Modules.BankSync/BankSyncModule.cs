@@ -276,6 +276,7 @@ public static class BankSyncModule
         services.AddScoped<DuplicateChargeDetectionJob>();
         services.AddScoped<CategorySpikeDetectionJob>();
         services.AddScoped<CoverageSentinelJob>();
+        services.AddScoped<CoverageHoleStartRepairService>();
         services.AddScoped<ICoverageHoleReader, CoverageHoleReader>();
         services.AddScoped<FxSpreadDetectionJob>();
         services.AddCompanionLinks();

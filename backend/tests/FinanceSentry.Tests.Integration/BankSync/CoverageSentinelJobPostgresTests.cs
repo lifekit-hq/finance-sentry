@@ -114,6 +114,27 @@ public sealed class CoverageSentinelJobPostgresTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task A_stray_purchase_week_inside_the_gap_does_not_move_the_hole_start_past_the_first_quiet_week()
+    {
+        var userId = Guid.NewGuid();
+        var account = AddAccount(userId, "USD");
+        // $25 a day until 09-06, then nothing - except two purchases in the week of 09-14 (50 > 20% of the 175 usual week).
+        Spend(account, Start, QuietFromSunday, 25m);
+        Spend(account, new DateTime(2026, 9, 16, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 9, 17, 0, 0, 0, DateTimeKind.Utc), 25m);
+        var syncedAt = Today.UtcDateTime.AddDays(15);
+        _db.SyncJobs.Add(new SyncJob(account.Id, userId) { Status = "success", StartedAt = syncedAt, CompletedAt = syncedAt });
+        await _db.SaveChangesAsync();
+        _time.Set(Today.AddDays(15)); // 2026-10-07: the latest complete week is 09-28
+
+        await Job().ExecuteAsync();
+
+        var hole = await _db.CoverageHoles.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().SingleAsync();
+        Assert.Equal(new DateOnly(2026, 9, 7), hole.From);
+        Assert.Null(hole.To);
+        Assert.Single(await GapAlertsAsync());
+    }
+
+    [DockerRequiredFact]
     public async Task The_hole_closes_and_the_alert_resolves_after_two_recovered_weeks()
     {
         var userId = Guid.NewGuid();

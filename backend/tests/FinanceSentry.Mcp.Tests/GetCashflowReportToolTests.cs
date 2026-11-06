@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -15,8 +16,15 @@ public sealed class GetCashflowReportToolTests
 
     private readonly Mock<IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>>> _handler = new();
 
+    private readonly Mock<ICoverageHoleReader> _holes = new();
+
+    public GetCashflowReportToolTests() =>
+        _holes
+            .Setup(h => h.GetHolesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
     private GetCashflowReportTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetCashflowReportTool>.Instance);
+        new(_handler.Object, _holes.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetCashflowReportTool>.Instance);
 
     private static MonthlyFlow Flow(
         string month,
@@ -106,6 +114,67 @@ public sealed class GetCashflowReportToolTests
         feb.Inflow.Should().Be(3000m);
         feb.Outflow.Should().Be(1000m);
         feb.Net.Should().Be(2000m);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FlagsTheMonthsACoverageHoleTouches_InsteadOfReadingThemAsFrugal()
+    {
+        SetupHandler(
+            Flow("2024-01", "USD", inflowUsd: 2000m, outflowUsd: 900m),
+            Flow("2024-02", "USD", inflowUsd: 2000m, outflowUsd: 40m),
+            Flow("2024-03", "USD", inflowUsd: 2000m, outflowUsd: 30m),
+            Flow("2024-04", "USD", inflowUsd: 2000m, outflowUsd: 950m));
+        // A hole from the middle of February that closed at the end of March: both months are touched, January and April are not.
+        _holes
+            .Setup(h => h.GetHolesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new CoverageHoleSpan(Guid.NewGuid(), new DateOnly(2024, 2, 12), new DateOnly(2024, 3, 31))]);
+
+        var result = await CreateSut().ExecuteAsync(
+            fromDate: new DateOnly(2024, 1, 1),
+            toDate: new DateOnly(2024, 4, 30));
+
+        result.Select(e => (e.Period, e.CoverageGap)).Should().Equal(
+            ("2024-01", false), ("2024-02", true), ("2024-03", true), ("2024-04", false));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FlagsAnEdgeMonth_WhenTheHoleLiesOutsideTheRequestedDaysOfThatMonth()
+    {
+        SetupHandler(
+            Flow("2024-09", "USD", inflowUsd: 2000m, outflowUsd: 40m),
+            Flow("2024-10", "USD", inflowUsd: 2000m, outflowUsd: 900m),
+            Flow("2024-11", "USD", inflowUsd: 2000m, outflowUsd: 35m));
+        var holes = new[]
+        {
+            new CoverageHoleSpan(Guid.NewGuid(), new DateOnly(2024, 9, 1), new DateOnly(2024, 9, 10)),
+            new CoverageHoleSpan(Guid.NewGuid(), new DateOnly(2024, 11, 20), null),
+        };
+        _holes
+            .Setup(h => h.GetHolesAsync(UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, DateOnly from, DateOnly to, CancellationToken _) =>
+                (IReadOnlyList<CoverageHoleSpan>)holes.Where(h => h.Overlaps(from, to)).ToList());
+
+        var result = await CreateSut().ExecuteAsync(
+            fromDate: new DateOnly(2024, 9, 20),
+            toDate: new DateOnly(2024, 11, 15));
+
+        result.Select(e => (e.Period, e.CoverageGap)).Should().Equal(
+            ("2024-09", true), ("2024-10", false), ("2024-11", true));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FailsTheCall_WhenTheCoverageHolesCannotBeRead()
+    {
+        SetupHandler(Flow("2024-01", "USD", inflowUsd: 2000m, outflowUsd: 900m));
+        _holes
+            .Setup(h => h.GetHolesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db unavailable"));
+
+        var act = () => CreateSut().ExecuteAsync(
+            fromDate: new DateOnly(2024, 1, 1),
+            toDate: new DateOnly(2024, 1, 31));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]

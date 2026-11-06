@@ -24,7 +24,7 @@ public class GetGoalsProgressQueryHandlerTests
     private readonly FakeTimeProvider _clock = new(Now);
 
     private GetGoalsProgressQueryHandler CreateHandler() => new(
-        new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, _clock),
+        new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock),
         new ScenarioReader(_careerEvents, _clock),
         _goals.Object,
         _clock);

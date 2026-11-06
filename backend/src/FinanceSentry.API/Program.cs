@@ -152,6 +152,12 @@ if (args.Length > 0 && args[0] == RepairNetWorthHistoryCommand.Verb)
     return;
 }
 
+if (args.Length > 0 && args[0] == RepairCoverageHoleStartCommand.Verb)
+{
+    await RepairCoverageHoleStartCommand.RunAsync(app.Services, args);
+    return;
+}
+
 if (args.Length > 0 && args[0] == SubscriptionDetectionCommand.Verb)
 {
     await SubscriptionDetectionCommand.RunAsync(app.Services, args);

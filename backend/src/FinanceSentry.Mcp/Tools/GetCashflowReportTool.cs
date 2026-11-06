@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -11,6 +12,7 @@ namespace FinanceSentry.Mcp.Tools;
 [McpServerToolType]
 public sealed class GetCashflowReportTool(
     IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> moneyFlowHandler,
+    ICoverageHoleReader coverageHoles,
     IIdentityResolver identity,
     ILogger<GetCashflowReportTool> logger)
 {
@@ -18,11 +20,12 @@ public sealed class GetCashflowReportTool(
     private const int DefaultMonthsBack = 6;
 
     private readonly IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> _moneyFlowHandler = moneyFlowHandler;
+    private readonly ICoverageHoleReader _coverageHoles = coverageHoles;
     private readonly IIdentityResolver _identity = identity;
     private readonly ILogger<GetCashflowReportTool> _logger = logger;
 
     [McpServerTool(Name = "get_cashflow_report")]
-    [Description("Returns a monthly cashflow report (inflow, outflow, net) from the classified money-flow statistics — internal transfers between the user's own accounts are excluded.")]
+    [Description("Returns a monthly cashflow report (inflow, outflow, net) from the classified money-flow statistics — internal transfers between the user's own accounts are excluded. A month with coverageGap true overlaps a period in which an account's spend stopped reaching the app, so its outflow is incomplete: read it as missing data, not as frugal spending.")]
     public async Task<IReadOnlyList<CashflowReportEntry>> ExecuteAsync(
         [Description("Optional inclusive start date. Defaults to 6 months ago.")] DateOnly? fromDate = null,
         [Description("Optional inclusive end date. Defaults to today.")] DateOnly? toDate = null,
@@ -59,6 +62,12 @@ public sealed class GetCashflowReportTool(
             return [];
         }
 
+        var holes = await _coverageHoles.GetHolesAsync(
+            userIdVal,
+            new DateOnly(from.Year, from.Month, 1),
+            new DateOnly(to.Year, to.Month, 1).AddMonths(1).AddDays(-1),
+            cancellationToken);
+
         // Each month has one row per currency (transfers and counterparty-matched transactions
         // already excluded upstream) plus at most one synthetic USD row carrying that month's
         // counterparty flows. Summing InflowUsd/OutflowUsd across every row for a month gives
@@ -77,9 +86,18 @@ public sealed class GetCashflowReportTool(
                     inflow,
                     outflow,
                     inflow - outflow,
-                    0);
+                    0,
+                    IsInCoverageGap(g.Key, holes));
             })
             .ToList();
+    }
+
+    private static bool IsInCoverageGap(string month, IReadOnlyList<CoverageHoleSpan> holes)
+    {
+        if (!DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var monthStart))
+            return false;
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        return holes.Any(h => h.Overlaps(monthStart, monthEnd));
     }
 
     private static bool IsWithinRange(string month, DateOnly from, DateOnly to)
@@ -96,4 +114,5 @@ public sealed record CashflowReportEntry(
     decimal Inflow,
     decimal Outflow,
     decimal Net,
-    int TransactionCount);
+    int TransactionCount,
+    bool CoverageGap = false);

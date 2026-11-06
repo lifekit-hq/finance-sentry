@@ -10,6 +10,10 @@ public record SkippedEstimateMonthDto(string Month, string Reason);
 /// <param name="HasEnoughHistory">Whether the history window holds <paramref name="MinHistoryMonths"/> usable months; below that no line is suggested from history.</param>
 /// <param name="HistoryMonthsUsed">The usable months the suggestions were learned from.</param>
 /// <param name="SkippedMonths">The months in the lookback that were left out, so the screen can say so.</param>
+/// <param name="SpendIncomplete">
+/// Whether a coverage hole touches this month itself: the spend shown is only what reached the app, so a low figure
+/// reads as missing data, not as thrift.
+/// </param>
 public record BudgetSummaryResponse(
     int Year,
     int Month,
@@ -20,4 +24,5 @@ public record BudgetSummaryResponse(
     bool HasEnoughHistory,
     int HistoryMonthsUsed,
     int MinHistoryMonths,
-    IReadOnlyList<SkippedEstimateMonthDto> SkippedMonths);
+    IReadOnlyList<SkippedEstimateMonthDto> SkippedMonths,
+    bool SpendIncomplete = false);

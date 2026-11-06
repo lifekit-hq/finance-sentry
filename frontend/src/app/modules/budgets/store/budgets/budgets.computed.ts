@@ -23,6 +23,7 @@ export function budgetsComputed(store: StateSignals) {
     skippedNote: computed(() =>
       BudgetEstimateUtils.skippedNote(store.summary()?.skippedMonths ?? [])
     ),
+    spendIncomplete: computed(() => store.summary()?.spendIncomplete ?? false),
     overBudgetCount: computed(
       () => (store.summary()?.items ?? []).filter(b => b.isOverBudget).length
     ),

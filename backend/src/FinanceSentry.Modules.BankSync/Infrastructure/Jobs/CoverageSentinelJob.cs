@@ -2,7 +2,6 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -191,11 +190,8 @@ public sealed class CoverageSentinelJob(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Weekly spend in USD by week-start Monday; converted once here, where the account's currency is in scope.</summary>
     private static Dictionary<DateOnly, decimal> Weekly(string currency, List<SpendRow> rows)
-        => rows
-            .GroupBy(r => CoverageGapDetector.WeekStart(DateOnly.FromDateTime(r.Date)))
-            .ToDictionary(g => g.Key, g => g.Sum(r => CurrencyConverter.ToUsd(Math.Abs(r.Amount), currency)));
+        => CoverageGapDetector.WeeklySpendUsd(currency, rows.Select(r => (r.Date, r.Amount)));
 
     private sealed record SpendRow(Guid AccountId, DateTime Date, decimal Amount);
 
