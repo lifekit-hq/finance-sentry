@@ -233,7 +233,7 @@ jobs:
     - uses: actions/setup-node@v7
       with:
         node-version: '22.x'
-    - uses: lifekit-hq/lifekit-common/.github/actions/baseline-report@v4.4.1
+    - uses: lifekit-hq/lifekit-common/.github/actions/baseline-report@v4.4.2
       with:
         token: ${{ github.token }}
         repo: ${{ github.repository }}
