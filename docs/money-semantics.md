@@ -1082,8 +1082,8 @@ are closed periods.
   `net_worth_snapshot_sources_backup_july_2026` first, in the same transaction as the rewrite, and never re-backs-up a
   row, so the backup keeps the originals.
 - **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
-  has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
-  Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
+  has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage /
+  Crypto**, plotted straight from the snapshot's split, so each split day's bands add up to
   its stored `totalNetWorth` (a negative cash band is drawn as it is). A charted day with no split is
   never dropped and never drawn as zeros in the three bands: it is one neutral **No split** band
   carrying the day's total (its sleeves summed, with the carry-forward below), so the stack top is the

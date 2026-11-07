@@ -300,12 +300,12 @@ export function dashboardComputed(store: StateSignals) {
         points: toPoints(splits.map(split => split?.cash ?? 0)),
       },
       {
-        label: 'Brokerage invested',
+        label: 'Brokerage',
         color: ChartColorUtils.canvas(SPLIT_COLOUR.brokerageInvested),
         points: toPoints(splits.map(split => split?.brokerageInvested ?? 0)),
       },
       {
-        label: 'Crypto invested',
+        label: 'Crypto',
         color: ChartColorUtils.canvas(SPLIT_COLOUR.cryptoInvested),
         points: toPoints(splits.map(split => split?.cryptoInvested ?? 0)),
       },
