@@ -213,6 +213,7 @@ jobs:
         path: |
           frontend/playwright-report/screens.json
           frontend/e2e/screens/.output
+        include-hidden-files: true
         if-no-files-found: ignore
 
   # A pull request that changes a screen baseline gets the screen before (base) and after (this

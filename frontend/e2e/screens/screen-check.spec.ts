@@ -1,7 +1,7 @@
 import {checkScreen, formatScreen, SCREEN_VIEWPORTS} from '@lifekit-hq/tokens/screen';
 import {test} from '@playwright/test';
 
-import {reportingBody, type ScreenTestBody} from './report-only';
+import {FindingError, reportingBody, type ScreenTestBody} from './report-only';
 import {wiredRoutes} from './routes';
 import {toGateRoute} from './screen-gates';
 
@@ -27,7 +27,7 @@ for (const [size, viewport] of Object.entries(SCREEN_VIEWPORTS)) {
               ? ''
               : `\nexpected page kind ${route.kind ?? 'none'}, the page declares ${result.kind ?? 'none'}`;
           if (result.findings.length > 0 || kindNote) {
-            throw new Error(formatScreen(result) + kindNote);
+            throw new FindingError(formatScreen(result) + kindNote);
           }
         };
         test(`${route.name} ${scheme}`, route.mode === 'enforce' ? run : reportingBody(run));

@@ -5,9 +5,43 @@ type AnyTest = TestType<any, any>;
 
 export const REPORT_ONLY_ANNOTATION = 'report-only';
 
+/** A failure to get a route onto the screen (prepare, ready): it fails the test in every mode. */
+export class SetupError extends Error {
+  public constructor(step: string, cause: unknown) {
+    super(`${step} failed: ${cause instanceof Error ? cause.message : String(cause)}`, {cause});
+    this.name = 'SetupError';
+  }
+}
+
+/** What a gate found, thrown by a gate body that has no matcher of its own. */
+export class FindingError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'FindingError';
+  }
+}
+
+/** Runs one setup step; whatever it throws is a `SetupError`, which `reportingBody` never swallows. */
+export async function asSetup(step: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    throw new SetupError(step, error);
+  }
+}
+
+function isFinding(error: unknown): boolean {
+  return (
+    error instanceof FindingError ||
+    (typeof error === 'object' && error !== null && 'matcherResult' in error)
+  );
+}
+
 /**
- * Returns a `test` whose tests do not fail on what the gates find: a failure inside the body is
- * recorded as a `report-only` annotation on the test, printed, and the test passes. The shared
+ * Returns a `test` whose tests do not fail on what the gates find: a finding inside the body (a
+ * failed matcher, a `FindingError`) is recorded as a `report-only` annotation on the test, printed,
+ * and the test passes. Anything else (a failed `prepare` or `ready`, a navigation or settle timeout,
+ * a broken mock) fails the test: a route the gates could not open has not been checked. The shared
  * fixtures (`defineScreenBaselines`, `defineRouteScans`) take a `test` and register their tests on
  * it, so handing them this one keeps their own wiring (sizes, schemes, viewports, settling) intact
  * while a route is being adopted. Everything but the call itself (`describe`, `use`, `skip`, ...)
@@ -33,7 +67,7 @@ export function reportingBody(body: ScreenTestBody): ScreenTestBody {
     try {
       await body({page}, info);
     } catch (error) {
-      if (info.expectedStatus === 'skipped') {
+      if (info.expectedStatus === 'skipped' || !isFinding(error)) {
         throw error;
       }
       const description = error instanceof Error ? error.message : String(error);

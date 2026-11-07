@@ -1,7 +1,7 @@
 import type {Page, test as playwrightTest} from '@playwright/test';
 
 import {prepareScreen, settleCharts, versionMasks} from '../support/visual-baseline';
-import {reportOnly} from './report-only';
+import {asSetup, reportOnly} from './report-only';
 import {type RouteMode, type WiredRoute, wiredRoutes} from './routes';
 
 /** What the shared fixtures take of a route: how to prepare it, open it and know it has rendered. */
@@ -17,11 +17,12 @@ export function toGateRoute(route: WiredRoute): GateRoute {
   return {
     name: route.name,
     url: route.path,
-    prepare: page => prepareScreen(page, route.fixture),
-    ready: async page => {
-      await route.fixture.ready(page);
-      await settleCharts(page);
-    },
+    prepare: page => asSetup('prepare', () => prepareScreen(page, route.fixture)),
+    ready: page =>
+      asSetup('ready', async () => {
+        await route.fixture.ready(page);
+        await settleCharts(page);
+      }),
     // The release version prints in the sidebar and changes on every release.
     mask: versionMasks,
   };
