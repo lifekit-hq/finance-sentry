@@ -3,6 +3,19 @@ import type {Page} from '@playwright/test';
 import {BROKERAGE_HOLDINGS} from './dossier-mocks';
 import {mockGet} from './visual-baseline';
 
+/** An institution's disclosure row: not a sleeve's performance panel (or the "How this is computed" row inside it). */
+export const INSTITUTION_ROW =
+  'cmn-disclosure-row:not([data-testid$="-section-growth"]):not([data-testid="growth-how-computed"])';
+
+/** A sleeve's performance panel is closed until opened; the first toggle under its row is the panel's own. */
+export async function openGrowth(page: Page, sleeve: 'brokerage' | 'crypto'): Promise<void> {
+  const toggle = page
+    .getByTestId(`${sleeve}-section-growth`)
+    .locator('button[aria-controls]')
+    .first();
+  await toggle.click();
+}
+
 const SYNCED_AT = '2026-09-15T10:00:00Z';
 
 function account(

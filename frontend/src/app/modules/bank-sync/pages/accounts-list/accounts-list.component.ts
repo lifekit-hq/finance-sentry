@@ -57,6 +57,8 @@ import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {BrokerageGrowthComponent} from '../../../holdings/components/brokerage-growth/brokerage-growth.component';
+import {GROWTH_SLEEVE_COPY} from '../../../holdings/constants/brokerage-growth/brokerage-growth.constants';
+import {type GrowthSleeve} from '../../../holdings/models/brokerage-growth/brokerage-growth.model';
 import {type PositionRow} from '../../../holdings/store/holdings.computed';
 import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
@@ -64,7 +66,10 @@ import {ConnectionDetailsDialogComponent} from '../../components/connection-deta
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {ManualHoldingDialogComponent} from '../../components/manual-holding-dialog/manual-holding-dialog.component';
 import {RemoveClosedAccountDialogComponent} from '../../components/remove-closed-account-dialog/remove-closed-account-dialog.component';
-import {CLOSED_ACCOUNTS_KEY} from '../../constants/accounts-disclosure/accounts-disclosure.constants';
+import {
+  CLOSED_ACCOUNTS_KEY,
+  GROWTH_KEY_PREFIX,
+} from '../../constants/accounts-disclosure/accounts-disclosure.constants';
 import {
   MANUAL_HOLDING_MENU,
   MENU_ACTION_EDIT,
@@ -192,6 +197,17 @@ export class AccountsListComponent implements OnInit {
   public readonly closedOpen = computed(
     () => this.store.institutionOpen()[CLOSED_ACCOUNTS_KEY] ?? false
   );
+
+  public readonly growthCopy = GROWTH_SLEEVE_COPY;
+
+  /** A sleeve's performance panel, closed unless this device opened it. */
+  public growthOpen(sleeve: GrowthSleeve): boolean {
+    return this.store.institutionOpen()[this.growthKey(sleeve)] ?? false;
+  }
+
+  public growthKey(sleeve: GrowthSleeve): string {
+    return `${GROWTH_KEY_PREFIX}${sleeve}`;
+  }
 
   public ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;

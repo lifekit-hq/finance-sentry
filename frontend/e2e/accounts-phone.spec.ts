@@ -1,6 +1,6 @@
 import {expect, type Locator, type Page, test} from '@playwright/test';
 
-import {mockAccounts} from './support/accounts-mocks';
+import {INSTITUTION_ROW, mockAccounts} from './support/accounts-mocks';
 import {API, mockApis} from './support/dossier-mocks';
 import {mockGet} from './support/visual-baseline';
 
@@ -172,7 +172,7 @@ function heavySummary(): typeof SUMMARY {
 // The shell's page-overflow spacer (a transparent block after the page frame) sits over the padding of
 // library rows that overflow the frame, so a tap lands on the row's label text, as a thumb does.
 /** A disclosure row's own toggle: it names its body (`aria-controls`) and states `aria-expanded`. */
-const ROW_TOGGLE = 'cmn-disclosure-row button[aria-controls]';
+const ROW_TOGGLE = `${INSTITUTION_ROW} button[aria-controls]`;
 
 async function toggle(row: Locator, name: string): Promise<void> {
   await row.getByText(name, {exact: true}).first().click();
@@ -208,8 +208,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await openAccounts(page);
 
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
-      // The performance panels' own "How this is computed" disclosures are not institution rows.
-      const rows = page.locator('cmn-disclosure-row:not([data-testid="growth-how-computed"])');
+      const rows = page.locator(INSTITUTION_ROW);
       await expect(rows).toHaveCount(3);
       await expect(rows.nth(1)).toContainText('Interactive Brokers');
       await expect(rows.nth(1)).toContainText('1 position');
@@ -240,7 +239,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
     test('opens a broker in place with value-first positions and no link out', async ({page}) => {
       await openAccounts(page);
 
-      const broker = page.locator('cmn-disclosure-row').nth(1);
+      const broker = page.locator(INSTITUTION_ROW).nth(1);
       await toggle(broker, 'Interactive Brokers');
 
       const row = broker.getByTestId('position-row').first();
@@ -334,7 +333,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       page,
     }) => {
       await openAccounts(page, heavySummary());
-      await expect(page.locator('cmn-disclosure-row').nth(1)).toBeVisible();
+      await expect(page.locator(INSTITUTION_ROW).nth(1)).toBeVisible();
 
       const screens = await page.evaluate(
         () => document.documentElement.scrollHeight / window.innerHeight

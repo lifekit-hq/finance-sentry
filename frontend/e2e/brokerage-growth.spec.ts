@@ -1,14 +1,34 @@
 import {expect, test} from '@playwright/test';
 
-import {BROKERAGE_GROWTH, BROKERAGE_PNL} from './support/accounts-mocks';
+import {BROKERAGE_GROWTH, BROKERAGE_PNL, openGrowth} from './support/accounts-mocks';
 import {mockHome} from './support/home-mocks';
 import {mockGet} from './support/visual-baseline';
 
 test.describe('Accounts brokerage and crypto sections: one performance card each', () => {
+  test('keeps each performance card closed until it is opened', async ({page}) => {
+    await mockHome(page);
+    await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
+    await page.goto('/accounts/list');
+
+    for (const sleeve of ['brokerage', 'crypto'] as const) {
+      const toggle = page
+        .getByTestId(`${sleeve}-section-growth`)
+        .locator('button[aria-controls]')
+        .first();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId(`${sleeve}-growth-growth`)).toBeHidden();
+    }
+
+    await openGrowth(page, 'crypto');
+    await expect(page.getByTestId('crypto-growth-growth')).toBeVisible();
+    await expect(page.getByTestId('brokerage-growth-growth')).toBeHidden();
+  });
+
   test('splits the brokerage change into what was paid in and what it earned', async ({page}) => {
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     const section = page.getByTestId('brokerage-growth');
     await expect(section).toContainText('since 30 Jun 2026');
@@ -24,6 +44,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     await page
       .getByTestId('brokerage-growth')
@@ -40,6 +61,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'crypto');
 
     await expect(page.getByTestId('crypto-growth-since')).toContainText('since 30 Jun 2026');
     await expect(page.getByTestId('crypto-growth-contributed')).toContainText('+$500.00');
@@ -52,6 +74,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
     await mockHome(page);
     await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     const line = page.getByTestId('brokerage-growth').getByTestId('book-vs-spy');
     await expect(line).toContainText(/since 14 Sept? 2025/);
@@ -61,6 +84,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
   test('adds QQQ over the same dates to the book against SPY line', async ({page}) => {
     await mockHome(page);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     await expect(page.getByTestId('book-vs-qqq-returns')).toHaveText('QQQ +18.7%');
   });
@@ -70,9 +94,12 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
   }) => {
     await mockHome(page);
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     await expect(page.getByTestId('brokerage-pnl-net-deposited-amount')).toHaveText('$35,200.00');
-    await expect(page.getByTestId('brokerage-pnl-net-deposited')).toContainText('Capital in the window');
+    await expect(page.getByTestId('brokerage-pnl-net-deposited')).toContainText(
+      'Capital in the window'
+    );
     await expect(page.getByTestId('brokerage-pnl-net-deposited-detail')).toContainText(
       'already includes earlier market gains'
     );
@@ -104,6 +131,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
       },
     });
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     await expect(page.getByTestId('brokerage-pnl-unrealized-amount')).toHaveText(
       'Basis unavailable'
@@ -133,6 +161,7 @@ test.describe('Accounts brokerage and crypto sections: one performance card each
       },
     });
     await page.goto('/accounts/list');
+    await openGrowth(page, 'brokerage');
 
     await expect(page.getByTestId('brokerage-growth-no-flows')).toContainText(
       'No contributions recorded yet for Interactive Brokers.'
