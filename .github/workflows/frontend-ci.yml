@@ -156,18 +156,102 @@ jobs:
     #     name: coverage-report-frontend
     #     path: frontend/coverage/
 
+  # The screen gates (screen check, route scan, pixel baselines) over every routed screen, in
+  # report-only mode per route (frontend/e2e/screens/routes.ts): findings are printed and
+  # annotated, and a route starts failing on them when it moves to `enforce`. Its own job so the
+  # ~15 minutes it takes stay off the critical path of the e2e above.
+  frontend-screens:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    - name: Install dependencies
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: npm ci
+      working-directory: frontend
+
+    - name: Build application
+      run: npm run build
+      working-directory: frontend
+
+    - name: Install Playwright Chromium
+      run: npx playwright install --with-deps chromium
+      working-directory: frontend
+
+    # The design judge is a release binary the route scan downloads once and verifies against a pinned sha256.
+    - name: Cache the design judge
+      uses: actions/cache@v6
+      with:
+        path: ~/.impeccable
+        key: impeccable-${{ hashFiles('frontend/package-lock.json') }}
+
+    - name: Screen check and baselines
+      run: npm run test:screens
+      working-directory: frontend
+
+    - name: Route scan
+      run: npm run test:routes
+      working-directory: frontend
+
+    - name: Upload the screen reports
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: screen-gates
+        path: |
+          frontend/playwright-report/screens.json
+          frontend/e2e/screens/.output
+        if-no-files-found: ignore
+
+  # A pull request that changes a screen baseline gets the screen before (base) and after (this
+  # branch) attached as one comment, edited in place on every push and removed when the baselines no
+  # longer differ. Same-repository branches only: a fork's token cannot comment.
+  baseline-report:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '22.x'
+    - uses: lifekit-hq/lifekit-common/.github/actions/baseline-report@v4.4.1
+      with:
+        token: ${{ github.token }}
+        repo: ${{ github.repository }}
+        pr: ${{ github.event.pull_request.number }}
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+
   # Required status check (branch protection) — keep this job name. Passes when the
   # heavy job succeeded or was skipped by the path filter; fails if anything failed or
   # was cancelled, including the changes job itself.
   lint-build-test:
-    needs: [changes, frontend-checks]
+    needs: [changes, frontend-checks, frontend-screens]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
     steps:
     - name: Require the frontend checks to have passed or been skipped
       env:
-        RESULTS: ${{ needs.changes.result }} ${{ needs.frontend-checks.result }}
+        RESULTS: ${{ needs.changes.result }} ${{ needs.frontend-checks.result }} ${{ needs.frontend-screens.result }}
       run: |
         echo "needs results: $RESULTS"
         case " $RESULTS " in

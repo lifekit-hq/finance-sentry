@@ -35,3 +35,12 @@ After **all tasks in a feature are complete**, act as a QA engineer: spin up the
 **Tools:** Use `mcp__plugin_playwright_playwright__browser_*` tools — snapshot first, screenshot only when visual proof is needed.
 
 ---
+
+## Screen gates (lifekit-common 4.4)
+
+Three shared gates run over every routed screen from `frontend/e2e/screens/`, on route-mocked fake data only (no finance data reaches a screenshot): the **screen check** (composition rules C0–C10), the **route scan** (design judge + axe-core) and **pixel baselines** (390/1280, light/dark, committed Linux images). Run them with `npm run test:screens` / `npm run test:routes` in `frontend/` after `npm run build`; Frontend CI runs them in the `frontend-screens` job.
+
+- `routes.ts` is the route list: each routed screen with the page kind (`cmn-page` kind) it is meant to be built on and its `mode`. `routes.spec.ts` fails when `AppRoute` gains a screen the list lacks.
+- `mode: 'report'` prints and annotates findings and passes; `'enforce'` fails on them; `'pending'` has no fixtures yet. A route moves to `enforce` in the PR that adopts its page template and clears its findings. Never fix a layout finding with an app-local patch or exception: it is fixed once in lifekit-common.
+- Baselines are Linux-only and exact. Never commit locally rendered ones: run the **Update screen baselines** workflow (Actions tab, or add the `update-baselines` label to the PR) on the branch, which renders them on the CI runner, commits them and posts the before/after on the PR. `.github/CODEOWNERS` asks the owner to review any `*-linux.png`.
+- The older `*-visual.spec.ts` baselines are untouched; they share their fixtures with the gates through `e2e/support/screens/`.
