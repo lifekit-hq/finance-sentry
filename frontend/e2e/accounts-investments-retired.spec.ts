@@ -1,6 +1,6 @@
 import {expect, test} from '@playwright/test';
 
-import {mockAccounts} from './support/accounts-mocks';
+import {INSTITUTION_ROW, mockAccounts} from './support/accounts-mocks';
 import {mockApis} from './support/dossier-mocks';
 
 // The Investments tab is retired: Accounts is the one inventory, and old links land on it.
@@ -27,7 +27,7 @@ test.describe('Retired Investments tab', () => {
     await page.goto('/accounts/investments?provider=ibkr');
 
     await expect(page).toHaveURL(/\/accounts\/list\?provider=ibkr$/);
-    const broker = page.locator('cmn-disclosure-row', {hasText: 'Interactive Brokers'});
+    const broker = page.locator(INSTITUTION_ROW, {hasText: 'Interactive Brokers'});
     await expect(broker.locator('button[aria-controls]').first()).toHaveAttribute(
       'aria-expanded',
       'true'
@@ -35,10 +35,7 @@ test.describe('Retired Investments tab', () => {
     await expect(broker.getByTestId('position-row').first()).toBeInViewport();
     await expect(broker.getByTestId('position-pnl').first()).toContainText('%');
     await expect(
-      page
-        .locator('cmn-disclosure-row', {hasText: 'Binance'})
-        .locator('button[aria-controls]')
-        .first()
+      page.locator(INSTITUTION_ROW, {hasText: 'Binance'}).locator('button[aria-controls]').first()
     ).toHaveAttribute('aria-expanded', 'false');
     if (SHOTS_DIR) {
       await page.screenshot({path: `${SHOTS_DIR}/accounts-provider-deep-link.png`});

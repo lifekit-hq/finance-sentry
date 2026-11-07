@@ -44,6 +44,33 @@ describe('AccountsListComponent growth sections', () => {
     expect(growth?.getAttribute('sleeve')).toBe('crypto');
   });
 
+  it.each([
+    ['brokerage', 'ibkr', 'Performance'],
+    ['crypto', 'binance', 'Crypto performance'],
+  ] as const)(
+    'keeps the %s performance panel closed until it is opened',
+    (category, provider, label) => {
+      const row = setup({provider, category}).querySelector(
+        `[data-testid="${category}-section-growth"]`
+      );
+      const toggle = row?.querySelector<HTMLButtonElement>('button[aria-controls]');
+
+      expect(toggle?.textContent).toContain(label);
+      expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    }
+  );
+
+  it('opens the performance panel when this device left it open', () => {
+    const fixture = setupFixture({provider: 'ibkr', category: 'brokerage'}, [], {
+      open: {'growth:brokerage': true},
+    });
+    const toggle = (fixture.nativeElement as HTMLElement)
+      .querySelector('[data-testid="brokerage-section-growth"]')
+      ?.querySelector<HTMLButtonElement>('button[aria-controls]');
+
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('draws no growth under the banks', () => {
     expect(
       setup({category: 'banking'}).querySelector('[data-testid$="-section-growth"]')
@@ -252,7 +279,7 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
   it('is one disclosure row with the compact sublabel and the total, like a bank', () => {
     const element = brokerage();
 
-    expect(element.querySelectorAll('cmn-disclosure-row')).toHaveLength(1);
+    expect(element.querySelectorAll('[data-testid="institution-total"]')).toHaveLength(1);
     expect(toggleIn(element)?.textContent).toContain('2 positions · $400.00 cash');
     expect(element.querySelector('[data-testid="institution-total"]')?.textContent).toContain(
       '$800.00'

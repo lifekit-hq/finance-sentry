@@ -19,3 +19,9 @@ export const ACCOUNTS_DEFAULT_OPEN: Readonly<Record<AccountCategory, boolean>> =
 
 /** The "Closed accounts" section's key in the same record; it follows no category, so it starts closed. */
 export const CLOSED_ACCOUNTS_KEY = 'closed:accounts';
+
+/**
+ * A sleeve's performance panel is a disclosure row in the same record, closed until this device opens it
+ * (it reads like a report, not like something to scan on every visit); the key follows `growth:<sleeve>`.
+ */
+export const GROWTH_KEY_PREFIX = 'growth:';

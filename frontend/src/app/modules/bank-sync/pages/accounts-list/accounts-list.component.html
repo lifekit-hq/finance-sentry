@@ -198,15 +198,20 @@
             </ul>
           </cmn-disclosure-row>
         }
-        <!-- How the sleeve grew, moved here from Home (#1186): one performance panel per sleeve, flush rows like the accounts above. -->
-        @if (section.category === 'brokerage') {
-          <div data-testid="brokerage-section-growth">
-            <fns-brokerage-growth />
-          </div>
-        } @else if (section.category === 'crypto') {
-          <div data-testid="crypto-section-growth">
-            <fns-brokerage-growth sleeve="crypto" />
-          </div>
+        <!-- How the sleeve grew (#1186): one performance panel per sleeve, closed until the owner opens it. -->
+        @if (section.category === 'brokerage' || section.category === 'crypto') {
+          <cmn-disclosure-row
+            [label]="growthCopy[section.category].title"
+            [open]="growthOpen(section.category)"
+            [attr.data-testid]="section.category + '-section-growth'"
+            (fnsDisclosureToggle)="store.setInstitutionOpen(growthKey(section.category), $event)"
+          >
+            @if (section.category === 'brokerage') {
+              <fns-brokerage-growth />
+            } @else {
+              <fns-brokerage-growth sleeve="crypto" />
+            }
+          </cmn-disclosure-row>
         }
       </cmn-list-section>
     }
