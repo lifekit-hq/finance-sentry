@@ -73,7 +73,5 @@ export const NET_WORTH_SERIES_ROUTES: ReadonlyMap<string, AppRoute> = new Map([
   ['Banking', AppRoute.AccountsList],
   ['Cash', AppRoute.AccountsList],
   ['Brokerage', AppRoute.Accounts],
-  ['Brokerage invested', AppRoute.Accounts],
   ['Crypto', AppRoute.Accounts],
-  ['Crypto invested', AppRoute.Accounts],
 ]);

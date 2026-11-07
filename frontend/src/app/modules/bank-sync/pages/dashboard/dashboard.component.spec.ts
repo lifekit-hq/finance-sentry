@@ -289,9 +289,7 @@ describe('DashboardComponent chart click-through', () => {
       ['Banking', '/accounts/list'],
       ['Cash', '/accounts/list'],
       ['Brokerage', '/accounts'],
-      ['Brokerage invested', '/accounts'],
       ['Crypto', '/accounts'],
-      ['Crypto invested', '/accounts'],
     ])('opens the accounts page behind the %s band', (label, url) => {
       const {fixture} = render();
       const navigateByUrl = vi

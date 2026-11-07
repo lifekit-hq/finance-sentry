@@ -117,12 +117,7 @@ describe('dashboardComputed cash / invested split', () => {
       const c = dashboardFor({monthlyFlow: [], netWorthHistory: history});
       const series = c.netWorthAreaSeries();
 
-      expect(series.map(s => s.label)).toEqual([
-        'Cash',
-        'Brokerage invested',
-        'Crypto invested',
-        'Other sources',
-      ]);
+      expect(series.map(s => s.label)).toEqual(['Cash', 'Brokerage', 'Crypto', 'Other sources']);
       expect(values(series[3])).toEqual([700, 800]);
       history.forEach((day, i) => {
         expect(series.reduce((sum, s) => sum + s.points[i].value, 0)).toBe(day.totalNetWorth);
@@ -160,7 +155,7 @@ describe('dashboardComputed cash / invested split', () => {
       expect(new Set(series.map(s => s.color)).size).toBe(series.length);
     });
 
-    it('stacks cash, brokerage invested and crypto invested when every day has a split', () => {
+    it('stacks cash, brokerage and crypto when every day has a split', () => {
       const c = dashboardFor({
         monthlyFlow: [],
         netWorthHistory: [
@@ -170,7 +165,7 @@ describe('dashboardComputed cash / invested split', () => {
       });
       const series = c.netWorthAreaSeries();
 
-      expect(series.map(s => s.label)).toEqual(['Cash', 'Brokerage invested', 'Crypto invested']);
+      expect(series.map(s => s.label)).toEqual(['Cash', 'Brokerage', 'Crypto']);
       expect(values(series[0])).toEqual([4_000, 4_500]);
       expect(values(series[1])).toEqual([5_000, 5_200]);
       expect(values(series[2])).toEqual([1_000, 900]);
@@ -202,12 +197,7 @@ describe('dashboardComputed cash / invested split', () => {
       });
       const series = c.netWorthAreaSeries();
 
-      expect(series.map(s => s.label)).toEqual([
-        'Cash',
-        'Brokerage invested',
-        'Crypto invested',
-        'No split',
-      ]);
+      expect(series.map(s => s.label)).toEqual(['Cash', 'Brokerage', 'Crypto', 'No split']);
       // Neither dropped nor attributed to a class: the three class bands are empty that day.
       expect(series.slice(0, 3).map(s => s.points[0].value)).toEqual([0, 0, 0]);
       expect(values(series[3])).toEqual([8_500, 0]);
