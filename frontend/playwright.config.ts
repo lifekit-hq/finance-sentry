@@ -5,8 +5,9 @@ const SPA_PORT = Number(process.env['E2E_PORT'] ?? 4201);
 
 export default defineConfig({
   testDir: './e2e',
-  // Live-stack smoke specs run via playwright.live.config.ts, never against serve.mjs.
-  testIgnore: '**/live/**',
+  // Live-stack smoke specs run via playwright.live.config.ts, never against serve.mjs; the screen
+  // gates run via playwright.screens.config.ts, which owns their screenshot options.
+  testIgnore: ['**/live/**', '**/screens/**'],
   fullyParallel: false,
   forbidOnly: !!process.env['CI'],
   // eslint-disable-next-line @typescript-eslint/no-magic-numbers

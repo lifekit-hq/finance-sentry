@@ -109,7 +109,15 @@ export interface VisualScreen {
   phoneHeight?: number;
 }
 
-async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
+/**
+ * Everything a screen needs before it is opened: the pinned clock, the third-party images stubbed,
+ * the shell's requests answered and the screen's own fixtures registered. The pixel baselines above
+ * and the screen gates (`e2e/screens`) both start here, so both look at the same fake data.
+ */
+export async function prepareScreen(
+  page: Page,
+  screen: Pick<VisualScreen, 'mocks'>
+): Promise<void> {
   await page.clock.install({time: FROZEN_NOW});
   for (const pattern of EXTERNAL_IMAGES) {
     await page.route(pattern, route =>
@@ -118,10 +126,19 @@ async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
   }
   await mockShell(page);
   await screen.mocks(page);
-  await page.goto(screen.path);
-  await screen.ready(page);
+}
+
+/** Lets fonts load and a chart's entry animation (timed off the fake clock) run to its end. */
+export async function settleCharts(page: Page): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
   await page.clock.runFor(CHART_SETTLE_MS);
+}
+
+async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
+  await prepareScreen(page, screen);
+  await page.goto(screen.path);
+  await screen.ready(page);
+  await settleCharts(page);
 }
 
 /**

@@ -87,6 +87,7 @@ lcov.info
 TestResults/
 test-results/
 playwright-report/
+frontend/e2e/screens/.output/
 
 # Docker
 docker-compose.override*.yml

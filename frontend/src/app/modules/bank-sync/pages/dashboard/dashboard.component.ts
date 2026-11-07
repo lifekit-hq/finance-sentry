@@ -147,7 +147,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 <cmn-skeleton
                   [className]="dataPlaceholder()"
                   class="block"
-                  height="1.875rem"
+                  text="2xl"
                   width="50%"
                 />
               } @else {
@@ -217,7 +217,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 @if (store.isHistoryFirstLoadFailed()) {
                   <cmn-skeleton
                     [className]="staticPlaceholder"
-                    height="19.8125rem"
+                    height="19.85rem"
                     data-testid="net-worth-chart-skeleton"
                   />
                 }
@@ -226,7 +226,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               ) {
                 <cmn-skeleton
                   [className]="eitherPlaceholder()"
-                  height="19.8125rem"
+                  height="19.85rem"
                   data-testid="net-worth-chart-skeleton"
                 />
               } @else if (!store.historyHasHistory()) {

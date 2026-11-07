@@ -1,13 +1,4 @@
-import {expect} from '@playwright/test';
-
 import {describeVisualBaseline} from './support/visual-baseline';
+import {MORE_SCREEN} from './support/screens/more.screen';
 
-describeVisualBaseline({
-  name: 'more',
-  title: 'More',
-  path: '/more',
-  mocks: () => Promise.resolve(),
-  ready: async page => {
-    await expect(page.locator('[data-more-version]')).toBeVisible();
-  },
-});
+describeVisualBaseline(MORE_SCREEN);

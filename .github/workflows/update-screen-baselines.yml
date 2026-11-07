@@ -1,0 +1,34 @@
+name: Update screen baselines
+
+# The one step that rewrites the screen baselines (docs/SCREEN-BASELINES.md in lifekit-common). It
+# renders them on the CI runner, the machine every later comparison runs on, commits the changed
+# images to the branch, starts Frontend CI on it and posts the before and after images on the
+# branch's pull request. Never on main.
+#   - from the Actions tab (workflow_dispatch) once this file is on main;
+#   - by adding the label `update-baselines` to the pull request, which also works on the branch
+#     that first adds this file.
+# Never commit baselines rendered on a laptop: they are Linux x64 renders of the CI runner.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  render:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'update-baselines'
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      packages: read # the install step reads the private @lifekit-hq/* packages
+    uses: lifekit-hq/lifekit-common/.github/workflows/screen-baselines.yml@v4.4.2
+    with:
+      lifekit-common-ref: v4.4.2
+      working-directory: frontend
+      build-command: npm run build
+      # The per-screen visual specs and the screen gates, each against its own Playwright config.
+      command: >-
+        npx playwright test e2e/*-visual.spec.ts e2e/appearance.spec.ts --update-snapshots=changed &&
+        npm run test:screens:update
+      baselines: frontend/e2e
+      ci-workflow: frontend-ci.yml
