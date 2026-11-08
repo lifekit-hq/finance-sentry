@@ -1,11 +1,13 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {ActivatedRoute, convertToParamMap} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
+import {LEDGER_DECISION_ID_PARAM} from '../../../../shared/enums/app-route/app-route.enum';
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
@@ -58,10 +60,19 @@ describe('DecisionsStore', () => {
   let sheet: {open: ReturnType<typeof vi.fn>};
   let scorecards: {read: ReturnType<typeof vi.fn>};
 
-  function inject(): InstanceType<typeof DecisionsStore> {
+  /** `openId` is the proposal a detail route names; the queue names none. */
+  function inject(openId: string | null = null): InstanceType<typeof DecisionsStore> {
     TestBed.configureTestingModule({
       providers: [
         DecisionsStore,
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              paramMap: convertToParamMap(openId ? {[LEDGER_DECISION_ID_PARAM]: openId} : {}),
+            },
+          },
+        },
         {provide: RecommendationService, useValue: service},
         {provide: DecisionSheetService, useValue: sheet},
         {provide: ScorecardService, useValue: scorecards},
@@ -82,49 +93,53 @@ describe('DecisionsStore', () => {
     };
   });
 
-  it('reads one scorecard per pending ticker and keys it by symbol', () => {
+  it("reads only the open proposal's scorecard and keys it by symbol", () => {
     service.list.mockReturnValue(
       of({
         pending: [
           mkRecommendation({id: 'a', ticker: 'GRAB'}),
           mkRecommendation({id: 'b', ticker: 'DRAM'}),
-          mkRecommendation({id: 'c', ticker: 'GRAB'}),
         ],
         decided: [mkRecommendation({id: 'd', ticker: 'NVDA', status: 'Rejected'})],
       })
     );
-    const store = inject();
+    const store = inject('b');
 
-    expect(scorecards.read.mock.calls.map(([symbol]) => symbol)).toEqual(['GRAB', 'DRAM']);
-    expect(Object.keys(store.scorecards()).sort()).toEqual(['DRAM', 'GRAB']);
-    expect(store.scorecards()['GRAB'].verdict.word).toBe('Avoid');
+    expect(scorecards.read.mock.calls.map(([symbol]) => symbol)).toEqual(['DRAM']);
+    expect(Object.keys(store.scorecards())).toEqual(['DRAM']);
+    expect(store.scorecards()['DRAM'].verdict.word).toBe('Avoid');
+    expect(store.selected()?.ticker).toBe('DRAM');
   });
 
-  it('leaves a card without a verdict when its scorecard read fails', () => {
+  it('leaves the detail without a verdict when its scorecard read fails', () => {
     service.list.mockReturnValue(
-      of({
-        pending: [
-          mkRecommendation({id: 'a', ticker: 'GRAB'}),
-          mkRecommendation({id: 'b', ticker: 'DRAM'}),
-        ],
-        decided: [],
-      })
+      of({pending: [mkRecommendation({id: 'a', ticker: 'GRAB'})], decided: []})
     );
-    scorecards.read.mockImplementation((symbol: string) =>
-      symbol === 'GRAB'
-        ? throwError(() => new HttpErrorResponse({status: 500}))
-        : of(ScorecardFixtures.scorecard({symbol}))
-    );
-    const store = inject();
+    scorecards.read.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));
+    const store = inject('a');
 
-    expect(Object.keys(store.scorecards())).toEqual(['DRAM']);
+    expect(Object.keys(store.scorecards())).toEqual([]);
     expect(store.view().status).toBe('success');
   });
 
-  it('reads no scorecard for an empty queue', () => {
-    inject();
+  it('reads no scorecard for the queue, which opens on no proposal', () => {
+    service.list.mockReturnValue(
+      of({pending: [mkRecommendation({id: 'a', ticker: 'GRAB'})], decided: []})
+    );
+    const store = inject();
 
     expect(scorecards.read).not.toHaveBeenCalled();
+    expect(store.selected()).toBeNull();
+  });
+
+  it('finds an open proposal that was already decided, and none for an unknown id', () => {
+    service.list.mockReturnValue(
+      of({pending: [], decided: [mkRecommendation({id: 'd', status: 'Rejected'})]})
+    );
+
+    expect(inject('d').selected()?.status).toBe('Rejected');
+    TestBed.resetTestingModule();
+    expect(inject('nope').selected()).toBeNull();
   });
 
   it('loads on open and is loading until the queue arrives', () => {

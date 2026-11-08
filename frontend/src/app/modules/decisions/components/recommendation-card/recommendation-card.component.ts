@@ -43,6 +43,8 @@ export class RecommendationCardComponent {
   public readonly recommendation = input.required<RecommendationDto>();
   /** Off on the asset dossier, which is already the ticker's page. */
   public readonly linkTicker = input(false);
+  /** Off on the decision detail, which pins Reject and Confirm to the screen's foot instead. */
+  public readonly showActions = input(true);
   /** The ticker's scorecard and verdict word; absent while it loads or when it could not be read. */
   public readonly scorecard = input<Nullable<ScorecardDto>>(null);
   public readonly decide = output<RecommendationVerdict>();

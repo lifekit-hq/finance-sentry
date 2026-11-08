@@ -75,17 +75,19 @@
       </section>
     }
 
-    <footer class="flex flex-wrap justify-end gap-cmn-2">
-      <cmn-button
-        (clicked)="decide.emit('reject')"
-        variant="secondary"
-        data-testid="recommendation-reject"
-      >
-        Reject
-      </cmn-button>
-      <cmn-button (clicked)="decide.emit('confirm')" data-testid="recommendation-confirm">
-        Confirm…
-      </cmn-button>
-    </footer>
+    @if (showActions()) {
+      <footer class="flex flex-wrap justify-end gap-cmn-2">
+        <cmn-button
+          (clicked)="decide.emit('reject')"
+          variant="secondary"
+          data-testid="recommendation-reject"
+        >
+          Reject
+        </cmn-button>
+        <cmn-button (clicked)="decide.emit('confirm')" data-testid="recommendation-confirm">
+          Confirm…
+        </cmn-button>
+      </footer>
+    }
   </article>
 </cmn-card>

@@ -16,6 +16,19 @@ import {InputHintsDirective} from './input-hints.directive';
 })
 class HostComponent {}
 
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'fns-ticker-host',
+  imports: [InputHintsDirective],
+  template: `
+    <cmn-input autocapitalize="characters" autocorrect="off" spellcheck="false">
+      <!-- eslint-disable-next-line lifekit/no-raw-controls -- stands in for cmn-input's inner input -->
+      <input />
+    </cmn-input>
+  `,
+})
+class TickerHostComponent {}
+
 describe('InputHintsDirective', () => {
   it('copies inputmode and enterkeyhint onto the inner input', () => {
     const fixture = TestBed.createComponent(HostComponent);
@@ -23,5 +36,14 @@ describe('InputHintsDirective', () => {
     const field = (fixture.nativeElement as HTMLElement).querySelector('input');
     expect(field?.getAttribute('inputmode')).toBe('decimal');
     expect(field?.getAttribute('enterkeyhint')).toBe('done');
+  });
+
+  it('copies the capitalisation, autocorrect and spellcheck hints a ticker field asks for', () => {
+    const fixture = TestBed.createComponent(TickerHostComponent);
+    fixture.detectChanges();
+    const field = (fixture.nativeElement as HTMLElement).querySelector('input');
+    expect(field?.getAttribute('autocapitalize')).toBe('characters');
+    expect(field?.getAttribute('autocorrect')).toBe('off');
+    expect(field?.getAttribute('spellcheck')).toBe('false');
   });
 });

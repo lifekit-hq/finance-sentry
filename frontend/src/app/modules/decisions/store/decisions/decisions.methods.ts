@@ -1,3 +1,4 @@
+import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {
@@ -22,6 +23,9 @@ export function decisionsMethods(store: WritableStateSource<DecisionsState>) {
         pending: state.pending.filter(r => r.id !== decided.id),
         decided: [decided, ...state.decided.filter(r => r.id !== decided.id)],
       }));
+    },
+    select(id: Nullable<string>): void {
+      patchState(store, {selectedId: id});
     },
     setScorecard(card: ScorecardDto): void {
       patchState(store, state => ({scorecards: {...state.scorecards, [card.symbol]: card}}));

@@ -7,7 +7,7 @@ import {PLACEHOLDER_IMAGE, type VisualScreen} from '../support/visual-baseline';
 import {ACCOUNTS_SCREEN} from '../support/screens/accounts.screen';
 import {ALERTS_SCREEN} from '../support/screens/alerts.screen';
 import {BUDGETS_SCREEN} from '../support/screens/budgets.screen';
-import {DECISIONS_SCREEN} from '../support/screens/decisions.screen';
+import {DECISION_DETAIL_SCREEN, DECISIONS_SCREEN} from '../support/screens/decisions.screen';
 import {EVENTS_SCREEN} from '../support/screens/events.screen';
 import {FLOW_BREAKDOWN_SCREEN} from '../support/screens/flow-breakdown.screen';
 import {LEDGER_SCREEN} from '../support/screens/ledger.screen';
@@ -162,6 +162,14 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     note: "The Ledger's decision queue.",
     mode: 'report',
     fixture: fixtureOf(DECISIONS_SCREEN),
+  },
+  {
+    name: 'decision-detail',
+    path: DECISION_DETAIL_SCREEN.path,
+    kind: 'detail',
+    note: 'One Ledger proposal, pushed from the queue, with Reject and Confirm pinned.',
+    mode: 'report',
+    fixture: fixtureOf(DECISION_DETAIL_SCREEN),
   },
   {
     name: 'ledger-chat',

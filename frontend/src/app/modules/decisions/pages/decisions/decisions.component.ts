@@ -1,9 +1,10 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {RouterLink} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {
   AsyncStateComponent,
   CardComponent,
+  ListItemRowComponent,
   PageContainerComponent,
   PageScrollComponent,
   SkeletonComponent,
@@ -15,41 +16,41 @@ import {
   LOSS_TEXT_CLASS,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
-import {RecommendationCardComponent} from '../../components/recommendation-card/recommendation-card.component';
+import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {
-  DECISION_SKELETON_CARDS,
   DECISION_SKELETON_DECIDED_ROWS,
-  DECISION_SKELETON_EVIDENCE_LINES,
-  DECISION_SKELETON_FACTS,
   DECISION_SKELETON_OUTCOME_LINES,
-  DECISION_SKELETON_TEXT_LINES,
+  DECISION_SKELETON_PENDING_ROWS,
   DECISIONS_EMPTY_COPY,
   RECOMMENDATION_ACTION_LABEL,
   RECOMMENDATION_ACTION_VARIANT,
   RECOMMENDATION_STATUS_LABEL,
   RECOMMENDATION_STATUS_VARIANT,
+  RECOMMENDATION_TRIGGER_LABEL,
 } from '../../constants/recommendation/recommendation.constants';
 import {
   RecommendationExcessPipe,
   RecommendationExcessTonePipe,
   RecommendationOutcomePipe,
+  RecommendationRowValuePipe,
 } from '../../pipes/recommendation.pipe';
 import {DecisionsStore} from '../../store/decisions/decisions.store';
 import {type OutcomeTone} from '../../utils/recommendation.utils';
 
-/** The Decisions queue on the Ledger tab: pending proposals oldest first, then the last 30 days' outcomes. */
+/** The Decisions queue on the Ledger tab: pending proposals oldest first, one row each that pushes its detail, then the last 30 days' outcomes. */
 @Component({
   selector: 'fns-decisions',
   imports: [
     AsyncStateComponent,
     CardComponent,
     DatePipe,
+    ListItemRowComponent,
     PageContainerComponent,
     PageScrollComponent,
-    RecommendationCardComponent,
     RecommendationExcessPipe,
     RecommendationExcessTonePipe,
     RecommendationOutcomePipe,
+    RecommendationRowValuePipe,
     RouterLink,
     SkeletonComponent,
     TagComponent,
@@ -60,22 +61,27 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
   templateUrl: './decisions.component.html',
 })
 export class DecisionsComponent {
+  private readonly router = inject(Router);
+
   public readonly store = inject(DecisionsStore);
 
   public readonly dossierRoute = AppRoute.AssetDossier;
   public readonly emptyCopy = DECISIONS_EMPTY_COPY;
-  public readonly skeletonCards = Array.from({length: DECISION_SKELETON_CARDS});
+  public readonly skeletonPendingRows = DECISION_SKELETON_PENDING_ROWS;
   public readonly skeletonDecidedRows = Array.from({length: DECISION_SKELETON_DECIDED_ROWS});
-  public readonly skeletonFacts = Array.from({length: DECISION_SKELETON_FACTS});
-  public readonly skeletonTextLines = DECISION_SKELETON_TEXT_LINES;
-  public readonly skeletonEvidenceLines = DECISION_SKELETON_EVIDENCE_LINES;
   public readonly skeletonOutcomeLines = DECISION_SKELETON_OUTCOME_LINES;
   public readonly actionLabel = RECOMMENDATION_ACTION_LABEL;
   public readonly actionVariant = RECOMMENDATION_ACTION_VARIANT;
+  public readonly triggerLabel = RECOMMENDATION_TRIGGER_LABEL;
   public readonly statusLabel = RECOMMENDATION_STATUS_LABEL;
   public readonly statusVariant = RECOMMENDATION_STATUS_VARIANT;
   public readonly toneClass: Readonly<Record<OutcomeTone, string>> = {
     gain: GAIN_TEXT_CLASS,
     loss: LOSS_TEXT_CLASS,
   };
+
+  /** Pushes the proposal's detail, where Reject and Confirm are pinned. */
+  public open(rec: RecommendationDto): void {
+    void this.router.navigate([AppRoute.LedgerDecision, rec.id]);
+  }
 }

@@ -11,7 +11,11 @@ import {
   SUBSCRIPTIONS_ADD_ACTION,
 } from './shared/constants/page-actions/page-actions.constants';
 import {TAB_PRELOAD_DATA} from './shared/constants/tab-preload/tab-preload.constants';
-import {AppRoute, ASSET_DOSSIER_SYMBOL_PARAM} from './shared/enums/app-route/app-route.enum';
+import {
+  AppRoute,
+  ASSET_DOSSIER_SYMBOL_PARAM,
+  LEDGER_DECISION_ID_PARAM,
+} from './shared/enums/app-route/app-route.enum';
 import {Permission} from './shared/enums/permission/permission.enum';
 
 export const APP_ROUTES: Routes = [
@@ -172,6 +176,16 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./modules/events/pages/events/events.component').then(m => m.EventsComponent),
         ...RouteTitleUtils.of('Events'),
+      },
+      {
+        path: `${AppRoute.LedgerDecision.slice(1)}/:${LEDGER_DECISION_ID_PARAM}`,
+        canMatch: [permissionGuard(Permission.AiUse)],
+        loadComponent: () =>
+          import('./modules/decisions/pages/decision-detail/decision-detail.component').then(
+            m => m.DecisionDetailComponent
+          ),
+        ...RouteTitleUtils.of('Decision'),
+        data: {parent: AppRoute.LedgerDecisions} satisfies PageChromeData,
       },
       {
         path: AppRoute.Ledger.slice(1),

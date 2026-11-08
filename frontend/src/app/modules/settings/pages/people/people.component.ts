@@ -23,6 +23,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
@@ -44,6 +45,7 @@ const SKELETON_ROWS = 3;
     CardComponent,
     FormFieldComponent,
     InputComponent,
+    InputHintsDirective,
     ListItemRowComponent,
     SkeletonComponent,
     TagComponent,

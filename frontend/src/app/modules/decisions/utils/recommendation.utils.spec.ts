@@ -40,6 +40,22 @@ function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Recommend
   };
 }
 
+describe('RecommendationUtils.rowValue', () => {
+  it('reads a move as its whole-dollar size', () => {
+    expect(RecommendationUtils.rowValue(mkRecommendation({sizeUsd: 2080}))).toBe('$2,080');
+  });
+
+  it('reads a Hold as the share of book it keeps', () => {
+    expect(
+      RecommendationUtils.rowValue(mkRecommendation({action: 'Hold', shareOfBookBeforePct: 12.2}))
+    ).toBe('12.2%');
+  });
+
+  it('is empty when the proposal carries no size', () => {
+    expect(RecommendationUtils.rowValue(mkRecommendation({sizeUsd: null}))).toBe('');
+  });
+});
+
 describe('RecommendationUtils.sizeLine', () => {
   it('reads a trim as shares, dollars and the share of book it moves', () => {
     expect(RecommendationUtils.sizeLine(mkRecommendation())).toBe(

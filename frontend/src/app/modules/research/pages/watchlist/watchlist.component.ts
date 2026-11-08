@@ -26,6 +26,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
@@ -53,6 +54,7 @@ const MAX_NOTE_LENGTH = 500;
     EmptyStateComponent,
     FormFieldComponent,
     InputComponent,
+    InputHintsDirective,
     PageContainerComponent,
     PageScrollComponent,
     ReactiveFormsModule,
@@ -88,7 +90,9 @@ export class WatchlistComponent {
       lastSyncedAt: null,
     });
   });
-  public readonly isEmpty = computed(() => this.store.items().length === 0);
+  public readonly isEmpty = computed(
+    () => this.store.items().length === 0 && !this.store.isFormOpen()
+  );
 
   public readonly form = new FormGroup({
     ticker: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
