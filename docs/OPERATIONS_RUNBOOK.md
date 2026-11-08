@@ -157,6 +157,20 @@ A person closes their own account from Settings (Danger zone). It is reversible 
 - **Audit:** a purged closure keeps its row (`PurgedAt`, `ErasedRows` per module, `CredentialRevocation`). Never delete these rows; they are the record that the erasure happened.
 - Do not edit `PurgeDueAt` to hurry a purge in production: once it runs, nothing is recoverable short of a backup restore.
 
+## 13. Fleet-agent Identity (Accept, Limit, Revoke)
+
+The fleet's own service identity is the Logto machine-to-machine application `fleet-agent` (created by `scripts/identity/fleet-agent.sh` in lifekit-stack; the app never holds its secret). The API accepts its access tokens as a second bearer scheme next to the user session, on the fleet endpoints only:
+
+| Scope | Endpoint | Does |
+| --- | --- | --- |
+| `fleet:read` | `GET /api/v1/fleet/transactions`, `GET /api/v1/fleet/categories` | reads the Owner's transactions and the category list |
+| `fleet:recategorise` | `PUT /api/v1/fleet/transactions/{id}/category` | files one transaction under another category; the response names the previous one, and PUTting it back undoes the change. Moves into or out of `INCOME`, `TRANSFER_IN`, `TRANSFER_OUT` and `LOAN_PAYMENTS` answer `409` (they change money figures, not a label). Each change is on the audit trail (`FleetAgent`, ids and the field name only) |
+
+- **What a token must be:** issued by the `Auth:Oidc` authority (or `Auth:FleetAgent:Authority`), audience `https://fleet.lifekit.internal/api`, unexpired, signed with a key from the provider's discovery document, machine-to-machine (`sub` equals `client_id`; `Auth:FleetAgent:ClientId` pins the application when set) and carrying at least one fleet scope. A session token, a token of another application or audience, an expired one or one with no fleet scope gets `401`; a valid token without the scope the endpoint needs gets `403`.
+- **Who it acts as:** the one Owner account (set `Auth:FleetAgent:ActAsUserId` when there are several). With zero or several Owners and no account named, or when that Owner is locked out, every fleet token gets `401`.
+- **What it cannot do:** nothing outside the table. The scheme is never the default, so every other endpoint (money, accounts, connections, ownership, Research) still sees only the user scheme and answers a fleet token `401`; no scope exists for those writes.
+- **Revoke:** `bash scripts/identity/fleet-agent.sh revoke` (lifekit-stack) takes the app's role away: Logto keeps issuing it tokens, but with no scope, and this API refuses those with `401`. A token already issued lives out its hour. After a leak run `rotate` first (the old secret stops at once), and `revoke --delete` to stop all tokens. To refuse the fleet on this side alone, set `AUTH_FLEET_AGENT_ENABLED=false` in `docker/.env.sops` and let the next deploy recreate the `api` container; nothing is restarted by hand.
+
 ## Contact
 
 - On-call channel: `#finance-sentry-oncall`

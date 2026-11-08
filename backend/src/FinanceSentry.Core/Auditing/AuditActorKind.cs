@@ -17,4 +17,7 @@ public enum AuditActorKind
 
     /// <summary>A background job: no person in scope.</summary>
     Job,
+
+    /// <summary>The fleet-agent identity (a machine-to-machine token of the org identity provider) acting for the owner.</summary>
+    FleetAgent,
 }

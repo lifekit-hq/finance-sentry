@@ -95,9 +95,31 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
             .OfType<string>()
             .Distinct()
             .ToList();
-        named.Should().OnlyContain(policy => AuthPolicies.PermissionByPolicy.ContainsKey(policy));
+        named.Should().OnlyContain(policy =>
+            AuthPolicies.PermissionByPolicy.ContainsKey(policy) || AuthPolicies.ScopeByFleetPolicy.ContainsKey(policy));
         foreach (var policy in named)
             (await policies.GetPolicyAsync(policy)).Should().NotBeNull(policy);
+    }
+
+    /// <summary>
+    /// The fleet-agent scheme is never the default: only an endpoint behind a fleet scope policy (reviewed here) can
+    /// authenticate with it, so a fleet token reaches nothing else.
+    /// </summary>
+    [Fact]
+    public void FleetAgentPolicies_AreOnExactlyTheReviewedEndpoints()
+    {
+        var endpoints = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>();
+
+        var fleet = endpoints
+            .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>()
+                .Any(a => a.Policy is { } policy && AuthPolicies.ScopeByFleetPolicy.ContainsKey(policy)))
+            .SelectMany(e => Describe(e).Select(route => $"{route} [{e.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Single()}]"))
+            .Order(StringComparer.Ordinal);
+
+        fleet.Should().Equal(
+            "GET /api/v1/fleet/categories [RequireFleetRead]",
+            "GET /api/v1/fleet/transactions [RequireFleetRead]",
+            "PUT /api/v1/fleet/transactions/{id:guid}/category [RequireFleetRecategorise]");
     }
 
     [Theory]
