@@ -74,14 +74,14 @@ public class FleetAgentAuthenticationTests : IClassFixture<FleetAgentApiFactory>
         var token = _factory.Token(ReadAndRecategorise);
         var path = $"/api/v1/fleet/transactions/{_factory.RecategorisedTransactionId}/category";
 
-        var change = await Put(path, token, CategoryKeys.Travel);
+        var change = await Put(path, token, CategoryKeys.FoodAndDrink);
 
         change.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await change.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("previousCategory").GetString().Should().Be(CategoryKeys.Entertainment);
-        body.GetProperty("category").GetString().Should().Be(CategoryKeys.Travel);
+        body.GetProperty("category").GetString().Should().Be(CategoryKeys.FoodAndDrink);
         body.GetProperty("changed").GetBoolean().Should().BeTrue();
-        _factory.CategoryOf(_factory.RecategorisedTransactionId).Should().Be(CategoryKeys.Travel);
+        _factory.CategoryOf(_factory.RecategorisedTransactionId).Should().Be(CategoryKeys.FoodAndDrink);
 
         var undo = await Put(path, token, body.GetProperty("previousCategory").GetString()!);
 
@@ -94,7 +94,7 @@ public class FleetAgentAuthenticationTests : IClassFixture<FleetAgentApiFactory>
     {
         var path = $"/api/v1/fleet/transactions/{_factory.AuditedTransactionId}/category";
 
-        (await Put(path, _factory.Token(Recategorise), CategoryKeys.Travel)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Put(path, _factory.Token(Recategorise), CategoryKeys.Entertainment)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
         var events = await scope.ServiceProvider.GetRequiredService<AuthDbContext>().AuditEvents
@@ -111,7 +111,9 @@ public class FleetAgentAuthenticationTests : IClassFixture<FleetAgentApiFactory>
     [InlineData(CategoryKeys.TransferOut)]
     [InlineData(CategoryKeys.Income)]
     [InlineData(CategoryKeys.LoanPayments)]
-    public async Task Recategorise_IntoAFlowCategory_Returns409_AndChangesNothing(string category)
+    [InlineData(CategoryKeys.RentAndUtilities)]
+    [InlineData(CategoryKeys.Travel)]
+    public async Task Recategorise_IntoAFlowCategoryOrAcrossTheDailySpendSet_Returns409_AndChangesNothing(string category)
     {
         var path = $"/api/v1/fleet/transactions/{_factory.FoodTransactionId}/category";
 
@@ -130,6 +132,39 @@ public class FleetAgentAuthenticationTests : IClassFixture<FleetAgentApiFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         _factory.CategoryOf(_factory.TransferTransactionId).Should().Be(CategoryKeys.TransferOut);
+    }
+
+    [Fact]
+    public async Task Recategorise_OutOfRentAndUtilities_Returns409()
+    {
+        var path = $"/api/v1/fleet/transactions/{_factory.RentTransactionId}/category";
+
+        var response = await Put(path, _factory.Token(Recategorise), CategoryKeys.GeneralServices);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        _factory.CategoryOf(_factory.RentTransactionId).Should().Be(CategoryKeys.RentAndUtilities);
+    }
+
+    [Fact]
+    public async Task Recategorise_IntoTheDailySpendSetFromOutside_Returns409()
+    {
+        var path = $"/api/v1/fleet/transactions/{_factory.ServicesTransactionId}/category";
+
+        var response = await Put(path, _factory.Token(Recategorise), CategoryKeys.FoodAndDrink);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        _factory.CategoryOf(_factory.ServicesTransactionId).Should().Be(CategoryKeys.GeneralServices);
+    }
+
+    [Fact]
+    public async Task Recategorise_BetweenTwoCategoriesOutsideEverySet_Succeeds()
+    {
+        var path = $"/api/v1/fleet/transactions/{_factory.OutsideSetsTransactionId}/category";
+
+        var response = await Put(path, _factory.Token(Recategorise), CategoryKeys.Travel);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _factory.CategoryOf(_factory.OutsideSetsTransactionId).Should().Be(CategoryKeys.Travel);
     }
 
     [Fact]
@@ -371,6 +406,9 @@ public sealed class FleetAgentApiFactory : AuthApiFactory
     public Guid FoodTransactionId { get; } = Guid.NewGuid();
     public Guid RecategorisedTransactionId { get; } = Guid.NewGuid();
     public Guid AuditedTransactionId { get; } = Guid.NewGuid();
+    public Guid RentTransactionId { get; } = Guid.NewGuid();
+    public Guid ServicesTransactionId { get; } = Guid.NewGuid();
+    public Guid OutsideSetsTransactionId { get; } = Guid.NewGuid();
     public Guid TransferTransactionId { get; } = Guid.NewGuid();
     public Guid OtherUsersTransactionId { get; } = Guid.NewGuid();
 
@@ -452,7 +490,7 @@ public sealed class FleetAgentApiFactory : AuthApiFactory
         foreach (var key in new[]
                  {
                      CategoryKeys.FoodAndDrink, CategoryKeys.Entertainment, CategoryKeys.Travel, CategoryKeys.TransferOut,
-                     CategoryKeys.Income, CategoryKeys.LoanPayments,
+                     CategoryKeys.Income, CategoryKeys.LoanPayments, CategoryKeys.RentAndUtilities, CategoryKeys.GeneralServices,
                  })
         {
             if (!db.Categories.Any(c => c.Key == key))
@@ -467,6 +505,9 @@ public sealed class FleetAgentApiFactory : AuthApiFactory
             Fake(RecategorisedTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.Entertainment),
             Fake(AuditedTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.FoodAndDrink),
             Fake(TransferTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.TransferOut),
+            Fake(RentTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.RentAndUtilities),
+            Fake(ServicesTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.GeneralServices),
+            Fake(OutsideSetsTransactionId, OwnerId, ownerAccount.Id, CategoryKeys.GeneralServices),
             Fake(OtherUsersTransactionId, OtherUserId, otherAccount.Id, CategoryKeys.FoodAndDrink));
         db.SaveChanges();
     }

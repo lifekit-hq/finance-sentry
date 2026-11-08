@@ -84,8 +84,10 @@ public class FleetController(
 
     /// <summary>
     /// Files the transaction under another spending category. The response names the previous category: PUT it back to
-    /// undo. Moves into or out of income, transfer and loan-payment categories are refused (409): they change money
-    /// figures, not a label.
+    /// undo. Moves into or out of income, transfer, loan-payment and rent-and-utilities categories, and moves across
+    /// the day-to-day spend set (food, transport, merchandise, entertainment, personal care) the coverage sentinel
+    /// reads, are refused (409): they change money figures, not a label. Not durable: an operator recategorise pass
+    /// can put the previous category back with no audit entry; PUT again to redo it.
     /// </summary>
     [HttpPut("transactions/{id:guid}/category")]
     [Authorize(Policy = AuthPolicies.RequireFleetRecategorise)]
@@ -103,7 +105,7 @@ public class FleetController(
             RecategorizeOutcome.UnknownCategory =>
                 BadRequest(new ApiErrorBody("Unknown category.", "UNKNOWN_CATEGORY")),
             _ => Conflict(new ApiErrorBody(
-                "Moves into or out of income, transfer and loan-payment categories are not a recategorisation.",
+                "Moves into or out of income, transfer, loan-payment and rent-and-utilities categories, or across the day-to-day spend categories, change money figures and are not a recategorisation.",
                 "CATEGORY_AFFECTS_MONEY_FLOW")),
         };
     }
