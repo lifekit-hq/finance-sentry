@@ -19,68 +19,15 @@
         errorPlacement="above"
         retryable
       >
-        <!-- Shaped like a pending card and the decided list, line boxes at the cards' line heights -->
+        <!-- Shaped like the pending rows and the decided list -->
         <div skeleton class="space-y-cmn-6" data-testid="decisions-skeleton">
           <div class="flex flex-col gap-cmn-3">
             <div class="flex items-center" style="height: 0.9375rem">
               <cmn-skeleton class="w-full" width="6rem" height="0.75rem" />
             </div>
-            @for (_ of skeletonCards; track $index) {
-              <cmn-card>
-                <div class="flex flex-col gap-cmn-4">
-                  <div class="flex flex-col gap-cmn-2">
-                    <div class="flex items-center gap-cmn-2" style="height: 1.5rem">
-                      <cmn-skeleton width="2.75rem" height="1.25rem" />
-                      <cmn-skeleton width="3.5rem" height="0.875rem" />
-                      <cmn-skeleton class="flex-1" width="70%" height="0.75rem" />
-                    </div>
-                    <div class="flex items-center" style="height: 0.9375rem">
-                      <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
-                    </div>
-                  </div>
-                  <div class="flex items-center" style="height: 1.5rem">
-                    <cmn-skeleton class="w-full" width="85%" height="1rem" />
-                  </div>
-                  <div class="flex flex-col gap-cmn-1">
-                    <div class="flex items-center" style="height: 0.9375rem">
-                      <cmn-skeleton class="w-full" width="15%" height="0.75rem" />
-                    </div>
-                    @for (width of skeletonTextLines; track $index) {
-                      <div class="flex items-center" style="height: 1.3125rem">
-                        <cmn-skeleton [width]="width" class="w-full" height="0.875rem" />
-                      </div>
-                    }
-                  </div>
-                  <div class="grid gap-cmn-3 sm:grid-cols-2">
-                    @for (_ of skeletonFacts; track $index) {
-                      <div class="flex flex-col gap-cmn-1">
-                        <div class="flex items-center" style="height: 0.9375rem">
-                          <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
-                        </div>
-                        <div class="flex items-center" style="height: 1.3125rem">
-                          <cmn-skeleton class="w-full" width="70%" height="0.875rem" />
-                        </div>
-                      </div>
-                    }
-                  </div>
-                  <div class="flex flex-col gap-cmn-2">
-                    <div class="flex items-center" style="height: 0.9375rem">
-                      <cmn-skeleton class="w-full" width="20%" height="0.75rem" />
-                    </div>
-                    @for (width of skeletonEvidenceLines; track $index) {
-                      <div class="flex items-center gap-cmn-2" style="height: 1.3125rem">
-                        <cmn-skeleton width="4rem" height="1.25rem" />
-                        <cmn-skeleton [width]="width" class="flex-1" height="0.875rem" />
-                      </div>
-                    }
-                  </div>
-                  <div class="flex justify-end gap-cmn-2">
-                    <cmn-skeleton width="5rem" height="2.75rem" />
-                    <cmn-skeleton width="6.5rem" height="2.75rem" />
-                  </div>
-                </div>
-              </cmn-card>
-            }
+            <cmn-card padding="none" class="block">
+              <cmn-skeleton [count]="skeletonPendingRows" shape="row" />
+            </cmn-card>
           </div>
           <div class="flex flex-col gap-cmn-3">
             <div class="flex items-center" style="height: 0.9375rem">
@@ -116,14 +63,31 @@
           >
             Pending ({{ store.pending().length }})
           </h2>
-          @for (rec of store.pending(); track rec.id) {
-            <fns-recommendation-card
-              [recommendation]="rec"
-              [linkTicker]="true"
-              [scorecard]="store.scorecards()[rec.ticker] ?? null"
-              (decide)="store.decide({recommendation: rec, verdict: $event})"
-            />
-          } @empty {
+          @if (store.pending().length > 0) {
+            <ul
+              class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+              data-testid="decisions-pending"
+            >
+              @for (rec of store.pending(); track rec.id) {
+                <li [attr.data-testid]="'decision-row-' + rec.ticker">
+                  <cmn-list-item-row
+                    [label]="rec.ticker"
+                    [sublabel]="triggerLabel[rec.triggerKind]"
+                    [action]="true"
+                    [attr.aria-label]="actionLabel[rec.action] + ' ' + rec.ticker"
+                    (activated)="open(rec)"
+                  >
+                    <cmn-tag [variant]="actionVariant[rec.action]" avatar>
+                      {{ actionLabel[rec.action] }}
+                    </cmn-tag>
+                    <span amount class="shrink-0 text-cmn-sm tabular-nums text-text-primary">
+                      {{ rec | recommendationRowValue }}
+                    </span>
+                  </cmn-list-item-row>
+                </li>
+              }
+            </ul>
+          } @else {
             <p class="text-cmn-sm text-text-secondary" data-testid="decisions-pending-empty">
               Nothing is waiting on you.
             </p>

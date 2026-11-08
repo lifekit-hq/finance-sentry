@@ -8,4 +8,5 @@ export const WATCHLIST_EMPTY_COPY = {
   message: 'Your watchlist is empty',
   subMessage: 'Add a ticker with its buy-the-dip trigger to keep it in view.',
   icon: 'Eye',
+  actionLabel: 'Add a name',
 } as const;

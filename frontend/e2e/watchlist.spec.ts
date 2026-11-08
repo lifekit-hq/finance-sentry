@@ -74,13 +74,39 @@ test.describe('Watchlist', () => {
     await mockApis(page);
   });
 
-  test('shows the empty state when nothing is watched', async ({page}) => {
+  test('leads with the explanation and one action when nothing is watched, the form behind it', async ({
+    page,
+  }) => {
     await mockWatchlist(page, []);
     await page.goto('/watchlist');
-    await expect(page.getByTestId('watchlist-form')).toBeVisible();
-    await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
     await expect(page.getByText(/your watchlist is empty/i)).toBeVisible();
+    await expect(page.getByTestId('watchlist-form')).toHaveCount(0);
+    await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
     await expect(page.getByTestId('watchlist-count')).toHaveCount(0);
+
+    await page.getByRole('button', {name: 'Add a name'}).click();
+    await expect(page.getByTestId('watchlist-form')).toBeVisible();
+    await expect(page.getByText(/your watchlist is empty/i)).toHaveCount(0);
+  });
+
+  test('puts the explanation and its action on the first phone screen', async ({page}) => {
+    await page.setViewportSize({width: 390, height: 844});
+    await mockWatchlist(page, []);
+    await page.goto('/watchlist');
+    await expect(page.getByText(/your watchlist is empty/i)).toBeInViewport();
+    await expect(page.getByRole('button', {name: 'Add a name'})).toBeInViewport();
+  });
+
+  test('asks the phone keyboard for capitals and no autocorrect on a ticker, with Next to move on', async ({
+    page,
+  }) => {
+    await mockWatchlist(page, [PLTR]);
+    await page.goto('/watchlist');
+    const ticker = page.getByTestId('watchlist-ticker').locator('input');
+    await expect(ticker).toHaveAttribute('autocapitalize', 'characters');
+    await expect(ticker).toHaveAttribute('autocorrect', 'off');
+    await expect(ticker).toHaveAttribute('spellcheck', 'false');
+    await expect(ticker).toHaveAttribute('enterkeyhint', 'next');
   });
 
   test('counts the names and names each icon-only remove button after its ticker', async ({
@@ -143,6 +169,7 @@ test.describe('Watchlist', () => {
     });
     await mockWatchlist(page, []);
     await page.goto('/watchlist');
+    await page.getByRole('button', {name: 'Add a name'}).click();
     await page.getByTestId('watchlist-ticker').locator('input').fill('A'.repeat(21));
     await page.getByTestId('watchlist-add').click();
     await expect(page.getByTestId('watchlist-row')).toHaveCount(0);

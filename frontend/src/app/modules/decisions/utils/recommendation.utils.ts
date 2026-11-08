@@ -47,6 +47,17 @@ export class RecommendationUtils {
     return before && after ? `taking it from ${before} to ${after} of book` : '';
   }
 
+  /**
+   * The one figure on a queue row: what the move is worth ("$6,420"), or for a Hold the share of book it keeps
+   * ("23.1%"); empty when the proposal carries neither.
+   */
+  public static rowValue(rec: RecommendationDto): string {
+    if (rec.action === 'Hold') {
+      return RecommendationUtils.pct(rec.shareOfBookBeforePct);
+    }
+    return rec.sizeUsd === null ? '' : RecommendationUtils.aboutUsd(rec.sizeUsd);
+  }
+
   /** What became of a decided proposal: placed or not at the broker, or why it closed undecided. */
   public static outcome(rec: RecommendationDto): string {
     switch (rec.status) {

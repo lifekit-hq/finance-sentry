@@ -1,0 +1,64 @@
+<div class="flex flex-col gap-cmn-5 p-cmn-4" data-testid="chart-options-sheet">
+  <section class="flex flex-col gap-cmn-2">
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">Period</h3>
+    <lk-chip-row
+      [options]="periods"
+      [selected]="[store.period()]"
+      (lk-chip-row-change)="onPeriodChange($event)"
+      data-testid="sheet-chart-periods"
+      label="Chart period"
+    />
+  </section>
+
+  <section class="flex flex-col gap-cmn-2">
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+      Candle size
+    </h3>
+    <lk-chip-row
+      [options]="store.intervalOptions()"
+      [selected]="store.interval() ? [store.interval()!] : []"
+      (lk-chip-row-change)="onIntervalChange($event)"
+      data-testid="sheet-chart-intervals"
+      label="Candle size"
+    />
+  </section>
+
+  <section class="flex flex-col gap-cmn-2">
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+      Chart type
+    </h3>
+    <lk-segmented
+      [options]="kinds"
+      [value]="store.kind()"
+      (lk-segmented-change)="onKindChange($event)"
+      data-testid="sheet-chart-kind"
+      label="Chart type"
+    />
+  </section>
+
+  <section class="flex flex-col gap-cmn-2">
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+      Moving averages
+    </h3>
+    <lk-chip-row
+      [options]="store.averageOptions()"
+      [selected]="store.movingAverages()"
+      (lk-chip-row-change)="onAverageChange($event)"
+      data-testid="sheet-chart-averages"
+      label="Moving averages"
+      mode="multi"
+    />
+  </section>
+
+  <section class="flex flex-col gap-cmn-2">
+    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">Measure</h3>
+    <lk-chip-row
+      [options]="measureOptions"
+      [selected]="store.isMeasuring() ? ['measure'] : []"
+      (lk-chip-row-change)="onMeasureChange($event)"
+      data-testid="sheet-chart-measure-toggle"
+      label="Measure tool"
+      mode="multi"
+    />
+  </section>
+</div>

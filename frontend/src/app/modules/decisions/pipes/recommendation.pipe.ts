@@ -11,6 +11,13 @@ export class RecommendationSizePipe implements PipeTransform {
   }
 }
 
+@Pipe({name: 'recommendationRowValue'})
+export class RecommendationRowValuePipe implements PipeTransform {
+  public transform(rec: RecommendationDto): string {
+    return RecommendationUtils.rowValue(rec);
+  }
+}
+
 @Pipe({name: 'recommendationOutcome'})
 export class RecommendationOutcomePipe implements PipeTransform {
   public transform(rec: RecommendationDto): string {

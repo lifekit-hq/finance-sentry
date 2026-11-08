@@ -167,6 +167,16 @@ test.describe('Interactive price chart', () => {
   });
 });
 
+async function openChartOptions(page: Page): Promise<void> {
+  await page.getByTestId('chart-options').getByRole('button').click();
+  await expect(page.getByTestId('chart-options-sheet')).toBeVisible();
+}
+
+async function closeChartOptions(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('chart-options-sheet')).toBeHidden();
+}
+
 test.describe('Interactive price chart on a phone', () => {
   test.use({viewport: {width: 375, height: 800}, hasTouch: true, isMobile: true});
 
@@ -180,7 +190,12 @@ test.describe('Interactive price chart on a phone', () => {
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth).toBeLessThanOrEqual(375);
 
-    await page.getByTestId('chart-measure-toggle').getByRole('button', {name: 'Measure'}).click();
+    await openChartOptions(page);
+    await page
+      .getByTestId('sheet-chart-measure-toggle')
+      .getByRole('button', {name: 'Measure'})
+      .click();
+    await closeChartOptions(page);
     await page.getByTestId('price-chart-canvas').scrollIntoViewIfNeeded();
     const live = await chartBox(page);
     const y = live.y + live.height * 0.4;
@@ -199,5 +214,81 @@ test.describe('Interactive price chart on a phone', () => {
 
     await expect(page.getByTestId('measure-readout')).toContainText(/days/);
     await expect(page.getByTestId('price-chart-selection')).toBeVisible();
+  });
+
+  test('keeps one segmented period row above the chart and the rest behind Chart options', async ({
+    page,
+  }) => {
+    await openChart(page);
+    await chartBox(page);
+
+    const periods = page.getByTestId('chart-periods');
+    await expect(periods.getByRole('radio')).toHaveCount(5);
+    await expect(periods.getByRole('radio', {name: '1Y'})).toBeChecked();
+    for (const gone of [
+      'chart-kind',
+      'chart-intervals',
+      'chart-averages',
+      'chart-measure-toggle',
+    ]) {
+      await expect(page.getByTestId(gone)).toHaveCount(0);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      375
+    );
+
+    await openChartOptions(page);
+    const sheet = page.getByTestId('chart-options-sheet');
+    for (const id of [
+      'sheet-chart-periods',
+      'sheet-chart-intervals',
+      'sheet-chart-kind',
+      'sheet-chart-averages',
+      'sheet-chart-measure-toggle',
+    ]) {
+      await expect(sheet.getByTestId(id)).toBeVisible();
+    }
+  });
+
+  test('a period only the sheet offers asks for its own bars and leaves the row with none chosen', async ({
+    page,
+  }) => {
+    await openChart(page);
+    await chartBox(page);
+    const requests: string[] = [];
+    page.on('request', req => {
+      if (req.url().includes('/bars')) {
+        requests.push(new URL(req.url()).search);
+      }
+    });
+
+    await openChartOptions(page);
+    await page.getByTestId('sheet-chart-periods').getByRole('button', {name: 'YTD'}).click();
+    await expect.poll(() => requests.at(-1)).toBe('?period=YTD');
+    await closeChartOptions(page);
+
+    await expect(page.getByTestId('chart-periods').getByRole('radio', {checked: true})).toHaveCount(
+      0
+    );
+    await page.getByTestId('chart-periods').getByRole('radio', {name: '1M'}).click();
+    await expect.poll(() => requests.at(-1)).toBe('?period=1M');
+  });
+
+  test('the measure hint speaks touch, not Shift', async ({page}) => {
+    await openChart(page);
+    await chartBox(page);
+
+    const notes = page.getByTestId('chart-notes');
+    await expect(notes).toContainText('turn on Measure in Chart options');
+    await expect(notes).not.toContainText('Shift');
+  });
+});
+
+test.describe('Interactive price chart on a desktop', () => {
+  test('keeps the Shift hint where there is a keyboard', async ({page}) => {
+    await openChart(page);
+    await chartBox(page);
+
+    await expect(page.getByTestId('chart-notes')).toContainText('hold Shift and drag');
   });
 });

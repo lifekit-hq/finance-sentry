@@ -9,6 +9,7 @@ interface StateSignals {
   decided: Signal<DecisionsState['decided']>;
   isLoading: Signal<boolean>;
   errorMessage: Signal<string>;
+  selectedId: Signal<DecisionsState['selectedId']>;
 }
 
 export function decisionsComputed(store: StateSignals) {
@@ -16,6 +17,11 @@ export function decisionsComputed(store: StateSignals) {
   const hasData = computed(() => store.pending().length > 0 || store.decided().length > 0);
   return {
     hasData,
+    /** The open detail's proposal, pending or decided; null while loading or when no such id. */
+    selected: computed(() => {
+      const id = store.selectedId();
+      return [...store.pending(), ...store.decided()].find(rec => rec.id === id) ?? null;
+    }),
     // Reloads in place: rows stay under the banner; offline only counts while nothing is on screen.
     view: computed(() =>
       AsyncViewUtils.resolve({

@@ -20,6 +20,7 @@ export enum AppRoute {
   Construction = '/construction',
   Ledger = '/ledger',
   LedgerDecisions = '/ledger/decisions',
+  LedgerDecision = '/ledger/decision',
   Settings = '/settings',
   SettingsPeople = '/settings/people',
   More = '/more',
@@ -27,3 +28,5 @@ export enum AppRoute {
 }
 
 export const ASSET_DOSSIER_SYMBOL_PARAM = 'symbol';
+
+export const LEDGER_DECISION_ID_PARAM = 'id';

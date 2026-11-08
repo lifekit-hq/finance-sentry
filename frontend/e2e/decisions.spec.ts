@@ -90,15 +90,22 @@ test.describe('Decisions queue in the Ledger tab', () => {
     await routeVerdict(page, 'reject');
   });
 
-  test('lists DRAM first, then the rest, with the last 30 days decided', async ({page}) => {
+  test('lists DRAM first, then the rest, as one-line rows with the last 30 days decided', async ({
+    page,
+  }) => {
     await page.goto('/ledger/decisions');
     await expect(page).toHaveURL(/\/ledger\/decisions$/);
     await expect(page.getByRole('navigation', {name: 'Ledger view'})).toBeVisible();
 
-    const cards = page.locator('fns-recommendation-card');
-    await expect(cards).toHaveCount(2);
-    await expect(cards.first().getByRole('article')).toHaveAccessibleName('Trim DRAM');
-    await expect(cards.first()).toContainText('23.1%');
+    const rows = page.locator('[data-testid^="decision-row-"]');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText('Trim');
+    await expect(rows.first()).toContainText('DRAM');
+    await expect(rows.first()).toContainText('$6,420');
+    await expect(page.locator('fns-recommendation-card')).toHaveCount(0);
+    // A row is one line: far shorter than the paragraph blocks it replaced.
+    const box = await rows.first().boundingBox();
+    expect(box?.height ?? Infinity).toBeLessThan(90);
 
     const decided = page.getByTestId('decisions-decided');
     for (const rec of DECIDED) {
@@ -106,12 +113,28 @@ test.describe('Decisions queue in the Ledger tab', () => {
     }
   });
 
+  test('a row pushes its detail, where Reject and Confirm stay on screen', async ({page}) => {
+    await page.goto('/ledger/decisions');
+    await page.getByTestId('decision-row-DRAM').getByRole('button').click();
+
+    await expect(page).toHaveURL(/\/ledger\/decision\/rec-dram$/);
+    const card = page.getByTestId('recommendation-card-DRAM');
+    await expect(card).toContainText('Invalidated if');
+    const actions = page.getByTestId('decision-actions');
+    await expect(actions).toBeVisible();
+
+    // Pinned: still inside the viewport after the record is scrolled to its end.
+    await card.getByTestId('recommendation-evidence').scrollIntoViewIfNeeded();
+    await expect(actions.getByTestId('recommendation-confirm')).toBeInViewport();
+    await expect(actions.getByTestId('recommendation-reject')).toBeInViewport();
+  });
+
   test('rejecting asks for the real reason and keeps it', async ({page}) => {
     const writes = trackWrites(page);
-    await page.goto('/ledger/decisions');
+    await page.goto('/ledger/decision/rec-dram');
 
     await page
-      .getByTestId('recommendation-card-DRAM')
+      .getByTestId('decision-actions')
       .getByTestId('recommendation-reject')
       .getByRole('button')
       .click();

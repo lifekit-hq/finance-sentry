@@ -11,6 +11,9 @@ export function watchlistMethods(store: WritableStateSource<WatchlistState>) {
         items: [...items, ...s.items.filter(i => i.id.startsWith(PENDING_ID_PREFIX))],
       }));
     },
+    openForm(): void {
+      patchState(store, {isFormOpen: true});
+    },
     setLastAction(lastAction: WatchlistAction): void {
       patchState(store, {lastAction});
     },

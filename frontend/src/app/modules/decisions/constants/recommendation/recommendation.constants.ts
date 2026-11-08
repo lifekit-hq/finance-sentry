@@ -78,16 +78,10 @@ export const DECISION_SHEET_WIDTH = '28rem';
 export const DECISION_FAILED_MESSAGE = 'Could not record the decision. Try again.';
 export const DECISIONS_LOAD_FAILED_MESSAGE = 'Could not load the decisions queue.';
 export const ORDER_COPIED_MESSAGE = 'Order text copied.';
-/** Pending cards the loading placeholder draws. */
-export const DECISION_SKELETON_CARDS = 2;
+/** Pending rows the loading placeholder draws. */
+export const DECISION_SKELETON_PENDING_ROWS = 2;
 /** Decided rows the loading placeholder draws. */
 export const DECISION_SKELETON_DECIDED_ROWS = 2;
-/** Bar widths of the placeholder card's rationale lines. */
-export const DECISION_SKELETON_TEXT_LINES = ['100%', '95%', '40%'] as const;
-/** Fact pairs (Invalidated if, Expires) in the placeholder card. */
-export const DECISION_SKELETON_FACTS = 2;
-/** Bar widths of the placeholder card's evidence lines. */
-export const DECISION_SKELETON_EVIDENCE_LINES = ['80%', '65%'] as const;
 /** Bar widths of a placeholder decided row's outcome and excess lines. */
 export const DECISION_SKELETON_OUTCOME_LINES = ['80%', '45%'] as const;
 
@@ -96,6 +90,13 @@ export const DECISIONS_EMPTY_COPY = {
   subMessage:
     'Ledger stays silent until a broken thesis, a breached rule, a band or a fired event calls for a move.',
   icon: 'Inbox',
+} as const;
+
+/** Shown when a decision link names a proposal that no longer exists (expired out of the 30-day window). */
+export const DECISION_DETAIL_MISSING_COPY = {
+  message: 'Proposal not found',
+  subMessage: 'It may have closed more than 30 days ago. The queue lists what is still open.',
+  icon: 'SearchX',
 } as const;
 
 /** The dossier's note once its proposal is decided; the card's place says what was recorded. */

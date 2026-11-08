@@ -8,12 +8,21 @@ import {type WatchlistAction} from './watchlist.state';
 interface StateSignals {
   items: Signal<WatchlistItem[]>;
   lastAction: Signal<Nullable<WatchlistAction>>;
+  loadStatus: Signal<string>;
+  isFormOpen: Signal<boolean>;
   addErrorMessage: Signal<Nullable<string>>;
   removeErrorMessage: Signal<Nullable<string>>;
 }
 
 export function watchlistComputed(store: StateSignals) {
   return {
+    /**
+     * A loaded, empty watchlist the owner has not started adding to: the screen leads with the explanation and one
+     * action, and the form waits behind it. Until the load answers the form stays, so a returning owner's page does not shift.
+     */
+    isFirstRun: computed(
+      () => store.loadStatus() === 'success' && store.items().length === 0 && !store.isFormOpen()
+    ),
     /** Items with their dossier route, newest first. */
     rows: computed((): WatchlistRow[] =>
       [...store.items()]

@@ -1,9 +1,11 @@
-import {inject} from '@angular/core';
+import {inject, type Signal} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, filter, from, mergeMap, pipe, switchMap, tap} from 'rxjs';
 
+import {LEDGER_DECISION_ID_PARAM} from '../../../../shared/enums/app-route/app-route.enum';
 import {
   type RecommendationDto,
   type RecommendationsResult,
@@ -20,6 +22,8 @@ interface EffectsStore {
   setError(errorCode: Nullable<string>): void;
   setData(result: RecommendationsResult): void;
   applyDecision(decided: RecommendationDto): void;
+  select(id: Nullable<string>): void;
+  selectedId: Signal<Nullable<string>>;
   setScorecard(card: ScorecardDto): void;
 }
 
@@ -31,7 +35,7 @@ export function decisionsEffects(store: EffectsStore) {
   const sheet = inject(DecisionSheetService);
   const scorecards = inject(ScorecardService);
 
-  /** Each pending ticker's verdict (spec 726 US2); a failed read leaves that card without one. */
+  /** The open proposal's ticker verdict (spec 726 US2); a failed read leaves the detail without one. */
   const loadScorecards = rxMethod<string[]>(
     pipe(
       switchMap(tickers =>
@@ -55,7 +59,10 @@ export function decisionsEffects(store: EffectsStore) {
             tap(result => {
               store.setData(result);
               store.setSuccess();
-              loadScorecards([...new Set(result.pending.map(r => r.ticker))]);
+              const open = result.pending.find(rec => rec.id === store.selectedId());
+              if (open) {
+                loadScorecards([open.ticker]);
+              }
             }),
             catchError((err: unknown) => {
               store.setError(extractErrorCode(err));
@@ -76,6 +83,11 @@ export function decisionsEffects(store: EffectsStore) {
   };
 }
 
-export function decisionsHooks(store: {load: () => void}): void {
+/** The queue opens on no proposal; a detail route names one by id. */
+export function decisionsHooks(store: {
+  load: () => void;
+  select: (id: Nullable<string>) => void;
+}): void {
+  store.select(inject(ActivatedRoute).snapshot.paramMap.get(LEDGER_DECISION_ID_PARAM));
   store.load();
 }

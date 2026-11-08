@@ -30,7 +30,15 @@
               label="Email"
               formControlName="email"
             >
-              <cmn-input type="email" placeholder="name@example.com" autocomplete="off" />
+              <cmn-input
+                type="email"
+                placeholder="name@example.com"
+                autocomplete="off"
+                autocapitalize="none"
+                autocorrect="off"
+                inputmode="email"
+                enterkeyhint="send"
+              />
             </cmn-form-field>
             <cmn-button
               [disabled]="store.isInviteLoading()"

@@ -105,3 +105,24 @@ export interface PriceChartOption<T extends string> {
   value: T;
   label: string;
 }
+
+/** The slice of the chart's store the Chart options sheet reads and writes. */
+export interface PriceChartOptionsStore {
+  period(): PricePeriodId;
+  interval(): Nullable<PriceIntervalId>;
+  kind(): PriceChartKind;
+  movingAverages(): MovingAverageId[];
+  isMeasuring(): boolean;
+  intervalOptions(): readonly PriceChartOption<PriceIntervalId>[];
+  averageOptions(): readonly PriceChartOption<MovingAverageId>[];
+  selectPeriod(period: PricePeriodId): void;
+  selectInterval(interval: PriceIntervalId): void;
+  selectKind(kind: PriceChartKind): void;
+  toggleMovingAverage(id: MovingAverageId): void;
+  setMeasuring(isMeasuring: boolean): void;
+}
+
+/** What the phone's Chart options sheet opens with: the chart's own store, whose selections it edits in place. */
+export interface PriceChartOptionsSheetData {
+  store: PriceChartOptionsStore;
+}

@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
-import {provideRouter} from '@angular/router';
+import {provideRouter, Router} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {ASYNC_STATE_SHOW_DELAY_MS, type Nullable} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS} from '@lifekit-hq/ui';
 import {EMPTY, NEVER, of} from 'rxjs';
 import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
@@ -10,15 +10,12 @@ import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {
   type RecommendationDto,
   type RecommendationsResult,
 } from '../../../../shared/models/recommendation/recommendation.model';
-import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
-import {
-  DECISION_SKELETON_CARDS,
-  DECISIONS_EMPTY_COPY,
-} from '../../constants/recommendation/recommendation.constants';
+import {DECISIONS_EMPTY_COPY} from '../../constants/recommendation/recommendation.constants';
 import {DecisionSheetService} from '../../services/decision-sheet.service';
 import {RecommendationService} from '../../services/recommendation.service';
 import {ScorecardService} from '../../services/scorecard.service';
@@ -88,35 +85,13 @@ describe('DecisionsComponent', () => {
     read = vi.fn().mockReturnValue(EMPTY);
   });
 
-  it("opens each pending card's research verdict once its scorecard arrives", () => {
-    read.mockImplementation((symbol: string) =>
-      symbol === 'GRAB' ? of(ScorecardFixtures.scorecard({symbol})) : EMPTY
-    );
-    const {host} = render({
-      pending: [
-        mkRecommendation({id: 'a', ticker: 'GRAB'}),
-        mkRecommendation({id: 'b', ticker: 'DRAM'}),
-      ],
-      decided: [],
-    });
-
-    const verdictOf = (ticker: string): Nullable<Element> =>
-      host.querySelector(
-        `[data-testid="recommendation-card-${ticker}"] [data-testid="recommendation-verdict"]`
-      );
-    expect(
-      verdictOf('GRAB')?.querySelector('[data-testid="verdict-word"]')?.textContent?.trim()
-    ).toBe('AVOID');
-    expect(verdictOf('DRAM')).toBeNull();
-  });
-
   it('says plainly that Finance Sentry never trades', () => {
     const {host} = render({pending: [], decided: []});
 
     expect(host.textContent).toContain('Finance Sentry never trades');
   });
 
-  it('holds the place of the pending cards and the decided list while the queue loads', () => {
+  it('holds the place of the pending rows and the decided list while the queue loads', () => {
     vi.useFakeTimers();
     onTestFinished(() => {
       vi.useRealTimers();
@@ -138,7 +113,7 @@ describe('DecisionsComponent', () => {
       '[data-testid="decisions-skeleton"]'
     );
 
-    expect(skeleton?.querySelectorAll('cmn-card').length).toBe(DECISION_SKELETON_CARDS);
+    expect(skeleton?.querySelector('cmn-skeleton[shape="row"]')).not.toBeNull();
     expect(skeleton?.textContent).not.toContain(DECISIONS_EMPTY_COPY.message);
   });
 
@@ -146,35 +121,46 @@ describe('DecisionsComponent', () => {
     const {host} = render({pending: [], decided: []});
 
     expect(host.textContent).toContain(DECISIONS_EMPTY_COPY.message);
-    expect(host.querySelector('fns-recommendation-card')).toBeNull();
+    expect(host.querySelector('[data-testid="decisions-pending"]')).toBeNull();
   });
 
-  it('lists pending proposals oldest first, each with its ticker linked', () => {
+  it('lists pending proposals oldest first as one-line rows: verb chip, ticker, value', () => {
     const {host} = render({
       pending: [
         mkRecommendation({id: 'b', ticker: 'GRAB', createdAt: '2026-10-12T00:00:00Z'}),
-        mkRecommendation({id: 'a', ticker: 'DRAM', createdAt: '2026-10-01T00:00:00Z'}),
+        mkRecommendation({
+          id: 'a',
+          ticker: 'DRAM',
+          action: 'Exit',
+          sizeUsd: 6420,
+          createdAt: '2026-10-01T00:00:00Z',
+        }),
       ],
       decided: [],
     });
 
-    const cards = Array.from(host.querySelectorAll('[data-testid^="recommendation-card-"]'));
-    expect(cards.map(c => c.getAttribute('data-testid'))).toEqual([
-      'recommendation-card-DRAM',
-      'recommendation-card-GRAB',
+    const rows = Array.from(host.querySelectorAll('[data-testid^="decision-row-"]'));
+    expect(rows.map(r => r.getAttribute('data-testid'))).toEqual([
+      'decision-row-DRAM',
+      'decision-row-GRAB',
     ]);
-    expect(cards[0].querySelector('a')?.getAttribute('href')).toBe('/assets/DRAM');
+    expect(rows[0].textContent).toContain('Exit');
+    expect(rows[0].textContent).toContain('DRAM');
+    expect(rows[0].textContent).toContain('$6,420');
+    expect(rows[0].textContent).not.toContain('Invalidated if');
+    expect(host.querySelector('fns-recommendation-card')).toBeNull();
     expect(host.querySelector('[data-testid="decisions-decided"]')).toBeNull();
     expect(host.textContent).toContain('No decisions in the last 30 days.');
   });
 
-  it('opens the sheet for the verdict picked on a card', () => {
-    const pending = mkRecommendation();
+  it("pushes the proposal's detail when its row is pressed", () => {
+    const pending = mkRecommendation({id: 'rec-9'});
     const {host} = render({pending: [pending], decided: []});
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    host.querySelector<HTMLElement>('[data-testid="recommendation-confirm"] button')?.click();
+    host.querySelector<HTMLElement>('[data-testid="decision-row-GRAB"] button')?.click();
 
-    expect(open).toHaveBeenCalledWith(pending, 'confirm');
+    expect(navigate).toHaveBeenCalledWith([AppRoute.LedgerDecision, 'rec-9']);
   });
 
   it("shows decided outcomes with the owner's decision valued against the S&P 500, toned by sign", () => {

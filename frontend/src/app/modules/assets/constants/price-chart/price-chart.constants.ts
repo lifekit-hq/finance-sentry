@@ -21,6 +21,11 @@ export const PRICE_PERIODS: readonly PriceChartOption<PricePeriodId>[] = [
   {value: 'ALL', label: 'All'},
 ];
 
+/** The periods the phone's one segmented row carries (a segmented control holds five at most); the rest live in Chart options. */
+export const PRICE_PHONE_PERIODS: readonly PriceChartOption<PricePeriodId>[] = PRICE_PERIODS.filter(
+  option => ['1D', '1M', '1Y', '5Y', 'ALL'].includes(option.value)
+);
+
 export const DEFAULT_PRICE_PERIOD: PricePeriodId = '1Y';
 
 export const PRICE_INTERVALS: readonly PriceChartOption<PriceIntervalId>[] = [
@@ -80,6 +85,10 @@ export const SECONDS_PER_MINUTE = 60;
 
 export const MEASURE_HINT =
   'To measure a span, hold Shift and drag across the chart, or turn on Measure and drag.';
+/** The phone's version of the hint: no keyboard, so Measure is switched on in Chart options first. */
+export const MEASURE_HINT_TOUCH =
+  'To measure a span, turn on Measure in Chart options, then drag across the chart.';
+export const CHART_OPTIONS_LABEL = 'Chart options';
 export const MEASURE_OPTIONS: readonly PriceChartOption<'measure'>[] = [
   {value: 'measure', label: 'Measure'},
 ];

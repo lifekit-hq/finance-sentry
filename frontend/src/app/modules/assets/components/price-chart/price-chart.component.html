@@ -19,50 +19,73 @@
         </p>
       }
     </div>
-    <lk-segmented
-      [options]="kinds"
-      [value]="store.kind()"
-      (lk-segmented-change)="onKindChange($event)"
-      data-testid="chart-kind"
-      label="Chart type"
-    />
+    @if (!isPhone()) {
+      <lk-segmented
+        [options]="kinds"
+        [value]="store.kind()"
+        (lk-segmented-change)="onKindChange($event)"
+        data-testid="chart-kind"
+        label="Chart type"
+      />
+    }
   </div>
 
-  <lk-chip-row
-    [options]="periods"
-    [selected]="[store.period()]"
-    (lk-chip-row-change)="onPeriodChange($event)"
-    class="mt-cmn-3 block"
-    data-testid="chart-periods"
-    label="Chart period"
-  />
-  <lk-chip-row
-    [options]="store.intervalOptions()"
-    [selected]="store.interval() ? [store.interval()!] : []"
-    (lk-chip-row-change)="onIntervalChange($event)"
-    class="mt-cmn-1 block"
-    data-testid="chart-intervals"
-    label="Candle size"
-  />
-  <div class="mt-cmn-1 flex flex-wrap items-center gap-x-cmn-3">
+  @if (isPhone()) {
+    <lk-segmented
+      [options]="phonePeriods"
+      [value]="phonePeriod()"
+      (lk-segmented-change)="onPhonePeriodChange($event)"
+      class="mt-cmn-3 block"
+      data-testid="chart-periods"
+      label="Chart period"
+    />
+    <cmn-button
+      (clicked)="openOptions()"
+      variant="secondary"
+      size="sm"
+      icon="SlidersHorizontal"
+      class="mt-cmn-2 block"
+      data-testid="chart-options"
+    >
+      {{ optionsLabel }}
+    </cmn-button>
+  } @else {
     <lk-chip-row
-      [options]="store.averageOptions()"
-      [selected]="store.movingAverages()"
-      (lk-chip-row-change)="onAverageChange($event)"
-      class="block min-w-0 flex-1"
-      data-testid="chart-averages"
-      label="Moving averages"
-      mode="multi"
+      [options]="periods"
+      [selected]="[store.period()]"
+      (lk-chip-row-change)="onPeriodChange($event)"
+      class="mt-cmn-3 block"
+      data-testid="chart-periods"
+      label="Chart period"
     />
     <lk-chip-row
-      [options]="measureOptions"
-      [selected]="store.isMeasuring() ? ['measure'] : []"
-      (lk-chip-row-change)="onMeasureChange($event)"
-      data-testid="chart-measure-toggle"
-      label="Measure tool"
-      mode="multi"
+      [options]="store.intervalOptions()"
+      [selected]="store.interval() ? [store.interval()!] : []"
+      (lk-chip-row-change)="onIntervalChange($event)"
+      class="mt-cmn-1 block"
+      data-testid="chart-intervals"
+      label="Candle size"
     />
-  </div>
+    <div class="mt-cmn-1 flex flex-wrap items-center gap-x-cmn-3">
+      <lk-chip-row
+        [options]="store.averageOptions()"
+        [selected]="store.movingAverages()"
+        (lk-chip-row-change)="onAverageChange($event)"
+        class="block min-w-0 flex-1"
+        data-testid="chart-averages"
+        label="Moving averages"
+        mode="multi"
+      />
+      <lk-chip-row
+        [options]="measureOptions"
+        [selected]="store.isMeasuring() ? ['measure'] : []"
+        (lk-chip-row-change)="onMeasureChange($event)"
+        data-testid="chart-measure-toggle"
+        label="Measure tool"
+        mode="multi"
+      />
+    </div>
+  }
 
   <cmn-async-state
     [status]="store.asyncStatus()"
@@ -147,8 +170,10 @@
         @if (store.averageHint(); as hint) {
           <p>{{ hint }}</p>
         }
-        <p>{{ intervalReason }}</p>
-        <p>{{ measureHint }}</p>
+        @if (!isPhone()) {
+          <p>{{ intervalReason }}</p>
+        }
+        <p>{{ measureHint() }}</p>
       </div>
     }
   </cmn-async-state>

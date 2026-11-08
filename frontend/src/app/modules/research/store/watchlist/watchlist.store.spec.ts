@@ -201,4 +201,31 @@ describe('WatchlistStore', () => {
     expect(store.items()).toEqual([PLTR, MRNA]);
     expect(store.removeErrorMessage()).not.toBe('');
   });
+
+  it('leads with the explanation on a loaded, empty list and keeps the form behind it', () => {
+    const store = setup({getItems: vi.fn().mockReturnValue(of([]))});
+
+    expect(store.isFirstRun()).toBe(true);
+
+    store.openForm();
+
+    expect(store.isFirstRun()).toBe(false);
+  });
+
+  it('keeps the form while the list loads, so a returning owner sees no shift', () => {
+    const store = setup({getItems: vi.fn().mockReturnValue(new Subject<WatchlistItem[]>())});
+
+    expect(store.isFirstRun()).toBe(false);
+  });
+
+  it('keeps the form on a failed load and on a list with names', () => {
+    const failed = setup({
+      getItems: vi.fn().mockReturnValue(throwError(() => new HttpErrorResponse({status: 500}))),
+    });
+    expect(failed.isFirstRun()).toBe(false);
+
+    TestBed.resetTestingModule();
+    const filled = setup({getItems: vi.fn().mockReturnValue(of([PLTR]))});
+    expect(filled.isFirstRun()).toBe(false);
+  });
 });
