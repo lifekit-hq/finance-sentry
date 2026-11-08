@@ -23,6 +23,10 @@ export function dashboardMethods(store: WritableStateSource<DashboardState>) {
     setScrubIndex(index: number | null): void {
       patchState(store, {scrubIndex: index});
     },
+    // Closing the chart ends any scrub with it: the sparkline cannot hold one.
+    toggleChart(): void {
+      patchState(store, state => ({chartExpanded: !state.chartExpanded, scrubIndex: null}));
+    },
     setHistoryLoading(loading: boolean): void {
       patchState(store, {historyLoading: loading});
     },

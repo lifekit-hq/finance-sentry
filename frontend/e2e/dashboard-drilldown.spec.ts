@@ -455,6 +455,10 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     const bar = page.getByRole('group', {name: 'History range'});
     const chart = page.locator('cmn-area-chart');
     await expect(bar).toBeVisible();
+    // Home opens on a sparkline under the figure; the full chart is one tap away.
+    await expect(page.locator('cmn-line-chart')).toBeVisible();
+    await expect(chart).toHaveCount(0);
+    await page.getByTestId('net-worth-chart-toggle').click();
     await expect(chart).toBeVisible();
 
     const boxes = await bar.getByRole('button').evaluateAll(cells =>
@@ -479,6 +483,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await page.goto('/dashboard');
     const value = page.getByTestId('net-worth-value');
     await expect(value).toContainText('$50,000.00');
+    await page.getByTestId('net-worth-chart-toggle').click();
     const canvas = page.locator('cmn-area-chart canvas');
     await expect(canvas).toBeVisible();
     const box = await canvas.boundingBox();
@@ -580,6 +585,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await mockHistory(page);
     await page.goto('/dashboard');
     await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
+    await page.getByTestId('net-worth-chart-toggle').click();
     const canvas = page.locator('cmn-area-chart canvas');
     await expect(canvas).toBeVisible();
     await waitForChartToSettle(canvas);

@@ -75,6 +75,21 @@ describe('NetWorthWhyMovedComponent', () => {
     expect(el.querySelector('[data-testid="net-worth-why-moved-change-note"]')).toBeNull();
   });
 
+  it('leads each line with an icon, ahead of its label', () => {
+    const el = render(bridge());
+
+    for (const key of ['savings', 'investmentReturn']) {
+      const line = el.querySelector(`[data-testid="net-worth-why-moved-${key}"]`);
+      const icon = line?.querySelector('cmn-icon');
+      const label = line?.querySelector('span.font-medium');
+
+      expect(icon, key).not.toBeNull();
+      expect(icon?.compareDocumentPosition(label as Node), key).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    }
+  });
+
   it('notes what the change holds beyond the two lines', () => {
     const el = render(bridge({endValue: 11_250, newlyLinked: 250}));
 
