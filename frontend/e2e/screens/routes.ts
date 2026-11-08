@@ -120,7 +120,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: BUDGETS_SCREEN.path,
     kind: 'list',
     note: 'Monthly estimates per category.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(BUDGETS_SCREEN),
   },
   {
@@ -128,7 +128,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: SUBSCRIPTIONS_SCREEN.path,
     kind: 'list',
     note: 'Detected recurring charges.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(SUBSCRIPTIONS_SCREEN),
   },
   {
@@ -136,7 +136,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: WATCHLIST_SCREEN.path,
     kind: 'list',
     note: 'Watched assets.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(WATCHLIST_SCREEN),
   },
   {

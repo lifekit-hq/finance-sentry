@@ -24,7 +24,7 @@ import {
   MenuComponent,
   type MenuItem,
   type Nullable,
-  PageContainerComponent,
+  PageComponent,
   PageScrollComponent,
   SkeletonComponent,
   StatCardComponent,
@@ -88,7 +88,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
   selector: 'fns-subscriptions',
   imports: [
     FxImpactWidgetComponent,
-    PageContainerComponent,
+    PageComponent,
     PageScrollComponent,
     ButtonComponent,
     CardComponent,
