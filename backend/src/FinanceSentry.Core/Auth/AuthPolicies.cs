@@ -25,6 +25,22 @@ public static class AuthPolicies
     /// </summary>
     public const string RequireMcpPersonalToken = "RequireMcpPersonalToken";
 
+    /// <summary>
+    /// The fleet-agent identity's read gate: a token of the fleet-agent scheme (never a person's session) carrying
+    /// <see cref="FleetScopes.Read"/>. Not a permission policy: the fleet principal holds no permission claim.
+    /// </summary>
+    public const string RequireFleetRead = "RequireFleetRead";
+
+    /// <summary>The fleet-agent identity's recategorisation gate: <see cref="FleetScopes.Recategorise"/>.</summary>
+    public const string RequireFleetRecategorise = "RequireFleetRecategorise";
+
+    /// <summary>The scope each fleet policy requires. Fleet policies authenticate with the fleet-agent scheme only.</summary>
+    public static readonly IReadOnlyDictionary<string, string> ScopeByFleetPolicy = new Dictionary<string, string>
+    {
+        [RequireFleetRead] = FleetScopes.Read,
+        [RequireFleetRecategorise] = FleetScopes.Recategorise,
+    };
+
     /// <summary>Operations access (<see cref="Permissions.OpsAdmin"/>); the name predates permissions.</summary>
     public const string RequireOwner = "RequireOwner";
 

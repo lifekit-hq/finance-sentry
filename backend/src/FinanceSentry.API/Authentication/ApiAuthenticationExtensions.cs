@@ -9,7 +9,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 /// The API host's authentication: the shared JwtBearer registration (<see cref="AccessTokenAuthenticationExtensions"/>)
 /// for <see cref="AuthAudiences.App"/> tokens, reading the app's access token from the
 /// <see cref="AuthCookies.AccessToken"/> cookie (<c>__Host-</c>-prefixed in production, see <see cref="AuthCookies"/>;
-/// the Authorization header still works), plus the default-deny fallback policy.
+/// the Authorization header still works), plus the default-deny fallback policy. The fleet-agent identity
+/// (<see cref="FleetAgentAuthenticationExtensions"/>) sits next to it as a named scheme that only the fleet
+/// policies use; it is never the default.
 /// </summary>
 public static class ApiAuthenticationExtensions
 {
@@ -19,10 +21,12 @@ public static class ApiAuthenticationExtensions
     /// (Identity registers its own cookie scheme as the default; this replaces that default).</summary>
     public static IServiceCollection AddApiAuthentication(this IServiceCollection services) =>
         services.AddAccessTokenAuthentication(AuthAudiences.App, options =>
-        {
-            options.Events.OnMessageReceived = ReadAccessTokenCookie;
-            options.Events.OnForbidden = WriteForbiddenBodyAsync;
-        });
+            {
+                options.Events.OnMessageReceived = ReadAccessTokenCookie;
+                options.Events.OnForbidden = WriteForbiddenBodyAsync;
+            })
+            // The fleet-agent identity: a second, named scheme reachable only through the fleet policies.
+            .AddFleetAgentAuthentication();
 
     private static Task ReadAccessTokenCookie(MessageReceivedContext context)
     {
