@@ -31,6 +31,13 @@ export const NET_WORTH_BRIDGE_SUMMARY_LABELS = {
   change: 'Change',
 } as const;
 
+/** The icon leading each "why it moved" line (Lucide names). */
+export const NET_WORTH_BRIDGE_SUMMARY_ICONS = {
+  savings: 'PiggyBank',
+  investmentReturn: 'TrendingUp',
+  fxTranslation: 'ArrowLeftRight',
+} as const;
+
 /** The one sentence under each "why it moved" line. */
 export const NET_WORTH_BRIDGE_SUMMARY_EXPLANATIONS = {
   savings: 'Money that came in minus money you spent.',

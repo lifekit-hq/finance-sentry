@@ -28,6 +28,8 @@ export interface DashboardState {
   historyError: string | null;
   /** Index into the drawn history while a pointer scrubs the hero chart; null at rest. */
   scrubIndex: number | null;
+  /** Whether Home shows the full chart instead of the hero's sparkline. */
+  chartExpanded: boolean;
 }
 
 export const initialDashboardState: DashboardState = {
@@ -43,6 +45,7 @@ export const initialDashboardState: DashboardState = {
   historyLoading: false,
   historyError: null,
   scrubIndex: null,
+  chartExpanded: false,
 };
 
 /** What a revisit restores: the last visit's numbers and history with the range each was loaded for. */

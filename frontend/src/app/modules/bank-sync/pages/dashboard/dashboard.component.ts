@@ -16,6 +16,7 @@ import {
   ButtonComponent,
   CardComponent,
   IconComponent,
+  LineChartComponent,
   PageContainerComponent,
   SkeletonComponent,
   StatCardComponent,
@@ -71,6 +72,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     CardComponent,
     HeadlineBadgeComponent,
     IconComponent,
+    LineChartComponent,
     MoneyPipe,
     NetWorthWhyMovedComponent,
     RouterLink,
@@ -125,8 +127,8 @@ const HISTORY_RANGES: ChipRowOption[] = [
           </cmn-card>
 
           <!--
-            One hero: the headline figure and how it moved, the chart it comes from (its own legend
-            names the cash and invested bands), then the range control under the chart
+            One hero: the headline figure and how it moved, a sparkline of it (the full chart, whose own
+            legend names the cash and invested bands, is one tap away), then the range control
             (Robinhood/IBKR hero, #825 pick 2). The control stays page-level: it also drives "why it
             moved", "where it is" and the tiles below. Holding the chart scrubs the figure, the delta
             and the "where it is" rows to that point; release snaps them back.
@@ -142,6 +144,16 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 >
                   Net worth →
                 </a>
+                <!-- Always drawn, so the header keeps one height while the history loads. -->
+                <cmn-button
+                  [icon]="store.chartExpanded() ? 'ChevronUp' : 'ChartArea'"
+                  [disabled]="!store.historyHasHistory()"
+                  (clicked)="store.toggleChart()"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="net-worth-chart-toggle"
+                  >{{ store.chartExpanded() ? 'Hide chart' : 'Chart' }}</cmn-button
+                >
               </div>
               @if (store.isFirstLoad()) {
                 <cmn-skeleton
@@ -224,15 +236,38 @@ const HISTORY_RANGES: ChipRowOption[] = [
               } @else if (
                 store.isHistoryFirstLoad() || (!store.historyHasHistory() && store.isFirstLoad())
               ) {
-                <cmn-skeleton
-                  [className]="eitherPlaceholder()"
-                  height="19.85rem"
-                  data-testid="net-worth-chart-skeleton"
-                />
+                @if (store.chartExpanded()) {
+                  <cmn-skeleton
+                    [className]="eitherPlaceholder()"
+                    height="19.85rem"
+                    data-testid="net-worth-chart-skeleton"
+                  />
+                } @else {
+                  <!-- Wrapped like the sparkline it stands for, so the stack spaces both the same. -->
+                  <div class="h-14">
+                    <cmn-skeleton
+                      [className]="eitherPlaceholder()"
+                      height="3.5rem"
+                      data-testid="net-worth-chart-skeleton"
+                    />
+                  </div>
+                }
               } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
                 >
+              } @else if (!store.chartExpanded()) {
+                <!-- The sparkline answers "which way": the same totals the full chart draws, a tap from it. -->
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+                <div (click)="store.toggleChart()" class="h-14" data-testid="net-worth-sparkline">
+                  <cmn-line-chart
+                    [data]="store.netWorthTrendPoints()"
+                    [currency]="store.baseCurrency()"
+                    [label]="store.netWorthChartLabel()"
+                    [compact]="true"
+                    class="block h-full"
+                  />
+                </div>
               } @else {
                 <cmn-area-chart
                   [series]="store.netWorthAreaSeries()"

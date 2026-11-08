@@ -1,5 +1,5 @@
 import {computed, type Signal} from '@angular/core';
-import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS, type ChartPoint} from '@lifekit-hq/charts-core';
 import {type AllocationSegment, type AreaSeries, type Nullable} from '@lifekit-hq/ui';
 
 import {
@@ -550,6 +550,12 @@ export function dashboardComputed(store: StateSignals) {
     ),
 
     netWorthAreaSeries,
+    // The stack top as one line, for the hero's sparkline: the same totals the full chart draws.
+    netWorthTrendPoints: computed((): ChartPoint[] => {
+      const totals = chartedTotals();
+      const labels = netWorthAreaSeries()[0]?.points ?? [];
+      return totals.map((value, i) => ({label: labels[i].label, value}));
+    }),
     netWorthChartLabel: computed(() =>
       hasSplit() ? NET_WORTH_BY_SPLIT_LABEL : NET_WORTH_BY_SLEEVE_LABEL
     ),

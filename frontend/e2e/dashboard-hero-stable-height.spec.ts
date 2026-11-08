@@ -125,6 +125,9 @@ for (const [name, viewport] of [
       await mockApis(page);
       await page.goto('/dashboard');
       await expect(page.getByTestId('net-worth-change')).toBeVisible();
+      // Scrubbing is the full chart's: open it first, and hold that height as the baseline.
+      await page.getByTestId('net-worth-chart-toggle').click();
+      await expect(page.locator('cmn-area-chart')).toBeVisible();
       const card = heroCard(page);
       const baseline = (await card.boundingBox())?.height ?? 0;
       const canvas = card.locator('canvas').first();

@@ -29,11 +29,15 @@ function fakeStore(
 ) {
   const historyRange = signal<HistoryRange>(range);
   const setScrubIndex = vi.fn();
+  const toggleChart = vi.fn();
   const setHistoryRange = vi.fn((next: HistoryRange) => historyRange.set(next));
   const real: Record<string, unknown> = {
     historyRange,
     setHistoryRange,
     setScrubIndex,
+    toggleChart,
+    // Open by default here so the specs below exercise the full chart; the real store starts closed.
+    chartExpanded: signal(true),
     data: signal(data),
     baseCurrency: signal('EUR'),
     isLoading: signal(false),
@@ -140,6 +144,40 @@ describe('DashboardComponent range presets', () => {
     );
     expect(order[1]?.compareDocumentPosition(order[2] as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('opens on a sparkline under the figure, with the full chart one tap away', () => {
+    const {el, store} = render('3m', undefined, {chartExpanded: signal(false)});
+    const card = el.querySelector('cmn-card');
+    const order = [
+      '[data-testid="net-worth-value"]',
+      '[data-testid="net-worth-sparkline"]',
+      'lk-chip-row',
+    ].map(sel => card?.querySelector(sel));
+
+    expect(order.every(Boolean)).toBe(true);
+    expect(card?.querySelector('cmn-area-chart')).toBeNull();
+    expect(card?.querySelector('cmn-line-chart')).not.toBeNull();
+    expect(order[0]?.compareDocumentPosition(order[1] as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(order[1]?.compareDocumentPosition(order[2] as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    el.querySelector<HTMLElement>('[data-testid="net-worth-sparkline"]')?.click();
+    expect(store['toggleChart']).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['Chart', false],
+    ['Hide chart', true],
+  ])('labels the chart toggle %j while the full chart is open: %s', (label, expanded) => {
+    const {el} = render('3m', undefined, {chartExpanded: signal(expanded)});
+
+    expect(el.querySelector('[data-testid="net-worth-chart-toggle"]')?.textContent?.trim()).toBe(
+      label
     );
   });
 
