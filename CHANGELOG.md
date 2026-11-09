@@ -5,6 +5,71 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.19.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.18.0...v1.19.0) (2026-11-09)
+
+
+### Features
+
+* **auth:** accept the fleet-agent identity next to the user scheme ([#1357](https://github.com/lifekit-hq/finance-sentry/issues/1357)) ([7dde876](https://github.com/lifekit-hq/finance-sentry/commit/7dde876fb538d7692e5fc5f4e1d6357d33ba03a9))
+* **auth:** add user data export, privacy and terms pages, and informational-only labelling ([#1293](https://github.com/lifekit-hq/finance-sentry/issues/1293)) ([886637c](https://github.com/lifekit-hq/finance-sentry/commit/886637ca6701bae230cbd60e0c3cd16c0fd5576a))
+* **auth:** audit trail for profile data and field-encryption primitive ([#1319](https://github.com/lifekit-hq/finance-sentry/issues/1319)) ([ee482d2](https://github.com/lifekit-hq/finance-sentry/commit/ee482d2aa589cdb1eef92349bed90eea5739e987))
+* **bank-sync:** add detection_phrases table seeded from statement vocabulary ([#1288](https://github.com/lifekit-hq/finance-sentry/issues/1288)) ([1dd0c8e](https://github.com/lifekit-hq/finance-sentry/commit/1dd0c8e113b7df9146932b8805fa2706b17701ae))
+* **bank-sync:** Home leads with a sparkline, full chart a tap away, and icons on "Why it moved" ([#1353](https://github.com/lifekit-hq/finance-sentry/issues/1353)) ([30e4a33](https://github.com/lifekit-hq/finance-sentry/commit/30e4a331e75747fc6276d2f8cbe4e68f76ec3570))
+* **bank-sync:** show connection details from the accounts menu ([#1307](https://github.com/lifekit-hq/finance-sentry/issues/1307)) ([25b5b4e](https://github.com/lifekit-hq/finance-sentry/commit/25b5b4e96c5123bb941348fbfe48c2ad2a62b6bc))
+* **budgets:** rework Budgets into history-filled monthly estimates ([#1309](https://github.com/lifekit-hq/finance-sentry/issues/1309)) ([82279e0](https://github.com/lifekit-hq/finance-sentry/commit/82279e0a842b2b5a1e2535b223665616f6f3684d))
+* **companion:** batch MarketStructure and NewsCluster signals into the ledger-pulse ([#1296](https://github.com/lifekit-hq/finance-sentry/issues/1296)) ([85b26be](https://github.com/lifekit-hq/finance-sentry/commit/85b26be8d265592de309eb6cca1ccae8a201c820))
+* **frontend:** bump lifekit-common to 4.4.2 and wire the screen check, route scan and baselines ([#1350](https://github.com/lifekit-hq/finance-sentry/issues/1350)) ([81a4828](https://github.com/lifekit-hq/finance-sentry/commit/81a482801010d919f9ec511a1abeccc7f742bb68))
+* **frontend:** phone fixes for the ledger queue, dossier chart, watchlist first run and keyboards ([#1354](https://github.com/lifekit-hq/finance-sentry/issues/1354)) ([e479373](https://github.com/lifekit-hq/finance-sentry/commit/e47937365447c60efaaccec1ca6a8050c1eb9b91))
+* **frontend:** put events and decision detail on cmn-page ([#1360](https://github.com/lifekit-hq/finance-sentry/issues/1360)) ([eded70a](https://github.com/lifekit-hq/finance-sentry/commit/eded70acef1839f5623a1d28ffde4c78df645028))
+* **frontend:** put settings and people on cmn-page ([#1361](https://github.com/lifekit-hq/finance-sentry/issues/1361)) ([9fc047f](https://github.com/lifekit-hq/finance-sentry/commit/9fc047f8cdf8577b7168bc4d3c9817e6e36aef4c))
+* **frontend:** put subscriptions and watchlist on cmn-page ([#1359](https://github.com/lifekit-hq/finance-sentry/issues/1359)) ([c040ef4](https://github.com/lifekit-hq/finance-sentry/commit/c040ef4300d97552118fd3ee0beb3cb720eac5f8))
+* **holdings:** show Accounts performance panel as four rows with a disclosure ([#1303](https://github.com/lifekit-hq/finance-sentry/issues/1303)) ([6d7500c](https://github.com/lifekit-hq/finance-sentry/commit/6d7500ca5f0b9bbc16a7b2922a81dae3b25531a6))
+* **holdings:** show realized and unrealized P&L on capital, with QQQ, in the brokerage performance panel ([#1314](https://github.com/lifekit-hq/finance-sentry/issues/1314)) ([128c0c5](https://github.com/lifekit-hq/finance-sentry/commit/128c0c57957df106c0755a73746c95e87bdfa231))
+* **portfolio-construction:** apply IPS sector exclusions using scorecard sector data ([#1334](https://github.com/lifekit-hq/finance-sentry/issues/1334)) ([e9412a5](https://github.com/lifekit-hq/finance-sentry/commit/e9412a5b0e5d46fc779bca4647846fc4606aaf55))
+* **portfolio-construction:** ranked universe screen with verdicts and suggested weights ([#1313](https://github.com/lifekit-hq/finance-sentry/issues/1313)) ([52b1355](https://github.com/lifekit-hq/finance-sentry/commit/52b1355273cc42b11b8d18f187d2d9c03727ad69))
+* **radar:** make thesis symbols a Radar universe source ([#1330](https://github.com/lifekit-hq/finance-sentry/issues/1330)) ([66fedb7](https://github.com/lifekit-hq/finance-sentry/commit/66fedb7842309a0f9a22f612c67250304b58c67e))
+* **research:** derive gross margin from revenue less cost of revenue when no GrossProfit is reported ([#1327](https://github.com/lifekit-hq/finance-sentry/issues/1327)) ([483180c](https://github.com/lifekit-hq/finance-sentry/commit/483180c690bc64d8c5abb165c8251f472b58299e))
+* **research:** interactive price chart on the asset dossier ([#1317](https://github.com/lifekit-hq/finance-sentry/issues/1317)) ([a5e6f9f](https://github.com/lifekit-hq/finance-sentry/commit/a5e6f9fbc7b312b9a9191c9acd5acce71bb7409d))
+* **research:** Irish disposal-tax context per position (CGT, exit tax) ([#1318](https://github.com/lifekit-hq/finance-sentry/issues/1318)) ([0441bec](https://github.com/lifekit-hq/finance-sentry/commit/0441bec70ad032832f788a8f6af39e5548e74d74))
+* **research:** link notable price moves to news and Radar signals on the asset dossier ([#1305](https://github.com/lifekit-hq/finance-sentry/issues/1305)) ([857e3b6](https://github.com/lifekit-hq/finance-sentry/commit/857e3b6b35f5c516608f9cd2061cf0f2942496e1))
+* **research:** per-share verdict block on asset page and verdict chips on Accounts rows ([#1294](https://github.com/lifekit-hq/finance-sentry/issues/1294)) ([69259ff](https://github.com/lifekit-hq/finance-sentry/commit/69259fff92b8fc9eeecd3757000990bc6ebbd26c))
+* **subscriptions:** alert when a detected subscription's price goes up ([#1302](https://github.com/lifekit-hq/finance-sentry/issues/1302)) ([daf2f33](https://github.com/lifekit-hq/finance-sentry/commit/daf2f338c9658fc3d1b7a86fbfd4162f8cdfbdf8))
+* **subscriptions:** return the exchange-rate insight as a data-gated widget ([#1311](https://github.com/lifekit-hq/finance-sentry/issues/1311)) ([c00be50](https://github.com/lifekit-hq/finance-sentry/commit/c00be50c38cc1315dc8f97fbd6e6b7f7712ab43e))
+* **subscriptions:** show merchant logos on subscription and installment rows ([#1304](https://github.com/lifekit-hq/finance-sentry/issues/1304)) ([ae9172f](https://github.com/lifekit-hq/finance-sentry/commit/ae9172ffb3b269fbaba105e2ee2f8a18dae88747))
+* **wealth:** add career-money timeline and scenario projection ([#1329](https://github.com/lifekit-hq/finance-sentry/issues/1329)) ([65fb97c](https://github.com/lifekit-hq/finance-sentry/commit/65fb97c842aca1b5aa70b3d07c6c657754eedd07))
+* **wealth:** add repair-net-worth-history verb for the July 2026 history (R1) ([#1289](https://github.com/lifekit-hq/finance-sentry/issues/1289)) ([f9a5a3f](https://github.com/lifekit-hq/finance-sentry/commit/f9a5a3fa606c6fda1106b38cdac859b4ad7e1945))
+* **wealth:** burn, savings rate and runway read ([#454](https://github.com/lifekit-hq/finance-sentry/issues/454)) ([#1315](https://github.com/lifekit-hq/finance-sentry/issues/1315)) ([64fc05e](https://github.com/lifekit-hq/finance-sentry/commit/64fc05e01271907a33cec17c9620f08ed4ce2e14))
+* **wealth:** declared income sources, encrypted and audited ([#1328](https://github.com/lifekit-hq/finance-sentry/issues/1328)) ([075589f](https://github.com/lifekit-hq/finance-sentry/commit/075589f9a42b5f1896a7d932e8f20f6696872846))
+* **wealth:** financial-profile read surface and risk-capacity indicator ([#1331](https://github.com/lifekit-hq/finance-sentry/issues/1331)) ([f5bc5a2](https://github.com/lifekit-hq/finance-sentry/commit/f5bc5a286373610beb896d584e27832347245f51))
+* **wealth:** track IPS goals against net worth and savings ([#1316](https://github.com/lifekit-hq/finance-sentry/issues/1316)) ([bd7d538](https://github.com/lifekit-hq/finance-sentry/commit/bd7d538359a8c1c6a918f563c9f905633325e3f4))
+
+
+### Bug Fixes
+
+* **bank-sync:** drop the redundant "invested" from dashboard allocation and chart labels ([#1347](https://github.com/lifekit-hq/finance-sentry/issues/1347)) ([787398d](https://github.com/lifekit-hq/finance-sentry/commit/787398d0e4e51218e53e3a6825f0ada22c96bb37))
+* **bank-sync:** fold Home's exchange-rates line into the Change total ([#1298](https://github.com/lifekit-hq/finance-sentry/issues/1298)) ([d5ab724](https://github.com/lifekit-hq/finance-sentry/commit/d5ab72455cbc3dddbc8b3f5a8f207f7fa80192cb))
+* **bank-sync:** keep the brokerage and crypto performance panels closed until opened ([#1348](https://github.com/lifekit-hq/finance-sentry/issues/1348)) ([98af517](https://github.com/lifekit-hq/finance-sentry/commit/98af5173ea1ef261f12ec88b878bacb5472579eb))
+* **bank-sync:** re-key owner-specific counterparties to the owner ([#1287](https://github.com/lifekit-hq/finance-sentry/issues/1287)) ([aaf42f9](https://github.com/lifekit-hq/finance-sentry/commit/aaf42f9397f9f94c1ed4ea26c36c27d539dd55a3))
+* **bank-sync:** start coverage holes at the first quiet week and treat them as missing data in spend readers ([#1338](https://github.com/lifekit-hq/finance-sentry/issues/1338)) ([41c867a](https://github.com/lifekit-hq/finance-sentry/commit/41c867a8484edc517d2cf4f76e2e12f14c9feb97))
+* **budgets:** stop applying the owner's Sep/Oct 2026 exclusion to every user ([#1326](https://github.com/lifekit-hq/finance-sentry/issues/1326)) ([32d02cf](https://github.com/lifekit-hq/finance-sentry/commit/32d02cfacb124934b3352f363cb96cf5b2ea35d2))
+* **research:** label the position verdict chip as informational, not advice ([#1312](https://github.com/lifekit-hq/finance-sentry/issues/1312)) ([c23eff6](https://github.com/lifekit-hq/finance-sentry/commit/c23eff6681d0e34ee7c9f22945ab24f7089a9f05))
+* **research:** name missed bars in WAIT verdict, follow dossier symbol changes, log section failures ([#1286](https://github.com/lifekit-hq/finance-sentry/issues/1286)) ([daae04c](https://github.com/lifekit-hq/finance-sentry/commit/daae04ccb01af1f4cb5125329ea1322dc0271cef))
+* **wealth:** guard net-worth history against a repeated carried zero and a frozen quote ([#1284](https://github.com/lifekit-hq/finance-sentry/issues/1284)) ([5dedaa5](https://github.com/lifekit-hq/finance-sentry/commit/5dedaa500ab276a29503e9565696ec69564cb1dd)), closes [#1283](https://github.com/lifekit-hq/finance-sentry/issues/1283)
+
+
+### Refactoring
+
+* **bank-sync:** move Inzhur connect store load state onto withAsyncStatus ([#951](https://github.com/lifekit-hq/finance-sentry/issues/951)) ([#1297](https://github.com/lifekit-hq/finance-sentry/issues/1297)) ([779237e](https://github.com/lifekit-hq/finance-sentry/commit/779237ebc78c575fe85d2e639a52edab20d25eea))
+* **frontend:** load the TrueLayer bank list with rxResource ([#1337](https://github.com/lifekit-hq/finance-sentry/issues/1337)) ([0b7735d](https://github.com/lifekit-hq/finance-sentry/commit/0b7735de1274e5c7eb4574b4bd3239d23125a3e5))
+* **frontend:** move auth, IBKR connect and TrueLayer picker load state onto platform async primitives ([#1333](https://github.com/lifekit-hq/finance-sentry/issues/1333)) ([3e394c5](https://github.com/lifekit-hq/finance-sentry/commit/3e394c5ac43315a337af4412f00bb10cecfa14f8))
+
+
+### Documentation
+
+* **design:** add the money design pattern page ([#1342](https://github.com/lifekit-hq/finance-sentry/issues/1342)) ([ec319b1](https://github.com/lifekit-hq/finance-sentry/commit/ec319b19b1945a087308cde2d59f532c4174c183)), closes [#1339](https://github.com/lifekit-hq/finance-sentry/issues/1339)
+* name license holder and add security email fallback ([#1300](https://github.com/lifekit-hq/finance-sentry/issues/1300)) ([5abe640](https://github.com/lifekit-hq/finance-sentry/commit/5abe6400ddfa1a5044ff87c6299d0c9570f2d92b))
+* **ops:** refresh database backup and data export guides ([#1332](https://github.com/lifekit-hq/finance-sentry/issues/1332)) ([3a88df5](https://github.com/lifekit-hq/finance-sentry/commit/3a88df543ed04baa6a4b1f0b38744ddaed03b237))
+
 ## [1.18.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.17.0...v1.18.0) (2026-11-02)
 
 
