@@ -21,9 +21,9 @@ jobs:
       actions: write
       pull-requests: write
       packages: read # the install step reads the private @lifekit-hq/* packages
-    uses: lifekit-hq/lifekit-common/.github/workflows/screen-baselines.yml@v4.6.0
+    uses: lifekit-hq/lifekit-common/.github/workflows/screen-baselines.yml@v4.7.0
     with:
-      lifekit-common-ref: v4.6.0
+      lifekit-common-ref: v4.7.0
       working-directory: frontend
       build-command: npm run build
       # The per-screen visual specs and the screen gates, each against its own Playwright config.
