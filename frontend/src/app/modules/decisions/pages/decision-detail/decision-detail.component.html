@@ -1,65 +1,63 @@
-<cmn-page-container spacing="none" fill>
-  <div class="flex min-h-0 flex-1 flex-col gap-cmn-4" data-testid="decision-detail">
-    <cmn-page-scroll label="Decision">
-      <cmn-async-state
-        [status]="store.view().status"
-        [errorMessage]="store.view().errorMessage"
-        [isEmpty]="store.selected() === null"
-        [emptyMessage]="missingCopy.message"
-        [emptySubMessage]="missingCopy.subMessage"
-        [emptyIcon]="missingCopy.icon"
-        (retry)="store.load()"
-        class="block"
-        errorPlacement="above"
-        retryable
-      >
-        <cmn-card skeleton data-testid="decision-detail-skeleton">
-          <cmn-skeleton [count]="4" shape="row" />
-        </cmn-card>
+<cmn-page kind="detail" fill data-testid="decision-detail">
+  <cmn-page-scroll label="Decision">
+    <cmn-async-state
+      [status]="store.view().status"
+      [errorMessage]="store.view().errorMessage"
+      [isEmpty]="store.selected() === null"
+      [emptyMessage]="missingCopy.message"
+      [emptySubMessage]="missingCopy.subMessage"
+      [emptyIcon]="missingCopy.icon"
+      (retry)="store.load()"
+      class="block"
+      errorPlacement="above"
+      retryable
+    >
+      <cmn-card skeleton data-testid="decision-detail-skeleton">
+        <cmn-skeleton [count]="4" shape="row" />
+      </cmn-card>
 
-        @if (store.selected(); as rec) {
-          <fns-recommendation-card
-            [recommendation]="rec"
-            [scorecard]="store.scorecards()[rec.ticker] ?? null"
-            [showActions]="false"
-          />
-        }
-      </cmn-async-state>
-    </cmn-page-scroll>
-
-    @if (store.selected(); as rec) {
-      @if (rec.status === 'Pending') {
-        <!-- Pinned: a sibling of the scroll region, so it stays at the foot while the record scrolls -->
-        <div
-          class="flex shrink-0 gap-cmn-2 border-t border-border-default pt-cmn-3"
-          data-testid="decision-actions"
-        >
-          <cmn-button
-            (clicked)="store.decide({recommendation: rec, verdict: 'reject'})"
-            variant="secondary"
-            class="flex-1"
-            data-testid="recommendation-reject"
-          >
-            Reject
-          </cmn-button>
-          <cmn-button
-            (clicked)="store.decide({recommendation: rec, verdict: 'confirm'})"
-            class="flex-1"
-            data-testid="recommendation-confirm"
-          >
-            Confirm…
-          </cmn-button>
-        </div>
-      } @else {
-        <p
-          class="shrink-0 border-t border-border-default pt-cmn-3 text-cmn-sm text-text-secondary"
-          data-testid="decision-recorded"
-        >
-          <cmn-tag [variant]="statusVariant[rec.status]">{{ statusLabel[rec.status] }}</cmn-tag>
-          {{ rec.decidedAt ?? rec.expiresAt | date: 'mediumDate' }} ·
-          {{ rec | recommendationOutcome }}
-        </p>
+      @if (store.selected(); as rec) {
+        <fns-recommendation-card
+          [recommendation]="rec"
+          [scorecard]="store.scorecards()[rec.ticker] ?? null"
+          [showActions]="false"
+        />
       }
+    </cmn-async-state>
+  </cmn-page-scroll>
+
+  @if (store.selected(); as rec) {
+    @if (rec.status === 'Pending') {
+      <!-- Pinned: a sibling of the scroll region, so it stays at the foot while the record scrolls -->
+      <div
+        class="flex shrink-0 gap-cmn-2 border-t border-border-default pt-cmn-3"
+        data-testid="decision-actions"
+      >
+        <cmn-button
+          (clicked)="store.decide({recommendation: rec, verdict: 'reject'})"
+          variant="secondary"
+          class="flex-1"
+          data-testid="recommendation-reject"
+        >
+          Reject
+        </cmn-button>
+        <cmn-button
+          (clicked)="store.decide({recommendation: rec, verdict: 'confirm'})"
+          class="flex-1"
+          data-testid="recommendation-confirm"
+        >
+          Confirm…
+        </cmn-button>
+      </div>
+    } @else {
+      <p
+        class="shrink-0 border-t border-border-default pt-cmn-3 text-cmn-sm text-text-secondary"
+        data-testid="decision-recorded"
+      >
+        <cmn-tag [variant]="statusVariant[rec.status]">{{ statusLabel[rec.status] }}</cmn-tag>
+        {{ rec.decidedAt ?? rec.expiresAt | date: 'mediumDate' }} ·
+        {{ rec | recommendationOutcome }}
+      </p>
     }
-  </div>
-</cmn-page-container>
+  }
+</cmn-page>

@@ -1,4 +1,4 @@
-<cmn-page-container spacing="none" fill>
+<cmn-page kind="list" fill>
   <p class="text-cmn-sm text-text-secondary">
     What is coming for your book, what fired, and what the reader made of it
   </p>
@@ -8,12 +8,11 @@
     [activeTab]="store.view()"
     (activeTabChange)="selectView($event)"
     ariaLabel="Events view"
-    class="mt-cmn-5"
   />
 
   @if (store.view() === 'calendar') {
-    <div class="mt-cmn-4 flex items-center gap-cmn-2">
-      <span class="shrink-0 text-cmn-xs uppercase tracking-wide text-text-secondary">Next</span>
+    <div class="flex items-center gap-cmn-2">
+      <span class="shrink-0 text-cmn-xs text-text-secondary">Next</span>
       <lk-chip-row
         [options]="horizonOptions"
         [selected]="selectedHorizon()"
@@ -24,8 +23,8 @@
       />
     </div>
 
-    <div class="mt-cmn-2 flex items-center gap-cmn-2">
-      <span class="shrink-0 text-cmn-xs uppercase tracking-wide text-text-secondary">Kinds</span>
+    <div class="flex items-center gap-cmn-2">
+      <span class="shrink-0 text-cmn-xs text-text-secondary">Kinds</span>
       <lk-chip-row
         [options]="kindOptions"
         [selected]="store.kinds()"
@@ -38,7 +37,7 @@
     </div>
 
     @if (store.unavailableSourceLabels().length > 0) {
-      <cmn-alert variant="warning" class="mt-cmn-4 block" data-testid="sources-unavailable">
+      <cmn-alert variant="warning" class="block" data-testid="sources-unavailable">
         Some sources did not answer: {{ store.unavailableSourceLabels().join(', ') }}. Days may look
         emptier than they are.
       </cmn-alert>
@@ -51,7 +50,7 @@
       [errorMessage]="store.upcomingErrorMessage()"
       [skeletonRows]="skeletonRows.length"
       [keepContent]="false"
-      class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      class="flex min-h-0 flex-1 flex-col"
       emptySubMessage="No dated events for your holdings, watchlist, theses or the macro calendar in this window."
       skeletonShape="section"
     >
@@ -70,7 +69,7 @@
             @for (section of store.upcomingSections(); track section.id) {
               @if (store.upcomingSections().length > 1) {
                 <h2
-                  class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+                  class="font-label text-cmn-xs font-semibold text-text-secondary"
                   data-testid="week-section"
                 >
                   {{ section.label }}
@@ -149,7 +148,7 @@
       [isEmpty]="store.isFiredEmpty()"
       [keepContent]="false"
       (retry)="retryFired()"
-      class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      class="flex min-h-0 flex-1 flex-col"
       emptySubMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
       errorPlacement="above"
       retryable
@@ -276,4 +275,4 @@
       </cmn-page-scroll>
     </cmn-async-state>
   }
-</cmn-page-container>
+</cmn-page>

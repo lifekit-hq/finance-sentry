@@ -152,7 +152,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: EVENTS_SCREEN.path,
     kind: 'list',
     note: 'Upcoming and fired events.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(EVENTS_SCREEN),
   },
   {
@@ -168,7 +168,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: DECISION_DETAIL_SCREEN.path,
     kind: 'detail',
     note: 'One Ledger proposal, pushed from the queue, with Reject and Confirm pinned.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(DECISION_DETAIL_SCREEN),
   },
   {

@@ -32,38 +32,30 @@
     </p>
 
     <section class="flex flex-col gap-cmn-1">
-      <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">Why</h3>
+      <h2 class="text-cmn-xs font-semibold text-text-secondary">Why</h2>
       <p class="whitespace-pre-line text-cmn-sm text-text-primary">{{ rec.rationale }}</p>
     </section>
     @if (scorecard(); as card) {
       <section class="flex flex-col gap-cmn-1" data-testid="recommendation-verdict">
-        <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
-          Research verdict
-        </h3>
+        <h2 class="text-cmn-xs font-semibold text-text-secondary">Research verdict</h2>
         <fns-scorecard-verdict [scorecard]="card" />
       </section>
     }
 
     <dl class="grid gap-cmn-3 text-cmn-sm sm:grid-cols-2">
       <div class="flex flex-col gap-cmn-1">
-        <dt class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
-          Invalidated if
-        </dt>
+        <dt class="text-cmn-xs font-semibold text-text-secondary">Invalidated if</dt>
         <dd class="text-text-primary">{{ rec.invalidationTrigger }}</dd>
       </div>
       <div class="flex flex-col gap-cmn-1">
-        <dt class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
-          Expires
-        </dt>
+        <dt class="text-cmn-xs font-semibold text-text-secondary">Expires</dt>
         <dd class="text-text-primary">{{ rec.expiresAt | date: 'mediumDate' }}</dd>
       </div>
     </dl>
 
     @if (rec.evidence.length > 0) {
       <section class="flex flex-col gap-cmn-2">
-        <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
-          Evidence
-        </h3>
+        <h2 class="text-cmn-xs font-semibold text-text-secondary">Evidence</h2>
         <ul class="flex flex-col gap-cmn-2" data-testid="recommendation-evidence">
           @for (item of rec.evidence; track $index) {
             <li class="flex items-start gap-cmn-2 text-cmn-sm">
