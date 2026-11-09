@@ -11,6 +11,7 @@
     [errorMessage]="view().errorMessage"
     [isEmpty]="store.rows().length === 0"
     [keepContent]="false"
+    [crossfade]="false"
     (retry)="store.load()"
     emptyMessage="No income declared yet"
     emptySubMessage="Add what you expect to earn, so planning does not rely only on what landed last month."

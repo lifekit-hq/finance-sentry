@@ -113,6 +113,78 @@ describe('AssetDossierComponent', () => {
     });
   });
 
+  describe('verdict header', () => {
+    const SCORED = {...DOSSIER, scorecard: ScorecardFixtures.scorecard({symbol: DOSSIER.symbol})};
+    const QUOTE = {
+      ticker: 'DRAM',
+      price: 189.3,
+      previousClose: 187,
+      changePct: 1.2299,
+      currency: 'USD',
+    };
+    const header = (): HTMLElement | null => byTestId('dossier-verdict-header');
+
+    it('has no header, and the hero keeps the price slot, without a scorecard', () => {
+      fixture.detectChanges();
+
+      expect(header()).toBeNull();
+      expect(byTestId('dossier-quote')).not.toBeNull();
+    });
+
+    it('opens the page on the verdict word, ahead of the hero', () => {
+      mockStore.dossier.set(SCORED);
+      fixture.detectChanges();
+
+      expect(header()?.textContent).toContain('Avoid');
+      expect(header()?.nextElementSibling).toBe(byTestId('dossier-hero'));
+    });
+
+    it('keeps the word honest with "for new money" and the thesis state beside it', () => {
+      mockStore.dossier.set(SCORED);
+      fixture.detectChanges();
+
+      const pills = Array.from(header()?.querySelectorAll('cmn-tag') ?? []).map(tag =>
+        tag.textContent?.trim()
+      );
+      expect(pills).toEqual(['For new money', 'Thesis active']);
+    });
+
+    it('carries the fixed held line as the caveat on a held name', () => {
+      mockStore.dossier.set(SCORED);
+      fixture.detectChanges();
+
+      expect(header()?.textContent).toContain('You hold this.');
+    });
+
+    it('carries what turns the word to BUY on a name that is not held', () => {
+      mockStore.dossier.set({...SCORED, position: null});
+      fixture.detectChanges();
+
+      expect(header()?.textContent).toContain('Turns BUY when');
+    });
+
+    it('moves the price and the day change into the header, out of the hero', () => {
+      mockStore.dossier.set(SCORED);
+      mockStore.quote.set(QUOTE);
+      mockStore.quoteHeader.set({priceText: '$189.30', changeText: '+1.23%', direction: 'up'});
+      fixture.detectChanges();
+
+      expect(header()?.textContent).toContain('$189.30');
+      expect(header()?.textContent).toContain('+1.23%');
+      expect(header()?.textContent).toContain('+$2.30');
+      expect(byTestId('dossier-quote')).toBeNull();
+      expect(byTestId('dossier-price')).toBeNull();
+    });
+
+    it('shows the verdict alone while the quote is missing', () => {
+      mockStore.dossier.set(SCORED);
+      fixture.detectChanges();
+
+      expect(header()?.textContent).toContain('Avoid');
+      expect(header()?.textContent).not.toContain('$');
+    });
+  });
+
   it('shows only the error alert when the dossier fails to load', () => {
     mockStore.dossierErrorMessage.set('Failed to load asset dossier.');
     fixture.detectChanges();

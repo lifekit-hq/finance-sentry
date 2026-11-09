@@ -4,6 +4,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it} from 'vitest';
 
+import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -355,6 +356,45 @@ describe('dossierComputed', () => {
       const store = buildSignals({quote: null});
       TestBed.runInInjectionContext(() => {
         expect(dossierComputed(store).quoteHeader()).toBeNull();
+        expect(dossierComputed(store).quoteChange()).toBeNull();
+      });
+    });
+
+    it('hands the verdict header the day change as a ratio and an amount', () => {
+      const store = buildSignals({quote: QUOTE});
+      TestBed.runInInjectionContext(() => {
+        const change = dossierComputed(store).quoteChange();
+        expect(change?.percent).toBeCloseTo(0.0123);
+        expect(change?.amount).toBeCloseTo(2.3);
+      });
+    });
+  });
+
+  describe('verdictHeader', () => {
+    it('is null until the dossier loads', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(buildSignals()).verdictHeader()).toBeNull();
+      });
+    });
+
+    it('is null for a dossier the caller cannot read a scorecard for', () => {
+      const store = buildSignals({dossier: emptyDossier()});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).verdictHeader()).toBeNull();
+      });
+    });
+
+    it('reads the scorecard, and whether the book holds the name, into the header', () => {
+      const scorecard = ScorecardFixtures.scorecard({symbol: 'ZZZZ'});
+      TestBed.runInInjectionContext(() => {
+        const notHeld = dossierComputed(buildSignals({dossier: emptyDossier({scorecard})}));
+        expect(notHeld.verdictHeader()?.status.label).toBe('Avoid');
+        expect(notHeld.verdictHeader()?.caveat).toContain('Turns BUY when');
+
+        const held = dossierComputed(
+          buildSignals({dossier: emptyDossier({scorecard, position: POSITION})})
+        );
+        expect(held.verdictHeader()?.caveat).toContain('You hold this.');
       });
     });
   });

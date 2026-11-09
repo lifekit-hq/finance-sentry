@@ -190,3 +190,49 @@ describe('DossierQuoteUtils.isQuotable', () => {
     expect(DossierQuoteUtils.isQuotable(dossier())).toBe(false);
   });
 });
+
+describe('DossierQuoteUtils.toChange', () => {
+  it('reads the percent as a ratio and the amount as the gap to the previous close', () => {
+    const change = DossierQuoteUtils.toChange(quote());
+
+    expect(change?.percent).toBeCloseTo(0.012299);
+    expect(change?.amount).toBeCloseTo(2.3);
+  });
+
+  it('carries a loss as negative on both figures', () => {
+    const change = DossierQuoteUtils.toChange(
+      quote({price: 186.5, previousClose: 187.5, changePct: -0.5333})
+    );
+
+    expect(change?.percent).toBeCloseTo(-0.005333);
+    expect(change?.amount).toBeCloseTo(-1);
+  });
+
+  it('derives the amount from the percent when the quote has no previous close', () => {
+    const change = DossierQuoteUtils.toChange(
+      quote({price: 110, previousClose: null, changePct: 10})
+    );
+
+    expect(change?.percent).toBeCloseTo(0.1);
+    expect(change?.amount).toBeCloseTo(10);
+  });
+
+  it('has no change for a move of -100% with no previous close', () => {
+    expect(
+      DossierQuoteUtils.toChange(quote({price: 1, previousClose: null, changePct: -100}))
+    ).toBeNull();
+  });
+
+  it.each([
+    ['no percent', quote({changePct: null})],
+    ['a non-finite percent', quote({changePct: Number.NaN})],
+    ['no price', quote({price: 0})],
+    ['a non-finite price', quote({price: Number.NaN})],
+  ])('has no change for a quote with %s', (_label, input) => {
+    expect(DossierQuoteUtils.toChange(input)).toBeNull();
+  });
+
+  it('has no change without a quote', () => {
+    expect(DossierQuoteUtils.toChange(null)).toBeNull();
+  });
+});

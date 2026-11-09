@@ -15,6 +15,7 @@
     [errorMessage]="view().errorMessage"
     [isEmpty]="store.rows().length === 0"
     [keepContent]="false"
+    [crossfade]="false"
     (retry)="store.load()"
     emptyMessage="No career events yet"
     emptySubMessage="Add a raise, a bonus or a leave to see your savings path with it, next to the one you are on."

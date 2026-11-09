@@ -1,5 +1,6 @@
 import type {Page} from '@playwright/test';
 
+import {ScorecardFixtures} from '../../src/app/shared/models/scorecard/scorecard.fixtures';
 import {mockPreferences} from './preferences-mocks';
 
 export const API = '**/api/v1';
@@ -438,6 +439,8 @@ export const DOSSIER_AAPL = {
       payload: {volume: 2500000},
     },
   ],
+  // The owner reads a scorecard, so the page opens on its verdict (Avoid, for new money, on a held name).
+  scorecard: ScorecardFixtures.scorecard({symbol: 'AAPL'}),
   generatedAt: '2026-09-01T10:30:00Z',
 };
 
