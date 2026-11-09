@@ -15,7 +15,7 @@ import {
   CmnTab,
   EmptyStateComponent,
   type Nullable,
-  PageContainerComponent,
+  PageComponent,
   PageScrollComponent,
   SkeletonComponent,
   TabGroupComponent,
@@ -51,7 +51,7 @@ const SKELETON_ROWS = 4;
 @Component({
   selector: 'fns-events',
   imports: [
-    PageContainerComponent,
+    PageComponent,
     PageScrollComponent,
     AlertComponent,
     AsyncStateComponent,
