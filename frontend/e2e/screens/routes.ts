@@ -118,8 +118,8 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
   {
     name: 'budgets',
     path: BUDGETS_SCREEN.path,
-    kind: 'list',
-    note: 'Monthly estimates per category.',
+    kind: 'overview',
+    note: 'A month summary over a responsive card grid of category estimates.',
     mode: 'enforce',
     fixture: fixtureOf(BUDGETS_SCREEN),
   },
