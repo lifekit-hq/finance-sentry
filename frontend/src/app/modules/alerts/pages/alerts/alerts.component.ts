@@ -21,7 +21,7 @@ import {
   FilterBarSheetDirective,
   ListSectionComponent,
   type LucideIconName,
-  PageContainerComponent,
+  PageComponent,
   PageScrollComponent,
   SkeletonComponent,
   ToastService,
@@ -49,7 +49,7 @@ const ALERT_FILTER_CHIP_ID = 'filter';
 @Component({
   selector: 'fns-alerts',
   imports: [
-    PageContainerComponent,
+    PageComponent,
     PageScrollComponent,
     AlertCaptionPipe,
     AlertItemComponent,
