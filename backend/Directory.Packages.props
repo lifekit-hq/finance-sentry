@@ -57,7 +57,7 @@
     <PackageVersion Include="Lib.Net.Http.WebPush" Version="3.3.1" />
 
     <!-- Off-host backups (feature 024): Cloudflare R2 via the S3-compatible API -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.10" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.11" />
 
     <!-- Serilog -->
     <PackageVersion Include="Serilog" Version="4.4.0" />
@@ -71,7 +71,7 @@
 
     <!-- OpenTelemetry (metrics → Prometheus /metrics; traces → OTLP/HTTP → Tempo, feature 023 amendment) -->
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.2" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.2" />
     <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.18.0-beta.1" />
@@ -99,8 +99,8 @@
     <PackageVersion Include="AngleSharp" Version="1.10.0" />
 
     <!-- MCP -->
-    <PackageVersion Include="ModelContextProtocol" Version="2.3.1" />
-    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.1" />
+    <PackageVersion Include="ModelContextProtocol" Version="2.4.0" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
 
     <!-- Test stack -->
