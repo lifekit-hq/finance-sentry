@@ -160,7 +160,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: DECISIONS_SCREEN.path,
     kind: 'list',
     note: "The Ledger's decision queue.",
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(DECISIONS_SCREEN),
   },
   {
