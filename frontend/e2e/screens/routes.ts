@@ -144,7 +144,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: ALERTS_SCREEN.path,
     kind: 'list',
     note: 'The alert feed.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(ALERTS_SCREEN),
   },
   {

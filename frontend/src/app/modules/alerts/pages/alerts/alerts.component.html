@@ -1,5 +1,5 @@
-<cmn-page-container spacing="none" fill>
-  <p class="mb-cmn-3 text-cmn-sm text-text-secondary" data-testid="alerts-subtitle">
+<cmn-page kind="list" fill>
+  <p class="text-cmn-sm text-text-secondary" data-testid="alerts-subtitle">
     {{ alertsSubtitle() }}
   </p>
 
@@ -21,7 +21,7 @@
     </ng-template>
   </cmn-filter-bar>
 
-  <cmn-page-scroll class="mt-cmn-3" label="Alerts">
+  <cmn-page-scroll label="Alerts">
     <cmn-async-state
       [status]="view().status"
       [errorMessage]="view().errorMessage"
@@ -65,11 +65,11 @@
           <cmn-list-section [heading]="group.label" data-testid="alerts-day">
             @for (alert of group.items; track alert.id) {
               <!-- The dismiss button's 44px ::after hit area (PHONE_HIT_AREA_CLASSES in @lifekit-hq/ui)
-                   reaches ~5px past the card, which made cmn-page-scroll scroll sideways. -->
+                   reaches ~5px past the card, which makes cmn-page-scroll scroll sideways (lifekit-common#338). -->
               <div
                 [class]="alert.isResolved ? resolvedRowClass : ''"
                 [attr.data-resolved]="alert.isResolved"
-                class="relative overflow-x-clip rounded-cmn-md"
+                class="overflow-x-clip rounded-cmn-md"
                 data-testid="alert-row"
               >
                 <cmn-alert-item
@@ -82,22 +82,11 @@
                   [timestamp]="alert.createdAt"
                   [isRead]="alert.isRead || alert.isResolved"
                   [description]="alert | alertCaption"
-                  (read)="openAlert(alert)"
+                  (opened)="openAlert(alert)"
                   (dismissed)="dismiss(alert.id)"
                   density="flat"
+                  openable
                 />
-                <!-- An unread item's title is its own control, stretched over the card; a read item
-                   has none, so this one opens it. -->
-                @if (alert.isRead || alert.isResolved) {
-                  <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over a read cmn-alert-item, which has no control of its own -->
-                  <button
-                    [attr.aria-label]="alert.title"
-                    (click)="openAlert(alert)"
-                    class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                    type="button"
-                    data-testid="alert-row-open"
-                  ></button>
-                }
               </div>
             }
           </cmn-list-section>
@@ -105,4 +94,4 @@
       </lk-infinite-list>
     </cmn-async-state>
   </cmn-page-scroll>
-</cmn-page-container>
+</cmn-page>
