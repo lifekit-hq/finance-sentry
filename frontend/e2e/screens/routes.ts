@@ -197,7 +197,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: SETTINGS_SCREEN.path,
     kind: 'settings',
     note: 'Preferences, notifications and the account.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(SETTINGS_SCREEN),
   },
   {
@@ -205,7 +205,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: PEOPLE_SCREEN.path,
     kind: 'list',
     note: 'Who has access; Owner only.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(PEOPLE_SCREEN),
   },
   {
@@ -213,7 +213,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: MORE_SCREEN.path,
     kind: 'list',
     note: 'The phone shell’s overflow menu.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(MORE_SCREEN),
   },
   {
