@@ -16,7 +16,7 @@ import {
   FormFieldComponent,
   InputComponent,
   ListItemRowComponent,
-  PageContainerComponent,
+  PageComponent,
   PageScrollComponent,
   SkeletonComponent,
   TagComponent,
@@ -36,7 +36,7 @@ const SKELETON_ROWS = 3;
 @Component({
   selector: 'fns-people',
   imports: [
-    PageContainerComponent,
+    PageComponent,
     PageScrollComponent,
     ReactiveFormsModule,
     AlertComponent,
