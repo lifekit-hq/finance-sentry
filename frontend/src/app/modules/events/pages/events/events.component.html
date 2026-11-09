@@ -44,7 +44,8 @@
     }
 
     <!-- The host's flex column lays out these children directly;
-         the keep-content wrapper would put them in one box. -->
+         the keep-content wrapper would put them in one box. crossfade is off because 4.7.x defaults
+         it on, which wraps the body anyway (lifekit-common#339); drop it when that is fixed. -->
     <cmn-async-state
       [status]="upcomingStatus()"
       [errorMessage]="store.upcomingErrorMessage()"
@@ -142,7 +143,8 @@
     </cmn-async-state>
   } @else {
     <!-- The host's flex column lays out these children directly;
-         the keep-content wrapper would put them in one box. -->
+         the keep-content wrapper would put them in one box. crossfade is off because 4.7.x defaults
+         it on, which wraps the body anyway (lifekit-common#339); drop it when that is fixed. -->
     <cmn-async-state
       [status]="firedStatus()"
       [errorMessage]="store.firedErrorMessage() ?? ''"
