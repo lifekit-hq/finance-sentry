@@ -1,60 +1,61 @@
-<cmn-page-container spacing="none" fill>
-  <div class="flex min-h-0 flex-1 flex-col gap-cmn-5">
-    <p class="text-cmn-sm text-text-secondary">
-      What a month usually costs, learned from your own history
-    </p>
+<cmn-page kind="overview" fill>
+  <p class="text-cmn-sm text-text-secondary">
+    What a month usually costs, learned from your own history
+  </p>
 
-    <cmn-month-stepper
-      [value]="store.selectedMonthDate()"
-      [max]="currentMonth"
-      (valueChange)="onMonthChange($event)"
-    />
+  <cmn-month-stepper
+    [value]="store.selectedMonthDate()"
+    [max]="currentMonth"
+    (valueChange)="onMonthChange($event)"
+  />
 
-    <!-- Each month is its own query: a reload shows the skeleton, never last month's rows. -->
-    <cmn-page-scroll label="Budgets">
-      <cmn-async-state
-        [status]="view().status"
-        [errorMessage]="view().errorMessage"
-        [errorPlacement]="errorPlacement()"
-        [isEmpty]="store.items().length === 0"
-        [keepContent]="false"
-        [emptyMessage]="emptyMessage()"
-        [emptySubMessage]="emptySubMessage()"
-        (retry)="store.loadSummary()"
-        class="block space-y-cmn-5"
-        emptyIcon="PiggyBank"
-        retryable
-      >
-        <!-- Line boxes match the cards' text line heights, so the cards land where these sit -->
-        <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
-          <cmn-card>
-            <div class="flex items-center" style="height: 0.9375rem">
-              <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
-            </div>
-            <div class="mt-cmn-1 flex items-center" style="height: 1.625rem">
-              <cmn-skeleton class="w-full" width="50%" height="1.25rem" />
-            </div>
-            <cmn-skeleton class="mt-cmn-3 block" height="0.625rem" />
-          </cmn-card>
-          <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
-            @for (_ of skeletonCards; track $index) {
-              <cmn-card>
-                <div class="mb-cmn-3 flex h-8 items-center justify-between gap-cmn-2">
-                  <cmn-skeleton class="flex-1" width="45%" height="0.875rem" />
-                  <cmn-skeleton width="2rem" height="2rem" />
-                </div>
-                <div class="flex items-center" style="height: 1.5rem">
-                  <cmn-skeleton class="w-full" width="40%" height="1rem" />
-                </div>
-                <cmn-skeleton class="mt-cmn-3 block" height="0.375rem" />
-                <div class="mt-cmn-1 flex items-center" style="height: 0.9375rem">
-                  <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
-                </div>
-              </cmn-card>
-            }
+  <!-- Each month is its own query: a reload shows the skeleton, never last month's rows. -->
+  <cmn-page-scroll label="Budgets">
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [errorPlacement]="errorPlacement()"
+      [isEmpty]="store.items().length === 0"
+      [keepContent]="false"
+      [emptyMessage]="emptyMessage()"
+      [emptySubMessage]="emptySubMessage()"
+      (retry)="store.loadSummary()"
+      class="block"
+      emptyIcon="PiggyBank"
+      retryable
+    >
+      <!-- Line boxes match the cards' text line heights, so the cards land where these sit -->
+      <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
+        <cmn-card>
+          <div class="flex items-center" style="height: 0.9375rem">
+            <cmn-skeleton class="w-full" width="35%" height="0.75rem" />
           </div>
+          <div class="mt-cmn-1 flex items-center" style="height: 1.625rem">
+            <cmn-skeleton class="w-full" width="50%" height="1.25rem" />
+          </div>
+          <cmn-skeleton class="mt-cmn-3 block" height="0.625rem" />
+        </cmn-card>
+        <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
+          @for (_ of skeletonCards; track $index) {
+            <cmn-card>
+              <div class="mb-cmn-3 flex h-8 items-center justify-between gap-cmn-2">
+                <cmn-skeleton class="flex-1" width="45%" height="0.875rem" />
+                <cmn-skeleton width="2rem" height="2rem" />
+              </div>
+              <div class="flex items-center" style="height: 1.5rem">
+                <cmn-skeleton class="w-full" width="40%" height="1rem" />
+              </div>
+              <cmn-skeleton class="mt-cmn-3 block" height="0.375rem" />
+              <div class="mt-cmn-1 flex items-center" style="height: 0.9375rem">
+                <cmn-skeleton class="w-full" width="30%" height="0.75rem" />
+              </div>
+            </cmn-card>
+          }
         </div>
+      </div>
 
+      <!-- async-state wraps its content in one div (crossfade), so the vertical rhythm lives here -->
+      <div class="space-y-cmn-5">
         <!-- Months the estimates do not learn from, in plain words -->
         @if (store.skippedNote(); as note) {
           <cmn-alert variant="info" class="block" data-testid="budgets-skipped-note">
@@ -89,9 +90,7 @@
         <!-- Expected by month end -->
         @let behind = store.expectedMonthEnd() > store.totalEstimate();
         <cmn-card class="block">
-          <div
-            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-          >
+          <div class="font-label text-cmn-xs font-semibold text-text-secondary">
             {{ store.isCurrentMonth() ? 'Expected by month end' : 'Spent in ' + store.monthName() }}
           </div>
           <div class="mt-cmn-1 flex flex-wrap items-baseline gap-x-cmn-2">
@@ -257,7 +256,7 @@
             </cmn-card>
           }
         </div>
-      </cmn-async-state>
-    </cmn-page-scroll>
-  </div>
-</cmn-page-container>
+      </div>
+    </cmn-async-state>
+  </cmn-page-scroll>
+</cmn-page>
