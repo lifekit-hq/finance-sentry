@@ -15,6 +15,7 @@ import {DossierChecksUtils} from '../utils/dossier-checks.utils';
 import {DossierFactsUtils} from '../utils/dossier-facts.utils';
 import {DossierPositionUtils} from '../utils/dossier-position.utils';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
+import {DossierVerdictUtils} from '../utils/dossier-verdict.utils';
 import {DossierViewUtils} from '../utils/dossier-view.utils';
 
 interface StateSignals {
@@ -83,6 +84,18 @@ export function dossierComputed(store: StateSignals) {
       store.isThesisExpanded() ? thesisParagraphs() : thesisParagraphs().slice(0, 1)
     ),
     quoteHeader: computed(() => DossierQuoteUtils.toHeader(store.quote())),
+    quoteChange: computed(() => DossierQuoteUtils.toChange(store.quote())),
+    // The page opens on this when the owner can read a scorecard; null otherwise, and the hero keeps the price.
+    verdictHeader: computed(() => {
+      const dossier = store.dossier();
+      return dossier
+        ? DossierVerdictUtils.header(
+            dossier.scorecard ?? null,
+            dossier.position !== null,
+            dossier.thesis
+          )
+        : null;
+    }),
     heroProfile: computed(() => {
       const dossier = store.dossier();
       return dossier ? DossierViewUtils.heroProfile(dossier) : null;

@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 
+import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
 import {type ThesisDto} from '../models/dossier/dossier.model';
 import {DossierVerdictUtils} from './dossier-verdict.utils';
 
@@ -71,5 +72,68 @@ describe('DossierVerdictUtils.thesisStatus', () => {
     expect(status.thesisLabel).toBe('Thesis invalidated');
     expect(status.killSwitchLabel).toBe('Kill-switch tripped');
     expect(status.brokenReason).toBe('Gross margin fell below 35.0% for 2 quarters.');
+  });
+});
+
+describe('DossierVerdictUtils.header', () => {
+  const scorecard = ScorecardFixtures.scorecard();
+
+  it('has no header without a scorecard', () => {
+    expect(DossierVerdictUtils.header(null, true, thesis())).toBeNull();
+  });
+
+  it('words the verdict in sentence case and tints it by the verdict block tones', () => {
+    expect(DossierVerdictUtils.header(scorecard, false, null)?.status).toEqual({
+      tone: 'error',
+      label: 'Avoid',
+    });
+  });
+
+  it.each([
+    ['StrongBuy', 'success', 'Strong buy'],
+    ['Buy', 'success', 'Buy'],
+    ['Wait', 'neutral', 'Wait'],
+    ['NotScored', 'neutral', 'Not scored'],
+  ] as const)('maps %s to a %s %s', (word, tone, label) => {
+    const scored = ScorecardFixtures.scorecard({
+      verdict: {...scorecard.verdict, word},
+    });
+
+    expect(DossierVerdictUtils.header(scored, false, null)?.status).toEqual({tone, label});
+  });
+
+  it('puts "for new money" and the thesis state beside the word', () => {
+    expect(DossierVerdictUtils.header(scorecard, true, thesis())?.pills).toEqual([
+      {label: 'For new money', tone: 'neutral'},
+      {label: 'Thesis active', tone: 'success'},
+    ]);
+    expect(
+      DossierVerdictUtils.header(scorecard, true, thesis({brokenAt: '2026-10-02T00:00:00Z'}))
+        ?.pills[1]
+    ).toEqual({label: 'Thesis invalidated', tone: 'error'});
+    expect(DossierVerdictUtils.header(scorecard, false, null)?.pills[1]).toEqual({
+      label: 'No thesis on file',
+      tone: 'neutral',
+    });
+  });
+
+  it('carries the fixed held line on a held name, whatever turns it BUY', () => {
+    expect(DossierVerdictUtils.header(scorecard, true, null)?.caveat).toBe(
+      'You hold this. Holding follows your thesis and its kill-switch, never the word.'
+    );
+  });
+
+  it('carries what turns the word BUY on a name that is not held', () => {
+    expect(DossierVerdictUtils.header(scorecard, false, null)?.caveat).toBe(
+      'Turns BUY when crowding is no longer Extended or the P/E premium falls to 0% or below (reads +29.2%).'
+    );
+  });
+
+  it('has no caveat when a name that is not held has nothing to turn', () => {
+    const buy = ScorecardFixtures.scorecard({
+      verdict: {...scorecard.verdict, word: 'Buy', turnsBuyWhen: null},
+    });
+
+    expect(DossierVerdictUtils.header(buy, false, null)?.caveat).toBeNull();
   });
 });

@@ -18,6 +18,7 @@
         [errorPlacement]="errorPlacement()"
         [isEmpty]="store.items().length === 0"
         [keepContent]="false"
+        [crossfade]="false"
         [emptyMessage]="emptyMessage()"
         [emptySubMessage]="emptySubMessage()"
         (retry)="store.loadSummary()"

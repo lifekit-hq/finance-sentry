@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention -- map keys are the API's PascalCase enum values */
 import {type TagVariant} from '@lifekit-hq/ui';
 
-import {type VerdictReasonStatus} from '../../../../shared/models/scorecard/scorecard.model';
+import {
+  type VerdictReasonStatus,
+  type VerdictWord,
+} from '../../../../shared/models/scorecard/scorecard.model';
 import {type ThesisStatusState} from '../../models/dossier/dossier-verdict.model';
 
 /** Shown where a held name has no thesis, or an unwritten one has nothing for the kill-switch to watch. */
@@ -19,6 +22,21 @@ export const THESIS_STATE_VARIANT: Readonly<Record<ThesisStatusState, TagVariant
   active: 'success',
   tripped: 'error',
 };
+
+/**
+ * The verdict words as the header's large status word reads them: the same vocabulary as the verdict
+ * block's tag (`VERDICT_WORD_LABEL`), in sentence case because a 42px word in capitals shouts.
+ */
+export const VERDICT_HEADER_WORD_LABEL: Readonly<Record<VerdictWord, string>> = {
+  StrongBuy: 'Strong buy',
+  Buy: 'Buy',
+  Wait: 'Wait',
+  Avoid: 'Avoid',
+  NotScored: 'Not scored',
+};
+
+/** The pill that keeps the word honest: it reads a position the owner does not yet hold. */
+export const VERDICT_HEADER_NEW_MONEY_PILL = 'For new money';
 
 /** The tick beside a reason: clears its bar, falls short, or has nothing to read. */
 export const VERDICT_REASON_MARK_CLASS: Readonly<Record<VerdictReasonStatus, string>> = {

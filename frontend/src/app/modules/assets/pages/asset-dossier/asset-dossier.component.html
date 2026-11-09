@@ -1,10 +1,11 @@
 <cmn-page-container>
-  <!-- The host's spacing lays out these children directly;
-       the keep-content wrapper would put them in one box. -->
+  <!-- The host's spacing lays out these children directly; the keep-content and crossfade
+       wrappers would each put them in one box. -->
   <cmn-async-state
     [status]="dossierStatus()"
     [errorMessage]="store.dossierErrorMessage()"
     [keepContent]="false"
+    [crossfade]="false"
     class="block space-y-cmn-5"
     emptySubMessage="No position, thesis, valuation, coverage, news or signal is recorded for this asset yet."
   >
@@ -52,6 +53,19 @@
     </ng-template>
 
     @if (store.dossier(); as dossier) {
+      <!-- State first: the verdict word with the price opposite, on the page ground. Owner only: without ai.use the API sends no scorecard, and the hero keeps the price. -->
+      @if (store.verdictHeader(); as header) {
+        <cmn-verdict-header
+          [status]="header.status"
+          [pills]="header.pills"
+          [caveat]="header.caveat"
+          [price]="store.quoteHeader()?.priceText ?? null"
+          [currency]="store.quote()?.currency ?? null"
+          [change]="store.quoteChange()"
+          data-testid="dossier-verdict-header"
+        />
+      }
+
       <!-- Hero: who this is, today's quote and what the book holds, before anything else. The top bar owns the symbol and the way back (route data). -->
       <cmn-card class="block" data-testid="dossier-hero">
         <div class="flex flex-col gap-cmn-4 sm:flex-row sm:items-start sm:justify-between">
@@ -87,31 +101,34 @@
               }
             </div>
           </div>
-          <!-- Reserved slot: same height whether the quote is loading, present or missing, so the page never jumps. -->
-          <div
-            class="flex min-h-[3rem] min-w-[7rem] flex-col justify-center sm:items-end sm:text-right"
-            data-testid="dossier-quote"
-          >
-            @if (store.quoteHeader(); as quote) {
-              <span
-                class="font-headline text-cmn-2xl font-bold text-text-primary"
-                data-testid="dossier-price"
-              >
-                {{ quote.priceText }}
-              </span>
-              @if (quote.changeText) {
+          <!-- With a verdict header the price lives there; without one the quote keeps its reserved slot. -->
+          @if (!store.verdictHeader()) {
+            <!-- Reserved slot: same height whether the quote is loading, present or missing, so the page never jumps. -->
+            <div
+              class="flex min-h-[3rem] min-w-[7rem] flex-col justify-center sm:items-end sm:text-right"
+              data-testid="dossier-quote"
+            >
+              @if (store.quoteHeader(); as quote) {
                 <span
-                  [class]="deltaClass[quote.direction]"
-                  class="text-cmn-sm font-medium"
-                  data-testid="dossier-day-change"
+                  class="font-headline text-cmn-2xl font-bold text-text-primary"
+                  data-testid="dossier-price"
                 >
-                  {{ quote.changeText }}
+                  {{ quote.priceText }}
                 </span>
+                @if (quote.changeText) {
+                  <span
+                    [class]="deltaClass[quote.direction]"
+                    class="text-cmn-sm font-medium"
+                    data-testid="dossier-day-change"
+                  >
+                    {{ quote.changeText }}
+                  </span>
+                }
+              } @else if (store.isQuoteLoading()) {
+                <cmn-skeleton height="1.75rem" width="6rem" />
               }
-            } @else if (store.isQuoteLoading()) {
-              <cmn-skeleton height="1.75rem" width="6rem" />
-            }
-          </div>
+            </div>
+          }
         </div>
 
         @if (store.performanceStrip(); as strip) {

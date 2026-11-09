@@ -29,6 +29,7 @@ import {
   SkeletonComponent,
   TagComponent,
   type TagVariant,
+  VerdictHeaderComponent,
 } from '@lifekit-hq/ui';
 
 import {
@@ -123,6 +124,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     NgTemplateOutlet,
     TagComponent,
     TriggerSentencePipe,
+    VerdictHeaderComponent,
   ],
   templateUrl: './asset-dossier.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

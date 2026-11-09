@@ -4,6 +4,7 @@ import {INSTITUTION_ROW} from './support/accounts-mocks';
 import {
   API,
   AUTH_RESPONSE,
+  DOSSIER_AAPL,
   DOSSIER_UNKNOWN,
   EMPTY_LEDGER_READ,
   LEDGER_READ_NARRATIVE,
@@ -31,8 +32,34 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
   });
 
-  test('dossier header shows price and the day change beside the symbol', async ({page}) => {
+  test('dossier opens on the verdict, with the price and the day change opposite', async ({
+    page,
+  }) => {
     await page.goto('/assets/AAPL');
+    const header = page.getByTestId('dossier-verdict-header');
+    await expect(header).toContainText('Avoid');
+    await expect(header).toContainText('For new money');
+    await expect(header).toContainText('Thesis active');
+    await expect(header).toContainText('You hold this.');
+    await expect(header).toContainText('$189.30');
+    await expect(header).toContainText('+1.23%');
+    await expect(header).toContainText('+$2.30');
+    // The price moved out of the hero with it.
+    await expect(page.getByTestId('dossier-price')).toHaveCount(0);
+  });
+
+  test('dossier without a scorecard keeps the price and the day change in the hero', async ({
+    page,
+  }) => {
+    await page.route(`${API}/research/assets/AAPL/dossier`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({...DOSSIER_AAPL, scorecard: null}),
+      })
+    );
+    await page.goto('/assets/AAPL');
+    await expect(page.getByTestId('dossier-verdict-header')).toHaveCount(0);
     await expect(page.getByTestId('dossier-price')).toHaveText('$189.30');
     await expect(page.getByTestId('dossier-day-change')).toHaveText('+1.23%');
   });
@@ -182,7 +209,10 @@ test.describe('Asset Dossier', () => {
     await expect(lots).toBeVisible();
     await expect(lots).not.toHaveAttribute('open', '');
     await expect(lots.locator('summary')).toContainText('Tax lots (');
-    await expect(page.getByText('Revenue growth (YoY) falls below 5.0%')).toBeVisible();
+    // The verdict block's kill-switch lists the same rule, so look in the thesis card.
+    await expect(
+      page.locator('#thesis').getByText('Revenue growth (YoY) falls below 5.0%')
+    ).toBeVisible();
   });
 
   test('dossier page renders the recommendation trend as one verdict and bar', async ({page}) => {

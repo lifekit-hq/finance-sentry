@@ -1,4 +1,4 @@
-import {type Nullable} from '@lifekit-hq/ui';
+import {type Nullable, type VerdictChange} from '@lifekit-hq/ui';
 
 import {MoneyUtils} from '../../../shared/utils/money.utils';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../models/dossier/dossier.model';
 
 const CHANGE_FRACTION_DIGITS = 2;
+const PERCENT_PER_RATIO = 100;
 
 export class DossierQuoteUtils {
   /**
@@ -67,5 +68,26 @@ export class DossierQuoteUtils {
     const sign = direction === 'up' ? '+' : direction === 'down' ? '-' : '';
     const magnitude = Math.abs(rounded).toFixed(CHANGE_FRACTION_DIGITS);
     return {priceText, changeText: `${sign}${magnitude}%`, direction};
+  }
+
+  /**
+   * The day's move as the verdict header draws it: the percent as a ratio and the amount in the quote's
+   * currency. The amount is the gap to the previous close; when the quote has none it is what the percent
+   * implies of today's price. Null when the quote has no usable price or no percent to measure the day by.
+   */
+  public static toChange(quote: Nullable<DossierQuoteDto>): Nullable<VerdictChange> {
+    if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
+      return null;
+    }
+    const changePct = quote.changePct;
+    if (changePct === null || changePct === undefined || !Number.isFinite(changePct)) {
+      return null;
+    }
+    const percent = changePct / PERCENT_PER_RATIO;
+    if (quote.previousClose !== null && Number.isFinite(quote.previousClose)) {
+      return {percent, amount: quote.price - quote.previousClose};
+    }
+    // A move of -100% leaves no price to derive a previous close from.
+    return percent > -1 ? {percent, amount: quote.price - quote.price / (1 + percent)} : null;
   }
 }
