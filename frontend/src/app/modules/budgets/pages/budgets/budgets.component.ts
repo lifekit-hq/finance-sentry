@@ -10,7 +10,7 @@ import {
   MenuComponent,
   type MenuItem,
   MonthStepperComponent,
-  PageComponent,
+  PageContainerComponent,
   PageScrollComponent,
   SkeletonComponent,
   TagComponent,
@@ -62,7 +62,7 @@ const REMOVE_ROLE_MENU = withoutTransactions(REMOVE_MENU);
 @Component({
   selector: 'fns-budgets',
   imports: [
-    PageComponent,
+    PageContainerComponent,
     PageScrollComponent,
     InputHintsDirective,
     RouterLink,
