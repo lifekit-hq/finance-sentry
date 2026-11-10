@@ -20,7 +20,7 @@
 | 9  | Sync completion | Wait for sync to finish | Status changes to "active", transaction count updated |
 | 10 | Duplicate deduplication | Sync same transactions twice | No duplicates in transaction list |
 | 11 | Provider outage | Provider API returns 503 | Error recorded in SyncJob, account status = "failed"; the provider call is retried inline first (short backoff, `ProviderHttpResilience`), then the next scheduled cycle (30 min) retries |
-| 12 | Credential expiry | TrueLayer consent expires (invalid_grant) | Account status = "reauth_required", user prompted; MCP `get_sync_health` reports TrueLayer as "error" (also for an EXPIRED connection) |
+| 12 | Credential expiry | TrueLayer consent expires (invalid_grant) | Account status = "reauth_required", user prompted; MCP `get_sync_health` reports TrueLayer as "error" (also for an EXPIRED connection that has no accounts or still has a live one) |
 | 13 | Webhook TRANSACTIONS_READY | POST webhook with valid HMAC | Sync enqueued for affected account |
 | 14 | Webhook invalid HMAC | POST webhook with tampered body | 401 returned, sync NOT enqueued |
 

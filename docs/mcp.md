@@ -18,7 +18,7 @@
 - A service token (a headless agent - Ledger, the OpenClaw finance agent) never creates, changes or deletes Research data: finance-sentry is the source, the agent proposes and the change lands on the owner's word. The Research write tools - `save_thesis`, `delete_thesis`, `register_thesis_source`, `promote_candidate`, `reject_candidate`, `save_ips`, `record_risk_remeasurement` - carry `[Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]`, which only a personal token (the owner's own session) passes, so the SDK's authorization filters hide them from a service token's `tools/list` and refuse the call; `watchlist` applies the same policy to `add`/`remove` and keeps `list` open. Proposals stay open to the agent: `propose_recommendation` (the owner decides it) and `score_candidate` (a nomination the owner promotes or rejects). `stdio` is always the owner's own session and is not gated. Pinned by `ResearchWriteAuthorizationTests`.
 - `stdio` refresh is automatic through the MCP token endpoint and locally stored refresh token.
 - HTTP clients refresh through the MCP token endpoint using dedicated MCP refresh tokens.
-- The browser-based `auth login` flow is intended for a host-run `stdio` MCP process. Containerized clients should prefer HTTP MCP.
+- The browser-based `auth login` flow is intended for a host-run `stdio` MCP process. Containerized clients should prefer HTTP MCP. A desktop client reaching the deployed stack runs stdio over ssh through `scripts/mcp-stdio.sh` (see the README MCP section); the gateway serves no `/mcp` route.
 
 ## Audit trail for profile reads
 
