@@ -79,6 +79,7 @@ public sealed class TransportAwareIdentityResolverTests
             new ServiceCollection().AddLogging().AddMcpOAuthTokenClient().BuildServiceProvider()
                 .GetRequiredService<McpOAuthTokenClient>(),
             Options.Create(new JwtOptions { Secret = secret }),
+            TimeProvider.System,
             NullLogger<LocalMcpSession>.Instance);
         session.InitializeAsync().GetAwaiter().GetResult();
         return session;

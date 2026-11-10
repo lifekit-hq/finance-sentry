@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -50,7 +51,22 @@ public sealed class LocalMcpSessionTests
         session.GetPrincipal().Should().BeNull();
     }
 
-    private static async Task<LocalMcpSession> InitializeAsync(string? secret, string token)
+    [Fact]
+    public async Task Keeps_Its_Principal_Inside_The_Refresh_Window_Until_The_Token_Expires()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var expiresAt = clock.GetUtcNow().UtcDateTime.AddMinutes(3);
+        var session = await InitializeAsync(Secret, Token(SecurityAlgorithms.HmacSha256), clock, expiresAt);
+
+        clock.Advance(TimeSpan.FromMinutes(2));
+        session.GetPrincipal().Should().NotBeNull("the token is still valid for a minute; only a refresh is due");
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        session.GetPrincipal().Should().BeNull("the token has expired");
+    }
+
+    private static async Task<LocalMcpSession> InitializeAsync(
+        string? secret, string token, TimeProvider? clock = null, DateTime? expiresAt = null)
     {
         var credentialFile = Path.Combine(Path.GetTempPath(), $"mcp-auth-test-{Guid.NewGuid():N}", "mcp-auth.json");
         var config = new ConfigurationBuilder()
@@ -62,7 +78,7 @@ public sealed class LocalMcpSessionTests
             "http://localhost:4200",
             token,
             "refresh-token",
-            DateTime.UtcNow.AddHours(1),
+            expiresAt ?? DateTime.UtcNow.AddHours(1),
             Guid.NewGuid().ToString(),
             "user@example.com",
             "mcp.full_access"));
@@ -72,6 +88,7 @@ public sealed class LocalMcpSessionTests
             new ServiceCollection().AddLogging().AddMcpOAuthTokenClient().BuildServiceProvider()
                 .GetRequiredService<McpOAuthTokenClient>(),
             Options.Create(new JwtOptions { Secret = secret }),
+            clock ?? TimeProvider.System,
             NullLogger<LocalMcpSession>.Instance);
         await session.InitializeAsync();
         return session;

@@ -230,7 +230,8 @@ public sealed class ReadPortCompositionTests
         var first = new DateTimeOffset(2026, 9, 1, 6, 0, 0, TimeSpan.Zero);
         var second = first.AddDays(1);
         var snapshots = new Mock<IHoldingSnapshotRepository>();
-        snapshots.Setup(s => s.ListSinceUnscopedAsync(User, first.Date, It.IsAny<CancellationToken>()))
+        // UTC midnight, as the source asks for it: a bare first.Date would take the machine's local offset.
+        snapshots.Setup(s => s.ListSinceUnscopedAsync(User, new DateTimeOffset(first.Date, TimeSpan.Zero), It.IsAny<CancellationToken>()))
             .ReturnsAsync(
             [
                 new HoldingSnapshot { UserId = User, Symbol = "AAA", Sleeve = RiskSleeve.Brokerage, Quantity = 10m, UsdValue = 1_100m, CapturedAt = second },

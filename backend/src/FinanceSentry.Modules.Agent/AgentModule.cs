@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Agent.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ModelContextProtocol.Server;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Http;
@@ -91,6 +92,7 @@ public static class AgentModule
         services.AddHttpContextAccessor();
         services.AddLocalMcpCredentialStore();
         services.AddMcpOAuthTokenClient();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
 

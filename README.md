@@ -247,36 +247,33 @@ Specs live in `.specify/specs/<feature>/`. Architecture principles and quality g
 
 ## MCP Server
 
-Finance Sentry ships a read-only **Model Context Protocol (MCP) server** (`FinanceSentry.Mcp`) that lets MCP-capable clients — Claude Desktop, Claude Code, or any MCP host — query live financial data without going through the REST API. It exposes 11 tools covering account balances, transactions, budgets, alerts, portfolio positions, detected subscriptions, and sync health. Four additional tools are stubs that return `{ status: "not_yet_available" }` while their backing modules are still under development.
+Finance Sentry ships a **Model Context Protocol (MCP) server** (`FinanceSentry.Mcp`) that lets MCP-capable clients — Claude Desktop, Claude Code, or any MCP host — query live financial data without going through the REST API: balances, transactions, budgets, portfolio, risk, research and sync health. Every tool acts only for the signed-in person. It speaks `stdio` (a local client spawns it) or streamable HTTP (`MCP_TRANSPORT=http`, port `MCP_HTTP_PORT`, default 5100; production runs this for the OpenClaw agent).
 
-### Connect via Claude Desktop (stdio transport)
+### Connect Claude Desktop to a deployed instance
 
-Add the following block to your `claude_desktop_config.json` (usually `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+The tools read the database directly, so the stdio process runs on the box that hosts the stack. [`scripts/mcp-stdio.sh`](scripts/mcp-stdio.sh) starts a throwaway stdio container from the deployed `finance-sentry-mcp` image, on its compose network and with its environment, and keeps the MCP sign-in on the host so it survives redeploys. Copy it onto the box (needs `docker` and `jq`), then:
+
+1. **Sign in once.** On the box run `mcp-stdio.sh login`. It prints a connect URL with a `127.0.0.1:<port>` callback; from the machine with the browser forward that port (`ssh -N -L <port>:127.0.0.1:<port> <box>`), open the URL and approve.
+2. **Point Claude Desktop at it** in `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "finance-sentry": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "/absolute/path/to/finance-sentry/backend/src/FinanceSentry.Mcp"
-      ],
-      "env": {
-        "MCP_TRANSPORT": "stdio",
-        "MCP_CONNECTION_STRING": "Host=localhost;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password"
-      }
+      "command": "ssh",
+      "args": ["-T", "-o", "BatchMode=yes", "<box>", "/path/to/mcp-stdio.sh"]
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/finance-sentry` with the real path on your machine. Make sure the local Docker stack is running (`docker compose -f docker/docker-compose.dev.yml up -d postgres`) so the MCP server can reach PostgreSQL.
+On Windows with SSH set up inside WSL, use `"command": "wsl.exe"` with `"args": ["bash", "-c", "ssh -T -o BatchMode=yes <box> /path/to/mcp-stdio.sh"]`. `mcp-stdio.sh status` shows who is signed in; `logout` revokes it.
 
-For HTTP/SSE transport (networked or multi-client deployments), set `MCP_TRANSPORT=http` and optionally `MCP_HTTP_PORT=5100`. Copy `.env.example` to `.env` and adjust the values before starting the server.
+### Local development (stdio)
 
-See [docs/mcp.md](docs/mcp.md) for the full tool catalogue — input parameters, return schemas, and real-vs-stub status for each tool.
+With the dev stack up (`docker compose -f docker/docker-compose.dev.yml up -d postgres api frontend`), sign in once with `dotnet run --project backend/src/FinanceSentry.Mcp -- auth login` (credentials land in `~/.config/finance-sentry/mcp-auth.json`), then point the client at `dotnet run --project /absolute/path/to/finance-sentry/backend/src/FinanceSentry.Mcp` with `MCP_TRANSPORT=stdio` and `ConnectionStrings__Default` set to the dev database. `backend/src/FinanceSentry.Mcp/mcp-probe.sh` drives a session from the shell.
+
+See [docs/mcp.md](docs/mcp.md) for transports, identity and the tool catalogue.
 
 ## License & Security
 
