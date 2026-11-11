@@ -10,7 +10,7 @@
 
 ## Message format
 
-⚠️ WARN degraded/stale data · 💡 INFO signals, market events · 📊 BRIEF digest/scan summaries. Line 1 `{emoji} {TYPE} · {Subject}`; 2-3 facts as values joined by ` ·` ("VIX 19.9 · rising"); optional detail line; one inline `[View →]` only where a URL is natural.
+⚠️ WARN degraded/stale data · 💡 INFO signals/market events · 📊 BRIEF digest/scan. Line 1 `{emoji} {TYPE} · {Subject}`; 2-3 facts as values joined ` ·` ("VIX 19.9 · rising"); optional detail line; one inline `[View →]` only where a URL fits.
 
 ## Hierarchy & delegation
 
