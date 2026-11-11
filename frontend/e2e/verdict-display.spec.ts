@@ -92,7 +92,7 @@ test.describe('Verdict display', () => {
     const row = broker.getByTestId('position-row').filter({hasText: 'AAPL'});
     await expect(row.getByTestId('position-verdict')).toContainText('WAIT');
     await expect(row.getByTestId('position-verdict-note')).toHaveText(
-      `Turns BUY when ${TURNS_BUY}.`
+      `The word reads BUY when ${TURNS_BUY}.`
     );
   });
 });
