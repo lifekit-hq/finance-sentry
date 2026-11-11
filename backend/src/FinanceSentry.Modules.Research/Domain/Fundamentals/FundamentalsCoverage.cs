@@ -5,13 +5,17 @@ namespace FinanceSentry.Modules.Research.Domain.Fundamentals;
 /// replaces a bare empty list. <see cref="Status"/> is one of <see cref="FundamentalsCoverageStatus"/>;
 /// <see cref="IssuerType"/> one of <see cref="FundamentalsIssuerType"/> (null when no source could
 /// tell); <see cref="Reason"/> explains anything short of full coverage; <see cref="Bases"/> names the
-/// provider behind each period basis that was supplied.
+/// provider behind each period basis that was supplied. <see cref="ErrorCode"/> (#1375) is set only on
+/// <see cref="FundamentalsCoverageStatus.SourceUnavailable"/> when the failure has a machine-readable
+/// cause (<c>map_unavailable</c>: the EDGAR ticker→CIK map could not be loaded), so a caller can tell an
+/// infrastructure failure from genuine no-data.
 /// </summary>
 public sealed record FundamentalsCoverage(
     string Status,
     string? IssuerType,
     string? Reason,
-    IReadOnlyList<FundamentalsBasisCoverage> Bases);
+    IReadOnlyList<FundamentalsBasisCoverage> Bases,
+    string? ErrorCode = null);
 
 /// <summary>
 /// One supplied period basis (<see cref="FundamentalsBasis"/>): the provider whose series it is, the

@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Tests.Unit;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -86,6 +87,29 @@ public sealed class FundamentalsChainServiceTests
         result.Facts.Should().BeEmpty();
         result.Coverage.Status.Should().Be(FundamentalsCoverageStatus.SourceUnavailable);
         result.Coverage.Reason.Should().Contain("edgar unavailable").And.Contain("503");
+    }
+
+    [Fact]
+    public async Task FailedSourceWithAnErrorCode_CarriesItOnTheCoverage()
+    {
+        // #1375: a caller can tell "the ticker->CIK map is down" from a generic provider failure.
+        var edgar = new ScriptedSource("edgar", FundamentalsSourceResult.Failed(
+            "EDGAR ticker->CIK map unavailable", errorCode: EdgarErrorCodes.MapUnavailable));
+
+        var result = await Chain([edgar]).GetFundamentalsAsync("MU", 20);
+
+        result.Coverage.Status.Should().Be(FundamentalsCoverageStatus.SourceUnavailable);
+        result.Coverage.ErrorCode.Should().Be(EdgarErrorCodes.MapUnavailable);
+    }
+
+    [Fact]
+    public async Task FailedSourceWithoutAnErrorCode_LeavesTheCoverageCodeNull()
+    {
+        var edgar = new ScriptedSource("edgar", FundamentalsSourceResult.Failed("503 from data.sec.gov"));
+
+        var result = await Chain([edgar]).GetFundamentalsAsync("MU", 20);
+
+        result.Coverage.ErrorCode.Should().BeNull();
     }
 
     [Fact]

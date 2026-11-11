@@ -417,8 +417,11 @@ public static class ResearchModule
         // Singleton: holds the cached Yahoo crumb + per-ticker event cache across requests.
         services.AddSingleton<IEarningsCalendarService, YahooEarningsCalendarService>();
 
-        // Singleton: caches the ticker->CIK map + per-ticker EDGAR results across requests.
-        services.AddSingleton<ISecEdgarService, SecEdgarService>();
+        // Singleton: caches the ticker->CIK map + per-ticker EDGAR results across requests. The same
+        // instance is also the source's health reader, so get_sync_health reports the map's state (#1375).
+        services.AddSingleton<SecEdgarService>();
+        services.AddSingleton<ISecEdgarService>(sp => sp.GetRequiredService<SecEdgarService>());
+        services.AddSingleton<IDataSourceHealthReader>(sp => sp.GetRequiredService<SecEdgarService>());
         services.AddFundamentalsChain(config);
 
         // Analyst-actions sources. MarketBeat is the sole per-action source since the Yahoo

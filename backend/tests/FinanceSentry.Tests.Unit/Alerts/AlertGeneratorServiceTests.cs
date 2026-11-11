@@ -955,6 +955,147 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GenerateThesisMonitoringBlind_InfraBlind_AddsAnErrorAlertCarryingTheSummary()
+    {
+        AllowAlert(AlertType.JobFailure);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU UNMONITORABLE: MU gross_margin INFRA_BLIND (map down)", infraBlind: true);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.JobFailure &&
+            a.Severity == AlertSeverity.Error &&
+            a.UserId == _userId &&
+            a.ReferenceId != null &&
+            a.Title.Contains("data source down") &&
+            a.Message.Contains("unwatched, not intact") &&
+            a.Message.Contains("MU gross_margin INFRA_BLIND")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_MissingData_IsAWarning()
+    {
+        AllowAlert(AlertType.JobFailure);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU PARTIALLY_MONITORABLE: MU revenue_yoy NO_DATA", infraBlind: false);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Severity == AlertSeverity.Warning), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_ExistingActive_BumpsInsteadOfAdding()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Error });
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU blind", infraBlind: true);
+
+        VerifyNothingAdded();
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_InfraBlind_EscalatesAStandingWarning()
+    {
+        var warning = new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Warning };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(warning);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU INFRA_BLIND (map down)", infraBlind: true);
+
+        _repo.Verify(r => r.ResolveAsync(warning.Id, default), Times.Once);
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Severity == AlertSeverity.Error && a.Title.Contains("data source down")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_MissingData_BumpsAStandingWarning()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Warning });
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU revenue_yoy NO_DATA", infraBlind: false);
+
+        VerifyNothingAdded();
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_RecentlyDismissed_StaysQuietForADay()
+    {
+        DateTimeOffset? quietSince = null;
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync((Alert?)null);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.JobFailure, It.IsAny<Guid?>(), "thesis-monitoring", It.IsAny<DateTimeOffset>(), default))
+            .Callback<Guid, string, Guid?, string?, DateTimeOffset, CancellationToken>((_, _, _, _, since, _) => quietSince = since)
+            .ReturnsAsync(true);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU blind", infraBlind: true);
+
+        VerifyNothingAdded();
+        Assert.NotNull(quietSince);
+        Assert.InRange(DateTimeOffset.UtcNow - quietSince!.Value, TimeSpan.FromHours(23.9), TimeSpan.FromHours(24.1));
+    }
+
+    [Fact]
+    public async Task ResolveThesisMonitoringBlind_ResolvesTheSameReferenceItWasRaisedOn()
+    {
+        var written = new List<Alert>();
+        AllowAlert(AlertType.JobFailure);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU blind", infraBlind: true);
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, written.Single().ReferenceId, default))
+            .ReturnsAsync(open);
+
+        await _service.ResolveThesisMonitoringBlindAlertAsync(_userId);
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisCoverageDegraded_AddsAnErrorAlertOnTheThesis_SupersedingTheOpenOne()
+    {
+        var thesisId = Guid.NewGuid();
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(open);
+
+        await _service.GenerateThesisCoverageDegradedAlertAsync(_userId, thesisId, "MU", "MU (MU gross_margin went blind since 2026-11-11 08:00 UTC)");
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.JobFailure &&
+            a.Severity == AlertSeverity.Error &&
+            a.ReferenceLabel == "MU" &&
+            a.Title == "Monitoring coverage degraded: MU" &&
+            a.Message.StartsWith("Monitoring coverage degraded: MU (MU gross_margin went blind since")), default), Times.Once);
+        _repo.Verify(
+            r => r.HasRecentAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+                It.IsAny<DateTimeOffset>(), default),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GenerateThesisCoverageDegraded_KeysTheReferenceOnTheThesis()
+    {
+        var written = new List<Alert>();
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateThesisCoverageDegradedAlertAsync(_userId, Guid.NewGuid(), "MU", "MU (MU gross_margin went blind)");
+        await _service.GenerateThesisCoverageDegradedAlertAsync(_userId, Guid.NewGuid(), "MU", "MU (MU gross_margin went blind)");
+
+        written.Select(a => a.ReferenceId).Distinct().Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task GenerateNewsCluster_NoExisting_AddsWarningAlert()
     {
         var day = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -1336,7 +1477,7 @@ public class AlertGeneratorServiceTests
         var perObservedChange = new[] { AlertType.PriceHike };
         // Deduped once per reference, ever — no silence window applies.
         var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.ConnectionDormant };
-        // The silent-detector alert is the only generator left on JobFailure and sets its own window per draft.
+        // The silent-detector and thesis-monitoring-blind alerts are the windowed generators on JobFailure and set their own window per draft; the coverage-degraded one records every occurrence.
         var windowPerDraft = new[] { AlertType.JobFailure };
 
         var declared = (Dictionary<string, TimeSpan>)typeof(AlertGeneratorService)

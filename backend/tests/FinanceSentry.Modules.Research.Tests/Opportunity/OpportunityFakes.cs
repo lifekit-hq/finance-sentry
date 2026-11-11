@@ -269,6 +269,18 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task ResolveCoverageGapAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateThesisBreakAlertAsync(Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
+        => Task.CompletedTask;
+
     public Task ResolveThesisBreakAlertAsync(Guid userId, Guid thesisId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateMarketStructureAlertAsync(Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default, AlertDedup dedup = AlertDedup.ActiveThenSilence) => Task.CompletedTask;
     public Task GenerateMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, string reason, CancellationToken ct = default) => Task.CompletedTask;

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
@@ -21,7 +22,8 @@ public sealed class GetSyncHealthTool(
     IIdentityResolver identity,
     ILogger<GetSyncHealthTool> logger,
     IEnumerable<IConnectionHealthReader> healthReaders,
-    IOptionsMonitor<ConnectionHealthOptions> healthOptions)
+    IOptionsMonitor<ConnectionHealthOptions> healthOptions,
+    IEnumerable<IDataSourceHealthReader> dataSourceReaders)
 {
     private readonly BankSyncDbContext _bankSync = bankSyncDbContext;
     private readonly CryptoSyncDbContext _cryptoSync = cryptoSyncDbContext;
@@ -29,6 +31,7 @@ public sealed class GetSyncHealthTool(
     private readonly IIdentityResolver _identity = identity;
     private readonly ILogger<GetSyncHealthTool> _logger = logger;
 
+    private const string DataSourceKind = "data_source";
     private const string ReauthRequiredStatus = "reauth_required";
     private const string ExpiredConnectionStatus = "EXPIRED";
     private const string ReauthRequiredMessage = "Reconnection required.";
@@ -38,7 +41,10 @@ public sealed class GetSyncHealthTool(
     [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, Revolut X, IBKR). " +
         "For a provider whose connection health is policy-driven it also returns health: healthy, retrying (failing, retried " +
         "automatically, nothing to do), reconnect_needed (only the user can fix it by reconnecting) or dormant (failing for days, " +
-        "possibly closed); status is then error only for a failure the user is told about.")]
+        "possibly closed); status is then error only for a failure the user is told about. " +
+        "It also lists the external data sources behind fundamentals and filings (kind data_source, e.g. sec-edgar): status ok, " +
+        "error or never_synced, health healthy, stale (refresh failing, an older copy is still served) or unavailable (nothing " +
+        "usable: dependent reads such as get_fundamentals fail with map_unavailable), lastSyncAt = last successful refresh.")]
     public async Task<IReadOnlyList<SyncHealthEntry>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
@@ -55,7 +61,44 @@ public sealed class GetSyncHealthTool(
             await GetIbkrHealthAsync(userIdVal, cancellationToken),
         ];
 
-        return await WithConnectionHealthAsync(userIdVal, entries, cancellationToken);
+        return [.. await WithConnectionHealthAsync(userIdVal, entries, cancellationToken), .. DataSourceEntries()];
+    }
+
+    /// <summary>
+    /// The external data sources, beside the account providers (#1375): a source that is down is named here instead of only
+    /// surfacing as empty results from the tools that read it. Read from in-process state, so it never calls the provider.
+    /// </summary>
+    private List<SyncHealthEntry> DataSourceEntries()
+    {
+        var entries = new List<SyncHealthEntry>();
+        foreach (var reader in dataSourceReaders)
+        {
+            try
+            {
+                entries.Add(FromDataSource(reader.Read()));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read data source health from {Reader}.", reader.GetType().Name);
+            }
+        }
+
+        return entries;
+    }
+
+    private static SyncHealthEntry FromDataSource(DataSourceHealth health)
+    {
+        var status = health.State switch
+        {
+            DataSourceHealthState.NeverChecked => "never_synced",
+            DataSourceHealthState.Healthy => "ok",
+            _ => "error",
+        };
+
+        return new SyncHealthEntry(
+            health.Source, health.LastSuccessAt?.UtcDateTime, status, health.Detail,
+            Health: health.State == DataSourceHealthState.NeverChecked ? null : health.State,
+            Kind: DataSourceKind);
     }
 
     /// <summary>
@@ -265,11 +308,14 @@ public sealed class GetSyncHealthTool(
 
 /// <param name="Health">
 /// The connection-health label (<c>healthy</c>, <c>retrying</c>, <c>reconnect_needed</c>, <c>dormant</c>) for a provider
-/// the policy drives; omitted for every other provider.
+/// the policy drives; omitted for every other provider. For a data source it is the source's state (<c>healthy</c>,
+/// <c>stale</c>, <c>unavailable</c>).
 /// </param>
+/// <param name="Kind"><c>data_source</c> for an external data source (EDGAR); omitted for an account provider.</param>
 public sealed record SyncHealthEntry(
     string Provider,
     DateTime? LastSyncAt,
     string Status,
     string? ErrorMessage,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Health = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Health = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Kind = null);

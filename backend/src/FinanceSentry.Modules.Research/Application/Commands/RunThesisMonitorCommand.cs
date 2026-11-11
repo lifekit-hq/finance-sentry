@@ -31,6 +31,9 @@ public class RunThesisMonitorCommandHandler(
 {
     private const int MaxFundamentalsPerConcept = 8;
 
+    // Alert.Message holds 1000 characters; the alert text wraps the summary in a sentence.
+    private const int MaxAlertSummaryLength = 800;
+
     // Calendar-day padding over a trading-day count so weekends/holidays don't starve the window
     // (same 1.5x heuristic Radar's StructureQueryService.LookbackSince uses).
     private const decimal RelativeReturnLookbackPaddingFactor = 1.5m;
@@ -47,6 +50,8 @@ public class RunThesisMonitorCommandHandler(
         var skipped = 0;
         var errors = 0;
         var unmonitorable = new List<UnmonitorableThesis>();
+        var degraded = new List<CoverageDegradation>();
+        var runAt = DateTimeOffset.UtcNow;
 
         var fundamentalsCache = new Dictionary<string, FundamentalsResult>(StringComparer.OrdinalIgnoreCase);
         var closesCache = new Dictionary<string, IReadOnlyList<DailyClose>>(StringComparer.OrdinalIgnoreCase);
@@ -91,6 +96,12 @@ public class RunThesisMonitorCommandHandler(
                 if (blind is not null)
                 {
                     unmonitorable.Add(blind);
+                }
+
+                var regression = await RecordCoverageAsync(thesis, evaluations, blind, runAt, ct);
+                if (regression is not null)
+                {
+                    degraded.Add(regression);
                 }
 
                 var verdicts = evaluations.Select(e => e.Verdict).ToList();
@@ -138,9 +149,139 @@ public class RunThesisMonitorCommandHandler(
             }
         }
 
+        await NotifyMonitoringBlindAsync(cmd.UserId, unmonitorable, runCompleteWithoutErrors: errors == 0, ct);
+
         return new ThesisMonitorRunSummary(
-            thesesEvaluated, triggersEvaluated, breaksRaised, breaksCleared, skipped, errors, unmonitorable);
+            thesesEvaluated, triggersEvaluated, breaksRaised, breaksCleared, skipped, errors, unmonitorable, degraded);
     }
+
+    /// <summary>
+    /// The coverage-degradation diff (#1375): the triggers that produced a verdict on the previous run and cannot now,
+    /// read from the snapshot the previous run stored on the thesis. Raises one alert per thesis naming them, then
+    /// stores this run's snapshot. A trigger that was already blind last run is not reported again (the post-run
+    /// blind-spot notice owns that), and a thesis with no snapshot yet (its first monitored run) has nothing to diff.
+    /// Neither the alert nor the snapshot write may abort the run.
+    /// </summary>
+    private async Task<CoverageDegradation?> RecordCoverageAsync(
+        InvestmentThesis thesis,
+        IReadOnlyList<(ThesisInvalidationTrigger Trigger, TriggerVerdict Verdict)> evaluations,
+        UnmonitorableThesis? blind,
+        DateTimeOffset runAt,
+        CancellationToken ct)
+    {
+        var evaluableKeys = evaluations
+            .Where(e => e.Verdict is not TriggerVerdict.NonEvaluable)
+            .Select(e => TriggerKey(thesis, e.Trigger))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        CoverageDegradation? regression = null;
+        if (thesis.MonitorSnapshot is { } previous && blind is not null)
+        {
+            var wasEvaluable = previous.EvaluableKeys.ToHashSet(StringComparer.Ordinal);
+
+            // blind.Triggers is the non-evaluable evaluations, in order (DescribeUnmonitorable), so they pair by index.
+            var lostTriggers = evaluations
+                .Where(e => e.Verdict is TriggerVerdict.NonEvaluable)
+                .Zip(blind.Triggers, (e, described) => (e.Trigger, Described: described))
+                .Where(x => wasEvaluable.Contains(TriggerKey(thesis, x.Trigger)))
+                .Select(x => x.Described)
+                .ToList();
+
+            if (lostTriggers.Count > 0)
+            {
+                var found = new CoverageDegradation(thesis.Id, thesis.Ticker, runAt, lostTriggers);
+                regression = found;
+                await TryAlertAsync(
+                    () => alertGenerator.GenerateThesisCoverageDegradedAlertAsync(
+                        thesis.UserId, thesis.Id, thesis.Ticker, DescribeDegradation(found), ct),
+                    thesis.UserId, "coverage-degraded", ct);
+            }
+        }
+
+        try
+        {
+            await thesisRepo.SaveMonitorSnapshotAsync(
+                thesis.UserId, thesis.Id, new ThesisMonitorSnapshot(runAt, evaluations.Count, evaluableKeys), ct);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                ex, "Saving the monitor snapshot failed for thesis {ThesisId} ({Ticker})", thesis.Id, thesis.Ticker);
+        }
+
+        return regression;
+    }
+
+    /// <summary>
+    /// The post-run meta-check (#1375): any thesis the run was blind on - UNMONITORABLE or PARTIALLY_MONITORABLE - raises
+    /// one alert for the user now, naming every blind trigger and its cause, instead of living only in the summary and the
+    /// log. A run that evaluated everything resolves the open one; a run that errored resolves nothing (it learned less).
+    /// </summary>
+    private async Task NotifyMonitoringBlindAsync(
+        Guid userId, IReadOnlyList<UnmonitorableThesis> unmonitorable, bool runCompleteWithoutErrors, CancellationToken ct)
+    {
+        if (unmonitorable.Count == 0)
+        {
+            if (runCompleteWithoutErrors)
+            {
+                await TryAlertAsync(
+                    () => alertGenerator.ResolveThesisMonitoringBlindAlertAsync(userId, ct), userId, "monitoring-blind-resolve", ct);
+            }
+
+            return;
+        }
+
+        var infraBlind = unmonitorable.Any(t => t.Triggers.Any(x => x.Cause == ThesisBlindCause.InfraBlind));
+        await TryAlertAsync(
+            () => alertGenerator.GenerateThesisMonitoringBlindAlertAsync(
+                userId, Truncate(DescribeBlindSpots(unmonitorable), MaxAlertSummaryLength), infraBlind, ct),
+            userId, "monitoring-blind", ct);
+    }
+
+    private async Task TryAlertAsync(Func<Task> raise, Guid userId, string what, CancellationToken ct)
+    {
+        try
+        {
+            await raise();
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Raising the {Alert} notice failed for user {UserId}", what, userId);
+        }
+    }
+
+    private static string DescribeBlindSpots(IReadOnlyList<UnmonitorableThesis> unmonitorable)
+        => string.Join(
+            " | ",
+            unmonitorable.Select(t =>
+                $"{t.Ticker} {t.Status}: {string.Join("; ", t.Triggers.Select(DescribeBlindTrigger))}"));
+
+    private static string DescribeBlindTrigger(UnmonitorableTrigger t)
+        => $"{t.Subject} {t.Metric} {t.Cause} ({(t.Cause == ThesisBlindCause.InfraBlind ? t.Coverage?.Reason ?? t.Reason : t.Reason)})";
+
+    private static string DescribeDegradation(CoverageDegradation d)
+        => Truncate(
+            $"{d.Ticker} ({string.Join(", ", d.Triggers.Select(t => $"{t.Subject} {t.Metric}"))} went blind since "
+            + $"{d.Since.UtcDateTime:yyyy-MM-dd HH:mm} UTC; {string.Join("; ", d.Triggers.Select(DescribeBlindTrigger))})",
+            MaxAlertSummaryLength);
+
+    private static string Truncate(string value, int max)
+        => value.Length <= max ? value : string.Concat(value.AsSpan(0, max - 1), "…");
+
+    // A trigger's identity for the run-over-run diff: what it reads and how, not its threshold, so editing a
+    // threshold never reads as a coverage change.
+    private static string TriggerKey(InvestmentThesis thesis, ThesisInvalidationTrigger trigger)
+        => string.Join(
+            '|',
+            trigger.Metric,
+            trigger.ProxyTicker ?? thesis.Ticker,
+            trigger.PeriodType,
+            trigger.Direction,
+            trigger.ConsecutivePeriods,
+            trigger.BenchmarkTicker,
+            trigger.WindowDays);
 
     private async Task<TriggerVerdict> EvaluateTriggerAsync(
         ThesisInvalidationTrigger trigger,
@@ -226,7 +367,11 @@ public class RunThesisMonitorCommandHandler(
                     isFundamentals ? PeriodTypeName(e.Trigger.PeriodType) : null,
                     subject,
                     ((TriggerVerdict.NonEvaluable)e.Verdict).Reason,
-                    coverage);
+                    coverage,
+                    // A fundamentals source that failed (not "no data") is infrastructure: INFRA_BLIND (#1375).
+                    coverage?.Status == FundamentalsCoverageStatus.SourceUnavailable
+                        ? ThesisBlindCause.InfraBlind
+                        : ThesisBlindCause.NoData);
             })
             .ToList();
 

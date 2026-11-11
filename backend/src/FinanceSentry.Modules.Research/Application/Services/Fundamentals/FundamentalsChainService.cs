@@ -43,6 +43,7 @@ public sealed class FundamentalsChainService(
         var answers = new Dictionary<string, IReadOnlyList<FundamentalFact>>(StringComparer.Ordinal);
         string? issuerType = null;
         string? failure = null;
+        string? failureCode = null;
 
         foreach (var source in orderedSources)
         {
@@ -57,6 +58,7 @@ public sealed class FundamentalsChainService(
             if (result.Outcome == FundamentalsSourceOutcome.Failed)
             {
                 failure = $"{source.Name} unavailable: {result.Detail}";
+                failureCode = result.ErrorCode;
                 break;
             }
 
@@ -100,7 +102,7 @@ public sealed class FundamentalsChainService(
             .SelectMany(provider => answers[provider].Where(f =>
                 chosen.TryGetValue(BasisOf(f), out var series) && series.Provider == provider))
             .ToList();
-        var coverage = BuildCoverage(upper, chosen, issuerType, failure, noData);
+        var coverage = BuildCoverage(upper, chosen, issuerType, failure, failureCode, noData);
 
         logger.LogDebug(
             "Fundamentals for {Ticker}: {Status}; {Bases}",
@@ -130,6 +132,7 @@ public sealed class FundamentalsChainService(
         IReadOnlyDictionary<string, Series> chosen,
         string? issuerType,
         string? failure,
+        string? failureCode,
         IReadOnlyList<string> noData)
     {
         var bases = Bases
@@ -156,7 +159,8 @@ public sealed class FundamentalsChainService(
 
         if (failure is not null)
         {
-            return new FundamentalsCoverage(FundamentalsCoverageStatus.SourceUnavailable, issuerType, failure, bases);
+            return new FundamentalsCoverage(
+                FundamentalsCoverageStatus.SourceUnavailable, issuerType, failure, bases, failureCode);
         }
 
         var tried = noData.Count == 0 ? "no source is configured" : string.Join("; ", noData);
