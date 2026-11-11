@@ -34,6 +34,7 @@ internal sealed class AuthUserDataExporter(AuthDbContext db) : IUserDataExporter
                 u.Theme,
                 u.ThemeSeed,
                 u.ThemeIntensity,
+                u.VerdictDisplay,
                 u.EmailAlerts,
                 u.LowBalanceAlerts,
                 u.LowBalanceThreshold,

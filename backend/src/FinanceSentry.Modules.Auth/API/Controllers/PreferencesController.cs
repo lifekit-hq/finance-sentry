@@ -8,7 +8,7 @@ namespace FinanceSentry.Modules.Auth.API.Controllers;
 
 /// <summary>
 /// The signed-in person's account preferences in the lifekit app-shell shape (<c>GET</c> and <c>PATCH</c> of
-/// one resource). Today it carries the appearance; the profile and alert fields stay on <c>/profile</c>.
+/// one resource). Today it carries the appearance and the verdict display; the profile and alert fields stay on <c>/profile</c>.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -28,7 +28,7 @@ public class PreferencesController(
     public async Task<IActionResult> UpdatePreferences([FromBody] UpdatePreferencesRequest request, CancellationToken ct)
     {
         var preferences = await updatePreferencesHandler.Handle(
-            new UpdatePreferencesCommand(User.RequireUserId(), request.Appearance), ct);
+            new UpdatePreferencesCommand(User.RequireUserId(), request.Appearance, request.VerdictDisplay), ct);
         return Ok(preferences);
     }
 }

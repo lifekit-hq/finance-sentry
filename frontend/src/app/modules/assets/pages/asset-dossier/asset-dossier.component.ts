@@ -26,6 +26,7 @@ import {
   LineChartComponent,
   PageContainerComponent,
   RelativeTimePipe,
+  SegmentedComponent,
   SkeletonComponent,
   TagComponent,
   type TagVariant,
@@ -37,6 +38,10 @@ import {
   LOSS_TEXT_CLASS,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
+import {
+  VERDICT_DISPLAY_LABEL,
+  VERDICT_DISPLAY_OPTIONS,
+} from '../../../../shared/constants/preferences/app-preferences.constants';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
@@ -111,6 +116,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     ProviderLabelPipe,
     RelativeTimePipe,
     RouterLink,
+    SegmentedComponent,
     PriceChartComponent,
     VerdictBlockComponent,
     SignalTypeLabelPipe,
@@ -162,6 +168,8 @@ export class AssetDossierComponent {
   public readonly chartRanges = CHART_RANGES;
   public readonly chartSkeletonHeight = CHART_SKELETON_HEIGHT;
   public readonly ownershipNote = OWNERSHIP_NOTE;
+  public readonly verdictDisplayOptions = VERDICT_DISPLAY_OPTIONS;
+  public readonly verdictDisplayLabel = VERDICT_DISPLAY_LABEL;
   // A tick per rule: passed, failed, or not evaluable on the data on hand.
   public readonly ruleTickClass: Record<RuleState, string> = {
     pass: 'bg-gain',

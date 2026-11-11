@@ -53,14 +53,25 @@ public sealed class GetScorecardVerdictsQueryTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsOnlyTheWord_NotTheReasonsOrTheRuleTable()
+    public async Task Handle_ReturnsOnlyTheWordAndWhatTurnsItBuy_NotTheReasonsOrTheRuleTable()
     {
         var result = await HandlerFor(SingleRead(("AAA", 78))).Handle(
             new GetScorecardVerdictsQuery(["AAA"]), CancellationToken.None);
 
         typeof(ScorecardVerdictSummary).GetProperties().Select(p => p.Name)
-            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId");
+            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId", "TurnsBuyWhen");
         result.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Handle_CarriesTheSingleReadsTurnsBuyLine_AndNothingWhereThereIsNoBarToName()
+    {
+        var single = SingleRead(("AAA", 78), ("BBB", 9));
+
+        var result = await HandlerFor(single).Handle(new GetScorecardVerdictsQuery(["AAA", "BBB"]), CancellationToken.None);
+
+        result[0].TurnsBuyWhen.Should().BeNull("a BUY has no bar left to clear");
+        result[1].TurnsBuyWhen.Should().Be(Card("BBB", 9).Verdict.TurnsBuyWhen).And.NotBeNullOrWhiteSpace();
     }
 
     private static GetScorecardVerdictsQueryHandler HandlerFor(Mock<IQueryHandler<GetScorecardQuery, ScorecardResult>> single) =>

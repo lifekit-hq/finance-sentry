@@ -5,7 +5,10 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {describe, expect, it} from 'vitest';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
-import {type VerdictWord} from '../../../shared/models/scorecard/scorecard.model';
+import {
+  type ScorecardVerdictSummary,
+  type VerdictWord,
+} from '../../../shared/models/scorecard/scorecard.model';
 import {type Position} from '../models/position/position.model';
 import {holdingsComputed} from './holdings.computed';
 
@@ -26,12 +29,20 @@ function position(overrides: Partial<Position>): Position {
   };
 }
 
+function summary(
+  symbol: string,
+  word: VerdictWord,
+  turnsBuyWhen: Nullable<string> = null
+): ScorecardVerdictSummary {
+  return {symbol, word, firedRuleId: 'rule', turnsBuyWhen};
+}
+
 function build(
   positions: Position[],
   dayChangePctByTicker: Record<string, number> = {},
   status: AsyncStatus = 'idle',
   headline: Nullable<Headline> = null,
-  verdictByTicker: Record<string, VerdictWord> = {}
+  verdictByTicker: Record<string, ScorecardVerdictSummary> = {}
 ) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
@@ -358,7 +369,7 @@ describe('holdingsComputed hidden positions', () => {
       {},
       'idle',
       null,
-      {AAPL: 'Wait', BTC: 'Buy'}
+      {AAPL: summary('AAPL', 'Wait', 'structure reaches 50 (reads 40)'), BTC: summary('BTC', 'Buy')}
     );
 
     const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
@@ -367,5 +378,30 @@ describe('holdingsComputed hidden positions', () => {
     expect(bySymbol('AAPL')?.verdict).toBe('Wait');
     expect(bySymbol('MSFT')?.verdict).toBeNull();
     expect(bySymbol('BTC')?.verdict).toBeNull();
+  });
+
+  it('says what would turn the verdict BUY only where the API names a bar', () => {
+    const stock = {provider: 'ibkr', instrumentType: 'STK', assetClass: 'equity' as const};
+    const computed = build(
+      [
+        position({...stock, symbol: 'AAPL', currentValue: 110}),
+        position({...stock, symbol: 'MSFT', currentValue: 50}),
+        position({...stock, symbol: 'NVDA', currentValue: 40}),
+      ],
+      {},
+      'idle',
+      null,
+      {
+        AAPL: summary('AAPL', 'Wait', 'structure reaches 50 (reads 40)'),
+        MSFT: summary('MSFT', 'Buy'),
+      }
+    );
+
+    const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
+    const note = (s: string) => rows.find(r => r.symbol === s)?.verdictNote;
+
+    expect(note('AAPL')).toBe('Turns BUY when structure reaches 50 (reads 40).');
+    expect(note('MSFT')).toBeNull();
+    expect(note('NVDA')).toBeNull();
   });
 });

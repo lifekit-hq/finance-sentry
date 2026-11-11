@@ -17,11 +17,13 @@ import {
   tap,
 } from 'rxjs';
 
+import {VERDICT_DISPLAYS} from '../../../shared/constants/preferences/app-preferences.constants';
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
 import {
   type RecommendationDto,
   type RecommendationVerdict,
 } from '../../../shared/models/recommendation/recommendation.model';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
@@ -77,6 +79,7 @@ export function dossierEffects(store: StoreMethods) {
   const injector = inject(Injector);
   const decisionSheet = inject(DecisionSheetService);
   const authStore = inject(AuthStore);
+  const preferences = inject(AppPreferencesStore);
 
   // An alert deep-links to a card (`/assets/NVDA#analyst-coverage`); the card only exists once the
   // dossier has loaded, so the router's own fragment handling has nothing to land on. Scroll after
@@ -285,8 +288,18 @@ export function dossierEffects(store: StoreMethods) {
     }
   };
 
+  // The choice follows the person: it is saved to the account, applied at once, and rolled back (with a toast)
+  // by the preferences store when the save is refused.
+  const setVerdictDisplay = (choice: string): void => {
+    const verdictDisplay = VERDICT_DISPLAYS.find(display => display === choice);
+    if (verdictDisplay) {
+      void preferences.patch({verdictDisplay});
+    }
+  };
+
   return {
     openSymbol,
+    setVerdictDisplay,
     loadDossier,
     decideRecommendation,
     loadLedgerRead,

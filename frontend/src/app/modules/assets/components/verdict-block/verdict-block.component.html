@@ -21,7 +21,9 @@
       </p>
     }
 
-    @if (v.reasons.length > 0) {
+    @if (display() === 'detailed') {
+      <fns-verdict-trail [scorecard]="scorecard()" />
+    } @else if (v.reasons.length > 0) {
       <ul class="flex flex-col gap-cmn-2" data-testid="verdict-reasons">
         @for (reason of v.reasons; track reason.axis) {
           <li
@@ -96,4 +98,9 @@
 <p class="mt-cmn-3 text-cmn-xs text-text-secondary" data-testid="verdict-not-advice">
   {{ notAdvice }}
 </p>
-<fns-scorecard-verdict [scorecard]="scorecard()" [showSummary]="false" class="mt-cmn-2" />
+<fns-scorecard-verdict
+  [scorecard]="scorecard()"
+  [showSummary]="false"
+  [showRules]="display() === 'simple'"
+  class="mt-cmn-2"
+/>

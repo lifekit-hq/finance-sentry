@@ -28,6 +28,33 @@ public class MePreferencesTests(AuthApiFactory factory) : IClassFixture<AuthApiF
         appearance.GetProperty("theme").GetString().Should().Be("system");
         appearance.TryGetProperty("seed", out _).Should().BeFalse();
         appearance.TryGetProperty("intensity", out _).Should().BeFalse();
+        doc.RootElement.GetProperty("verdictDisplay").GetString().Should().Be("simple");
+    }
+
+    [Fact]
+    public async Task Patch_WithAVerdictDisplay_StoresItAndLeavesTheAppearanceUntouched()
+    {
+        using var client = await ClientAsync();
+        await PatchAsync(client, """{"appearance":{"theme":"dark","seed":"#4f46e5"}}""");
+
+        var response = await PatchAsync(client, """{"verdictDisplay":"detailed"}""");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var saved = await response.Content.ReadFromJsonAsync<PreferencesShape>();
+        saved!.VerdictDisplay.Should().Be("detailed");
+        saved.Appearance.Should().Be(new AppearanceShape("dark", "#4f46e5", null));
+        (await client.GetFromJsonAsync<PreferencesShape>(Url))!.VerdictDisplay.Should().Be("detailed");
+    }
+
+    [Fact]
+    public async Task Patch_WithoutAVerdictDisplay_LeavesItUntouched()
+    {
+        using var client = await ClientAsync();
+        await PatchAsync(client, """{"verdictDisplay":"detailed"}""");
+
+        var response = await PatchAsync(client, """{"appearance":{"theme":"light"}}""");
+
+        (await response.Content.ReadFromJsonAsync<PreferencesShape>())!.VerdictDisplay.Should().Be("detailed");
     }
 
     [Fact]
@@ -72,6 +99,7 @@ public class MePreferencesTests(AuthApiFactory factory) : IClassFixture<AuthApiF
     [InlineData("""{"appearance":{"theme":"sepia"}}""")]
     [InlineData("""{"appearance":{"theme":"dark","seed":"blue"}}""")]
     [InlineData("""{"appearance":{"theme":"dark","intensity":1.5}}""")]
+    [InlineData("""{"verdictDisplay":"verbose"}""")]
     public async Task Patch_WithAnInvalidValue_Returns400AndSavesNothing(string body)
     {
         using var client = await ClientAsync();
@@ -88,10 +116,11 @@ public class MePreferencesTests(AuthApiFactory factory) : IClassFixture<AuthApiF
     {
         using var first = await ClientAsync();
         using var second = await ClientAsync();
-        await PatchAsync(first, """{"appearance":{"theme":"dark","seed":"#4f46e5"}}""");
+        await PatchAsync(first, """{"appearance":{"theme":"dark","seed":"#4f46e5"},"verdictDisplay":"detailed"}""");
 
-        (await second.GetFromJsonAsync<PreferencesShape>(Url))!.Appearance
-            .Should().Be(new AppearanceShape("system", null, null));
+        var other = (await second.GetFromJsonAsync<PreferencesShape>(Url))!;
+        other.Appearance.Should().Be(new AppearanceShape("system", null, null));
+        other.VerdictDisplay.Should().Be("simple");
     }
 
     [Fact]
@@ -116,5 +145,5 @@ public class MePreferencesTests(AuthApiFactory factory) : IClassFixture<AuthApiF
 
     private sealed record AppearanceShape(string Theme, string? Seed, double? Intensity);
 
-    private sealed record PreferencesShape(AppearanceShape Appearance);
+    private sealed record PreferencesShape(AppearanceShape Appearance, string VerdictDisplay);
 }

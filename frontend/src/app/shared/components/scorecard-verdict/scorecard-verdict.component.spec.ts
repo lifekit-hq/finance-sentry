@@ -41,6 +41,18 @@ describe('ScorecardVerdictComponent', () => {
     expect(host.querySelector('[data-testid="verdict-why"]')).not.toBeNull();
   });
 
+  it('drops the rule table, and keeps the axes, when the rules are turned off', () => {
+    const fixture = TestBed.createComponent(ScorecardVerdictComponent);
+    fixture.componentRef.setInput('scorecard', ScorecardFixtures.scorecard());
+    fixture.componentRef.setInput('showRules', false);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('[data-testid="verdict-rule-buy"]')).toBeNull();
+    expect(host.querySelector('[data-testid="verdict-structure-basis"]')).toBeNull();
+    expect(host.querySelector('[data-testid="verdict-axis-Valuation"]')).not.toBeNull();
+  });
+
   it('says beside the word that it is information, not advice', () => {
     const host = render(ScorecardFixtures.scorecard());
 
