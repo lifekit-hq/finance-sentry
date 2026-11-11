@@ -150,7 +150,7 @@ public static class DerivedFundamentalsMath
             {
                 income.TryGetValue(end, out var ni);
                 equity.TryGetValue(end, out var eq);
-                var fy = ni?.FiscalYear ?? eq?.FiscalYear;
+                int? fy = end.Year;
                 if (ni is null || eq is null)
                 {
                     return new ReturnOnEquityPeriod(
@@ -214,14 +214,20 @@ public static class DerivedFundamentalsMath
             })
             .ToList();
 
-        return raw.Select(p => p with { YoyChange = Yoy(p, raw) }).ToList();
+        return raw
+            .Select(p =>
+            {
+                var (change, reason) = Yoy(p, raw);
+                return p with { YoyChange = change, YoyReason = reason };
+            })
+            .ToList();
     }
 
-    private static decimal? Yoy(FreeCashFlowPeriod current, IReadOnlyList<FreeCashFlowPeriod> all)
+    private static (decimal? Change, string? Reason) Yoy(FreeCashFlowPeriod current, IReadOnlyList<FreeCashFlowPeriod> all)
     {
         if (current.FreeCashFlow is not { } now)
         {
-            return null;
+            return (null, null);
         }
 
         var target = current.PeriodEnd.AddYears(-1);
@@ -231,8 +237,13 @@ public static class DerivedFundamentalsMath
                         && Math.Abs(p.PeriodEnd.DayNumber - target.DayNumber) <= YearEarlierToleranceDays)
             .OrderBy(p => Math.Abs(p.PeriodEnd.DayNumber - target.DayNumber))
             .FirstOrDefault();
-        return prior?.FreeCashFlow is { } before && before != 0
-            ? (now - before) / Math.Abs(before)
-            : null;
+        if (prior?.FreeCashFlow is not { } before)
+        {
+            return (null, "no free cash flow for the same period a year earlier in the history read (it may fall outside the facts the source provides)");
+        }
+
+        return before == 0
+            ? (null, "free cash flow a year earlier was zero")
+            : ((now - before) / Math.Abs(before), null);
     }
 }

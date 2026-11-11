@@ -377,6 +377,45 @@ public sealed class SecEdgarFundamentalsTests
             .Value.Should().Be(250m, "the narrower, later tag wins an overlapping period");
     }
 
+    [Fact]
+    public async Task ReturnOnEquity_LabelsAYearByTheFilingThatFirstReportedIt_NotItsLaterComparative()
+    {
+        // The FY2024 10-K repeats the 2023 year-end figures as comparatives tagged fy=2024.
+        const string income = """
+            {"label":"Net income","units":{"USD":[
+              {"end":"2023-12-31","val":90,"accn":"0000000001-24-000001","fy":2023,"fp":"FY","form":"10-K"},
+              {"end":"2023-12-31","val":90,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"},
+              {"end":"2024-12-31","val":120,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}
+            """;
+        const string equity = """
+            {"label":"Equity","units":{"USD":[
+              {"end":"2023-12-31","val":900,"accn":"0000000001-24-000001","fy":2023,"fp":"FY","form":"10-K"},
+              {"end":"2023-12-31","val":900,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"},
+              {"end":"2024-12-31","val":1200,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}
+            """;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json("""{"0":{"cik_str":1234567,"ticker":"ACME","title":"Acme Corp"}}""");
+            }
+
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/NetIncomeLoss.json" => Json(income),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/StockholdersEquity.json" => Json(equity),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            };
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
+        var roe = DerivedFundamentalsMath.ReturnOnEquity(facts, 5);
+
+        roe.Select(r => (r.PeriodEnd, r.FiscalYear, r.ReturnOnEquity)).Should().Equal(
+            (new DateOnly(2024, 12, 31), (int?)2024, (decimal?)0.1m),
+            (new DateOnly(2023, 12, 31), (int?)2023, (decimal?)0.1m));
+    }
+
     private const string BabaTickerMap = """{"0":{"cik_str":1577552,"ticker":"BABA","title":"Alibaba Group Holding Ltd"}}""";
 
     private static FundamentalFact Fact(IReadOnlyList<FundamentalFact> facts, string concept, DateOnly periodEnd)

@@ -142,6 +142,7 @@ public sealed class CashFlowMathTests
         dto.FreeCashFlowReason.Should().BeNull();
         dto.Facts.Select(f => f.Concept).Should().BeEquivalentTo("Capex", "OperatingCashFlow");
     }
+
     [Fact]
     public async Task Handler_ReadsEnoughHistoryForRequestedYearsAndTheirYearEarlierComparison()
     {
@@ -169,14 +170,44 @@ public sealed class CashFlowMathTests
         dto.FreeCashFlow.Count(p => p.Basis == FundamentalsBasis.Quarterly).Should().Be(5);
     }
 
+    [Fact]
+    public async Task Handler_AskingForMoreYearsThanTheFactCapHolds_ExplainsTheMissingYearEarlierComparison()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Point("OperatingCashFlow", "2026-03-31", 300, "Q1", 2026), Point("Capex", "2026-03-31", 100, "Q1", 2026),
+        };
+        for (var year = 2020; year <= 2025; year++)
+        {
+            foreach (var (fp, end) in new[] { ("Q1", $"{year}-03-31"), ("Q2", $"{year}-06-30"), ("Q3", $"{year}-09-30"), ("Q4", $"{year}-12-31"), ("FY", $"{year}-12-31") })
+            {
+                facts.Add(Point("OperatingCashFlow", end, fp == "FY" ? 1000 + (100 * (year - 2020)) : 250, fp, year));
+                facts.Add(Point("Capex", end, fp == "FY" ? 400 : 100, fp, year));
+            }
+        }
+
+        var sut = new GetFundamentalsQueryHandler(new TrimmingFundamentalsService(facts));
+
+        var dto = await sut.Handle(new GetFundamentalsQuery("ACME", 5), CancellationToken.None);
+
+        // 20 facts a concept reach back only to the second quarter of 2022: four fiscal years, not the five asked for.
+        var annual = dto.FreeCashFlow.Where(p => p.Basis == FundamentalsBasis.Annual).ToList();
+        annual.Select(p => p.PeriodEnd.Year).Should().Equal(2025, 2024, 2023, 2022);
+        annual.Take(3).Should().OnlyContain(p => p.YoyChange != null && p.YoyReason == null);
+        annual[3].YoyChange.Should().BeNull();
+        annual[3].YoyReason.Should().Contain("a year earlier");
+    }
+
     private sealed class TrimmingFundamentalsService(IReadOnlyList<FundamentalFact> facts) : Application.Services.Fundamentals.IFundamentalsService
     {
+        private const int ChainFactCap = 20;
+
         public Task<Application.Services.Fundamentals.FundamentalsResult> GetFundamentalsAsync(
             string ticker, int maxPerConcept, CancellationToken ct = default)
         {
             var trimmed = facts
                 .GroupBy(f => f.Concept)
-                .SelectMany(g => g.OrderByDescending(f => f.PeriodEnd).Take(maxPerConcept))
+                .SelectMany(g => g.OrderByDescending(f => f.PeriodEnd).Take(Math.Min(maxPerConcept, ChainFactCap)))
                 .ToList();
             return Task.FromResult(FakeFundamentalsService.ResultFor(ticker, trimmed));
         }
