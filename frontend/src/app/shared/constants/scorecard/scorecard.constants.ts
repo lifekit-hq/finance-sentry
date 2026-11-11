@@ -80,3 +80,5 @@ export const VERDICT_FOR_NEW_MONEY = 'for new money';
 export const VERDICT_HELD_LINE =
   'You hold this. Holding follows your thesis and its kill-switch, never the word.';
 export const VERDICT_TURNS_BUY_PREFIX = 'Turns BUY when';
+/** The row line on a held position: a statement about the word, never an invitation to add. */
+export const VERDICT_HELD_ROW_PREFIX = 'The word reads BUY when';

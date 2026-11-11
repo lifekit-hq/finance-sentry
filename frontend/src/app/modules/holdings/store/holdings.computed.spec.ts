@@ -400,7 +400,8 @@ describe('holdingsComputed hidden positions', () => {
     const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
     const note = (s: string) => rows.find(r => r.symbol === s)?.verdictNote;
 
-    expect(note('AAPL')).toBe('Turns BUY when structure reaches 50 (reads 40).');
+    expect(note('AAPL')).toBe('The word reads BUY when structure reaches 50 (reads 40).');
+    expect(note('AAPL')).not.toContain('Turns BUY');
     expect(note('MSFT')).toBeNull();
     expect(note('NVDA')).toBeNull();
   });

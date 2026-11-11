@@ -10,6 +10,7 @@ import {
   VERDICT_AXIS_LABEL,
   VERDICT_CONDITION_SUBJECT,
   VERDICT_CONDITION_UNIT,
+  VERDICT_HELD_ROW_PREFIX,
   VERDICT_OPERATOR_LABEL,
   VERDICT_TURNS_BUY_PREFIX,
 } from '../constants/scorecard/scorecard.constants';
@@ -80,6 +81,11 @@ export class ScorecardUtils {
   /** The line saying what would turn the verdict into BUY, as one sentence; null where the API names no bar. */
   public static turnsBuyLine(turnsBuyWhen: Nullable<string>): Nullable<string> {
     return turnsBuyWhen ? `${VERDICT_TURNS_BUY_PREFIX} ${turnsBuyWhen}.` : null;
+  }
+
+  /** The same bar worded for a held position's list row: what would change the word, not advice to add. */
+  public static heldRowLine(turnsBuyWhen: Nullable<string>): Nullable<string> {
+    return turnsBuyWhen ? `${VERDICT_HELD_ROW_PREFIX} ${turnsBuyWhen}.` : null;
   }
 
   /** The description of the rule that fired, or null when the table names none. */

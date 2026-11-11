@@ -356,6 +356,20 @@ describe('ScorecardUtils.turnsBuyLine', () => {
   });
 });
 
+describe('ScorecardUtils.heldRowLine', () => {
+  it('states what would change the word without the add-prompt phrasing', () => {
+    const line = ScorecardUtils.heldRowLine('structure reaches 50 (reads 40)');
+
+    expect(line).toBe('The word reads BUY when structure reaches 50 (reads 40).');
+    expect(line).not.toContain('Turns BUY');
+  });
+
+  it('is null where the API names no bar', () => {
+    expect(ScorecardUtils.heldRowLine(null)).toBeNull();
+    expect(ScorecardUtils.heldRowLine('')).toBeNull();
+  });
+});
+
 describe('ScorecardUtils.firedRule', () => {
   it('returns the description of the rule that fired', () => {
     expect(ScorecardUtils.firedRule(card.verdict)).toBe('Rule extended_and_rich.');

@@ -122,7 +122,7 @@ export function holdingsComputed(store: StateSignals) {
         dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
         hiddenReason: p.hiddenReason ?? null,
         verdict: verdict?.word ?? null,
-        verdictNote: ScorecardUtils.turnsBuyLine(verdict?.turnsBuyWhen ?? null),
+        verdictNote: ScorecardUtils.heldRowLine(verdict?.turnsBuyWhen ?? null),
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);
