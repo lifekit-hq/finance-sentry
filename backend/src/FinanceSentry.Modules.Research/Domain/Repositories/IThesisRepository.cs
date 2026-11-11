@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Research.Domain.Repositories;
 
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
+
 public interface IThesisRepository
 {
     Task<IReadOnlyList<InvestmentThesis>> ListAsync(Guid userId, CancellationToken ct = default);
@@ -16,6 +18,13 @@ public interface IThesisRepository
 
     /// <summary>Inserts or updates the thesis. The existence check opts out of the Owner query filter, so the monitor job updates rather than re-inserts.</summary>
     Task UpsertAsync(InvestmentThesis thesis, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records what the monitor could evaluate on this run (#1375). A targeted write that opts out of the Owner query filter
+    /// (the monitor job has no principal) and keeps its own user predicate; it leaves <c>UpdatedAt</c> alone, so a run never
+    /// reorders the thesis list.
+    /// </summary>
+    Task SaveMonitorSnapshotAsync(Guid userId, Guid thesisId, ThesisMonitorSnapshot snapshot, CancellationToken ct = default);
 
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default);
 }

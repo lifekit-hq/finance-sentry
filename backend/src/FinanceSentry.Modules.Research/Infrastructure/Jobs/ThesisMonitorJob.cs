@@ -27,7 +27,8 @@ public sealed class ThesisMonitorJob(
                 "Thesis monitor run for user {UserId}: {ThesesEvaluated} theses, " +
                 "{TriggersEvaluated} triggers, {BreaksRaised} breaks raised, " +
                 "{BreaksCleared} cleared, {Skipped} skipped, {Errors} errors, " +
-                "{Unmonitorable} theses with unmonitorable triggers ({UnmonitorableTickers})",
+                "{Unmonitorable} theses with unmonitorable triggers ({UnmonitorableTickers}), " +
+                "{Degraded} theses with degraded coverage",
                 userId,
                 summary.ThesesEvaluated,
                 summary.TriggersEvaluated,
@@ -36,7 +37,8 @@ public sealed class ThesisMonitorJob(
                 summary.Skipped,
                 summary.Errors,
                 summary.Unmonitorable.Count,
-                string.Join(", ", summary.Unmonitorable.Select(u => $"{u.Ticker}:{u.Status}")));
+                string.Join(", ", summary.Unmonitorable.Select(u => $"{u.Ticker}:{u.Status}")),
+                summary.CoverageDegraded?.Count ?? 0);
         }
     }
 }

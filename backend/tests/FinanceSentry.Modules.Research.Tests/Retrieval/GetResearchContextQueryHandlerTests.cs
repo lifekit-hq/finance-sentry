@@ -181,6 +181,11 @@ internal sealed class FakeThesisRepository : IThesisRepository
         return Task.CompletedTask;
     }
 
+    public Task SaveMonitorSnapshotAsync(
+        Guid userId, Guid thesisId, FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMonitorSnapshot snapshot,
+        CancellationToken ct = default)
+        => Task.CompletedTask;
+
     public Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
         => Task.FromResult(Theses.RemoveAll(t => t.UserId == userId && t.Id == id) > 0);
 }

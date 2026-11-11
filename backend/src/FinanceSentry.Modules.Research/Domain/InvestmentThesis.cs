@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Domain;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 
 public class InvestmentThesis : IHasUpdatedAt, IUserOwned
 {
@@ -18,6 +19,10 @@ public class InvestmentThesis : IHasUpdatedAt, IUserOwned
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? BrokenAt { get; set; }
     public string? BrokenReason { get; set; }
+
+    // What the monitor could evaluate on its last run (#1375). Written by the monitor alone, through
+    // IThesisRepository.SaveMonitorSnapshotAsync, so a run never moves UpdatedAt.
+    public ThesisMonitorSnapshot? MonitorSnapshot { get; set; }
 }
 
 public record ThesisDataPoint(string Metric, string Direction, decimal Threshold, string Source);

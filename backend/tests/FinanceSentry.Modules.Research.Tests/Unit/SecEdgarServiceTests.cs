@@ -2,7 +2,10 @@ namespace FinanceSentry.Modules.Research.Tests.Unit;
 
 using System.Net;
 using System.Text;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -190,13 +193,81 @@ public sealed class SecEdgarServiceTests
         submissionsCalls.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetRecentFilingsAsync_TickerMapFetchFailed_ThrowsWithTheMapUnavailableCode()
+    {
+        var sut = CreateSut(request => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+
+        var act = () => sut.GetRecentFilingsAsync("MU", ["10-Q"], 10, surfaceProviderFailure: true);
+
+        var thrown = await act.Should().ThrowAsync<EdgarProviderException>();
+        thrown.Which.ErrorCode.Should().Be(EdgarErrorCodes.MapUnavailable);
+        thrown.Which.Message.Should().Contain("map unavailable").And.Contain("MU");
+    }
+
+    [Fact]
+    public async Task GetRecentFilingsAsync_SubmissionsFailure_CarriesTheSourceUnavailableCode()
+    {
+        var sut = CreateSut(request => request.RequestUri!.Host == "www.sec.gov"
+            ? Json(TickerMapJson)
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+
+        var act = () => sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10, surfaceProviderFailure: true);
+
+        (await act.Should().ThrowAsync<EdgarProviderException>()).Which.ErrorCode
+            .Should().Be(EdgarErrorCodes.SourceUnavailable);
+    }
+
+    [Fact]
+    public async Task GetTaxonomyFundamentalsAsync_TickerMapFetchFailed_IsFailedWithTheMapUnavailableCode()
+    {
+        var sut = CreateSut(request => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+
+        var result = await sut.GetTaxonomyFundamentalsAsync("MU", FundamentalFact.UsGaapTaxonomy);
+
+        result.Outcome.Should().Be(FundamentalsSourceOutcome.Failed);
+        result.ErrorCode.Should().Be(EdgarErrorCodes.MapUnavailable);
+    }
+
+    [Fact]
+    public async Task GetTaxonomyFundamentalsAsync_TickerNotInTheMap_IsNoData_NotAMapFailure()
+    {
+        var sut = CreateSut(request => Json(TickerMapJson));
+
+        var result = await sut.GetTaxonomyFundamentalsAsync("NOTAFILER", FundamentalFact.UsGaapTaxonomy);
+
+        result.Outcome.Should().Be(FundamentalsSourceOutcome.NoData);
+        result.ErrorCode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task MapFailure_IsReportedThroughTheSourceHealth_ThenClearsWhenTheMapLoads()
+    {
+        var up = false;
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 11, 11, 8, 0, 0, TimeSpan.Zero));
+        var sut = CreateSut(request => up ? Json(TickerMapJson) : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), clock);
+        sut.Read().State.Should().Be(DataSourceHealthState.NeverChecked);
+
+        await sut.GetTaxonomyFundamentalsAsync("MU", FundamentalFact.UsGaapTaxonomy);
+        sut.Read().Should().Match<DataSourceHealth>(h =>
+            h.Source == "sec-edgar" && h.State == DataSourceHealthState.Unavailable && h.ConsecutiveFailures == 1);
+
+        up = true;
+        clock.Advance(TimeSpan.FromMinutes(1));
+        await sut.GetTaxonomyFundamentalsAsync("AAPL", FundamentalFact.UsGaapTaxonomy);
+        sut.Read().State.Should().Be(DataSourceHealthState.Healthy);
+    }
+
     private static SecEdgarService CreateSut(
         Func<HttpRequestMessage, HttpResponseMessage> respond, TimeProvider? clock = null)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient(SecEdgarService.HttpClientName))
             .Returns(() => new HttpClient(new DelegatingStub(respond)));
-        return new SecEdgarService(factory.Object, clock ?? TimeProvider.System, NullLogger<SecEdgarService>.Instance);
+        // No retry backoff: a failing map would otherwise sleep through the production delays in every test.
+        return new SecEdgarService(
+            factory.Object, clock ?? TimeProvider.System, NullLogger<SecEdgarService>.Instance,
+            new EdgarTickerMapOptions { RetryDelays = [] });
     }
 
     private static HttpResponseMessage Json(string body)

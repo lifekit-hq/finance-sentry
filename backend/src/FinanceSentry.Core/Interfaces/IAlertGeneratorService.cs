@@ -233,6 +233,35 @@ public interface IAlertGeneratorService
         string detectorName,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Raises the run-level notice that the thesis monitor could not evaluate some triggers (#1375): one open alert per
+    /// user, carrying <paramref name="summary"/> (which theses and triggers are blind, and why). Error severity when
+    /// <paramref name="infraBlind"/> (an infrastructure failure, not missing data), Warning otherwise. A dismissal quiets
+    /// it for a day while the blind spot persists.
+    /// </summary>
+    Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId,
+        string summary,
+        bool infraBlind,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the monitoring-blind Alert once a run evaluates every trigger of every thesis.</summary>
+    Task ResolveThesisMonitoringBlindAlertAsync(
+        Guid userId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a coverage-degradation Alert for one thesis (#1375): a trigger that evaluated on the previous run could
+    /// not be evaluated on this one. Error severity; each degradation is recorded, replacing the still-open earlier
+    /// one on the same thesis.
+    /// </summary>
+    Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId,
+        Guid thesisId,
+        string ticker,
+        string reason,
+        CancellationToken ct = default);
+
     /// <summary>Resolves the market-structure freshness Alert once the Radar feed catches back up.</summary>
     Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId,

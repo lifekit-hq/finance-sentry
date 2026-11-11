@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Scoring;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -115,6 +116,13 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasConversion(
                 v => JsonSerializer.Serialize(v, jsonOptions),
                 v => JsonSerializer.Deserialize<List<ThesisInvalidationTrigger>>(v, jsonOptions) ?? new());
+        // The monitor's last-run coverage (#1375): a small JSON document, nullable for every thesis
+        // that has not been monitored since the column was added.
+        tb.Property(x => x.MonitorSnapshot)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, jsonOptions),
+                v => v == null ? null : JsonSerializer.Deserialize<ThesisMonitorSnapshot>(v, jsonOptions));
         tb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_thesis_user_ticker");
 
         var nb = modelBuilder.Entity<NewsArticle>();

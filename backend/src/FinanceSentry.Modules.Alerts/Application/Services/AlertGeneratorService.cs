@@ -14,6 +14,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>How long a dismissed detector-silent alert stays quiet while the silence persists.</summary>
     private static readonly TimeSpan DetectorSilentDismissQuiet = TimeSpan.FromDays(7);
 
+    /// <summary>How long a dismissed monitoring-blind alert stays quiet while the blind spot persists.</summary>
+    private static readonly TimeSpan ThesisMonitoringBlindDismissQuiet = TimeSpan.FromDays(1);
+
     /// <summary>
     /// The backstop silence window per alert type: how long after the last alert of that type on the
     /// same reference a fresh one stays quiet. Every generator reads its window from here, so adding
@@ -307,6 +310,37 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveDetectorSilentAlertAsync(
         Guid userId, string detectorName, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.JobFailure, DetectorSilentReferenceId(detectorName), ct);
+
+    public Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.JobFailure, infraBlind ? AlertSeverity.Error : AlertSeverity.Warning,
+            ThesisMonitoringBlindReferenceId(userId), "thesis-monitoring",
+            infraBlind ? "Thesis monitoring is blind (data source down)" : "Thesis monitoring is blind",
+            $"The thesis monitor could not evaluate some triggers, so those theses are unwatched, not intact: {summary}")
+        {
+            // The open alert absorbs every re-run; after a dismissal, stay quiet for a day while it persists.
+            SilenceWindow = ThesisMonitoringBlindDismissQuiet,
+        },
+            ct);
+
+    public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.JobFailure, ThesisMonitoringBlindReferenceId(userId), ct);
+
+    public Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.JobFailure, AlertSeverity.Error,
+            ThesisCoverageDegradedReferenceId(thesisId), ticker,
+            $"Monitoring coverage degraded: {ticker}",
+            $"Monitoring coverage degraded: {reason}")
+        {
+            // Each degradation is its own event (a trigger can recover and go blind again): record it, replacing the
+            // still-open earlier one on the same thesis.
+            Dedup = AlertDedup.Always,
+            SupersedeOpen = true,
+        },
+            ct);
 
     public Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId, Guid referenceId, CancellationToken ct = default)
@@ -758,6 +792,14 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-user synthetic GUID for cash-sweep dedup.</summary>
     private static Guid CashSweepReferenceId(Guid userId)
         => DerivedReferenceId($"cash:sweep:{userId}");
+
+    /// <summary>Stable per-user synthetic GUID - one open monitoring-blind alert per user.</summary>
+    private static Guid ThesisMonitoringBlindReferenceId(Guid userId)
+        => DerivedReferenceId($"thesis-monitoring-blind:{userId:N}");
+
+    /// <summary>Stable per-thesis synthetic GUID - one open coverage-degraded alert per thesis.</summary>
+    private static Guid ThesisCoverageDegradedReferenceId(Guid thesisId)
+        => DerivedReferenceId($"thesis-coverage-degraded:{thesisId:N}");
 
     /// <summary>Stable per-detector synthetic GUID — one open detector-silent alert per detector.</summary>
     private static Guid DetectorSilentReferenceId(string detectorName)

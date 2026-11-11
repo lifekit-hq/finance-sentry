@@ -36,13 +36,15 @@ public enum FundamentalsSourceOutcome
 /// <summary>
 /// A source's answer. <see cref="IssuerType"/> is set by a source that can tell (EDGAR, from what the
 /// issuer files), <see cref="Detail"/> explains a <see cref="FundamentalsSourceOutcome.NoData"/> or
-/// <see cref="FundamentalsSourceOutcome.Failed"/> answer.
+/// <see cref="FundamentalsSourceOutcome.Failed"/> answer; <see cref="ErrorCode"/> (#1375) names a failure's
+/// machine-readable cause when it has one (<c>map_unavailable</c>).
 /// </summary>
 public sealed record FundamentalsSourceResult(
     FundamentalsSourceOutcome Outcome,
     IReadOnlyList<FundamentalFact> Facts,
     string? IssuerType = null,
-    string? Detail = null)
+    string? Detail = null,
+    string? ErrorCode = null)
 {
     public static FundamentalsSourceResult WithFacts(IReadOnlyList<FundamentalFact> facts, string? issuerType = null)
         => new(FundamentalsSourceOutcome.Facts, facts, issuerType);
@@ -50,6 +52,6 @@ public sealed record FundamentalsSourceResult(
     public static FundamentalsSourceResult NoData(string detail, string? issuerType = null)
         => new(FundamentalsSourceOutcome.NoData, [], issuerType, detail);
 
-    public static FundamentalsSourceResult Failed(string detail, string? issuerType = null)
-        => new(FundamentalsSourceOutcome.Failed, [], issuerType, detail);
+    public static FundamentalsSourceResult Failed(string detail, string? issuerType = null, string? errorCode = null)
+        => new(FundamentalsSourceOutcome.Failed, [], issuerType, detail, errorCode);
 }
