@@ -142,4 +142,43 @@ public sealed class CashFlowMathTests
         dto.FreeCashFlowReason.Should().BeNull();
         dto.Facts.Select(f => f.Concept).Should().BeEquivalentTo("Capex", "OperatingCashFlow");
     }
+    [Fact]
+    public async Task Handler_ReadsEnoughHistoryForRequestedYearsAndTheirYearEarlierComparison()
+    {
+        // Five cash-flow facts a year (Q1-Q4 and FY, Q4 and FY sharing a period end), as EDGAR yields them.
+        var facts = new List<FundamentalFact>();
+        for (var i = 0; i <= 5; i++)
+        {
+            var year = 2020 + i;
+            foreach (var (fp, end) in new[] { ("Q1", $"{year}-03-31"), ("Q2", $"{year}-06-30"), ("Q3", $"{year}-09-30"), ("Q4", $"{year}-12-31"), ("FY", $"{year}-12-31") })
+            {
+                var annual = fp == "FY";
+                facts.Add(Point("OperatingCashFlow", end, annual ? 1000 + (100 * i) : 250 + (25 * i), fp, year));
+                facts.Add(Point("Capex", end, annual ? 400 : 100, fp, year));
+            }
+        }
+
+        var sut = new GetFundamentalsQueryHandler(new TrimmingFundamentalsService(facts));
+
+        var dto = await sut.Handle(new GetFundamentalsQuery("ACME", 3), CancellationToken.None);
+
+        var annualPeriods = dto.FreeCashFlow.Where(p => p.Basis == FundamentalsBasis.Annual).ToList();
+        annualPeriods.Select(p => p.PeriodEnd.Year).Should().Equal(2025, 2024, 2023);
+        annualPeriods.Select(p => p.YoyChange).Should().Equal(
+            (1100m - 1000m) / 1000m, (1000m - 900m) / 900m, (900m - 800m) / 800m);
+        dto.FreeCashFlow.Count(p => p.Basis == FundamentalsBasis.Quarterly).Should().Be(5);
+    }
+
+    private sealed class TrimmingFundamentalsService(IReadOnlyList<FundamentalFact> facts) : Application.Services.Fundamentals.IFundamentalsService
+    {
+        public Task<Application.Services.Fundamentals.FundamentalsResult> GetFundamentalsAsync(
+            string ticker, int maxPerConcept, CancellationToken ct = default)
+        {
+            var trimmed = facts
+                .GroupBy(f => f.Concept)
+                .SelectMany(g => g.OrderByDescending(f => f.PeriodEnd).Take(maxPerConcept))
+                .ToList();
+            return Task.FromResult(FakeFundamentalsService.ResultFor(ticker, trimmed));
+        }
+    }
 }

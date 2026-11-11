@@ -15,15 +15,15 @@ public class GetFundamentalsQueryHandler(IFundamentalsService fundamentals)
 {
     private const int MinPerConcept = 1;
     private const int MaxPerConcept = 20;
-    private const int YoyLookbackPeriods = 4;
     private const int MinQuarters = 5;
 
     public async Task<FundamentalsDto> Handle(GetFundamentalsQuery query, CancellationToken ct)
     {
-        // Read extra history so the oldest requested period still has a year-earlier period to compare with.
+        // Read the maximum: the chain trims the newest N facts per concept with quarters and fiscal years mixed
+        // (about five cash-flow facts a year), so a smaller read would drop the years and the year-earlier
+        // periods this handler derives from. The source-level cache makes the extra history free.
         var requested = Math.Clamp(query.MaxPerConcept, MinPerConcept, MaxPerConcept);
-        var result = await fundamentals.GetFundamentalsAsync(
-            query.Ticker, Math.Min(requested + YoyLookbackPeriods, MaxPerConcept), ct);
+        var result = await fundamentals.GetFundamentalsAsync(query.Ticker, MaxPerConcept, ct);
 
         var fcf = DerivedFundamentalsMath.FreeCashFlow(result.Facts, Math.Max(requested, MinQuarters), requested);
         var roe = DerivedFundamentalsMath.ReturnOnEquity(result.Facts, requested);

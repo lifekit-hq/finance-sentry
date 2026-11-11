@@ -31,14 +31,16 @@ public static class CashFlowMath
     /// </summary>
     public static IReadOnlyList<FundamentalFact> DiscretePeriods(IEnumerable<FundamentalFact> facts)
     {
-        // One fact per (start, end): amended forms win, then the latest filing, then the last read.
+        // One fact per (start, end): amended forms win, then the latest filing, then the last read. A later
+        // filing repeats the period as a prior-year comparative under its own fiscal year, so the label comes
+        // from the earliest filing that reported the period.
         var durations = facts
             .Where(f => f.PeriodStart is not null && f.PeriodStart < f.PeriodEnd)
             .GroupBy(f => (f.PeriodStart, f.PeriodEnd))
             .Select(g => g
                 .OrderBy(f => f.Form.EndsWith("/A", StringComparison.OrdinalIgnoreCase))
                 .ThenBy(f => f.FiscalYear ?? int.MinValue)
-                .Last())
+                .Last() with { FiscalYear = g.Min(f => f.FiscalYear) })
             .ToList();
 
         var result = new List<FundamentalFact>();
