@@ -33,6 +33,32 @@ public sealed class CashFlowMathTests
             ("FY", 700m), ("Q4", 250m), ("Q3", 200m), ("Q2", 150m), ("Q1", 100m));
     }
 
+    // AMZN companyconcept NetCashProvidedByUsedInOperatingActivities (EDGAR, live read): the 10-Qs report the
+    // discrete three-month figure, the year-to-date one and a trailing-twelve-month one side by side.
+    [Fact]
+    public void DiscretePeriods_AmazonShapedFilings_LabelDiscreteQuartersByPositionAndDropTrailingTwelveMonths()
+    {
+        var c = CashFlowMath.OperatingCashFlowConcept;
+        var periods = CashFlowMath.DiscretePeriods([
+            Duration(c, "2025-04-01", "2025-06-30", 32_515, fy: 2025),
+            Duration(c, "2025-01-01", "2025-06-30", 49_530, fy: 2025),
+            Duration(c, "2024-07-01", "2025-06-30", 121_137, fy: 2025),
+            Duration(c, "2025-07-01", "2025-09-30", 35_525, fy: 2025),
+            Duration(c, "2025-01-01", "2025-09-30", 85_055, fy: 2025),
+            Duration(c, "2024-10-01", "2025-09-30", 130_691, fy: 2025),
+            Duration(c, "2025-01-01", "2025-12-31", 139_514, "10-K", fy: 2025),
+            Duration(c, "2026-01-01", "2026-03-31", 26_032, fy: 2026),
+            Duration(c, "2025-04-01", "2026-03-31", 148_531, fy: 2026),
+        ]);
+
+        periods.Select(p => (p.PeriodEnd.ToString("yyyy-MM-dd"), p.FiscalPeriod, p.Value)).Should().Equal(
+            ("2026-03-31", "Q1", 26_032m),
+            ("2025-12-31", "FY", 139_514m),
+            ("2025-12-31", "Q4", 54_459m),
+            ("2025-09-30", "Q3", 35_525m),
+            ("2025-06-30", "Q2", 32_515m));
+    }
+
     [Fact]
     public void DiscretePeriods_OmitsAQuarterWhoseEarlierYearToDateIsMissing()
     {

@@ -43,12 +43,35 @@ public static class CashFlowMath
                 .Last() with { FiscalYear = g.Min(f => f.FiscalYear) })
             .ToList();
 
+        // A twelve-month figure in a 10-Q is a trailing-twelve-month one (Amazon files them beside the quarter),
+        // not a fiscal year: only an annual filing's twelve months is the year.
+        durations.RemoveAll(f => QuartersIn(f) == MaxQuarters && f.Form.StartsWith("10-Q", StringComparison.OrdinalIgnoreCase));
+
+        // The first day of each fiscal year seen: every half-year / nine-month / full-year duration begins on one.
+        var yearStarts = durations
+            .Where(f => QuartersIn(f) is > 1)
+            .Select(f => f.PeriodStart!.Value)
+            .Distinct()
+            .ToList();
+
         var result = new List<FundamentalFact>();
         foreach (var fact in durations)
         {
             var quarters = QuartersIn(fact);
             if (quarters is null)
             {
+                continue;
+            }
+
+            if (quarters == 1)
+            {
+                // A three-month figure is Q1 only when it starts the fiscal year; filers that also report the
+                // discrete later quarters (Amazon's 10-Qs) would otherwise label every quarter Q1.
+                if (QuarterLabel(fact, yearStarts) is { } label)
+                {
+                    result.Add(fact with { FiscalPeriod = label });
+                }
+
                 continue;
             }
 
@@ -78,16 +101,30 @@ public static class CashFlowMath
             .ToList();
     }
 
-    // The discrete quarter ending at `fact.PeriodEnd` whose year-to-date length is `quarters` quarters:
-    // the fact itself for Q1, otherwise the fact less the same-year YTD one quarter shorter.
+    // Q1..Q4 of a three-month duration: its offset from the fiscal-year start it falls in, or - with no year
+    // start known - the filing's own Q1..Q3 label. Null when the quarter cannot be placed.
+    private static string? QuarterLabel(FundamentalFact fact, IReadOnlyList<DateOnly> yearStarts)
+    {
+        var start = fact.PeriodStart!.Value;
+        var yearStart = yearStarts.Where(s => s <= start.AddDays(QuarterToleranceDays)).OrderByDescending(s => s).FirstOrDefault();
+        if (yearStart != default)
+        {
+            var offset = (int)Math.Round((start.DayNumber - yearStart.DayNumber) / (double)DaysPerQuarter);
+            if (offset >= 0)
+            {
+                // Modulo: a quarter of a later year with no year-to-date fact of its own still counts from a known start.
+                return $"Q{(offset % MaxQuarters) + 1}";
+            }
+        }
+
+        return fact.FiscalPeriod is ['Q', >= '1' and <= '3'] ? fact.FiscalPeriod : null;
+    }
+
+    // The discrete quarter ending at `fact.PeriodEnd` whose year-to-date length is `quarters` (2-4) quarters:
+    // the fact less the same-year YTD one quarter shorter.
     private static FundamentalFact? DerivedQuarter(
         FundamentalFact fact, IReadOnlyList<FundamentalFact> durations, int quarters)
     {
-        if (quarters == 1)
-        {
-            return fact with { FiscalPeriod = "Q1" };
-        }
-
         var priorEnd = fact.PeriodEnd.AddMonths(-3);
         var prior = durations
             .Where(d => d.PeriodStart == fact.PeriodStart
