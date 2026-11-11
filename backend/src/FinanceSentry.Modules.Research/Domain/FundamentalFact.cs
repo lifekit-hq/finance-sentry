@@ -6,7 +6,8 @@ namespace FinanceSentry.Modules.Research.Domain;
 // Provenance: Form is the filing it came from (10-K, 10-Q, 20-F, 40-F, …/A; empty for a non-filing
 // source), Taxonomy the XBRL taxonomy it was tagged in (us-gaap, ifrs-full) or the provider's own
 // normalization, and SourceProvenance the provider, document and fetch time. A fact returned by the
-// fundamentals chain always carries SourceProvenance.
+// fundamentals chain always carries SourceProvenance. PeriodStart is the first day of a duration fact
+// (cash-flow concepts only, #1376: needed to tell a quarter from a year-to-date figure).
 public sealed record FundamentalFact(
     string Ticker,
     string Concept,
@@ -18,7 +19,8 @@ public sealed record FundamentalFact(
     int? FiscalYear,
     string Form,
     string Taxonomy = FundamentalFact.UsGaapTaxonomy,
-    SourceProvenance? SourceProvenance = null)
+    SourceProvenance? SourceProvenance = null,
+    DateOnly? PeriodStart = null)
 {
     public const string UsGaapTaxonomy = "us-gaap";
     public const string IfrsTaxonomy = "ifrs-full";
