@@ -984,9 +984,37 @@ public class AlertGeneratorServiceTests
     [Fact]
     public async Task GenerateThesisMonitoringBlind_ExistingActive_BumpsInsteadOfAdding()
     {
-        SuppressByActiveAlert(AlertType.JobFailure);
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Error });
 
         await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU blind", infraBlind: true);
+
+        VerifyNothingAdded();
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_InfraBlind_EscalatesAStandingWarning()
+    {
+        var warning = new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Warning };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(warning);
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU INFRA_BLIND (map down)", infraBlind: true);
+
+        _repo.Verify(r => r.ResolveAsync(warning.Id, default), Times.Once);
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Severity == AlertSeverity.Error && a.Title.Contains("data source down")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateThesisMonitoringBlind_MissingData_BumpsAStandingWarning()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid(), Severity = AlertSeverity.Warning });
+
+        await _service.GenerateThesisMonitoringBlindAlertAsync(_userId, "MU revenue_yoy NO_DATA", infraBlind: false);
 
         VerifyNothingAdded();
         _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Once);

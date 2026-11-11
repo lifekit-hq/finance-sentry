@@ -311,18 +311,32 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         Guid userId, string detectorName, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.JobFailure, DetectorSilentReferenceId(detectorName), ct);
 
-    public Task GenerateThesisMonitoringBlindAlertAsync(
+    public async Task GenerateThesisMonitoringBlindAlertAsync(
         Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
-        => EmitAsync(userId, new AlertDraft(
+    {
+        var referenceId = ThesisMonitoringBlindReferenceId(userId);
+        var draft = new AlertDraft(
             AlertType.JobFailure, infraBlind ? AlertSeverity.Error : AlertSeverity.Warning,
-            ThesisMonitoringBlindReferenceId(userId), "thesis-monitoring",
+            referenceId, "thesis-monitoring",
             infraBlind ? "Thesis monitoring is blind (data source down)" : "Thesis monitoring is blind",
             $"The thesis monitor could not evaluate some triggers, so those theses are unwatched, not intact: {summary}")
         {
             // The open alert absorbs every re-run; after a dismissal, stay quiet for a day while it persists.
             SilenceWindow = ThesisMonitoringBlindDismissQuiet,
-        },
-            ct);
+        };
+
+        // A standing missing-data Warning must not absorb a later infrastructure outage: escalate it to the Error.
+        if (infraBlind)
+        {
+            var open = await _alerts.FindActiveAsync(userId, AlertType.JobFailure, referenceId, ct);
+            if (open is not null && open.Severity != AlertSeverity.Error)
+            {
+                draft = draft with { Dedup = AlertDedup.Always, SupersedeOpen = true };
+            }
+        }
+
+        await EmitAsync(userId, draft, ct);
+    }
 
     public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.JobFailure, ThesisMonitoringBlindReferenceId(userId), ct);
