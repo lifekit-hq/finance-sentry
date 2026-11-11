@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
@@ -52,6 +53,10 @@ public sealed class SecEdgarService(
         ("NetIncome", ["NetIncomeLoss"]),
         ("DilutedEPS", ["EarningsPerShareDiluted"]),
         ("StockholdersEquity", ["StockholdersEquity"]),
+        // Cash-flow statement lines (#1376): year-to-date durations, turned into discrete quarters by
+        // CashFlowMath. Capex tags run broadest to narrowest (the later tag wins an overlapping period).
+        ("OperatingCashFlow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]),
+        ("Capex", ["PaymentsToAcquireProductiveAssets", "PaymentsToAcquirePropertyPlantAndEquipment"]),
     ];
 
     // The same friendly concepts in the ifrs-full taxonomy, read only when a filer reports none of
@@ -69,6 +74,8 @@ public sealed class SecEdgarService(
         ("NetIncome", ["ProfitLossAttributableToOwnersOfParent"]),
         ("DilutedEPS", ["DilutedEarningsLossPerShare"]),
         ("StockholdersEquity", ["EquityAttributableToOwnersOfParent"]),
+        ("OperatingCashFlow", ["CashFlowsFromUsedInOperatingActivities"]),
+        ("Capex", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"]),
     ];
 
     private readonly EdgarTickerMap tickerMap = new(httpFactory, clock, logger, tickerMapOptions ?? new EdgarTickerMapOptions());
@@ -319,6 +326,12 @@ public sealed class SecEdgarService(
             }
         }
 
+        // Cash-flow facts are durations from the fiscal-year start: reduce them to discrete quarters + years.
+        if (CashFlowMath.IsCashFlowConcept(concept))
+        {
+            return new ConceptFetch(CashFlowMath.DiscretePeriods(merged), failures);
+        }
+
         // Collapse restatements + cross-tag overlap: keep one row per (period, fiscal period), newest first.
         var facts = merged
             .GroupBy(f => (f.PeriodEnd, f.FiscalPeriod))
@@ -373,6 +386,10 @@ public sealed class SecEdgarService(
                 ? conceptUrl
                 : $"https://www.sec.gov/Archives/edgar/data/{cikNoPad}/{accession.Replace("-", string.Empty)}/{accession}-index.htm";
 
+            var start = CashFlowMath.IsCashFlowConcept(concept)
+                ? ParseDate(point.TryGetProperty("start", out var st) ? st.GetString() : null)
+                : null;
+
             facts.Add(new FundamentalFact(
                 ticker,
                 concept,
@@ -384,7 +401,8 @@ public sealed class SecEdgarService(
                 point.TryGetProperty("fy", out var fy) && fy.ValueKind == JsonValueKind.Number ? fy.GetInt32() : null,
                 form,
                 taxonomy,
-                new SourceProvenance(provider, documentUrl, ingestedAt)));
+                new SourceProvenance(provider, documentUrl, ingestedAt),
+                start));
         }
 
         return facts;

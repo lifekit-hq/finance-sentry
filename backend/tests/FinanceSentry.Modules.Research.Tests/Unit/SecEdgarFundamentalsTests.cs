@@ -327,6 +327,95 @@ public sealed class SecEdgarFundamentalsTests
         result.IssuerType.Should().Be(FundamentalsIssuerType.InvestmentFund);
     }
 
+    [Fact]
+    public async Task CashFlow_YearToDateDatapoints_BecomeDiscreteQuartersLabelledByTheirOwnFiscalYear()
+    {
+        // companyconcept shape: cumulative durations from the fiscal-year start, each prior-year figure
+        // repeated as a comparative in the next year's filing under that filing's fy.
+        const string operating = """
+            {"label":"Net cash from operating activities","units":{"USD":[
+              {"start":"2024-01-01","end":"2024-03-31","val":100,"accn":"0000000001-24-000001","fy":2024,"fp":"Q1","form":"10-Q"},
+              {"start":"2024-01-01","end":"2024-06-30","val":250,"accn":"0000000001-24-000002","fy":2024,"fp":"Q2","form":"10-Q"},
+              {"start":"2024-01-01","end":"2024-09-30","val":450,"accn":"0000000001-24-000003","fy":2024,"fp":"Q3","form":"10-Q"},
+              {"start":"2024-01-01","end":"2024-12-31","val":700,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"},
+              {"start":"2024-01-01","end":"2024-03-31","val":100,"accn":"0000000001-25-000002","fy":2025,"fp":"Q1","form":"10-Q"},
+              {"start":"2025-01-01","end":"2025-03-31","val":120,"accn":"0000000001-25-000002","fy":2025,"fp":"Q1","form":"10-Q"},
+              {"start":"2024-01-01","end":"2024-12-31","val":700,"accn":"0000000001-26-000001","fy":2025,"fp":"FY","form":"10-K"}]}}
+            """;
+        const string broadCapex = """{"label":"Productive assets","units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":300,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        const string narrowCapex = """{"label":"PP&E","units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":250,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        var sut = CreateSut(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.RequestUri.Host == "www.sec.gov")
+            {
+                return Json("""{"0":{"cik_str":1234567,"ticker":"ACME","title":"Acme Corp"}}""");
+            }
+
+            return path switch
+            {
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/NetCashProvidedByUsedInOperatingActivities.json" => Json(operating),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/PaymentsToAcquireProductiveAssets.json" => Json(broadCapex),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/PaymentsToAcquirePropertyPlantAndEquipment.json" => Json(narrowCapex),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            };
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
+
+        var ocf = facts.Where(f => f.Concept == CashFlowMath.OperatingCashFlowConcept).ToList();
+        ocf.Select(f => (f.PeriodEnd, f.FiscalPeriod, f.Value, f.FiscalYear)).Should().BeEquivalentTo(
+        [
+            (new DateOnly(2025, 3, 31), "Q1", 120m, (int?)2025),
+            (new DateOnly(2024, 12, 31), "FY", 700m, (int?)2024),
+            (new DateOnly(2024, 12, 31), "Q4", 250m, (int?)2024),
+            (new DateOnly(2024, 9, 30), "Q3", 200m, (int?)2024),
+            (new DateOnly(2024, 6, 30), "Q2", 150m, (int?)2024),
+            (new DateOnly(2024, 3, 31), "Q1", 100m, (int?)2024),
+        ]);
+        facts.Single(f => f.Concept == CashFlowMath.CapexConcept && f.FiscalPeriod == "FY")
+            .Value.Should().Be(250m, "the narrower, later tag wins an overlapping period");
+    }
+
+    [Fact]
+    public async Task ReturnOnEquity_LabelsAYearByTheFilingThatFirstReportedIt_NotItsLaterComparative()
+    {
+        // The FY2024 10-K repeats the 2023 year-end figures as comparatives tagged fy=2024.
+        const string income = """
+            {"label":"Net income","units":{"USD":[
+              {"end":"2023-12-31","val":90,"accn":"0000000001-24-000001","fy":2023,"fp":"FY","form":"10-K"},
+              {"end":"2023-12-31","val":90,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"},
+              {"end":"2024-12-31","val":120,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}
+            """;
+        const string equity = """
+            {"label":"Equity","units":{"USD":[
+              {"end":"2023-12-31","val":900,"accn":"0000000001-24-000001","fy":2023,"fp":"FY","form":"10-K"},
+              {"end":"2023-12-31","val":900,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"},
+              {"end":"2024-12-31","val":1200,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}
+            """;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json("""{"0":{"cik_str":1234567,"ticker":"ACME","title":"Acme Corp"}}""");
+            }
+
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/NetIncomeLoss.json" => Json(income),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/StockholdersEquity.json" => Json(equity),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            };
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
+        var roe = DerivedFundamentalsMath.ReturnOnEquity(facts, 5);
+
+        roe.Select(r => (r.PeriodEnd, r.FiscalYear, r.ReturnOnEquity)).Should().Equal(
+            (new DateOnly(2024, 12, 31), (int?)2024, (decimal?)0.1m),
+            (new DateOnly(2023, 12, 31), (int?)2023, (decimal?)0.1m));
+    }
+
     private const string BabaTickerMap = """{"0":{"cik_str":1577552,"ticker":"BABA","title":"Alibaba Group Holding Ltd"}}""";
 
     private static FundamentalFact Fact(IReadOnlyList<FundamentalFact> facts, string concept, DateOnly periodEnd)
