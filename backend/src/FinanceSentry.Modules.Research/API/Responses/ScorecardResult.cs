@@ -207,5 +207,9 @@ public sealed record VerdictConditionDto(
     string? Actual,
     bool Met);
 
-/// <summary>One symbol's verdict word and the rule that fired, for a chip. Nothing else of the scorecard crosses.</summary>
-public sealed record ScorecardVerdictSummary(string Symbol, string Word, string FiredRuleId);
+/// <summary>
+/// One symbol's verdict word and the rule that fired, for a chip, plus the line saying what would turn it into BUY
+/// (the same <see cref="VerdictDto.TurnsBuyWhen"/> the full scorecard carries; null when there is no bar to name).
+/// Nothing else of the scorecard crosses.
+/// </summary>
+public sealed record ScorecardVerdictSummary(string Symbol, string Word, string FiredRuleId, string? TurnsBuyWhen);

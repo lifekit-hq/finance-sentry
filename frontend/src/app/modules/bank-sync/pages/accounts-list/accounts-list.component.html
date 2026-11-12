@@ -444,6 +444,13 @@
                       row.averagePrice | unitPrice
                     }}</span></span
                   >
+                  @if (row.verdictNote; as note) {
+                    <span
+                      class="line-clamp-2 text-cmn-xs text-text-secondary"
+                      data-testid="position-verdict-note"
+                      >{{ note }}</span
+                    >
+                  }
                 </span>
               </span>
               <span class="flex shrink-0 flex-col items-end leading-tight">

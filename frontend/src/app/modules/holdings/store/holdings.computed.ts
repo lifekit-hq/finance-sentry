@@ -3,10 +3,14 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
-import {type VerdictWord} from '../../../shared/models/scorecard/scorecard.model';
+import {
+  type ScorecardVerdictSummary,
+  type VerdictWord,
+} from '../../../shared/models/scorecard/scorecard.model';
 import {type HiddenReason} from '../../../shared/models/wealth/wealth.model';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
+import {ScorecardUtils} from '../../../shared/utils/scorecard.utils';
 import {type Position, type PositionAssetClass} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
 
@@ -15,7 +19,7 @@ interface StateSignals {
   headline: Signal<Nullable<Headline>>;
   status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
-  verdictByTicker: Signal<Record<string, VerdictWord>>;
+  verdictByTicker: Signal<Record<string, ScorecardVerdictSummary>>;
 }
 
 const WEIGHT_TO_PERCENT = 100;
@@ -45,6 +49,8 @@ export interface PositionRow {
   hiddenReason: Nullable<HiddenReason>;
   /** The research verdict word for a held listed stock (owner only); null shows no chip. */
   verdict: Nullable<VerdictWord>;
+  /** One sentence naming what would turn the verdict into BUY; null where the API names no bar. */
+  verdictNote: Nullable<string>;
   weightPercent: number;
 }
 
@@ -95,6 +101,9 @@ export function holdingsComputed(store: StateSignals) {
       const dayChangePct = DayChangeUtils.isQuotable(p)
         ? (dayChanges[p.symbol.toUpperCase()] ?? null)
         : null;
+      const verdict = DayChangeUtils.isQuotable(p)
+        ? (verdicts[p.symbol.toUpperCase()] ?? null)
+        : null;
       const row: PositionRow = {
         symbol: p.symbol,
         provider: p.provider,
@@ -112,7 +121,8 @@ export function holdingsComputed(store: StateSignals) {
         dayChangePct,
         dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
         hiddenReason: p.hiddenReason ?? null,
-        verdict: DayChangeUtils.isQuotable(p) ? (verdicts[p.symbol.toUpperCase()] ?? null) : null,
+        verdict: verdict?.word ?? null,
+        verdictNote: ScorecardUtils.heldRowLine(verdict?.turnsBuyWhen ?? null),
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);

@@ -342,12 +342,22 @@
       <!-- Research verdict (spec 726 US2): the word for new money first under the price, with its reasons and the thesis beside it. Owner only: without ai.use the API sends no scorecard. -->
       @if (dossier.scorecard; as scorecard) {
         <cmn-card class="block" data-testid="dossier-verdict">
-          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
+          <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
+            <cmn-segmented
+              [options]="verdictDisplayOptions"
+              [label]="verdictDisplayLabel"
+              [value]="store.verdictDisplay()"
+              (valueChange)="store.setVerdictDisplay($event)"
+              data-testid="verdict-display"
+            />
+          </div>
           <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
             A research read on structure, fundamentals, crowding and valuation. It places no trade.
           </p>
           <fns-verdict-block
             [scorecard]="scorecard"
+            [display]="store.verdictDisplay()"
             [held]="dossier.position !== null"
             [thesis]="dossier.thesis"
             class="mt-cmn-3"

@@ -17,8 +17,10 @@ public class GetPreferencesQueryHandler(UserManager<ApplicationUser> userManager
     }
 
     internal static PreferencesDto ToDto(ApplicationUser user) =>
-        new(new AppearanceDto(
-            ThemeModes.IsKnown(user.Theme) ? user.Theme : ThemeModes.System,
-            user.ThemeSeed,
-            user.ThemeIntensity));
+        new(
+            new AppearanceDto(
+                ThemeModes.IsKnown(user.Theme) ? user.Theme : ThemeModes.System,
+                user.ThemeSeed,
+                user.ThemeIntensity),
+            VerdictDisplayModes.IsKnown(user.VerdictDisplay) ? user.VerdictDisplay : VerdictDisplayModes.Simple);
 }

@@ -53,11 +53,13 @@ export interface VerdictDto {
   turnsBuyWhen: Nullable<string>;
 }
 
-/** One symbol's verdict word from the batch read behind the Accounts chips. */
+/** One symbol's verdict word from the batch read behind the Accounts rows, with what would turn it into BUY. */
 export interface ScorecardVerdictSummary {
   symbol: string;
   word: VerdictWord;
   firedRuleId: string;
+  /** The same line the full scorecard carries; null when there is no bar to name (BUY or better, or not scored). */
+  turnsBuyWhen: Nullable<string>;
 }
 
 /** Fractions stay fractions (0.12 = 12%); window keys are trading days. */
@@ -145,6 +147,11 @@ export interface ScorecardAxisView {
   summary: string;
   facts: ScorecardFact[];
   notes: string[];
+}
+
+/** One rule as a step of the audit trail: its place in the order, then the rule as the rule table shows it. */
+export interface VerdictTrailStep extends VerdictRuleView {
+  number: number;
 }
 
 /** One condition as the rule table shows it. */

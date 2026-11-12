@@ -39,6 +39,15 @@ public class UpdatePreferencesCommandValidatorTests
     public void Intensity_IsBoundedToZeroThroughOne(double intensity, bool valid) =>
         _validator.Validate(Command(new AppearanceDto("system", null, intensity))).IsValid.Should().Be(valid);
 
+    [Theory]
+    [InlineData("simple", true)]
+    [InlineData("detailed", true)]
+    [InlineData("", false)]
+    [InlineData("Detailed", false)]
+    [InlineData("verbose", false)]
+    public void VerdictDisplay_MustBeAKnownMode(string mode, bool valid) =>
+        _validator.Validate(new UpdatePreferencesCommand(Guid.NewGuid(), null, mode)).IsValid.Should().Be(valid);
+
     [Fact]
     public void NoAppearance_IsValid_BecauseAnOmittedFieldIsUntouched() =>
         _validator.Validate(Command(null)).IsValid.Should().BeTrue();

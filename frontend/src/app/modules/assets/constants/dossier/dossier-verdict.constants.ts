@@ -53,3 +53,9 @@ export const VERDICT_REASON_STATUS_LABEL: Readonly<Record<VerdictReasonStatus, s
   Missing: 'Nothing to read',
   NotApplicable: 'Does not apply',
 };
+
+/** The detailed reading's lead-in, and what each step says of itself. */
+export const VERDICT_TRAIL_INTRO =
+  'The rules are tried in this order, and the first one that matches decides.';
+export const VERDICT_TRAIL_FIRED_LABEL = 'Matches: this decides the word';
+export const VERDICT_TRAIL_MISS_LABEL = 'Does not match';

@@ -1,4 +1,5 @@
 import {HttpErrorResponse} from '@angular/common/http';
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, type ParamMap} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
@@ -7,6 +8,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
 import {
@@ -164,6 +166,7 @@ describe('DossierStore', () => {
     clearTarget: ReturnType<typeof vi.fn>;
   };
   let canUseAi: boolean;
+  let preferences: {preferences: ReturnType<typeof signal>; patch: ReturnType<typeof vi.fn>};
   let params: BehaviorSubject<ParamMap>;
   let sheet: {open: ReturnType<typeof vi.fn>};
 
@@ -178,6 +181,7 @@ describe('DossierStore', () => {
           useValue: {paramMap: params, snapshot: {fragment: null}},
         },
         {provide: AuthStore, useValue: {canUseAi: () => canUseAi}},
+        {provide: AppPreferencesStore, useValue: preferences},
         {provide: DecisionSheetService, useValue: sheet},
       ],
     });
@@ -186,6 +190,7 @@ describe('DossierStore', () => {
 
   beforeEach(() => {
     canUseAi = true;
+    preferences = {preferences: signal(null), patch: vi.fn().mockResolvedValue(true)};
     params = new BehaviorSubject(convertToParamMap({symbol: 'AAPL'}));
     sheet = {open: vi.fn().mockReturnValue(of(undefined))};
     service = {
@@ -543,5 +548,24 @@ describe('DossierStore', () => {
 
     expect(store.dossier()?.pendingRecommendation).toEqual(pending);
     expect(store.decidedRecommendation()).toBeNull();
+  });
+
+  it('saves the verdict display to the account and reads it back from there', () => {
+    const store = inject();
+    expect(store.verdictDisplay()).toBe('simple');
+
+    store.setVerdictDisplay('detailed');
+    preferences.preferences.set({verdictDisplay: 'detailed'});
+
+    expect(preferences.patch).toHaveBeenCalledExactlyOnceWith({verdictDisplay: 'detailed'});
+    expect(store.verdictDisplay()).toBe('detailed');
+  });
+
+  it('refuses a verdict display the account would not accept', () => {
+    const store = inject();
+
+    store.setVerdictDisplay('verbose');
+
+    expect(preferences.patch).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,9 @@
-import {computed, type Signal} from '@angular/core';
+import {computed, inject, type Signal} from '@angular/core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type AsyncStateStatus, type Nullable} from '@lifekit-hq/ui';
 
+import {DEFAULT_VERDICT_DISPLAY} from '../../../shared/constants/preferences/app-preferences.constants';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {SECTION_AXIS} from '../constants/dossier/dossier-checks.constants';
 import {
   type AssetChartDto,
@@ -32,6 +34,8 @@ interface StateSignals {
 const PARAGRAPH_BREAK = /\n\s*\n/;
 
 export function dossierComputed(store: StateSignals) {
+  const preferences = inject(AppPreferencesStore);
+
   const thesisParagraphs = computed(() => {
     const text = store.dossier()?.thesis?.thesisText ?? '';
     return text.split(PARAGRAPH_BREAK).filter(p => p.trim().length > 0);
@@ -54,6 +58,10 @@ export function dossierComputed(store: StateSignals) {
   });
 
   return {
+    // How the owner reads a verdict, from the account (the same on every device); simple until it has loaded.
+    verdictDisplay: computed(
+      () => preferences.preferences()?.verdictDisplay ?? DEFAULT_VERDICT_DISPLAY
+    ),
     // Mirrors the render conditions in the template: a dossier whose every section is
     // null/empty renders a "no data" state instead of a page of hidden cards.
     hasDossierSections: computed(() => {

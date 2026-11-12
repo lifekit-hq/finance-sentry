@@ -31,6 +31,8 @@ export class ScorecardVerdictComponent {
    * carries its own word, reasons and notice, so it turns this off and keeps only the drill-down.
    */
   public readonly showSummary = input(true);
+  /** Show the rule table in the drill-down; the detailed verdict turns this off because it carries the trail itself. */
+  public readonly showRules = input(true);
 
   public readonly notAdvice = NOT_ADVICE_NOTICE;
   public readonly wordLabel = VERDICT_WORD_LABEL;

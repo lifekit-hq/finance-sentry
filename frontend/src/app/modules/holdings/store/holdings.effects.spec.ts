@@ -194,15 +194,14 @@ describe('holdingsEffects', () => {
       return store;
     };
 
-    it('reads the held listed stocks in one batch and stores each word by ticker', () => {
-      const getVerdicts = vi
-        .fn()
-        .mockReturnValue(of([{symbol: 'aapl', word: 'Buy', firedRuleId: 'buy'}]));
+    it('reads the held listed stocks in one batch and stores each summary by ticker', () => {
+      const summary = {symbol: 'aapl', word: 'Wait', firedRuleId: 'otherwise', turnsBuyWhen: 'x'};
+      const getVerdicts = vi.fn().mockReturnValue(of([summary]));
 
       const store = owned(getVerdicts);
 
       expect(getVerdicts).toHaveBeenCalledExactlyOnceWith(['AAPL']);
-      expect(store.setVerdicts).toHaveBeenCalledWith({AAPL: 'Buy'});
+      expect(store.setVerdicts).toHaveBeenCalledWith({AAPL: summary});
     });
 
     it('never reads a verdict without ai.use', () => {
