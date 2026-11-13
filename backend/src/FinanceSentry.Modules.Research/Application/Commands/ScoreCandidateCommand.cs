@@ -3,6 +3,8 @@ namespace FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Catalyst;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Ports;
@@ -37,7 +39,8 @@ public sealed class ScoreCandidateCommandHandler(
     IMarketRegimeSource marketRegimeSource,
     IThesisEventRecorder eventRecorder,
     IAlertGeneratorService alertGenerator,
-    IOptions<OpportunityOptions> options)
+    IOptions<OpportunityOptions> options,
+    IThemeAttentionReader? attentionReader = null)
     : ICommandHandler<ScoreCandidateCommand, ScoreCandidateResult>
 {
     private const string Scanner = "opportunity";
@@ -79,7 +82,11 @@ public sealed class ScoreCandidateCommandHandler(
         var (structureScore, fundamentalsScore, crowding, evidence, regime) =
             ScorecardComposer.Compose(structureSnapshot, fundamentalFacts, regimeSnapshot, _options);
 
-        evidence = evidence with { Correlation = await ReadCorrelationAsync(ticker, holdings, ct) };
+        evidence = evidence with
+        {
+            Correlation = await ReadCorrelationAsync(ticker, holdings, ct),
+            Attention = await ReadAttentionAsync(ticker, ct),
+        };
 
         var scorecard = new CandidateScorecard(
             structureScore, fundamentalsScore, crowding, ipsFit, evidence, _options.FormulaVersion, regime);
@@ -120,6 +127,27 @@ public sealed class ScoreCandidateCommandHandler(
         var read = await correlationReader.GetAsync(
             ticker, book, _options.CorrelationTopHoldings, _options.CorrelationMinBookCoverage, ct);
         return CorrelationFact.From(read, _options);
+    }
+
+    /// <summary>
+    /// The theme-attention fact (GDELT article volume of the themes the ticker is on): a fact only, no sub-score reads it. A read that
+    /// fails or a host with no attention store must not stop a score, so it comes back as a fact that says why it is empty.
+    /// </summary>
+    private async Task<AttentionFact?> ReadAttentionAsync(string ticker, CancellationToken ct)
+    {
+        if (attentionReader is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await attentionReader.GetForTickerAsync(ticker, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return AttentionFact.None($"Attention could not be read: {ex.GetType().Name}.");
+        }
     }
 
     private async Task EmitSignalsAsync(

@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Catalyst;
 using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
@@ -12,6 +13,7 @@ using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Services;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
+using FinanceSentry.Modules.Research.Infrastructure.Sources.Catalyst;
 using FinanceSentry.Modules.Research.Infrastructure.Sources.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using Hangfire;
@@ -97,6 +99,18 @@ public static class ResearchModule
                 CoverageEvaluationJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
+
+            // Catalyst detection (discovery funnel stage 7): GDELT attention first, then the 8-K scan whose nominations the
+            // 01:10 coverage evaluation reads. Both have an off-switch in the Catalyst section.
+            var catalystOptions = sp.GetRequiredService<IOptions<CatalystOptions>>().Value;
+            mgr.AddOrUpdate<ThemeAttentionRefreshJob>(
+                ThemeAttentionRefreshJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(catalystOptions.AttentionHourUtc, catalystOptions.AttentionMinuteUtc));
+            mgr.AddOrUpdate<CatalystDetectionJob>(
+                CatalystDetectionJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(catalystOptions.ScanHourUtc, catalystOptions.ScanMinuteUtc));
 
             mgr.AddOrUpdate<CandidateExpiryJob>(
                 "opportunity-candidate-expiry",
@@ -504,6 +518,38 @@ public static class ResearchModule
         services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();
         services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
         services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
+
+        // Catalyst detection (discovery funnel stage 7): the daily 8-K scan over the reference universe and the GDELT
+        // attention measure per theme. Provider rates are enforced by one keyed pacer each: the SEC's fair-access ceiling is
+        // 10 requests a second (this stays at Catalyst:SecRequestsPerSecond) and GDELT answers 429 above one request per 5 s.
+        services.Configure<CatalystOptions>(config.GetSection(CatalystOptions.SectionName));
+        services.AddKeyedSingleton(CatalystPacers.Sec, (sp, _) =>
+            RequestPacer.PerSecond(sp.GetRequiredService<IOptions<CatalystOptions>>().Value.SecRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
+        services.AddKeyedSingleton(CatalystPacers.Gdelt, (sp, _) =>
+            new RequestPacer(
+                TimeSpan.FromSeconds(Math.Max(1, sp.GetRequiredService<IOptions<CatalystOptions>>().Value.GdeltMinIntervalSeconds)),
+                sp.GetRequiredService<TimeProvider>()));
+        var gdeltTimeout = TimeSpan.FromSeconds(30);
+        services.AddHttpClient(GdeltTimelineClient.HttpClientName, client =>
+        {
+            client.Timeout = gdeltTimeout;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0");
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+        services.AddScoped<IEdgarFullTextSearch, EdgarFullTextSearch>();
+        services.AddScoped<IGdeltTimelineClient, GdeltTimelineClient>();
+        services.AddScoped<ICatalystRepository, CatalystRepository>();
+        services.AddScoped<IThemeAttentionRepository, ThemeAttentionRepository>();
+        services.AddScoped<CatalystFilingScanner>();
+        services.AddScoped<CatalystDetector>();
+        services.AddScoped<ThemeAttentionRefresher>();
+        services.AddScoped<IThemeAttentionReader, ThemeAttentionReader>();
+        services.AddScoped<CatalystDetectionJob>();
+        services.AddScoped<ThemeAttentionRefreshJob>();
+
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
 
         // Stage 1 of the #558 scan funnel. Scoped like its collaborators (quote reads and the analyst
