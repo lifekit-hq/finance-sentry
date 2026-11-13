@@ -6,6 +6,7 @@ using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
+using FinanceSentry.Modules.Research.Domain.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
@@ -59,6 +60,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
 
     public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
     public DbSet<BenchmarkRelativeRecord> BenchmarkRelativeRecords { get; set; } = null!;
+
+    public DbSet<ReferenceListMember> ReferenceListMembers { get; set; } = null!;
+
+    public DbSet<ReferenceRefreshRun> ReferenceRefreshRuns { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -349,6 +354,27 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         aumb.Property(x => x.Active).IsRequired();
         aumb.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         aumb.HasIndex(x => x.Ticker).IsUnique().HasDatabaseName("idx_analyst_universe_ticker");
+
+        // Reference universe (shared market data, no UserId): one row per (list, ticker), plus the refresh log.
+        var rlm = modelBuilder.Entity<ReferenceListMember>();
+        rlm.ToTable("reference_list_members");
+        rlm.HasKey(x => x.Id);
+        rlm.Property(x => x.ListKey).IsRequired().HasMaxLength(120);
+        rlm.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        rlm.Property(x => x.Name).HasMaxLength(300);
+        rlm.Property(x => x.Source).IsRequired().HasMaxLength(30);
+        rlm.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        rlm.HasIndex(x => new { x.ListKey, x.Ticker }).IsUnique().HasDatabaseName("idx_reference_members_list_ticker");
+        rlm.HasIndex(x => x.Ticker).HasDatabaseName("idx_reference_members_ticker");
+        rlm.HasIndex(x => x.Source).HasDatabaseName("idx_reference_members_source");
+
+        var rrr = modelBuilder.Entity<ReferenceRefreshRun>();
+        rrr.ToTable("reference_refresh_runs");
+        rrr.HasKey(x => x.Id);
+        rrr.Property(x => x.Source).IsRequired().HasMaxLength(30);
+        rrr.Property(x => x.Error).HasMaxLength(2000);
+        rrr.HasIndex(x => new { x.Source, x.FinishedAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_reference_runs_source_finished");
 
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");

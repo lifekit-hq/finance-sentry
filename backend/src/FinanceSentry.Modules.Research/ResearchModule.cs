@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
+using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -10,6 +11,7 @@ using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Services;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
+using FinanceSentry.Modules.Research.Infrastructure.Sources.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -80,6 +82,13 @@ public static class ResearchModule
                 "thesis-track-record-snapshot",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Weekly());
+
+            // Weekly reference-universe refresh (S&P 500, Nasdaq-100, FinanceDatabase sectors/industries, themes),
+            // Sunday 04:00 UTC - after FinanceDatabase's own Sunday update. A failed dataset fails the job.
+            mgr.AddOrUpdate<ReferenceUniverseRefreshJob>(
+                ReferenceUniverseRefreshJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Weekly(DayOfWeek.Sunday, 4));
 
             mgr.AddOrUpdate<CandidateExpiryJob>(
                 "opportunity-candidate-expiry",
@@ -450,6 +459,30 @@ public static class ResearchModule
         // Structured monthly consensus (feature 037). Always registered — the service no-ops via
         // IsConfigured when no key is present, keeping the DI graph stable across environments.
         services.AddSingleton<IRecommendationTrendsService, FinnhubRecommendationTrendsService>();
+        // Reference universe (stage A of the discovery funnel): lists as data, refreshed weekly. The S&P 500 port
+        // reads the table and falls back to the embedded seed (Sp500ConstituentSource).
+        services.Configure<ReferenceUniverseOptions>(config.GetSection(ReferenceUniverseOptions.SectionName));
+        var referenceTimeout = TimeSpan.FromSeconds(
+            config.GetSection(ReferenceUniverseOptions.SectionName).Get<ReferenceUniverseOptions>()?.RequestTimeoutSeconds
+            ?? new ReferenceUniverseOptions().RequestTimeoutSeconds);
+        services.AddHttpClient(ReferenceDatasetHttp.HttpClientName, client =>
+        {
+            client.Timeout = referenceTimeout;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0");
+        })
+            .AddProviderResilience(referenceTimeout, maxRetries: 2)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+        services.AddScoped<IReferenceListFeed, Sp500ConstituentsFeed>();
+        services.AddScoped<IReferenceListFeed, Nasdaq100Feed>();
+        services.AddScoped<IReferenceListFeed, FinanceDatabaseFeed>();
+        services.AddScoped<IReferenceListFeed, ThemeListFeed>();
+        services.AddScoped<IReferenceUniverseRepository, ReferenceUniverseRepository>();
+        services.AddScoped<ReferenceUniverseRefresher>();
+        services.AddScoped<ReferenceUniverseRefreshJob>();
+        services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
         services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
 
