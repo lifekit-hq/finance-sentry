@@ -21,6 +21,10 @@ public static class ReviewDueMessage
     private const char TailClose = ']';
     private const char EvidenceSeparator = '|';
     private const char Elision = '…';
+    private const string TailFalsifiersField = " falsifiers=";
+
+    /// <summary>A falsifier is cut into the room left only when at least this many characters remain; otherwise it is omitted.</summary>
+    private const int MinTruncatedFalsifier = 20;
 
     /// <summary>Evidence is dropped before the headline is cut below this many characters.</summary>
     private const int MinHeadlineRoom = 120;
@@ -32,25 +36,22 @@ public static class ReviewDueMessage
     {
         var evidence = review.Evidence.Select(Clean).Where(e => e.Length > 0).ToList();
         var falsifiers = CleanAll(review.NarrativeFalsifiers);
-        while (true)
-        {
-            var tail = Tail(review, evidence, falsifiers);
-            var room = maxLength - tail.Length;
-            if (room >= Math.Min(review.Headline.Length, MinHeadlineRoom) || (evidence.Count == 0 && falsifiers.Count == 0))
-            {
-                return Truncate(review.Headline, Math.Max(room, 0)) + tail;
-            }
+        var minRoom = Math.Min(review.Headline.Length, MinHeadlineRoom);
 
-            // Evidence goes first: a falsifier is the one thing on the notice Ledger cannot re-derive from a read.
-            if (evidence.Count > 0)
-            {
-                evidence.RemoveAt(evidence.Count - 1);
-            }
-            else
-            {
-                falsifiers.RemoveAt(falsifiers.Count - 1);
-            }
+        // Evidence goes first: a falsifier is the one thing on the notice Ledger cannot re-derive from a read.
+        while (evidence.Count > 0 && maxLength - Tail(review, evidence, falsifiers).Length < minRoom)
+        {
+            evidence.RemoveAt(evidence.Count - 1);
         }
+
+        if (falsifiers.Count > 0 && maxLength - Tail(review, evidence, falsifiers).Length < minRoom)
+        {
+            var overhead = Tail(review, evidence, []).Length + TailFalsifiersField.Length;
+            falsifiers = FitFalsifiers(falsifiers, review.SubjectId, maxLength - minRoom - overhead);
+        }
+
+        var tail = Tail(review, evidence, falsifiers);
+        return Truncate(review.Headline, Math.Max(maxLength - tail.Length, 0)) + tail;
     }
 
     /// <summary>
@@ -67,24 +68,8 @@ public static class ReviewDueMessage
         if (falsifiers.Count > 0)
         {
             const string falsifierLead = " | falsifiers=";
-            var keptFalsifiers = new List<string>();
-            var usedByFalsifiers = summary.Length + falsifierLead.Length;
-            foreach (var item in falsifiers)
-            {
-                var cost = item.Length + (keptFalsifiers.Count > 0 ? 1 : 0);
-                if (usedByFalsifiers + cost > maxLength)
-                {
-                    break;
-                }
-
-                keptFalsifiers.Add(item);
-                usedByFalsifiers += cost;
-            }
-
-            if (keptFalsifiers.Count > 0)
-            {
-                summary.Append(falsifierLead).Append(string.Join(EvidenceSeparator, keptFalsifiers));
-            }
+            var fitted = FitFalsifiers(falsifiers, review.SubjectId, maxLength - summary.Length - falsifierLead.Length);
+            summary.Append(falsifierLead).Append(string.Join(EvidenceSeparator, fitted));
         }
 
         var evidence = review.Evidence.Select(Clean).Where(e => e.Length > 0).ToList();
@@ -178,6 +163,47 @@ public static class ReviewDueMessage
     private static List<string> CleanAll(IReadOnlyList<string>? values)
         => (values ?? []).Select(Clean).Where(v => v.Length > 0).ToList();
 
+    /// <summary>
+    /// Fits the falsifiers into <paramref name="budget"/> characters (joined with the separator) without dropping any silently:
+    /// as many as fit are kept in order, the first that does not is cut with an ellipsis into the room left, and when anything
+    /// was cut or omitted a final <c>+N_more,full_list_on_thesis:&lt;id&gt;</c> item says so (N counts those omitted entirely).
+    /// </summary>
+    private static List<string> FitFalsifiers(List<string> falsifiers, Guid thesisId, int budget)
+    {
+        if (falsifiers.Sum(f => f.Length) + falsifiers.Count - 1 <= budget)
+        {
+            return falsifiers;
+        }
+
+        var room = budget - (TruncationMarker(falsifiers.Count, thesisId).Length + 1);
+        var kept = new List<string>();
+        var used = 0;
+        foreach (var item in falsifiers)
+        {
+            var separator = kept.Count > 0 ? 1 : 0;
+            if (used + separator + item.Length <= room)
+            {
+                kept.Add(item);
+                used += separator + item.Length;
+                continue;
+            }
+
+            var left = room - used - separator;
+            if (left >= MinTruncatedFalsifier)
+            {
+                kept.Add(Truncate(item, left));
+            }
+
+            break;
+        }
+
+        kept.Add(TruncationMarker(falsifiers.Count - kept.Count, thesisId));
+        return kept;
+    }
+
+    private static string TruncationMarker(int omitted, Guid thesisId)
+        => string.Create(CultureInfo.InvariantCulture, $"+{omitted}_more,full_list_on_thesis:{thesisId:D}");
+
     private static string Tail(ReviewDue review, List<string> evidence, List<string> falsifiers)
     {
         var tail = new StringBuilder(TailOpen)
@@ -187,7 +213,7 @@ public static class ReviewDueMessage
             .Append(" ref=").Append(Clean(review.Reference));
         if (falsifiers.Count > 0)
         {
-            tail.Append(" falsifiers=").Append(string.Join(EvidenceSeparator, falsifiers));
+            tail.Append(TailFalsifiersField).Append(string.Join(EvidenceSeparator, falsifiers));
         }
 
         if (evidence.Count > 0)
