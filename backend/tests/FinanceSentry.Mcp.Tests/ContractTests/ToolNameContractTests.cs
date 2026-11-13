@@ -45,6 +45,7 @@ public sealed class ToolNameContractTests
         "get_quotes",
         "get_radar_summary",
         "get_recent_filings",
+        "get_reference_universe",
         "get_research_context",
         "get_risk_rules",
         "get_sync_health",

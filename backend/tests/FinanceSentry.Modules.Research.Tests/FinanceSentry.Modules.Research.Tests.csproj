@@ -25,6 +25,8 @@
     <Content Include="Unit\Fixtures\Edgar\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- Recorded Yahoo fundamentals-timeseries responses for the provider-chain tests (issue #837). -->
     <Content Include="Unit\Fixtures\Yahoo\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The API's shipped configuration: the reference-universe theme defaults are asserted against it. -->
+    <Content Include="..\..\src\FinanceSentry.API\appsettings.json" Link="appsettings.reference-universe.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

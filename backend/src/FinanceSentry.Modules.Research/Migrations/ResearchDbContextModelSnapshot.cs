@@ -1192,6 +1192,89 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("recommendations", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ReferenceUniverse.ReferenceListMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source")
+                        .HasDatabaseName("idx_reference_members_source");
+
+                    b.HasIndex("Ticker")
+                        .HasDatabaseName("idx_reference_members_ticker");
+
+                    b.HasIndex("ListKey", "Ticker")
+                        .IsUnique()
+                        .HasDatabaseName("idx_reference_members_list_ticker");
+
+                    b.ToTable("reference_list_members", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ReferenceUniverse.ReferenceRefreshRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "FinishedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_reference_runs_source_finished");
+
+                    b.ToTable("reference_refresh_runs", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ResearchChunk", b =>
                 {
                     b.Property<Guid>("Id")
