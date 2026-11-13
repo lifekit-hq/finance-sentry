@@ -5,6 +5,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
@@ -64,6 +65,12 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
     public DbSet<ReferenceListMember> ReferenceListMembers { get; set; } = null!;
 
     public DbSet<ReferenceRefreshRun> ReferenceRefreshRuns { get; set; } = null!;
+
+    public DbSet<CoverageMember> CoverageMembers { get; set; } = null!;
+
+    public DbSet<CoverageJournalEntry> CoverageJournal { get; set; } = null!;
+
+    public DbSet<CoverageVerdictObservation> CoverageVerdictObservations { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -375,6 +382,42 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         rrr.Property(x => x.Error).HasMaxLength(2000);
         rrr.HasIndex(x => new { x.Source, x.FinishedAt }).IsDescending(false, true)
             .HasDatabaseName("idx_reference_runs_source_finished");
+
+        var cvm = modelBuilder.Entity<CoverageMember>();
+        cvm.ToTable("coverage_members");
+        cvm.HasKey(x => x.Id);
+        cvm.Property(x => x.UserId).IsRequired();
+        cvm.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvm.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvm.Property(x => x.AddedReason).IsRequired().HasMaxLength(20);
+        cvm.Property(x => x.CorrelationToBook).HasPrecision(6, 4);
+        cvm.HasIndex(x => new { x.UserId, x.Ticker }).IsUnique().HasDatabaseName("ux_coverage_members_user_ticker");
+
+        var cvj = modelBuilder.Entity<CoverageJournalEntry>();
+        cvj.ToTable("coverage_journal");
+        cvj.HasKey(x => x.Id);
+        cvj.Property(x => x.UserId).IsRequired();
+        cvj.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvj.Property(x => x.Action).IsRequired().HasMaxLength(10);
+        cvj.Property(x => x.Rule).IsRequired().HasMaxLength(40);
+        cvj.Property(x => x.Reason).IsRequired().HasMaxLength(20);
+        cvj.Property(x => x.Detail).IsRequired().HasMaxLength(1000);
+        cvj.Property(x => x.At).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvj.Property(x => x.CorrelationToBook).HasPrecision(6, 4);
+        cvj.HasIndex(x => new { x.UserId, x.Ticker, x.At }).IsDescending(false, false, true)
+            .HasDatabaseName("idx_coverage_journal_user_ticker_at");
+
+        var cvo = modelBuilder.Entity<CoverageVerdictObservation>();
+        cvo.ToTable("coverage_verdict_observations");
+        cvo.HasKey(x => x.Id);
+        cvo.Property(x => x.UserId).IsRequired();
+        cvo.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvo.Property(x => x.Verdict).IsRequired().HasMaxLength(20);
+        cvo.Property(x => x.FiredRuleId).IsRequired().HasMaxLength(40);
+        cvo.Property(x => x.ObservedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvo.HasIndex(x => new { x.UserId, x.Ticker, x.ObservedOn }).IsUnique()
+            .HasDatabaseName("ux_coverage_observations_user_ticker_day");
+        cvo.HasIndex(x => x.ObservedOn).HasDatabaseName("idx_coverage_observations_day");
 
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");

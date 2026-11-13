@@ -4,8 +4,9 @@ using FinanceSentry.Modules.PortfolioConstruction.Domain;
 using Microsoft.Extensions.Configuration;
 
 /// <summary>
-/// Configuration of the construction screen (section <c>PortfolioConstruction</c>). The archetypes and the curated
-/// universe are data, not code (spec 726 FR-012, OQ-1).
+/// Configuration of the construction screen (section <c>PortfolioConstruction</c>). The archetypes are data, not code
+/// (spec 726 FR-012); the universe is not configured here: it is the viewer's held and watchlist names plus the
+/// coverage universe the pipeline maintains (<see cref="Core.Interfaces.ICoverageUniverseReader"/>).
 /// </summary>
 public sealed class PortfolioConstructionOptions
 {
@@ -16,16 +17,11 @@ public sealed class PortfolioConstructionOptions
 
     /// <summary>
     /// Binds the section onto the shipped defaults. A list or dictionary the configuration names replaces the
-    /// shipped one (the configuration binder would append to it), so a configured archetype or curated list means
+    /// shipped one (the configuration binder would append to it), so a configured archetype or list means
     /// exactly what it says; a key it does not name keeps the shipped value.
     /// </summary>
     public static void Bind(IConfiguration section, PortfolioConstructionOptions options)
     {
-        if (section.GetSection(nameof(CuratedUniverse)).Exists())
-        {
-            options.CuratedUniverse.Clear();
-        }
-
         foreach (var configured in section.GetSection(nameof(Archetypes)).GetChildren())
         {
             if (!options.Archetypes.TryGetValue(configured.Key, out var archetype))
@@ -51,17 +47,6 @@ public sealed class PortfolioConstructionOptions
 
         section.Bind(options);
     }
-
-    /// <summary>
-    /// The configured curated list: a bounded set of well-known single equities that keeps the universe non-empty
-    /// for a user with no holdings and no watchlist (spec 726 OQ-1). The viewer's held and watchlist names are
-    /// added to it.
-    /// </summary>
-    public List<string> CuratedUniverse { get; set; } =
-    [
-        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "AVGO", "COST", "V", "MA",
-        "JNJ", "PG", "KO", "PEP", "UNH", "HD", "LLY", "XOM", "JPM", "ORCL",
-    ];
 
     /// <summary>
     /// The most names one read scores. Every name costs a scorecard read, so the universe is bounded

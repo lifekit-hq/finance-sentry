@@ -16,7 +16,6 @@ public sealed class PortfolioConstructionOptionsTests
         options.DefaultArchetype.Should().Be("growth");
         options.Archetypes["growth"].Sleeves.Values.Sum().Should().Be(100m);
         options.Archetypes["balanced"].Sleeves.Values.Sum().Should().Be(100m);
-        options.CuratedUniverse.Should().NotBeEmpty().And.HaveCountLessThanOrEqualTo(options.MaxUniverseSize);
     }
 
     [Fact]
@@ -48,8 +47,6 @@ public sealed class PortfolioConstructionOptionsTests
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["PortfolioConstruction:CuratedUniverse:0"] = "AAPL",
-            ["PortfolioConstruction:CuratedUniverse:1"] = "MSFT",
             ["PortfolioConstruction:Archetypes:strict:Label"] = "Strict",
             ["PortfolioConstruction:Archetypes:strict:EligibleVerdicts:0"] = "StrongBuy",
             ["PortfolioConstruction:Archetypes:strict:Ordering:0"] = "fundamentals",
@@ -62,7 +59,6 @@ public sealed class PortfolioConstructionOptionsTests
         var options = new PortfolioConstructionOptions();
         PortfolioConstructionOptions.Bind(config.GetSection(PortfolioConstructionOptions.SectionName), options);
 
-        options.CuratedUniverse.Should().Equal("AAPL", "MSFT");
         var strict = options.Archetypes["strict"];
         strict.EligibleVerdicts.Should().Equal("StrongBuy");
         strict.Ordering.Should().Equal("fundamentals");

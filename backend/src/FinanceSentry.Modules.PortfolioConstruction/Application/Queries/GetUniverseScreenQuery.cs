@@ -11,7 +11,8 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// The ranked universe screen with the archetype's suggested weights (spec 726 US1, US3). The universe is the
-/// viewer's held and watchlist names plus the configured curated list, bounded (OQ-1, FR-003); each name is scored
+/// viewer's held and watchlist names plus the coverage universe the pipeline maintains ("our own index", capped and
+/// kept by add and remove rules), bounded (OQ-1, FR-003); each name is scored
 /// by the unchanged 019 scorers behind <see cref="IUniverseScorecardSource"/>; the constructor then gates, orders
 /// and weights them under the stricter of the archetype's defaults and the viewer's own limits. Nothing is stored,
 /// and nothing here places or prepares a trade (FR-018).
@@ -23,13 +24,14 @@ public sealed class GetUniverseScreenQueryHandler(
     IConstructionPolicySource policySource,
     IHeldEquitySource held,
     IWatchlistReader watchlist,
+    ICoverageUniverseReader coverage,
     IMemoryCache cache,
     IOptions<PortfolioConstructionOptions> options,
     TimeProvider clock) : IQueryHandler<GetUniverseScreenQuery, UniverseScreenResult>
 {
     public const string HeldSource = "held";
     public const string WatchlistSource = "watchlist";
-    public const string CuratedSource = "curated";
+    public const string CoverageSource = "coverage";
 
     private const string CacheKeyPrefix = "portfolio-construction:scorecard:";
 
@@ -154,10 +156,10 @@ public sealed class GetUniverseScreenQueryHandler(
             }
         }
 
-        // The viewer's own names come first, so the cap never drops a name they hold or watch for a curated one.
+        // The viewer's own names come first, so the cap never drops a name they hold or watch for a coverage one.
         Add(await held.ListSymbolsAsync(userId, ct), HeldSource);
         Add(await watchlist.ListTickersAsync(userId, ct), WatchlistSource);
-        Add(config.CuratedUniverse, CuratedSource);
+        Add(await coverage.ListTickersAsync(userId, ct), CoverageSource);
 
         var truncated = order.Count > config.MaxUniverseSize;
         var kept = order.Take(config.MaxUniverseSize).ToList();

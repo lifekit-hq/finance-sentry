@@ -21,6 +21,7 @@ public sealed class UniverseScreenQueryTests
     private readonly Mock<IConstructionPolicySource> _policy = new();
     private readonly Mock<IHeldEquitySource> _held = new();
     private readonly Mock<IWatchlistReader> _watchlist = new();
+    private readonly Mock<ICoverageUniverseReader> _coverage = new();
     private readonly List<IReadOnlyList<string>> _asked = [];
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
@@ -29,6 +30,7 @@ public sealed class UniverseScreenQueryTests
         _policy.Setup(p => p.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(ConstructionPolicy.None);
         _held.Setup(h => h.ListSymbolsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _watchlist.Setup(w => w.ListTickersAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _coverage.Setup(c => c.ListTickersAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(["AAA", "BBB", "CCC"]);
         _scorecards
             .Setup(s => s.GetAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns((IReadOnlyList<string> symbols, CancellationToken _) =>
@@ -39,22 +41,34 @@ public sealed class UniverseScreenQueryTests
     }
 
     private GetUniverseScreenQueryHandler Handler(PortfolioConstructionOptions? options = null) =>
-        new(_scorecards.Object, _policy.Object, _held.Object, _watchlist.Object, _cache,
-            Options.Create(options ?? new PortfolioConstructionOptions { CuratedUniverse = ["AAA", "BBB", "CCC"] }),
+        new(_scorecards.Object, _policy.Object, _held.Object, _watchlist.Object, _coverage.Object, _cache,
+            Options.Create(options ?? new PortfolioConstructionOptions()),
             new FakeTimeProvider(Cards.ScoredAt));
 
     [Fact]
-    public async Task ColdStartUser_SeesTheWholeCuratedUniverse_WithFourAxesAVerdictAndNoBookDependence()
+    public async Task ColdStartUser_SeesTheWholeCoverageUniverse_WithFourAxesAVerdictAndNoBookDependence()
     {
         var result = await Handler().Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
 
         result.Rows.Select(r => r.Symbol).Should().BeEquivalentTo("AAA", "BBB", "CCC");
         result.Rows.Should().OnlyContain(r =>
             r.Structure != null && r.Fundamentals != null && r.Crowding != null && r.Valuation != null
-            && r.Verdict != null && r.Sources.Count == 1 && r.Sources[0] == "curated");
+            && r.Verdict != null && r.Sources.Count == 1 && r.Sources[0] == "coverage");
         result.Archetype.Should().Be("growth");
         result.Archetypes.Select(a => a.Key).Should().Equal("balanced", "growth");
         result.Construction.Constraints.Should().OnlyContain(c => c.Source == ConstraintSource.ArchetypeDefault);
+    }
+
+    [Fact]
+    public async Task TheUniverse_IsTheCoverageSetAndNeverAHardCodedList()
+    {
+        _coverage.Setup(c => c.ListTickersAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(["nvda", "AVGO"]);
+
+        var result = await Handler().Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
+
+        _asked.Single().Should().Equal("NVDA", "AVGO");
+        result.Rows.Select(r => r.Symbol).Should().BeEquivalentTo("NVDA", "AVGO");
+        result.Rows.Should().OnlyContain(r => r.Sources.Count == 1 && r.Sources[0] == "coverage");
     }
 
     [Fact]
@@ -92,7 +106,7 @@ public sealed class UniverseScreenQueryTests
     {
         _held.Setup(h => h.ListSymbolsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(["hld", "AAA"]);
         _watchlist.Setup(w => w.ListTickersAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(["WCH", "hld"]);
-        var options = new PortfolioConstructionOptions { CuratedUniverse = ["AAA", "BBB", "CCC"], MaxUniverseSize = 4 };
+        var options = new PortfolioConstructionOptions { MaxUniverseSize = 4 };
 
         var result = await Handler(options).Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
 
@@ -100,7 +114,7 @@ public sealed class UniverseScreenQueryTests
         result.Truncated.Should().BeTrue();
         result.UniverseCap.Should().Be(4);
         result.Rows.Single(r => r.Symbol == "HLD").Sources.Should().Equal("held", "watchlist");
-        result.Rows.Single(r => r.Symbol == "AAA").Sources.Should().Equal("held", "curated");
+        result.Rows.Single(r => r.Symbol == "AAA").Sources.Should().Equal("held", "coverage");
     }
 
     [Fact]
@@ -189,9 +203,9 @@ public sealed class UniverseScreenQueryTests
     [Fact]
     public async Task EmptyUniverse_ReturnsAnExplicitEmptyScreen()
     {
-        var options = new PortfolioConstructionOptions { CuratedUniverse = [] };
+        _coverage.Setup(c => c.ListTickersAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
-        var result = await Handler(options).Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetUniverseScreenQuery(UserId, null), CancellationToken.None);
 
         result.Rows.Should().BeEmpty();
         result.Construction.Notes.Should().Contain(n => n.Contains("universe is empty"));

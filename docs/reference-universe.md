@@ -60,6 +60,8 @@ populate it earlier.
 - **`IReferenceUniverseReader`**: `GetListsAsync`, `GetMembersAsync(list)`, `GetListsForTickerAsync(ticker)`, `GetStatusAsync()`.
 - **MCP `get_reference_universe(list?, ticker?, limit?, offset?)`**: catalogue with no arguments, members of a list (ordered by ticker, `limit` 1-1000 default 200, `offset` default 0 to page; `memberCount` is the full total), or the lists a ticker belongs to.
 
+- **Coverage universe** (`docs/coverage-universe.md`): the list a Scan or Ledger candidate is drawn from is separate from the reference universe; coverage is the capped list the pipeline keeps, and a reference list is only where candidates can come from.
+
 ## Not here
 
 Correlation to the book is not a property of a list: a theme such as `theme:semiconductors` or `theme:memory` is a
