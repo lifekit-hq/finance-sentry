@@ -16,7 +16,7 @@ using Moq;
 using Xunit;
 
 /// <summary>
-/// The news ingestion budget: the book (holdings, then thesis and watchlist names) keeps its 60 places, and coverage names
+/// The news ingestion budget: the book (watchlist, then thesis, then held names) keeps its 60 places, and coverage names
 /// the book does not name are read in rotating slices on top, so a coverage list of 100 is covered without starving a held name.
 /// </summary>
 public sealed class NewsIngestionCoverageTests
@@ -59,7 +59,7 @@ public sealed class NewsIngestionCoverageTests
     }
 
     [Fact]
-    public async Task Without_coverage_the_run_reads_holdings_then_thesis_then_watchlist_names()
+    public async Task Without_coverage_the_run_reads_watchlist_then_thesis_then_held_names()
     {
         _h.Hold("NVDA");
         await _h.ThesisAsync("MU");
@@ -69,25 +69,36 @@ public sealed class NewsIngestionCoverageTests
 
         await Job().IngestTickersAsync();
 
-        _fetched.Should().ContainSingle().Which.Should().Equal("NVDA", "MU", "AAPL");
+        _fetched.Should().ContainSingle().Which.Should().Equal("AAPL", "MU", "NVDA");
     }
 
     [Fact]
-    public async Task Held_names_keep_the_budget_ahead_of_thesis_and_watchlist_names()
+    public async Task When_the_book_exceeds_the_budget_the_tail_is_cut_in_watchlist_thesis_held_order()
     {
-        for (var i = 0; i < 60; i++)
+        for (var i = 0; i < 30; i++)
+        {
+            _h.Db.WatchlistItems.Add(new WatchlistItem { UserId = CoverageHarness.UserId, Ticker = $"W{i:00}" });
+            _h.WatchedTickers.Add($"W{i:00}");
+        }
+
+        await _h.Db.SaveChangesAsync();
+        for (var i = 0; i < 20; i++)
+        {
+            await _h.ThesisAsync($"T{i:00}");
+        }
+
+        for (var i = 0; i < 20; i++)
         {
             _h.Hold($"H{i:00}");
         }
-
-        await _h.ThesisAsync("ZZZ");
 
         await Job().IngestTickersAsync();
 
         var fetched = _fetched.Should().ContainSingle().Subject;
         fetched.Should().HaveCount(60);
-        fetched.Should().NotContain("ZZZ");
-        fetched.Should().Contain("H00").And.Contain("H59");
+        fetched.Take(30).Should().OnlyContain(t => t.StartsWith('W'));
+        fetched.Skip(30).Take(20).Should().OnlyContain(t => t.StartsWith('T'));
+        fetched.Skip(50).Should().Equal(Enumerable.Range(0, 10).Select(i => $"H{i:00}"));
     }
 
     [Fact]

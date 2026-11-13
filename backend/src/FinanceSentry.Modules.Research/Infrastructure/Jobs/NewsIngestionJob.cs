@@ -35,7 +35,7 @@ public sealed class NewsIngestionJob(
     private static readonly HashSet<string> NonTickerInstrumentTypes = new(StringComparer.OrdinalIgnoreCase) { "CASH", "REIT", "BOND" };
 
     /// <summary>
-    /// Reads news for the book first (holdings, then thesis and watchlist names, at most <c>MaxTickersPerRun</c>), then for a
+    /// Reads news for the book first (watchlist, then thesis and holdings names, at most <c>MaxTickersPerRun</c>), then for a
     /// rotating slice of the coverage universe the book does not already name, so a coverage list of 100 neither starves a
     /// held name nor goes unread: every covered name is read once every few runs.
     /// </summary>
@@ -68,6 +68,16 @@ public sealed class NewsIngestionJob(
             .Distinct()
             .ToListAsync(ct);
 
+        foreach (var t in watchlistTickers)
+        {
+            Add(t);
+        }
+
+        foreach (var t in thesisTickers)
+        {
+            Add(t);
+        }
+
         var coverageTickers = new List<string>();
         foreach (var userId in userIds)
         {
@@ -84,16 +94,6 @@ public sealed class NewsIngestionJob(
             }
 
             coverageTickers.AddRange(await universe.CoverageTickersByPriorityAsync(userId, ct));
-        }
-
-        foreach (var t in thesisTickers)
-        {
-            Add(t);
-        }
-
-        foreach (var t in watchlistTickers)
-        {
-            Add(t);
         }
 
         var toFetch = priority.Take(MaxTickersPerRun).ToList();
