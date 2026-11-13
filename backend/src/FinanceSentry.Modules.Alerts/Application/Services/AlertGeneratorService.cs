@@ -49,9 +49,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         [AlertType.CategorySpike] = TimeSpan.FromDays(7),
         // 7-day backstop; the daily detector doesn't spam while the routing pattern persists.
         [AlertType.FxSpread] = TimeSpan.FromDays(7),
-        // The pulse checklist's cadence: one rebalance proposal per drift per week. The daily job re-sees a
-        // persisting drift every run, and accepting or dismissing the proposal closes its row, so only a
-        // window as long as the cadence keeps the same drift quiet (#1266).
+        // The pulse checklist's cadence: how long a proposal the operator acted on (accepted, dismissed, deferred)
+        // keeps its drift quiet. An open proposal holds its drift for as long as it stays open (see DriftEpisode).
         [AlertType.RebalanceProposal] = TimeSpan.FromDays(7),
         [AlertType.CashSweepProposal] = TimeSpan.FromHours(24),
         // Backstop only — the reference id already carries the event date, so a re-run within the
@@ -494,12 +493,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             ct);
     }
 
-    /// <summary>
-    /// The label every rebalance proposal carried before it named its drift. An open alert still wearing it is the
-    /// same drift as far as anyone can tell, so the deploy that introduced signatures doesn't re-notify it.
-    /// </summary>
-    private const string LegacyRebalanceLabel = "portfolio";
-
     public Task GenerateRebalanceProposalAlertAsync(
         Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
@@ -507,23 +500,25 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             RebalancePortfolioReferenceId(userId), RebalanceLabel(driftSignature),
             $"Rebalance proposal: {orderCount} order(s)", orderSummary)
         {
-            SupersedeWhenLabelChanges = true,
-            SilenceIgnoresCleared = true,
-            LegacyLabel = LegacyRebalanceLabel,
+            Dedup = AlertDedup.Episode,
         },
             ct);
 
     private static string RebalanceLabel(string driftSignature)
     {
-        var label = string.IsNullOrWhiteSpace(driftSignature) ? LegacyRebalanceLabel : driftSignature.Trim();
+        var label = driftSignature.Trim();
         return label.Length <= ReferenceLabelMaxLength ? label : label[..ReferenceLabelMaxLength];
     }
 
     /// <summary>Column width of <see cref="Alert.ReferenceLabel"/>.</summary>
     private const int ReferenceLabelMaxLength = 200;
 
-    public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
-        => ResolveAsync(userId, AlertType.RebalanceProposal, RebalancePortfolioReferenceId(userId), ct);
+    public async Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
+    {
+        var reference = RebalancePortfolioReferenceId(userId);
+        await ResolveAsync(userId, AlertType.RebalanceProposal, reference, ct);
+        await _alerts.MarkAcceptedClearedAsync(userId, AlertType.RebalanceProposal, reference, ct);
+    }
 
     public Task GeneratePolicyReviewAlertAsync(
         Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default)
@@ -770,30 +765,35 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             var existing = await _alerts.FindActiveAsync(userId, draft.Type, draft.ReferenceId, ct);
             if (existing is not null)
             {
-                if (!draft.SupersedeWhenLabelChanges || SameDrift(existing.ReferenceLabel, draft))
-                {
-                    // A suppressed repeat still happened — bump the existing row instead of dropping it
-                    // silently, so the recurrence is recorded while the row count stays at 1 (#419 S5).
-                    await _alerts.BumpOccurrenceAsync(existing.Id, ct);
-                    return;
-                }
-
-                // The open alert describes a different drift than this one (#1266): it is superseded, and
-                // the new one is judged by the silence window below like any first sighting.
-                await _alerts.ResolveAsync(existing.Id, ct);
+                // A suppressed repeat still happened — bump the existing row instead of dropping it
+                // silently, so the recurrence is recorded while the row count stays at 1 (#419 S5).
+                await _alerts.BumpOccurrenceAsync(existing.Id, ct);
+                return;
             }
+        }
+
+        var createdAt = DateTimeOffset.UtcNow;
+        if (draft.Dedup == AlertDedup.Episode)
+        {
+            var rows = await _alerts.GetByReferenceAsync(userId, draft.Type, draft.ReferenceId, ct);
+            var open = rows.FirstOrDefault(a => !a.IsResolved && !a.IsDismissed);
+            if (!DriftEpisode.Worsens(rows, draft.ReferenceLabel, createdAt - SilenceWindows[draft.Type]))
+            {
+                if (open is not null) await _alerts.BumpOccurrenceAsync(open.Id, ct);
+                return;
+            }
+
+            // The open proposal is superseded, not cleared: it and its successor share the instant, which is how
+            // the episode tells a worsening from the drift ending. idx_alert_dedup allows one open row per reference.
+            if (open is not null) await _alerts.ResolveAtAsync(open.Id, createdAt, ct);
         }
 
         if (draft.Dedup is AlertDedup.ActiveThenSilence or AlertDedup.SilenceOnly)
         {
             var window = draft.SilenceWindow ?? SilenceWindows[draft.Type];
             var quietSince = DateTimeOffset.UtcNow - window;
-            var recent = draft.SilenceIgnoresCleared
-                ? await _alerts.HasRecentUnclearedAsync(
-                    userId, draft.Type, draft.ReferenceId, draft.ReferenceLabel, quietSince, ct)
-                : await _alerts.HasRecentAsync(
-                    userId, draft.Type, draft.ReferenceId, draft.ReferenceLabel, quietSince, ct);
-            if (recent)
+            if (await _alerts.HasRecentAsync(
+                    userId, draft.Type, draft.ReferenceId, draft.ReferenceLabel, quietSince, ct))
                 return;
         }
 
@@ -807,6 +807,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         await _alerts.AddAsync(new Alert
         {
             UserId = userId,
+            CreatedAt = createdAt,
             Type = draft.Type,
             Severity = draft.Severity,
             Title = draft.Title,
@@ -817,10 +818,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             HealthState = draft.HealthState,
         }, ct);
     }
-
-    private static bool SameDrift(string? openLabel, AlertDraft draft)
-        => string.Equals(openLabel, draft.ReferenceLabel, StringComparison.Ordinal)
-           || (draft.LegacyLabel is not null && string.Equals(openLabel, draft.LegacyLabel, StringComparison.Ordinal));
 
     /// <summary>Account-level failures keep the account id; provider-level ones (no account) key on the provider.</summary>
     private static Guid SyncFailureReferenceId(string provider, Guid? accountId)
@@ -946,21 +943,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Overrides the type's declared window where one type carries two distinct events.</summary>
         public TimeSpan? SilenceWindow { get; init; }
-
-        /// <summary>
-        /// An open alert on the same reference whose <see cref="ReferenceLabel"/> differs is a different event: it is
-        /// resolved and this one recorded, instead of bumping the open row (the label names what the alert is about).
-        /// </summary>
-        public bool SupersedeWhenLabelChanges { get; init; }
-
-        /// <summary>
-        /// The silence window skips alerts the system resolved itself (condition cleared, superseded), so a recurrence
-        /// after the condition cleared is a new episode rather than a repeat.
-        /// </summary>
-        public bool SilenceIgnoresCleared { get; init; }
-
-        /// <summary>A label from before alerts of this type carried a specific one; an open alert wearing it counts as unchanged.</summary>
-        public string? LegacyLabel { get; init; }
 
         /// <summary>Resolves a still-open alert on the same reference before recording this one.</summary>
         public bool SupersedeOpen { get; init; }

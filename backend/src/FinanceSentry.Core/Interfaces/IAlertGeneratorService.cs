@@ -17,6 +17,12 @@ public enum AlertDedup
     /// resolved — suppresses a new one. No silence window applies.
     /// </summary>
     OncePerReference,
+
+    /// <summary>
+    /// One alert per drift episode: the alert's reference label names the drift, and it is recorded only when
+    /// the drift worsens on what the episode already announced (finance-sentry#1266).
+    /// </summary>
+    Episode,
 }
 
 public interface IAlertGeneratorService
@@ -362,11 +368,12 @@ public interface IAlertGeneratorService
     /// <summary>
     /// Raises a Warning alert proposing a concrete rebalance order list when IPS bands are breached
     /// (432). <paramref name="orderCount"/> is the number of order lines; <paramref name="orderSummary"/>
-    /// is the human-readable formatted list. <paramref name="driftSignature"/> names the drift the
-    /// proposal answers (breaching sleeves, direction, and how many band widths out): one drift episode
-    /// notifies once. A changed signature supersedes the open proposal and notifies again; the same one
-    /// stays quiet, whatever the operator did with the earlier proposal, for the weekly cadence
-    /// (finance-sentry#1266).
+    /// is the human-readable formatted list. <paramref name="driftSignature"/> names the drift the proposal
+    /// answers (<c>Asset:Direction:BandsOut</c> per breaching sleeve, joined by <c>;</c>). One drift episode
+    /// notifies once: a later run records a proposal only when some sleeve and direction is new to the episode
+    /// or further out than any band multiple it already announced, superseding the open proposal; a shrinking or
+    /// flickering drift stays quiet. A proposal the operator dismissed, deferred or accepted keeps its drift quiet
+    /// for the weekly cadence (finance-sentry#1266).
     /// </summary>
     Task GenerateRebalanceProposalAlertAsync(
         Guid userId,
@@ -376,8 +383,9 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing. That ends the
-    /// drift episode: a recurrence afterwards notifies at once, not after the weekly cadence.
+    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing, and marks an accepted
+    /// one as cleared too. That ends the drift episode: a recurrence afterwards notifies at once. A dismissed
+    /// proposal is not touched, so its drift stays quiet for the weekly cadence even across a clear.
     /// </summary>
     Task ResolveRebalanceProposalAlertAsync(
         Guid userId,

@@ -26,13 +26,12 @@ public interface IAlertRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// <see cref="HasRecentAsync"/> that skips alerts the system itself resolved (the raising condition
-    /// cleared, or a newer alert superseded it) — those ended their episode, so they no longer silence a
-    /// recurrence. An alert the user dismissed, accepted or deferred still counts (finance-sentry#1266).
+    /// Every alert of <paramref name="type"/> on <paramref name="referenceId"/> for the user, whatever its state
+    /// (open, dismissed, accepted, resolved). Read-only: the generator works out a drift episode from these rows
+    /// (finance-sentry#1266).
     /// </summary>
-    Task<bool> HasRecentUnclearedAsync(
-        Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
-        CancellationToken ct = default);
+    Task<IReadOnlyList<Alert>> GetByReferenceAsync(
+        Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
 
     Task<bool> MarkReadAsync(Guid userId, Guid alertId, CancellationToken ct = default);
 
@@ -41,6 +40,19 @@ public interface IAlertRepository
     Task<bool> DismissAsync(Guid userId, Guid alertId, CancellationToken ct = default);
 
     Task ResolveAsync(Guid alertId, CancellationToken ct = default);
+
+    /// <summary>
+    /// <see cref="ResolveAsync(Guid, CancellationToken)"/> stamped with the instant the caller also gives the alert
+    /// that supersedes it, so the pair can be told apart from a resolve that ended the condition.
+    /// </summary>
+    Task ResolveAtAsync(Guid alertId, DateTimeOffset resolvedAt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Re-stamps <c>ResolvedAt</c> to now on the user's accepted alerts of the type on the reference that still carry
+    /// the instant of their acceptance, so a resolve later than the acceptance reads as "the condition cleared".
+    /// Alerts already re-stamped are left alone.
+    /// </summary>
+    Task MarkAcceptedClearedAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
 
     /// <summary>
     /// A suppressed repeat of an open alert (finance-sentry#419 S5): increments <c>OccurrenceCount</c>
