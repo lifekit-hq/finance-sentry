@@ -492,6 +492,44 @@ public sealed class CoverageEvaluatorTests
     }
 
     [Fact]
+    public async Task ARemovedLedgerNominee_DoesNotFlap_OnAvoidAvoidWaitCycles_ButAFreshNominationReAdds()
+    {
+        var h = new CoverageHarness();
+        var old = await h.CandidateAsync("MU", CandidateSource.Ledger, decisionNote: "Nominated.");
+
+        async Task RunDayAsync(int day, string verdict)
+        {
+            h.Verdicts.Verdicts["MU"] = verdict;
+            await h.RunAsync(Day1.AddDays(day));
+        }
+
+        await RunDayAsync(0, "Wait");
+        (await h.TickersAsync()).Should().Equal("MU");
+
+        await RunDayAsync(1, "Avoid");
+        await RunDayAsync(2, "Avoid");
+        (await h.TickersAsync()).Should().BeEmpty();
+
+        await RunDayAsync(3, "Wait");
+        await RunDayAsync(4, "Avoid");
+        await RunDayAsync(5, "Avoid");
+        await RunDayAsync(6, "Wait");
+        (await h.TickersAsync()).Should().BeEmpty("the nomination predates the removal");
+        (await h.JournalAsync()).Select(e => e.Action).Should().Equal(CoverageAction.Added, CoverageAction.Removed);
+
+        h.Db.Attach(old).Entity.Status = CandidateStatus.Expired;
+        await h.Db.SaveChangesAsync();
+        await h.CandidateAsync("MU", CandidateSource.Ledger, decisionNote: "Nominated again.", createdAt: Day1.AddDays(6.5));
+        await RunDayAsync(7, "Wait");
+
+        (await h.TickersAsync()).Should().Equal("MU");
+        (await h.JournalAsync()).Select(e => (e.Action, e.Rule)).Should().Equal(
+            (CoverageAction.Added, CoverageRuleIds.LedgerNomination),
+            (CoverageAction.Removed, CoverageRuleIds.AvoidTwice),
+            (CoverageAction.Added, CoverageRuleIds.LedgerNomination));
+    }
+
+    [Fact]
     public async Task AFailedSave_LeavesNothingTrackedForTheNextUsersSave()
     {
         var h = new CoverageHarness();

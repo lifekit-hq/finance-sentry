@@ -81,6 +81,7 @@ public sealed class CoverageExplainer(
         var active = facts.ActiveCandidate;
         var buyDays = CoverageRules.BuyDaysInWindow(facts, _options, asOf);
         var nominated = active is { Source: CandidateSource.Ledger };
+        var nominationStands = active is not null && CoverageRules.NominationStands(facts, active);
 
         return
         [
@@ -89,9 +90,10 @@ public sealed class CoverageExplainer(
             new(CoverageRuleIds.Watchlist, "The ticker is on the watchlist: always covered.", true, facts.Watchlisted,
                 facts.Watchlisted ? "On the watchlist." : "Not on the watchlist."),
             new(CoverageRuleIds.LedgerNomination, "Ledger nominated the name with a decision note.", true,
-                nominated && active!.HasNominationNote,
+                nominationStands,
                 active is null ? "No Active candidate."
                     : !nominated ? $"The Active candidate is a {active.Source} candidate, not a Ledger nomination."
+                    : active.HasNominationNote && !nominationStands ? string.Create(CultureInfo.InvariantCulture, $"The Ledger nomination predates the name's removal ({facts.LastRemovedAt:yyyy-MM-dd}); it rejoins only on a fresh nomination.")
                     : active.HasNominationNote ? "An Active Ledger candidate with a decision note."
                     : "An Active Ledger candidate, but its creation carries no decision note."),
             new(CoverageRuleIds.BuyTwice,

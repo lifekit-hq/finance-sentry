@@ -127,6 +127,17 @@ public sealed class CoverageRulesTests
     }
 
     [Fact]
+    public void ALedgerNomination_CreatedBeforeTheLastRemoval_DoesNotAdd_ButAFreshOneDoes()
+    {
+        var stale = Facts(candidates: [Candidate(CandidateSource.Ledger, note: true)]) with { LastRemovedAt = AsOf.AddDays(-2) };
+        var fresh = Facts(candidates: [Candidate(CandidateSource.Ledger, note: true) with { CreatedAt = AsOf.AddDays(-1) }])
+            with { LastRemovedAt = AsOf.AddDays(-2) };
+
+        CoverageRules.EvaluateAdd(stale, Options, AsOf).Should().BeNull();
+        CoverageRules.EvaluateAdd(fresh, Options, AsOf)!.Rule.Should().Be(CoverageRuleIds.LedgerNomination);
+    }
+
+    [Fact]
     public void ANominationWithoutANote_OrFromTheScan_IsNotANominationRule()
     {
         CoverageRules.EvaluateAdd(Facts(candidates: [Candidate(CandidateSource.Ledger)]), Options, AsOf).Should().BeNull();

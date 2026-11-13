@@ -25,6 +25,8 @@ Remove (never for a held, watchlisted or thesis-carrying name):
 
 - `avoid_twice` - the two latest readings are Avoid. `candidate_expired` - the name's candidates are all expired. `no_event` - 60 days since the later of its last event and when it joined, and no dated catalyst (thesis catalyst or earnings date within 60 days). A failed earnings lookup never counts as "no catalyst".
 
+A removed name rejoins by a ranked rule only on evidence created after its last journalled removal: Buy readings on later days, or a Ledger nomination whose candidate was created after the removal. Held and watchlist adds need no cutoff (current state, protected from every remove rule).
+
 ## Cap and rank
 
 `Coverage:MaxMembers` (30 at launch in `appsettings.json`, 100 by default). Existing members are never displaced. Ranked adds fill the free slots in `rank` order: the mean of the scorecard's structure and fundamentals scores less the rule-D1 correlation penalty (`CorrelationFact`, the same one the opportunity add rule uses), so a name that moves with the owner's DRAM/SOXX concentration ranks down. Pinned adds are not capped; a pinned add over the cap is journaled as such, and a ranked add that does not fit is simply retried the next night.

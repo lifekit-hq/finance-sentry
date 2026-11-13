@@ -54,7 +54,7 @@ public static class CoverageRules
             return null;
         }
 
-        if (active.Source == CandidateSource.Ledger && active.HasNominationNote)
+        if (NominationStands(facts, active))
         {
             return new CoverageAddDecision(
                 CoverageRuleIds.LedgerNomination, CoverageReason.Ledger, false,
@@ -72,6 +72,18 @@ public static class CoverageRules
 
         return null;
     }
+
+    /// <summary>
+    /// The removal cutoff of every ranked add rule: a name removed at <see cref="CoverageTickerFacts.LastRemovedAt"/>
+    /// rejoins only on evidence created after that removal. A nomination is a candidate created at one moment, so it
+    /// stands only when that candidate postdates the removal; Buy readings are cut off the same way in
+    /// <see cref="BuyDaysInWindow"/>. The held and watchlist rules need no cutoff: they read current state and
+    /// protect the name from every remove rule, so no removal can have overruled them.
+    /// </summary>
+    public static bool NominationStands(CoverageTickerFacts facts, CoverageCandidateFacts active)
+        => active.Source == CandidateSource.Ledger
+            && active.HasNominationNote
+            && (facts.LastRemovedAt is not { } removedAt || active.CreatedAt > removedAt);
 
     /// <summary>
     /// Distinct days inside the window on which the verdict read Buy or StrongBuy, counting only readings after the
