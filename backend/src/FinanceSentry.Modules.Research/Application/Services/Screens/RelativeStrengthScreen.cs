@@ -30,14 +30,14 @@ public sealed class RelativeStrengthScreen(
         var settings = options.Value.RelativeStrength;
         var referenced = (await universe.TickersAsync(ct)).ToHashSet(StringComparer.Ordinal);
         var pool = (await structure.GetUniverseStructuresAsync(ct))
-            .Where(e => ReferenceListKeys.NormalizeTicker(e.Ticker) is { } ticker && referenced.Contains(ticker))
+            .Where(e => ReferenceListKeys.NormalizeTicker(e.Ticker) is { } ticker && referenced.Contains(ticker) && !e.IsEtfLens && !e.Snapshot.Stale)
             .ToList();
         if (pool.Count < settings.MinPoolSize)
         {
             return new ScreenRun(
                 Tag, [], pool.Count,
                 string.Create(CultureInfo.InvariantCulture,
-                    $"pool too small: {pool.Count} reference-list names have bars, the screen needs {settings.MinPoolSize}"));
+                    $"pool too small: {pool.Count} fresh reference-list names have bars, the screen needs {settings.MinPoolSize}"));
         }
 
         var hits = ScanNominationRules.Evaluate(pool, opportunity.Value)
@@ -46,7 +46,7 @@ public sealed class RelativeStrengthScreen(
                 n.Ticker.Trim().ToUpperInvariant(),
                 n.Reasons,
                 string.Create(CultureInfo.InvariantCulture,
-                    $"Relative strength percentile {n.RsPercentile?.ToString("0", CultureInfo.InvariantCulture) ?? "n/a"} among {pool.Count} reference-list names with bars ({string.Join("; ", n.Reasons)})."),
+                    $"Relative strength percentile {n.RsPercentile?.ToString("0", CultureInfo.InvariantCulture) ?? "n/a"} among {pool.Count} fresh reference-list names with bars ({string.Join("; ", n.Reasons)})."),
                 // Bars change every day, so the data has no evidence date of its own: the run time stands for it, and
                 // after a coverage removal the cooldown is what holds the name back.
                 asOf))

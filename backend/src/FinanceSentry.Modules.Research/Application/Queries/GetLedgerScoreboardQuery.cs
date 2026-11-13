@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.Screens;
 using Microsoft.Extensions.Options;
 
 public sealed record GetLedgerScoreboardQuery(Guid UserId, DateTimeOffset AsOf) : IQuery<LedgerScoreboardDto>;
@@ -173,7 +174,7 @@ public sealed class GetLedgerScoreboardQueryHandler(
 
     /// <summary>
     /// The nominating screen's tag where the candidate carries one: a <c>Screen</c> add is traced to the newest candidate
-    /// for the ticker created by the add (else the earliest), and its first nomination reason names the screen.
+    /// for the ticker created by the add (else the earliest), and its first screen-tag nomination reason names the screen (else its first reason).
     /// </summary>
     private static string? ScreenTag(string ticker, CoverageReason reason, DateTimeOffset at, IReadOnlyList<OpportunityCandidate> picks)
     {
@@ -186,7 +187,9 @@ public sealed class GetLedgerScoreboardQueryHandler(
             .Where(c => string.Equals(c.Ticker, ticker, StringComparison.OrdinalIgnoreCase) && c.NominationReasons.Count > 0)
             .ToList();
         var candidate = forTicker.Where(c => c.CreatedAt <= at).MaxBy(c => c.CreatedAt) ?? forTicker.MinBy(c => c.CreatedAt);
-        return candidate?.NominationReasons[0];
+        return candidate is null
+            ? null
+            : candidate.NominationReasons.FirstOrDefault(ScreenTags.IsScreenTag) ?? candidate.NominationReasons[0];
     }
 
     /// <summary>

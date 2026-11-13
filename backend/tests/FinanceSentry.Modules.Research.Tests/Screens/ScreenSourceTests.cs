@@ -188,7 +188,7 @@ public sealed class ScreenSourceTests
         run.Hits[0].Tag.Should().Be(ScreenTags.RelativeStrength);
         run.Hits[0].Reasons.Should().Equal(ScreenTags.RelativeStrength, ScanNominationRules.TopDecileRsReason);
         run.Hits[0].EvidenceAt.Should().Be(AsOf);
-        run.Hits[0].Detail.Should().Contain("percentile 100").And.Contain("10 reference-list names");
+        run.Hits[0].Detail.Should().Contain("percentile 100").And.Contain("10 fresh reference-list names");
     }
 
     [Fact]
@@ -215,6 +215,26 @@ public sealed class ScreenSourceTests
 
         run.Hits.Should().BeEmpty();
         run.Note.Should().Contain("pool too small").And.Contain("3").And.Contain("20");
+    }
+
+    [Fact]
+    public async Task RelativeStrength_StaleAndEtfLensEntries_DoNotCountTowardThePool()
+    {
+        var options = new ScreenOptions();
+        options.RelativeStrength.MinPoolSize = 20;
+        var reference = Enumerable.Range(1, 20).Select(i => $"R{i:00}").ToArray();
+        var bars = reference.Select((t, i) =>
+        {
+            var entry = Strength(t, 0.01m * (i + 1));
+            return i < 5 ? entry : entry with { Snapshot = entry.Snapshot with { Stale = true } };
+        }).ToList();
+        bars[0] = bars[0] with { IsEtfLens = true };
+
+        var run = await RsFor(options, reference, bars).RunAsync(AsOf);
+
+        run.Hits.Should().BeEmpty();
+        run.Examined.Should().Be(4);
+        run.Note.Should().Contain("pool too small").And.Contain("4").And.Contain("20");
     }
 
     // ── dated catalyst ────────────────────────────────────────────────────────

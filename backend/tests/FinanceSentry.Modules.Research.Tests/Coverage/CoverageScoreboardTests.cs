@@ -121,6 +121,28 @@ public sealed class CoverageScoreboardTests
         b.Horizons.Single(h => h.HorizonDays == 30).Overall.Status.Should().Be("Graded");
     }
 
+    [Theory]
+    [InlineData(CandidateSource.Scan, "scan: top-decile RS", "screen: dated catalyst", "screen: dated catalyst")]
+    [InlineData(CandidateSource.User, "conviction", "screen: fundamentals", "screen: fundamentals")]
+    [InlineData(CandidateSource.Scan, "screen: relative strength", "scan: top-decile RS", "screen: relative strength")]
+    [InlineData(CandidateSource.Scan, "scan: top-decile RS", "scan: 63d-high breakout", "scan: top-decile RS")]
+    public async Task A_screen_add_is_attributed_to_the_first_screen_tag_whatever_its_position(
+        CandidateSource source, string first, string second, string expected)
+    {
+        Add("AAA", Day0, CoverageReason.Screen);
+        Series("AAA", Day0, 120, 100m, 140m);
+        Series("SPY", Day0, 120, 400m, 400m);
+        _candidates.Candidates.Add(new OpportunityCandidate
+        {
+            UserId = User, Ticker = "AAA", Source = source, CreatedAt = Day0.AddDays(-2),
+            NominationReasons = [first, second],
+        });
+
+        var bySource = Headline(await Block(Day0.AddDays(100))).BySource;
+
+        bySource.Single(s => s.Source == "Screen").ScreenTag.Should().Be(expected);
+    }
+
     [Fact]
     public async Task Sources_are_attributed_by_add_reason_and_screen_tag()
     {
