@@ -2,6 +2,7 @@ namespace FinanceSentry.Core.Utils;
 
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using FinanceSentry.Core.Interfaces;
 
 /// <summary>
@@ -12,7 +13,7 @@ using FinanceSentry.Core.Interfaces;
 /// references without a schema change. Values never contain whitespace, <c>[</c>, <c>]</c> or <c>|</c> (<see cref="Clean"/>),
 /// so the tail parses unambiguously.
 /// </summary>
-public static class ReviewDueMessage
+public static partial class ReviewDueMessage
 {
     /// <summary>The alert message column (<c>Alert.Message</c>) holds this many characters.</summary>
     public const int MaxMessageLength = 1000;
@@ -167,15 +168,25 @@ public static class ReviewDueMessage
     /// Fits the falsifiers into <paramref name="budget"/> characters (joined with the separator) without dropping any silently:
     /// as many as fit are kept in order, the first that does not is cut with an ellipsis into the room left, and when anything
     /// was cut or omitted a final <c>+N_more,full_list_on_thesis:&lt;id&gt;</c> item says so (N counts those omitted entirely).
+    /// A marker already closing the list (a re-fit of a parsed message) is never cut: its N carries into the new one.
     /// </summary>
     private static List<string> FitFalsifiers(List<string> falsifiers, Guid thesisId, int budget)
     {
-        if (falsifiers.Sum(f => f.Length) + falsifiers.Count - 1 <= budget)
+        var carried = 0;
+        var marked = false;
+        if (falsifiers.Count > 0 && OmittedMarker().Match(falsifiers[^1]) is { Success: true } existing)
+        {
+            carried = int.Parse(existing.Groups[1].Value, CultureInfo.InvariantCulture);
+            marked = true;
+            falsifiers = falsifiers[..^1];
+        }
+
+        if (!marked && falsifiers.Sum(f => f.Length) + falsifiers.Count - 1 <= budget)
         {
             return falsifiers;
         }
 
-        var room = budget - (TruncationMarker(falsifiers.Count, thesisId).Length + 1);
+        var room = budget - (TruncationMarker(falsifiers.Count + carried, thesisId).Length + 1);
         var kept = new List<string>();
         var used = 0;
         foreach (var item in falsifiers)
@@ -197,9 +208,12 @@ public static class ReviewDueMessage
             break;
         }
 
-        kept.Add(TruncationMarker(falsifiers.Count - kept.Count, thesisId));
+        kept.Add(TruncationMarker(falsifiers.Count - kept.Count + carried, thesisId));
         return kept;
     }
+
+    [GeneratedRegex(@"^\+(\d+)_more,full_list_on_thesis:", RegexOptions.CultureInvariant)]
+    private static partial Regex OmittedMarker();
 
     private static string TruncationMarker(int omitted, Guid thesisId)
         => string.Create(CultureInfo.InvariantCulture, $"+{omitted}_more,full_list_on_thesis:{thesisId:D}");

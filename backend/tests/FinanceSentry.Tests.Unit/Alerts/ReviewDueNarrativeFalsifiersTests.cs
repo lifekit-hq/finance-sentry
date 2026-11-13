@@ -189,4 +189,34 @@ public sealed class ReviewDueNarrativeFalsifiersTests
         ReviewDueMessage.TryParse(message, out var parsed).Should().BeTrue();
         parsed.NarrativeFalsifiers.Should().Equal(entries);
     }
+
+    [Fact]
+    public void A_composed_then_parsed_then_summarised_list_reports_the_real_omitted_count()
+    {
+        var entries = Entries(20, 100);
+
+        var message = ReviewDueMessage.Compose(Review(entries));
+        ReviewDueMessage.TryParse(message, out var parsed).Should().BeTrue();
+        var summary = ReviewDueMessage.Summarize(parsed, SummaryCap);
+
+        var shown = SummaryFalsifiers(summary);
+        summary.Length.Should().BeLessThanOrEqualTo(SummaryCap);
+        shown.Take(2).Should().Equal(entries.Take(2));
+        shown.Count(f => f.Contains("_more,", StringComparison.Ordinal)).Should().Be(1, "the earlier marker is merged, not repeated or cut");
+        AssertMarker(shown, 20);
+    }
+
+    [Fact]
+    public void A_carried_marker_survives_a_summary_budget_that_would_otherwise_fit_the_rest()
+    {
+        var entries = Entries(20, 100);
+        ReviewDueMessage.TryParse(ReviewDueMessage.Compose(Review(entries)), out var parsed).Should().BeTrue();
+        var composedShown = parsed.NarrativeFalsifiers!;
+
+        var summary = ReviewDueMessage.Summarize(Review(composedShown.Take(2).Append(composedShown[^1]).ToList()), 1000);
+
+        var shown = SummaryFalsifiers(summary);
+        shown.Take(2).Should().Equal(entries.Take(2));
+        AssertMarker(shown, 2 + int.Parse(Regex.Match(composedShown[^1], @"^\+(\d+)_").Groups[1].Value));
+    }
 }
