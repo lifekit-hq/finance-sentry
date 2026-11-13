@@ -57,6 +57,7 @@ public sealed class PromoteCandidateCommandHandler(
     private const string PromotionThesisText = "Promoted from opportunity candidate.";
     private const string ScorecardSource = "candidate_scorecard";
     private const string ObservedDirection = "observed";
+    private const int MaxThesisTextLength = 4000;
 
     private readonly OpportunityOptions _options = options.Value;
 
@@ -153,7 +154,8 @@ public sealed class PromoteCandidateCommandHandler(
             parts.Add($"Decision note: {decisionNote.Trim()}");
         }
 
-        return string.Join(" ", parts);
+        var text = string.Join(" ", parts);
+        return text.Length <= MaxThesisTextLength ? text : text[..MaxThesisTextLength];
     }
 
     private static List<ThesisDataPoint> BuildKeyDataPoints(CandidateScore? latest)

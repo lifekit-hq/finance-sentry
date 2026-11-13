@@ -99,6 +99,27 @@ public sealed class PromoteRejectExpireHandlerTests
     }
 
     [Fact]
+    public async Task Promote_LongDecisionNote_KeepsCarriedThesisTextWithinColumnCap()
+    {
+        const int thesisTextColumnCap = 4000;
+        var candidates = new FakeCandidateRepository();
+        var scores = new FakeCandidateScoreRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        SeedScore(scores, candidate.Id);
+        var save = new RecordingSaveThesisHandler();
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
+        var handler = BuildPromote(candidates, scores, allowed, save, new RecordingRadarSignalWriter());
+
+        await handler.Handle(
+            new PromoteCandidateCommand(userId, candidate.Id, DecisionNote: new string('n', 3950)),
+            CancellationToken.None);
+
+        save.LastCommand!.ThesisText.Length.Should().BeLessThanOrEqualTo(thesisTextColumnCap);
+        save.LastCommand.ThesisText.Should().Contain("structure 72");
+    }
+
+    [Fact]
     public async Task Promote_ExplicitOverrides_WinOverCarriedText()
     {
         var candidates = new FakeCandidateRepository();
