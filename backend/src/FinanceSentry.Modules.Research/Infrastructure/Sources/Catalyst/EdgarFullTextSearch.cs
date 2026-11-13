@@ -28,18 +28,20 @@ public sealed partial class EdgarFullTextSearch(
         string item, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         var size = Math.Clamp(_options.FullTextPageSize, 1, 100);
+        var maxPages = Math.Max(1, _options.FullTextMaxPagesPerItem);
         var found = new List<CatalystFiling>();
-        for (var page = 0; page < Math.Max(1, _options.FullTextMaxPagesPerItem); page++)
+        for (var page = 0; page < maxPages; page++)
         {
             var (hits, total) = await ReadPageAsync(item, from, to, page * size, size, ct);
             found.AddRange(hits.SelectMany(h => h));
             if (hits.Count < size || (page + 1) * size >= total)
             {
-                break;
+                return found;
             }
         }
 
-        return found;
+        throw new CatalystFeedException(
+            $"EDGAR full-text search for item {item} holds more than the {maxPages * size} hits one run reads (Catalyst:FullTextMaxPagesPerItem); a partial read is not a complete one.");
     }
 
     /// <summary>The filings of every hit in one response body (a hit naming several tickers yields one filing per ticker); the hit count and the reported total.</summary>

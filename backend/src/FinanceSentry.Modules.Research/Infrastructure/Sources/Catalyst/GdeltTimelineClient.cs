@@ -105,7 +105,15 @@ public sealed class GdeltTimelineClient(
                 days.Add(new GdeltDay(DateOnly.FromDateTime(at), (long)Math.Round(value.GetDouble()), total));
             }
 
-            return [.. days.GroupBy(d => d.Day).Select(g => g.Last()).OrderBy(d => d.Day)];
+            return
+            [
+                .. days.GroupBy(d => d.Day)
+                    .Select(g => new GdeltDay(
+                        g.Key,
+                        g.Sum(d => d.Articles),
+                        g.Any(d => d.TotalArticles is not null) ? g.Sum(d => d.TotalArticles ?? 0) : null))
+                    .OrderBy(d => d.Day),
+            ];
         }
     }
 }

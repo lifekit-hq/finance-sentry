@@ -72,15 +72,18 @@ public sealed class CatalystFeedTests
     }
 
     [Fact]
-    public async Task Search_PagesUntilAShortPage_AndStopsAtThePageBound()
+    public async Task Search_PagesToTheReportedTotal_AndRefusesToCallATruncatedReadComplete()
     {
         var options = new CatalystOptions { FullTextPageSize = 2, FullTextMaxPagesPerItem = 3 };
         var http = new ScriptedHttp(_ => (HttpStatusCode.OK, Page(100, NvidiaHit, NvidiaHit)));
 
-        var found = await Search(http, options).SearchAsync("2.02", From, To);
+        var truncated = () => Search(http, options).SearchAsync("2.02", From, To);
 
+        await truncated.Should().ThrowAsync<CatalystFeedException>().WithMessage("*more than the 6 hits*");
         http.Requested.Should().HaveCount(3, "the page bound caps one run's request count");
-        found.Should().HaveCount(6);
+
+        var exact = new ScriptedHttp(_ => (HttpStatusCode.OK, Page(6, NvidiaHit, NvidiaHit)));
+        (await Search(exact, options).SearchAsync("2.02", From, To)).Should().HaveCount(6, "a total that fits the bound is a complete read");
 
         var shortPage = new ScriptedHttp(_ => (HttpStatusCode.OK, Page(3, NvidiaHit)));
         await Search(shortPage, options).SearchAsync("2.02", From, To);
@@ -102,7 +105,7 @@ public sealed class CatalystFeedTests
     {
         var options = new CatalystOptions { FullTextPageSize = 1, FullTextMaxPagesPerItem = 6 };
         var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
-        var http = new ScriptedHttp(_ => (HttpStatusCode.OK, Page(100, NvidiaHit)));
+        var http = new ScriptedHttp(_ => (HttpStatusCode.OK, Page(6, NvidiaHit)));
 
         await Search(http, options, clock).SearchAsync("2.02", From, To);
 
@@ -123,6 +126,20 @@ public sealed class CatalystFeedTests
         days.Should().Equal(
             new GdeltDay(new DateOnly(2026, 11, 11), 40, 90000),
             new GdeltDay(new DateOnly(2026, 11, 12), 55, 91000));
+    }
+
+    [Fact]
+    public void GdeltParse_SumsSubDailyBucketsIntoOneCountPerUtcDay()
+    {
+        const string body = """
+            {"timeline":[{"series":"Article Count","data":[
+             {"date":"20261111T000000Z","value":10,"norm":1000},{"date":"20261111T120000Z","value":15,"norm":1500},
+             {"date":"20261112T000000Z","value":5,"norm":900}]}]}
+            """;
+
+        GdeltTimelineClient.Parse(body, "HBM memory").Should().Equal(
+            new GdeltDay(new DateOnly(2026, 11, 11), 25, 2500),
+            new GdeltDay(new DateOnly(2026, 11, 12), 5, 900));
     }
 
     [Fact]
