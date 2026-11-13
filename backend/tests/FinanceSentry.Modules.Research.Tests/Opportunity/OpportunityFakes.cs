@@ -228,11 +228,23 @@ internal sealed class RecordingThesisEventRecorder : IThesisEventRecorder
 {
     public List<ThesisEventType> Events { get; } = [];
 
+    public List<(ThesisSubjectType SubjectType, ThesisEventType EventType, ThesisEventOrigin Origin, ThesisAudit? Audit)> Audited { get; } = [];
+
     public Task RecordAsync(
         Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
         ThesisEventType eventType, string? decisionNote = null, CancellationToken ct = default)
     {
         Events.Add(eventType);
+        return Task.CompletedTask;
+    }
+
+    public Task RecordAuditedAsync(
+        Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
+        ThesisEventType eventType, ThesisEventOrigin origin, ThesisAudit? audit,
+        string? decisionNote = null, CancellationToken ct = default)
+    {
+        Events.Add(eventType);
+        Audited.Add((subjectType, eventType, origin, audit));
         return Task.CompletedTask;
     }
 }

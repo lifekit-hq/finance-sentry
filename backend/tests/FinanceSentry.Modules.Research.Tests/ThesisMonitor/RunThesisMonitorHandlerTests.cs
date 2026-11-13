@@ -789,6 +789,18 @@ public class RunThesisMonitorHandlerTests
             string? decisionNote = null,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task RecordAuditedAsync(
+            Guid userId,
+            ThesisSubjectType subjectType,
+            Guid subjectId,
+            string ticker,
+            ThesisEventType eventType,
+            ThesisEventOrigin origin,
+            ThesisAudit? audit,
+            string? decisionNote = null,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     private sealed class FakeAlertGeneratorService : IAlertGeneratorService

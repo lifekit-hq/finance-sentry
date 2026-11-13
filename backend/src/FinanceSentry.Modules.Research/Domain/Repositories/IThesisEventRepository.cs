@@ -29,4 +29,18 @@ public interface IThesisEventRepository
 
     /// <summary>Stamps backfilled prices on the event. The snapshot job writes with no person in scope, so the lookup opts out of the Owner query filter.</summary>
     Task UpdatePricesAsync(ThesisEvent thesisEvent, CancellationToken ct = default);
+
+    /// <summary>One event of the user by id, or null.</summary>
+    Task<ThesisEvent?> FindAsync(Guid userId, Guid eventId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The origin of each subject's latest origin-setting event (<paramref name="eventTypes"/>), for the reads that show
+    /// who made the last change. A subject with no such event is absent (read as <see cref="ThesisEventOrigin.User"/>).
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, ThesisEventOrigin>> GetLatestOriginsAsync(
+        Guid userId,
+        ThesisSubjectType subjectType,
+        IReadOnlyCollection<Guid> subjectIds,
+        IReadOnlyCollection<ThesisEventType> eventTypes,
+        CancellationToken ct = default);
 }

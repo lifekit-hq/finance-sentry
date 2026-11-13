@@ -249,6 +249,80 @@ public sealed class PromoteRejectExpireHandlerTests
     }
 
     [Fact]
+    public async Task Promote_ByLedger_StampsLedgerOnThesisAndPromotionEvent_WithEvidence()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        var save = new RecordingSaveThesisHandler();
+        var events = new RecordingThesisEventRecorder();
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
+        var handler = new PromoteCandidateCommandHandler(
+            candidates, new FakeCandidateScoreRepository(), new FakeRiskPolicyGate(allowed),
+            new RecordingRadarSignalWriter(), events, save, Options.Create(new OpportunityOptions()));
+        var evidence = new ThesisEvidenceRefs(FilingAccessions: ["0000789019-26-000012"], FundamentalsAsOf: "2026-09-30");
+
+        await handler.Handle(
+            new PromoteCandidateCommand(
+                userId, candidate.Id, DecisionNote: "Cloud margin inflecting",
+                Origin: ThesisEventOrigin.Ledger, Evidence: evidence),
+            CancellationToken.None);
+
+        save.LastCommand!.Origin.Should().Be(ThesisEventOrigin.Ledger);
+        save.LastCommand.Rationale.Should().Be("Cloud margin inflecting");
+        save.LastCommand.Evidence.Should().Be(evidence);
+        var promoted = events.Audited.Should().ContainSingle(e => e.EventType == ThesisEventType.Promoted).Subject;
+        promoted.Origin.Should().Be(ThesisEventOrigin.Ledger);
+        promoted.SubjectType.Should().Be(ThesisSubjectType.Candidate);
+        promoted.Audit!.Rationale.Should().Be("Cloud margin inflecting");
+        promoted.Audit.Evidence.Should().Be(evidence);
+    }
+
+    [Fact]
+    public async Task Promote_ByLedger_RefusedByRiskGate_StillCreatesNoThesisAndNoEvent()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        var refused = new RiskGateVerdict(RiskGateDecision.Refused, "max_position_weight", 0.4m, 0.25m, 5_000m, "too big");
+        var save = new RecordingSaveThesisHandler();
+        var events = new RecordingThesisEventRecorder();
+        var handler = new PromoteCandidateCommandHandler(
+            candidates, new FakeCandidateScoreRepository(), new FakeRiskPolicyGate(refused),
+            new RecordingRadarSignalWriter(), events, save, Options.Create(new OpportunityOptions()));
+
+        var result = await handler.Handle(
+            new PromoteCandidateCommand(userId, candidate.Id, ProposedUsd: 9_000m, Origin: ThesisEventOrigin.Ledger),
+            CancellationToken.None);
+
+        result.ThesisId.Should().BeNull();
+        result.Gate.Decision.Should().Be(RiskGateDecision.Refused);
+        result.Gate.RuleKey.Should().Be("max_position_weight");
+        save.Calls.Should().Be(0);
+        events.Events.Should().BeEmpty();
+        candidate.Status.Should().Be(CandidateStatus.Active);
+    }
+
+    [Fact]
+    public async Task Reject_ByLedger_RecordsLedgerOriginAndReasonInTheAudit()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        var events = new RecordingThesisEventRecorder();
+        var handler = new RejectCandidateCommandHandler(candidates, events);
+
+        await handler.Handle(
+            new RejectCandidateCommand(userId, candidate.Id, "valuation too rich", ThesisEventOrigin.Ledger),
+            CancellationToken.None);
+
+        var rejected = events.Audited.Should().ContainSingle(e => e.EventType == ThesisEventType.Rejected).Subject;
+        rejected.Origin.Should().Be(ThesisEventOrigin.Ledger);
+        rejected.Audit!.Rationale.Should().Be("valuation too rich");
+        candidate.Status.Should().Be(CandidateStatus.Rejected);
+    }
+
+    [Fact]
     public async Task Expire_MarksExpired_AndAppendsFinalScoreSnapshot()
     {
         var candidates = new FakeCandidateRepository();

@@ -94,4 +94,32 @@ public class ThesisEventRepository(ResearchDbContext db) : IThesisEventRepositor
 
         await db.SaveChangesAsync(ct);
     }
+
+    public Task<ThesisEvent?> FindAsync(Guid userId, Guid eventId, CancellationToken ct = default)
+        => db.ThesisEvents.AsNoTracking().FirstOrDefaultAsync(e => e.UserId == userId && e.Id == eventId, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, ThesisEventOrigin>> GetLatestOriginsAsync(
+        Guid userId,
+        ThesisSubjectType subjectType,
+        IReadOnlyCollection<Guid> subjectIds,
+        IReadOnlyCollection<ThesisEventType> eventTypes,
+        CancellationToken ct = default)
+    {
+        if (subjectIds.Count == 0)
+        {
+            return new Dictionary<Guid, ThesisEventOrigin>();
+        }
+
+        var events = await db.ThesisEvents.AsNoTracking()
+            .Where(e => e.UserId == userId
+                && e.SubjectType == subjectType
+                && subjectIds.Contains(e.SubjectId)
+                && eventTypes.Contains(e.EventType))
+            .Select(e => new { e.SubjectId, e.Origin, e.Timestamp })
+            .ToListAsync(ct);
+
+        return events
+            .GroupBy(e => e.SubjectId)
+            .ToDictionary(g => g.Key, g => g.MaxBy(e => e.Timestamp)!.Origin);
+    }
 }

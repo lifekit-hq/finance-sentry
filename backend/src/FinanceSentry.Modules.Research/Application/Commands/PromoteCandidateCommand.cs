@@ -30,7 +30,9 @@ public record PromoteCandidateCommand(
     bool OverrideRisk = false,
     decimal ProposedUsd = 0m,
     string? DecisionNote = null,
-    bool Paper = false) : ICommand<PromoteCandidateResult>;
+    bool Paper = false,
+    ThesisEventOrigin Origin = ThesisEventOrigin.User,
+    ThesisEvidenceRefs? Evidence = null) : ICommand<PromoteCandidateResult>;
 
 public sealed record PromoteCandidateResult(
     Guid? ThesisId,
@@ -100,16 +102,21 @@ public sealed class PromoteCandidateCommandHandler(
                 [],
                 InvalidationTriggers: triggers,
                 EntryPrice: null,
-                DecisionNote: command.DecisionNote),
+                DecisionNote: command.DecisionNote,
+                Origin: command.Origin,
+                Rationale: command.DecisionNote,
+                Evidence: command.Evidence),
             ct);
 
         candidate.PromotedThesisId = thesis.Id;
         candidate.Status = CandidateStatus.Promoted;
         await candidateRepo.UpdateAsync(candidate, ct);
 
-        await eventRecorder.RecordAsync(
+        await eventRecorder.RecordAuditedAsync(
             command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
-            ThesisEventType.Promoted, command.DecisionNote, ct);
+            ThesisEventType.Promoted, command.Origin,
+            new ThesisAudit(Prior: null, New: null, command.DecisionNote, command.Evidence),
+            command.DecisionNote, ct);
 
         return new PromoteCandidateResult(thesis.Id, gate, CandidateFound: true);
     }

@@ -9,6 +9,8 @@ public interface IWatchlistRepository
 
     Task<WatchlistItem?> FindAsync(Guid userId, string ticker, CancellationToken ct = default);
 
+    Task<WatchlistItem?> FindByIdAsync(Guid userId, Guid itemId, CancellationToken ct = default);
+
     Task AddAsync(WatchlistItem item, CancellationToken ct = default);
 
     Task<bool> RemoveAsync(Guid userId, Guid itemId, CancellationToken ct = default);

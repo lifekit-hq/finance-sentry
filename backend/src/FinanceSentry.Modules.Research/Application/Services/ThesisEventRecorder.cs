@@ -16,12 +16,25 @@ public class ThesisEventRecorder(
 {
     public const string DefaultBenchmarkTicker = "SPY";
 
-    public async Task RecordAsync(
+    public Task RecordAsync(
         Guid userId,
         ThesisSubjectType subjectType,
         Guid subjectId,
         string ticker,
         ThesisEventType eventType,
+        string? decisionNote = null,
+        CancellationToken ct = default)
+        => RecordAuditedAsync(
+            userId, subjectType, subjectId, ticker, eventType, ThesisEventOrigin.User, audit: null, decisionNote, ct);
+
+    public async Task RecordAuditedAsync(
+        Guid userId,
+        ThesisSubjectType subjectType,
+        Guid subjectId,
+        string ticker,
+        ThesisEventType eventType,
+        ThesisEventOrigin origin,
+        ThesisAudit? audit,
         string? decisionNote = null,
         CancellationToken ct = default)
     {
@@ -35,7 +48,10 @@ public class ThesisEventRecorder(
             }
         }
 
-        var (subjectPrice, benchmarkPrice, pricesPending) = await TryGetPricesAsync(ticker, ct);
+        var stamped = eventType is not (ThesisEventType.Revised or ThesisEventType.Reverted);
+        var (subjectPrice, benchmarkPrice, pricesPending) = stamped
+            ? await TryGetPricesAsync(ticker, ct)
+            : (null, null, false);
 
         var thesisEvent = new ThesisEvent
         {
@@ -50,6 +66,8 @@ public class ThesisEventRecorder(
             BenchmarkTicker = DefaultBenchmarkTicker,
             PricesPending = pricesPending,
             DecisionNote = decisionNote,
+            Origin = origin,
+            Audit = audit,
         };
 
         await repo.AppendAsync(thesisEvent, ct);

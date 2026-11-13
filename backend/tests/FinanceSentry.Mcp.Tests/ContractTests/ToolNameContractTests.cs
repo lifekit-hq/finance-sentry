@@ -80,6 +80,7 @@ public sealed class ToolNameContractTests
         "propose_recommendation",
         "decide_recommendation",
         "reject_candidate",
+        "revert_thesis_revision",
         "score_candidate",
         "save_ips",
         "save_risk_rules",

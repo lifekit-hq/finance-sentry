@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Tests.Persistence;
 
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,7 @@ public sealed class ThesisTextRoundTripTests
             var handler = new SaveThesisCommandHandler(
                 new ThesisRepository(writeCtx),
                 new RecordingThesisEventRecorder(),
+                new ThesisOriginReader(new InMemoryThesisEventRepository()),
                 NullLogger<SaveThesisCommandHandler>.Instance);
 
             await handler.Handle(

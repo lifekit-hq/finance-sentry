@@ -35,7 +35,7 @@ public class GetPostmortemPacketQueryHandler(
     {
         var periodEvents = (await eventRepo.ListForPeriodAsync(
                 query.UserId, query.PeriodStart, query.PeriodEnd, ct))
-            .Where(e => e.SubjectType != ThesisSubjectType.Recommendation)
+            .Where(e => e.SubjectType is ThesisSubjectType.Thesis or ThesisSubjectType.Candidate)
             .ToList();
 
         var terminal = periodEvents

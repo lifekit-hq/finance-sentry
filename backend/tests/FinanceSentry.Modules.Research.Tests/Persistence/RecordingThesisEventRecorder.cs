@@ -15,6 +15,9 @@ public sealed class RecordingThesisEventRecorder : IThesisEventRecorder
 {
     public List<(Guid SubjectId, ThesisEventType EventType, string? DecisionNote)> Recorded { get; } = [];
 
+    /// <summary>The audited writes with their origin and payload (each is also in <see cref="Recorded"/>).</summary>
+    public List<(Guid SubjectId, ThesisSubjectType SubjectType, ThesisEventType EventType, ThesisEventOrigin Origin, ThesisAudit? Audit)> Audited { get; } = [];
+
     /// <summary>Thrown on every call when set — the journal-is-down case.</summary>
     public Exception? FailWith { get; init; }
 
@@ -33,6 +36,27 @@ public sealed class RecordingThesisEventRecorder : IThesisEventRecorder
         }
 
         this.Recorded.Add((subjectId, eventType, decisionNote));
+        return Task.CompletedTask;
+    }
+
+    public Task RecordAuditedAsync(
+        Guid userId,
+        ThesisSubjectType subjectType,
+        Guid subjectId,
+        string ticker,
+        ThesisEventType eventType,
+        ThesisEventOrigin origin,
+        ThesisAudit? audit,
+        string? decisionNote = null,
+        CancellationToken ct = default)
+    {
+        if (this.FailWith is { } failure)
+        {
+            return Task.FromException(failure);
+        }
+
+        this.Recorded.Add((subjectId, eventType, decisionNote));
+        this.Audited.Add((subjectId, subjectType, eventType, origin, audit));
         return Task.CompletedTask;
     }
 }

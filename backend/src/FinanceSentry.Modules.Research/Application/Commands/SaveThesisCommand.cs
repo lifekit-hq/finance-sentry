@@ -18,11 +18,15 @@ public record SaveThesisCommand(
     IReadOnlyList<ThesisCatalyst> Catalysts,
     IReadOnlyList<ThesisInvalidationTrigger> InvalidationTriggers,
     decimal? EntryPrice = null,
-    string? DecisionNote = null) : ICommand<ThesisDto>;
+    string? DecisionNote = null,
+    ThesisEventOrigin Origin = ThesisEventOrigin.User,
+    string? Rationale = null,
+    ThesisEvidenceRefs? Evidence = null) : ICommand<ThesisDto>;
 
 public class SaveThesisCommandHandler(
     IThesisRepository repo,
     IThesisEventRecorder eventRecorder,
+    ThesisOriginReader originReader,
     ILogger<SaveThesisCommandHandler> logger)
     : ICommandHandler<SaveThesisCommand, ThesisDto>
 {
@@ -32,12 +36,14 @@ public class SaveThesisCommandHandler(
 
         InvestmentThesis thesis;
         var isNewThesis = cmd.Id is null;
+        ThesisVersion? prior = null;
 
         if (cmd.Id is { } id)
         {
             var existing = await repo.FindAsync(cmd.UserId, id, ct)
                 ?? throw new ThesisNotFoundException();
             thesis = existing;
+            prior = ThesisVersion.Of(existing);
         }
         else
         {
@@ -51,17 +57,53 @@ public class SaveThesisCommandHandler(
         thesis.Catalysts = cmd.Catalysts.ToList();
         thesis.InvalidationTriggers = cmd.InvalidationTriggers.ToList();
 
+        var current = ThesisVersion.Of(thesis);
+        var revised = prior is not null && !prior.SameContentAs(current);
+
         await repo.UpsertAsync(thesis, ct);
 
+        var audit = new ThesisAudit(prior, current, Trimmed(cmd.Rationale) ?? Trimmed(cmd.DecisionNote), cmd.Evidence);
         if (isNewThesis)
         {
-            await TryRecordCreatedAsync(thesis, cmd.DecisionNote, ct);
+            await TryRecordCreatedAsync(thesis, cmd, audit, ct);
         }
+        else if (revised)
+        {
+            await RecordRevisedAsync(thesis, cmd, audit, ct);
+        }
+
+        var origin = isNewThesis || revised
+            ? cmd.Origin
+            : ThesisOriginReader.Resolve(await originReader.ForThesesAsync(cmd.UserId, [thesis.Id], ct), thesis.Id);
 
         return new ThesisDto(
             thesis.Id, thesis.Ticker, thesis.ThesisText,
             thesis.KeyDataPoints, thesis.Catalysts, thesis.InvalidationTriggers,
-            thesis.CreatedAt, thesis.UpdatedAt, thesis.BrokenAt, thesis.BrokenReason, thesis.EntryPrice);
+            thesis.CreatedAt, thesis.UpdatedAt, thesis.BrokenAt, thesis.BrokenReason, thesis.EntryPrice,
+            origin.ToString());
+    }
+
+    private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// A revision's journal entry is what makes a Ledger change visible and reversible, so unlike the Created append
+    /// it is not swallowed when Ledger made the change: the caller sees the failure and retries, instead of leaving a
+    /// change nothing recorded. The owner's own edit keeps the best-effort treatment.
+    /// </summary>
+    private async Task RecordRevisedAsync(InvestmentThesis thesis, SaveThesisCommand cmd, ThesisAudit audit, CancellationToken ct)
+    {
+        try
+        {
+            await eventRecorder.RecordAuditedAsync(
+                thesis.UserId, ThesisSubjectType.Thesis, thesis.Id, thesis.Ticker,
+                ThesisEventType.Revised, cmd.Origin, audit, audit.Rationale, ct);
+        }
+        catch (Exception ex) when (cmd.Origin == ThesisEventOrigin.User)
+        {
+            logger.LogError(
+                ex, "Revised-event recording failed for thesis {ThesisId} ({Ticker}) — thesis saved without it",
+                thesis.Id, thesis.Ticker);
+        }
     }
 
     /// <summary>
@@ -74,17 +116,20 @@ public class SaveThesisCommandHandler(
     /// error, because a lost Created event has no backfill path (unlike a missing quote, which
     /// <see cref="ThesisEventRecorder"/> marks PricesPending for the weekly job).
     /// </summary>
-    private async Task TryRecordCreatedAsync(InvestmentThesis thesis, string? decisionNote, CancellationToken ct)
+    private async Task TryRecordCreatedAsync(
+        InvestmentThesis thesis, SaveThesisCommand cmd, ThesisAudit audit, CancellationToken ct)
     {
         try
         {
-            await eventRecorder.RecordAsync(
+            await eventRecorder.RecordAuditedAsync(
                 thesis.UserId,
                 ThesisSubjectType.Thesis,
                 thesis.Id,
                 thesis.Ticker,
                 ThesisEventType.Created,
-                decisionNote,
+                cmd.Origin,
+                audit,
+                cmd.DecisionNote,
                 ct);
         }
         catch (Exception ex)

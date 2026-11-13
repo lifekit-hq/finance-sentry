@@ -5,4 +5,6 @@ public record WatchlistItemDto(
     string Ticker,
     string? Exchange,
     string? Note,
-    DateTimeOffset AddedAt);
+    DateTimeOffset AddedAt,
+    // Who added the entry: "User" or "Ledger".
+    string Origin = "User");
