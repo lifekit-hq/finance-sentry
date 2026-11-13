@@ -139,6 +139,23 @@ public sealed class NewsIngestionCoverageTests
     }
 
     [Fact]
+    public async Task A_covered_name_cut_from_the_books_tail_is_still_read_as_coverage()
+    {
+        for (var i = 0; i < 70; i++)
+        {
+            _h.Hold($"H{i:00}");
+        }
+
+        await CoverAsync("H64");
+
+        await Job().IngestTickersAsync();
+
+        var fetched = _fetched.Should().ContainSingle().Subject;
+        fetched.Take(60).Should().Equal(Enumerable.Range(0, 60).Select(i => $"H{i:00}"));
+        fetched.Skip(60).Should().Equal("H64");
+    }
+
+    [Fact]
     public async Task A_coverage_budget_of_zero_reads_no_coverage_only_name()
     {
         _h.Hold("NVDA");

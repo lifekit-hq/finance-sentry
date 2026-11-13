@@ -98,11 +98,11 @@ public sealed class NewsIngestionJob(
 
         var toFetch = priority.Take(MaxTickersPerRun).ToList();
 
-        // Coverage names the book does not already name, held-first within each user and then in ticker order, read in
+        // Coverage names the book's budget does not already read (a covered name cut from the book's tail still counts as coverage), held-first within each user and then in ticker order, read in
         // rotating slices so a long list is covered across runs without taking the book's budget.
         var options = coverageOptions.Value;
         var extras = coverageTickers
-            .Where(t => !seen.Contains(t))
+            .Where(t => !toFetch.Contains(t, StringComparer.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var slice = TickerRotation.Slice(
