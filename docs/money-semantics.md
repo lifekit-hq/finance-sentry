@@ -1519,7 +1519,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   bar at entry or exit is `notPriced`. A horizon with no graded membership reads "not enough history yet" and
   carries no figures; below 30 graded memberships it reads "too few to tell skill from luck (n of 30)". Each
   horizon also grades every source on its own: the add reason (Held, Watchlist, Screen, Ledger, User) and,
-  for a Screen add, the screen tag (the first nomination reason of the newest candidate created by the add).
+  for a Screen add, the screen tag (the first screen-tag nomination reason of the newest candidate created by the add, else its first reason).
   The grade needs bars for every member, so Radar's universe sync ingests coverage members that are not held,
   watched or under a thesis (`UniverseKind.Coverage`).
 
