@@ -32,6 +32,14 @@ runs:
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
 
+    # Changes weekly so the registry layer cache cannot keep serving a stale `apk upgrade` layer
+    # (the Dockerfiles declare ARG APK_REFRESH right before it), which would pin Alpine packages
+    # at the versions of whenever the layer was last built and fail the Trivy gate below.
+    - name: Compute weekly apk refresh key
+      id: apk-refresh
+      shell: bash
+      run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
     # One build per image: it is loaded into the local daemon, scanned, and only then pushed, so
     # the scanned image is the one that ships. The :buildcache registry cache is read by every
     # build and written only when pushing. provenance is off so a push stays a single manifest.
@@ -49,6 +57,8 @@ runs:
         labels: |
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.revision=${{ github.sha }}
+        build-args: |
+          APK_REFRESH=${{ steps.apk-refresh.outputs.week }}
         secrets: |
           npm_token=${{ inputs.token }}
         cache-from: type=registry,ref=ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}:buildcache

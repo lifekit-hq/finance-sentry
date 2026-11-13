@@ -15,6 +15,9 @@ using Microsoft.Extensions.Options;
 /// unless the caller passes <see cref="OverrideRisk"/>, in which case the override is recorded as a
 /// signal (never silent — FR-007). Invalidation triggers are the caller's when supplied, else the
 /// deterministic <see cref="TriggerPrefill"/> derived from the candidate's latest scorecard.
+/// Evidence at entry: the latest scorecard summary and the <see cref="DecisionNote"/> are carried into
+/// the thesis text and key data points. No scorecard degrades to an empty carry (the default text, no
+/// data points) and never fails the promotion.
 /// <see cref="Paper"/> (finance-sentry#704) marks the promotion as tracking-only: it never draws
 /// down real cash, so the gate skips the real-book cash-funding rule (MinCashBuffer) for it while
 /// still enforcing concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real
@@ -48,6 +51,9 @@ public sealed class PromoteCandidateCommandHandler(
     private const string OverrideSignalType = "promotion_risk_override";
     private const string SubjectTypeTicker = "Ticker";
     private const string PromotionThesisText = "Promoted from opportunity candidate.";
+    private const string ScorecardSource = "candidate_scorecard";
+    private const string ObservedDirection = "observed";
+    private const int MaxThesisTextLength = 4000;
 
     private readonly OpportunityOptions _options = options.Value;
 
@@ -81,16 +87,17 @@ public sealed class PromoteCandidateCommandHandler(
                 new { gate.RuleKey, gate.ObservedValue, gate.LimitValue }), ct);
         }
 
-        var triggers = command.Triggers ?? await BuildPrefilledTriggersAsync(candidate.Id, ct);
+        var latest = await scoreRepo.LatestForCandidateAsync(candidate.Id, ct);
+        var triggers = command.Triggers ?? BuildPrefilledTriggers(latest);
 
         var thesis = await saveThesis.Handle(
             new SaveThesisCommand(
                 command.UserId,
                 Id: null,
                 candidate.Ticker,
-                PromotionThesisText,
-                KeyDataPoints: [],
-                Catalysts: [],
+                BuildThesisText(latest, command.DecisionNote),
+                BuildKeyDataPoints(latest),
+                [],
                 InvalidationTriggers: triggers,
                 EntryPrice: null,
                 DecisionNote: command.DecisionNote),
@@ -107,9 +114,8 @@ public sealed class PromoteCandidateCommandHandler(
         return new PromoteCandidateResult(thesis.Id, gate, CandidateFound: true);
     }
 
-    private async Task<IReadOnlyList<ThesisInvalidationTrigger>> BuildPrefilledTriggersAsync(Guid candidateId, CancellationToken ct)
+    private IReadOnlyList<ThesisInvalidationTrigger> BuildPrefilledTriggers(CandidateScore? latest)
     {
-        var latest = await scoreRepo.LatestForCandidateAsync(candidateId, ct);
         var detail = new FundamentalsScoreDetail(
             latest?.Evidence.RevenueYoy, latest?.Evidence.GrossMarginLatest);
 
@@ -117,5 +123,58 @@ public sealed class PromoteCandidateCommandHandler(
             .Select(t => new ThesisInvalidationTrigger(
                 t.Metric, t.Direction, t.Threshold, t.ProxyTicker, t.ConsecutivePeriods))
             .ToList();
+    }
+
+    private static string BuildThesisText(CandidateScore? latest, string? decisionNote)
+    {
+        var parts = new List<string> { PromotionThesisText };
+        if (latest is not null)
+        {
+            var scorecard = new List<string>();
+            if (latest.StructureScore is { } structure)
+            {
+                scorecard.Add($"structure {structure}");
+            }
+
+            if (latest.FundamentalsScore is { } fundamentals)
+            {
+                scorecard.Add($"fundamentals {fundamentals}");
+            }
+
+            scorecard.Add($"crowding {latest.CrowdingClass}");
+            parts.Add($"Scorecard at entry ({latest.ScoredAt:yyyy-MM-dd}): {string.Join(", ", scorecard)}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(decisionNote))
+        {
+            parts.Add($"Decision note: {decisionNote.Trim()}");
+        }
+
+        var text = string.Join(" ", parts);
+        return text.Length <= MaxThesisTextLength ? text : text[..MaxThesisTextLength];
+    }
+
+    private static List<ThesisDataPoint> BuildKeyDataPoints(CandidateScore? latest)
+    {
+        var points = new List<ThesisDataPoint>();
+        if (latest is null)
+        {
+            return points;
+        }
+
+        void Add(string metric, decimal? value)
+        {
+            if (value is { } v)
+            {
+                points.Add(new ThesisDataPoint(metric, ObservedDirection, v, ScorecardSource));
+            }
+        }
+
+        Add("structure_score", latest.StructureScore);
+        Add("fundamentals_score", latest.FundamentalsScore);
+        Add("revenue_yoy", latest.Evidence.RevenueYoy);
+        Add("gross_margin", latest.Evidence.GrossMarginLatest);
+        Add("eps_yoy", latest.Evidence.EpsYoy);
+        return points;
     }
 }
