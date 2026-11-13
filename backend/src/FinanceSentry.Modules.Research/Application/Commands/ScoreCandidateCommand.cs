@@ -32,6 +32,7 @@ public sealed class ScoreCandidateCommandHandler(
     IIpsRepository ipsRepo,
     IPositionCapSource positionCapSource,
     IBrokerageHoldingsReader holdingsReader,
+    IReturnCorrelationReader correlationReader,
     IRadarSignalWriter signalWriter,
     IMarketRegimeSource marketRegimeSource,
     IThesisEventRecorder eventRecorder,
@@ -78,6 +79,8 @@ public sealed class ScoreCandidateCommandHandler(
         var (structureScore, fundamentalsScore, crowding, evidence, regime) =
             ScorecardComposer.Compose(structureSnapshot, fundamentalFacts, regimeSnapshot, _options);
 
+        evidence = evidence with { Correlation = await ReadCorrelationAsync(ticker, holdings, ct) };
+
         var scorecard = new CandidateScorecard(
             structureScore, fundamentalsScore, crowding, ipsFit, evidence, _options.FormulaVersion, regime);
 
@@ -104,6 +107,19 @@ public sealed class ScoreCandidateCommandHandler(
         await EmitSignalsAsync(command.UserId, candidate, ticker, structureScore, fundamentalsScore, ct);
 
         return new ScoreCandidateResult(candidate.Id, ticker, isNew, scorecard);
+    }
+
+    /// <summary>
+    /// The D1 correlation fact. An unusable book or thin bar history comes back as a fact whose figures are null
+    /// with reasons ("not evaluable"), never a number.
+    /// </summary>
+    private async Task<CorrelationFact> ReadCorrelationAsync(
+        string ticker, IReadOnlyList<BrokerageHoldingSummary> holdings, CancellationToken ct)
+    {
+        var book = holdings.Select(h => new CorrelationReference(h.Symbol, h.UsdValue)).ToList();
+        var read = await correlationReader.GetAsync(
+            ticker, book, _options.CorrelationTopHoldings, _options.CorrelationMinBookCoverage, ct);
+        return CorrelationFact.From(read, _options);
     }
 
     private async Task EmitSignalsAsync(

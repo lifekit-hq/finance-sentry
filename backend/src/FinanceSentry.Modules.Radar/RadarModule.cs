@@ -93,6 +93,7 @@ public static class RadarModule
         // #673: published read port - the Integration adapter reaches Radar signals only through it.
         services.AddScoped<ISubjectSignalReader, SubjectSignalReader>();
         services.AddScoped<IMarketStructureReader, MarketStructureReader>();
+        services.AddScoped<IReturnCorrelationReader, ReturnCorrelationReader>();
 
         services.AddScoped<IBookPerformanceService, BookPerformanceService>();
         services.AddCompanionLinks();

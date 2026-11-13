@@ -127,4 +127,26 @@ public sealed class OpportunityOptions
 
     /// <summary>Additional structure-score haircut for an Extended-crowding candidate when the curve is Inverted.</summary>
     public int RegimeInvertedExtendedHaircut { get; set; } = 5;
+
+    // ── #558 stage 2 / rule D1: the correlation fact (a documented scorecard input; verdicts do not read it) ──
+    /// <summary>How many of the book's largest positions the correlation fact reports individually.</summary>
+    public int CorrelationTopHoldings { get; set; } = 5;
+
+    /// <summary>
+    /// Fraction (0-1) of the book's value that must have usable bars for the correlation-to-book figure to be
+    /// evaluable; below it the fact reports "not evaluable" rather than a number from a sliver of the book.
+    /// </summary>
+    public decimal CorrelationMinBookCoverage { get; set; } = 0.5m;
+
+    /// <summary>
+    /// 63-day correlation to the book at/above which a name is flagged as moving with the book (D1: the owner's
+    /// existing low-correlation rule G2). 0.5 sits just under the 0.56 measured for CBRS against DRAM.
+    /// </summary>
+    public decimal CorrelationToBookFlagThreshold { get; set; } = 0.5m;
+
+    /// <summary>
+    /// Points a later add rule subtracts from a flagged name's rank (D1). The scorecard only exposes the number:
+    /// 0 when the name is not flagged or its correlation is not evaluable; no score or verdict is changed by it.
+    /// </summary>
+    public int CorrelationToBookPenalty { get; set; } = 20;
 }

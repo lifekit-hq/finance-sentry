@@ -13,7 +13,7 @@ public sealed class ScoreCandidateTool(
     IIdentityResolver identity)
 {
     [McpServerTool(Name = "score_candidate")]
-    [Description("Scores a conviction candidate deterministically (018 structure + EDGAR fundamentals + crowding + IPS fit). Creates the candidate the first time (source User by default, or Ledger when Ledger nominates from its own research), or appends a re-score to the existing active one. Sub-scores are 0-100 or null when not evaluable (never faked); there is no composite score. Every sub-score cites its raw inputs in the evidence.")]
+    [Description("Scores a conviction candidate deterministically (018 structure + EDGAR fundamentals + crowding + IPS fit). Creates the candidate the first time (source User by default, or Ledger when Ledger nominates from its own research), or appends a re-score to the existing active one. Sub-scores are 0-100 or null when not evaluable (never faked); there is no composite score. Every sub-score cites its raw inputs in the evidence. evidence.correlation adds the 63-day daily-return correlation of the ticker to the book's top five holdings and to the book (null with a reason when the stored bars cannot support it), plus the correlatedToBook flag and addPenalty a coverage add rule reads (rule D1: a name that moves with the book is ranked down); it is a fact, not a score.")]
     public async Task<ScoreCandidateResult?> ExecuteAsync(
         [Description("Ticker symbol to score, e.g. MSFT.")] string ticker,
         [Description("Optional contemporaneous reasoning captured at nomination time (decision journal).")] string? decisionNote = null,

@@ -182,6 +182,7 @@ public sealed class ToolParityTests
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();
         services.Configure<OpportunityOptions>(_ => { });
         services.AddScoped<IMarketStructureReader, MarketStructureReader>();
+        services.AddScoped<IReturnCorrelationReader, ReturnCorrelationReader>();
         services.AddScoped<IRiskPolicyGate, RiskPolicyGate>();
 
         // Research retrieval (036): real repos/chunker/retriever over the in-memory Research

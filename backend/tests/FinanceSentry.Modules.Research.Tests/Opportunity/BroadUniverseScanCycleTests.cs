@@ -161,6 +161,7 @@ public sealed class BroadUniverseScanCycleTests
             ips,
             new FakePositionCapSource(),
             new FakeBrokerageHoldingsReader([BroadUniverseRadarFixture.HeldPosition]),
+            new FakeReturnCorrelationReader(),
             new RecordingRadarSignalWriter(),
             new FakeMarketRegimeSource(),
             new RecordingThesisEventRecorder(),

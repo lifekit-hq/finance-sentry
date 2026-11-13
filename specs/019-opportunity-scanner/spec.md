@@ -114,6 +114,7 @@ A candidate Denys accepts is promoted into an `InvestmentThesis` with **proposed
 - **[DECISION]** IPS fit is reported as facts, not folded into the composite — strategy fit is Denys's call (via Ledger), not a hidden weight.
 - **[DECISION]** Scoring formulas are versioned (`FormulaVersion`) so historical scores stay honest when weights/rules change.
 - **[DECISION 2026-07-08]** FR-006b (expectations/"what's priced in") and FR-006c (base-rate check) are deferred to v1.1 — the scorecard carries reserved null `ValuationContext`/`BaseRateContext` slots, never placeholder data. Recorded here (not only in plan.md) per review: the spec is ground truth.
+- **[DECISION 2026-11-13]** Rule D1 / #558 stage 2: the scorecard carries a correlation fact (63-day return correlation to the book's top five holdings and to the book, `null` + reason when bars cannot support it) and a configurable add-rule penalty for a name that moves with the book (the owner's low-correlation rule G2). The fact is exposed, not applied: no existing sub-score, crowding class or verdict changes. Contract: `contracts/mcp-tools.md`.
 - **[DECISION 2026-07-08]** No composite score ships (FR-007); consequently `list_candidates` has no `minScore` filter and v1 exposes four MCP tools, not five.
 - **[OUT OF SCOPE]** LLM-driven theme discovery (Ledger prompt over `radar_signals`), estimate revisions, flow data, options data, backtesting, any UI beyond MCP/REST in v1.
 - **[MCP CONTRACT]** Five new tools (FR-012). Update the MCP tool-count contract test.

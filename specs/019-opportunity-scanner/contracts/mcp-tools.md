@@ -11,6 +11,20 @@ repos, scorers) in `ToolParityTests`.
   `evidence` (raw inputs per sub-score), `formulaVersion`. **No composite score.** Creates a candidate
   (source `User`) or re-scores the existing active one (appends a `CandidateScore`). Not-evaluable
   sub-scores are `null` + labeled; partial scorecards are marked, never faked (US1.3).
+- **Correlation fact (#558 stage 2, rule D1)**: `evidence.correlation` is the candidate's 63-day daily-return
+  correlation (adjusted closes from Radar's stored bars, no new data source, no model call) against each of the
+  book's top five holdings (`topHoldings[]`: `symbol`, `weight`, `correlation`, `observations`,
+  `notEvaluableReason`) and against the weight-averaged return of the whole book (`bookCorrelation`,
+  `bookObservations`, `bookCoverage`, `bookNotEvaluableReason`). The ticker itself is excluded from both
+  references. Fewer than 40 common returns, a missing or flat series, an empty book, or less than
+  `Opportunity:CorrelationMinBookCoverage` of the book's value with bars gives `null` plus a reason
+  (`no_bars`, `insufficient_overlap`, `zero_variance`, `empty_book`, `book_coverage_too_low`), never a number.
+  The D1 add-rule inputs ride along: `correlatedToBook` (`bookCorrelation >= Opportunity:CorrelationToBookFlagThreshold`,
+  default 0.5; `null` when not evaluable), `flagThreshold`, and `addPenalty` (`Opportunity:CorrelationToBookPenalty`
+  points, default 20, when flagged, else 0). Facts only: no sub-score, crowding class or verdict reads them; a later
+  coverage add rule does. It lives in the existing `Evidence` jsonb (older rows read it as `null`), so there is no
+  migration. The reader is `IReturnCorrelationReader` (Core port, Radar implementation) so the coverage entity can
+  call it without a scorecard.
 - **Acceptance (SC-002)**: MSFT with live 018 structure + EDGAR returns a complete scorecard < 10s,
   every sub-score citing its inputs.
 
