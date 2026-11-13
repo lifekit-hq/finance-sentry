@@ -16,9 +16,8 @@ using Microsoft.Extensions.Options;
 /// signal (never silent — FR-007). Invalidation triggers are the caller's when supplied, else the
 /// deterministic <see cref="TriggerPrefill"/> derived from the candidate's latest scorecard.
 /// Evidence at entry: the latest scorecard summary and the <see cref="DecisionNote"/> are carried into
-/// the thesis text and key data points; explicit <see cref="ThesisText"/>, <see cref="KeyDataPoints"/>
-/// and <see cref="Catalysts"/> from the caller win over the carried text. No scorecard degrades to an
-/// empty carry (the default text, no data points) and never fails the promotion.
+/// the thesis text and key data points. No scorecard degrades to an empty carry (the default text, no
+/// data points) and never fails the promotion.
 /// <see cref="Paper"/> (finance-sentry#704) marks the promotion as tracking-only: it never draws
 /// down real cash, so the gate skips the real-book cash-funding rule (MinCashBuffer) for it while
 /// still enforcing concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real
@@ -31,10 +30,7 @@ public record PromoteCandidateCommand(
     bool OverrideRisk = false,
     decimal ProposedUsd = 0m,
     string? DecisionNote = null,
-    bool Paper = false,
-    string? ThesisText = null,
-    IReadOnlyList<ThesisDataPoint>? KeyDataPoints = null,
-    IReadOnlyList<ThesisCatalyst>? Catalysts = null) : ICommand<PromoteCandidateResult>;
+    bool Paper = false) : ICommand<PromoteCandidateResult>;
 
 public sealed record PromoteCandidateResult(
     Guid? ThesisId,
@@ -99,9 +95,9 @@ public sealed class PromoteCandidateCommandHandler(
                 command.UserId,
                 Id: null,
                 candidate.Ticker,
-                command.ThesisText ?? BuildThesisText(latest, command.DecisionNote),
-                command.KeyDataPoints ?? BuildKeyDataPoints(latest),
-                command.Catalysts ?? [],
+                BuildThesisText(latest, command.DecisionNote),
+                BuildKeyDataPoints(latest),
+                [],
                 InvalidationTriggers: triggers,
                 EntryPrice: null,
                 DecisionNote: command.DecisionNote),

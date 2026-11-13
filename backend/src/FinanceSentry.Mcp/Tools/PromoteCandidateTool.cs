@@ -16,7 +16,7 @@ public sealed class PromoteCandidateTool(
 {
     [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "promote_candidate")]
-    [Description("Promotes an active candidate into a monitored InvestmentThesis. Always runs the 022 risk gate (check_risk_rules) first: if the proposed position is Refused, no thesis is created and the verdict (named rule + max compliant size) is returned — unless overrideRisk is true, which records the override as a signal. Set paper=true for a tracking-only promotion that will never draw down real cash: the gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real (non-paper) promotions keep today's full rule set. Invalidation triggers default to the deterministic prefill from the candidate's fundamentals; pass triggers to override. Evidence at entry: the candidate's latest scorecard summary and the decisionNote are carried into the thesis text and key data points (a candidate with no scorecard carries nothing and still promotes); pass thesisText, keyDataPoints or catalysts to override the carried text. Returns the thesis id (when created) and the gate verdict.")]
+    [Description("Promotes an active candidate into a monitored InvestmentThesis. Always runs the 022 risk gate (check_risk_rules) first: if the proposed position is Refused, no thesis is created and the verdict (named rule + max compliant size) is returned — unless overrideRisk is true, which records the override as a signal. Set paper=true for a tracking-only promotion that will never draw down real cash: the gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real (non-paper) promotions keep today's full rule set. Invalidation triggers default to the deterministic prefill from the candidate's fundamentals; pass triggers to override. Evidence at entry: the candidate's latest scorecard summary and the decisionNote are carried into the thesis text and key data points (a candidate with no scorecard carries nothing and still promotes). Returns the thesis id (when created) and the gate verdict.")]
     public async Task<PromoteCandidateResult?> ExecuteAsync(
         [Description("Candidate id to promote.")] Guid id,
         [Description("Optional invalidation triggers to override the deterministic prefill.")] IReadOnlyList<ThesisInvalidationTrigger>? triggers = null,
@@ -24,9 +24,6 @@ public sealed class PromoteCandidateTool(
         [Description("Proposed position size in USD for the risk gate's concentration/sizing check. Defaults to 0 (no sizing).")] decimal proposedUsd = 0m,
         [Description("Optional contemporaneous reasoning captured at promotion time.")] string? decisionNote = null,
         [Description("Set true for a paper/tracking-only promotion: the risk gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules. Defaults to false (real-book rule set unchanged).")] bool paper = false,
-        [Description("Optional thesis text; overrides the text carried from the scorecard and decision note.")] string? thesisText = null,
-        [Description("Optional key data points; override the ones carried from the candidate's scorecard.")] IReadOnlyList<ThesisDataPoint>? keyDataPoints = null,
-        [Description("Optional catalysts for the thesis (none are carried by default).")] IReadOnlyList<ThesisCatalyst>? catalysts = null,
         CancellationToken cancellationToken = default)
     {
         var effective = identity.GetUserId();
@@ -36,7 +33,7 @@ public sealed class PromoteCandidateTool(
         }
 
         return await handler.Handle(
-            new PromoteCandidateCommand(effective.Value, id, triggers, overrideRisk, proposedUsd, decisionNote, paper, thesisText, keyDataPoints, catalysts),
+            new PromoteCandidateCommand(effective.Value, id, triggers, overrideRisk, proposedUsd, decisionNote, paper),
             cancellationToken);
     }
 }

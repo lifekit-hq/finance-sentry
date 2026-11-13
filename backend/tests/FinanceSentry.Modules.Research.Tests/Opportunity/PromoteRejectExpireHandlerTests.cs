@@ -120,32 +120,6 @@ public sealed class PromoteRejectExpireHandlerTests
     }
 
     [Fact]
-    public async Task Promote_ExplicitOverrides_WinOverCarriedText()
-    {
-        var candidates = new FakeCandidateRepository();
-        var scores = new FakeCandidateScoreRepository();
-        var userId = Guid.NewGuid();
-        var candidate = SeedActive(candidates, userId, "MSFT");
-        SeedScore(scores, candidate.Id);
-        var save = new RecordingSaveThesisHandler();
-        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
-        var handler = BuildPromote(candidates, scores, allowed, save, new RecordingRadarSignalWriter());
-        var points = new[] { new ThesisDataPoint("custom", "above", 1m, "owner") };
-        var catalysts = new[] { new ThesisCatalyst(new DateOnly(2027, 1, 28), "Q2 earnings") };
-
-        await handler.Handle(
-            new PromoteCandidateCommand(
-                userId, candidate.Id, DecisionNote: "note",
-                ThesisText: "Owner thesis", KeyDataPoints: points, Catalysts: catalysts),
-            CancellationToken.None);
-
-        var cmd = save.LastCommand!;
-        cmd.ThesisText.Should().Be("Owner thesis");
-        cmd.KeyDataPoints.Should().BeEquivalentTo(points);
-        cmd.Catalysts.Should().BeEquivalentTo(catalysts);
-    }
-
-    [Fact]
     public async Task Promote_NoScorecard_DegradesToEmptyCarry_WithoutFailing()
     {
         var candidates = new FakeCandidateRepository();

@@ -21,13 +21,11 @@ repos, scorers) in `ToolParityTests`.
 ## `promote_candidate`
 - **Params**: `id: Guid`, `triggers?: ThesisInvalidationTrigger[]` (override the deterministic prefill),
   `overrideRisk?: bool`, `proposedUsd?: decimal`, `decisionNote?: string`, `userId?`, `paper?: bool`
-  (finance-sentry#704, default `false`), `thesisText?: string`, `keyDataPoints?: ThesisDataPoint[]`,
-  `catalysts?: ThesisCatalyst[]` (evidence-at-entry overrides)
+  (finance-sentry#704, default `false`)
 - **Evidence at entry**: the created thesis carries the candidate's latest scorecard summary (structure /
   fundamentals scores, crowding class, scored date) and the `decisionNote` in `ThesisText`, and the
   scorecard's observed figures (structure/fundamentals score, revenue YoY, gross margin, EPS YoY) as
-  `KeyDataPoints` (`direction: "observed"`, `source: "candidate_scorecard"`). Explicit `thesisText`,
-  `keyDataPoints`, `catalysts` win over the carried text. A candidate with no scorecard degrades to the
+  `KeyDataPoints` (`direction: "observed"`, `source: "candidate_scorecard"`). A candidate with no scorecard degrades to the
   default text and no data points; it never fails the promotion. Triggers, risk gate and the
   `SaveThesisCommand` path are unchanged; no schema change.
 - **Returns**: `{ thesisId?, gate: RiskGateVerdict }`. Runs `IRiskPolicyGate.CheckProposalAsync`
