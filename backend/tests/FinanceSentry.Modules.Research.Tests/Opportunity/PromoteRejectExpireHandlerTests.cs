@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -16,11 +17,13 @@ public sealed class PromoteRejectExpireHandlerTests
     private sealed class RecordingSaveThesisHandler : ICommandHandler<SaveThesisCommand, ThesisDto>
     {
         public int Calls { get; private set; }
+        public SaveThesisCommand? LastCommand { get; private set; }
         public Guid ThesisId { get; } = Guid.NewGuid();
 
         public Task<ThesisDto> Handle(SaveThesisCommand cmd, CancellationToken ct)
         {
             Calls++;
+            LastCommand = cmd;
             return Task.FromResult(new ThesisDto(
                 ThesisId, cmd.Ticker, cmd.ThesisText, cmd.KeyDataPoints, cmd.Catalysts,
                 cmd.InvalidationTriggers, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, null));
@@ -55,6 +58,89 @@ public sealed class PromoteRejectExpireHandlerTests
             new RecordingThesisEventRecorder(),
             save,
             Options.Create(new OpportunityOptions()));
+
+    private static CandidateScore SeedScore(FakeCandidateScoreRepository scores, Guid candidateId)
+    {
+        var score = new CandidateScore
+        {
+            CandidateId = candidateId,
+            StructureScore = 72,
+            FundamentalsScore = 88,
+            CrowdingClass = CrowdingClass.Normal,
+            Evidence = ScoreEvidence.Empty with { RevenueYoy = 0.31m, GrossMarginLatest = 0.62m },
+        };
+        scores.Scores.Add(score);
+        return score;
+    }
+
+    [Fact]
+    public async Task Promote_NoOverrides_CarriesScorecardAndDecisionNoteIntoThesis()
+    {
+        var candidates = new FakeCandidateRepository();
+        var scores = new FakeCandidateScoreRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        SeedScore(scores, candidate.Id);
+        var save = new RecordingSaveThesisHandler();
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
+        var handler = BuildPromote(candidates, scores, allowed, save, new RecordingRadarSignalWriter());
+
+        await handler.Handle(
+            new PromoteCandidateCommand(userId, candidate.Id, DecisionNote: "Cloud margin inflecting"),
+            CancellationToken.None);
+
+        var cmd = save.LastCommand!;
+        cmd.ThesisText.Should().Contain("structure 72").And.Contain("fundamentals 88")
+            .And.Contain("Decision note: Cloud margin inflecting");
+        cmd.KeyDataPoints.Should().Contain(d => d.Metric == "revenue_yoy" && d.Threshold == 0.31m && d.Source == "candidate_scorecard");
+        cmd.KeyDataPoints.Should().Contain(d => d.Metric == "fundamentals_score" && d.Threshold == 88m);
+        cmd.Catalysts.Should().BeEmpty();
+        cmd.InvalidationTriggers.Should().NotBeEmpty("prefilled triggers are unchanged");
+    }
+
+    [Fact]
+    public async Task Promote_ExplicitOverrides_WinOverCarriedText()
+    {
+        var candidates = new FakeCandidateRepository();
+        var scores = new FakeCandidateScoreRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        SeedScore(scores, candidate.Id);
+        var save = new RecordingSaveThesisHandler();
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
+        var handler = BuildPromote(candidates, scores, allowed, save, new RecordingRadarSignalWriter());
+        var points = new[] { new ThesisDataPoint("custom", "above", 1m, "owner") };
+        var catalysts = new[] { new ThesisCatalyst(new DateOnly(2027, 1, 28), "Q2 earnings") };
+
+        await handler.Handle(
+            new PromoteCandidateCommand(
+                userId, candidate.Id, DecisionNote: "note",
+                ThesisText: "Owner thesis", KeyDataPoints: points, Catalysts: catalysts),
+            CancellationToken.None);
+
+        var cmd = save.LastCommand!;
+        cmd.ThesisText.Should().Be("Owner thesis");
+        cmd.KeyDataPoints.Should().BeEquivalentTo(points);
+        cmd.Catalysts.Should().BeEquivalentTo(catalysts);
+    }
+
+    [Fact]
+    public async Task Promote_NoScorecard_DegradesToEmptyCarry_WithoutFailing()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        var save = new RecordingSaveThesisHandler();
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
+        var handler = BuildPromote(candidates, new FakeCandidateScoreRepository(), allowed, save, new RecordingRadarSignalWriter());
+
+        var result = await handler.Handle(new PromoteCandidateCommand(userId, candidate.Id), CancellationToken.None);
+
+        result.ThesisId.Should().Be(save.ThesisId);
+        save.LastCommand!.ThesisText.Should().Be("Promoted from opportunity candidate.");
+        save.LastCommand.KeyDataPoints.Should().BeEmpty();
+        candidate.Status.Should().Be(CandidateStatus.Promoted);
+    }
 
     [Fact]
     public async Task Promote_RefusedByGate_CreatesNoThesis_AndReturnsVerdict()
