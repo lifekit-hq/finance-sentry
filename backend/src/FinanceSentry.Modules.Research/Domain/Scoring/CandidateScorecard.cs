@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Domain.Scoring;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 
 /// <summary>
@@ -59,7 +60,8 @@ public sealed record ScoreEvidence(
     int? SectorRankDelta = null,
     decimal? DistanceFrom63dHigh = null,
     string? FundamentalsBasis = null,
-    CorrelationFact? Correlation = null)
+    CorrelationFact? Correlation = null,
+    AttentionFact? Attention = null)
 {
     public static ScoreEvidence Empty { get; } = new(
         new Dictionary<int, decimal?>(),

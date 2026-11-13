@@ -60,6 +60,7 @@ populate it earlier.
 - **`IReferenceUniverseReader`**: `GetListsAsync`, `GetMembersAsync(list)`, `GetListsForTickerAsync(ticker)`, `GetStatusAsync()`.
 - **MCP `get_reference_universe(list?, ticker?, limit?, offset?)`**: catalogue with no arguments, members of a list (ordered by ticker, `limit` 1-1000 default 200, `offset` default 0 to page; `memberCount` is the full total), or the lists a ticker belongs to.
 
+- **Catalyst detection** ([catalyst-detection.md](catalyst-detection.md)): the daily 8-K scan watches the members of the `index` and `theme` lists, and the daily GDELT attention reading measures each `theme:` list through `Catalyst:ThemePhrases`.
 - **Coverage universe** (`docs/coverage-universe.md`): the list a Scan or Ledger candidate is drawn from is separate from the reference universe; coverage is the capped list the pipeline keeps, and a reference list is only where candidates can come from.
 
 ## Not here

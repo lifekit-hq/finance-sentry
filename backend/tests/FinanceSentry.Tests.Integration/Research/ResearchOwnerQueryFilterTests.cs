@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.Research;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -338,6 +339,43 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         }
 
         (await asNoOne.CoverageEvents.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+
+        (await repository.PruneEventsUnscopedAsync(at.AddMinutes(1))).Should().Be(2);
+    }
+
+    [DockerRequiredFact]
+    public async Task Catalyst_events_follow_the_acting_person_and_the_scan_writes_are_scoped_to_the_named_user()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var filed = DateOnly.FromDateTime(at.UtcDateTime);
+
+        CatalystEvent Event(string accession) => new()
+        {
+            Ticker = "NVDA", Accession = accession, Form = "8-K", Items = "2.02", FilingDate = filed, Summary = "8-K item 2.02",
+            Source = "fulltext", DetectedAt = at, Disposition = CatalystDisposition.Nominated, Detail = "nominated", DocumentUrl = string.Empty,
+        };
+
+        await using var asNoOne = CreateContext();
+        var repository = new CatalystRepository(asNoOne);
+
+        (await repository.AddEventsUnscopedAsync(_userA, [Event("acc-1")])).Should().Be(1);
+        (await repository.AddEventsUnscopedAsync(_userA, [Event("acc-1")])).Should().Be(
+            0, "a filtered existence check would find nothing and insert the repeat; the opted-out check sees it");
+        (await repository.AddEventsUnscopedAsync(_userB, [Event("acc-1")])).Should().Be(1, "the identity is per person");
+
+        (await repository.ListHandledUnscopedAsync(_userA, filed)).Should().BeEquivalentTo(["NVDA|acc-1"]);
+        (await repository.ListHandledUnscopedAsync(_userA, filed.AddDays(1))).Should().BeEmpty();
+
+        var (events, total) = await repository.ListEventsUnscopedAsync(_userA, at.AddMinutes(-1), 10);
+        total.Should().Be(1);
+        events.Should().ContainSingle().Which.UserId.Should().Be(_userA);
+
+        await using (var asA = CreateContext(_userA))
+        {
+            (await asA.CatalystEvents.Select(e => e.UserId).ToListAsync()).Should().Equal(_userA);
+        }
+
+        (await asNoOne.CatalystEvents.AnyAsync()).Should().BeFalse("no person in scope matches no row");
 
         (await repository.PruneEventsUnscopedAsync(at.AddMinutes(1))).Should().Be(2);
     }

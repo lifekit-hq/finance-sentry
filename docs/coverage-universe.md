@@ -66,3 +66,7 @@ Per user, a hit is not nominated when the name is already covered, when the user
 - `ICoverageUniverseReader` (Core port; freshest activity first, then by ticker) - the portfolio-construction universe screen reads it instead of the old hard-coded list (`PortfolioConstructionOptions.CuratedUniverse` is gone).
 - MCP `list_coverage`, `explain_coverage(ticker)` and `list_coverage_events` ([mcp.md](mcp.md)).
 - A coverage name may carry a Ledger thesis, not only a scorecard; an active thesis protects it from removal.
+
+## Catalyst nominations
+
+A name outside coverage can reach it on an 8-K: the daily [catalyst scan](catalyst-detection.md) nominates it into the candidate path with a `catalyst: 8-K item ...` tag (source `Scan`), and the rules above decide the add; a covered name's filing goes through the stage 4 review. The scan adds no member and no rule, and a removed name is not re-nominated by a filing dated on or before its removal day.
