@@ -343,6 +343,36 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Coverage_event_digest_counts_removed_and_rescored_over_every_match_not_only_the_returned_page()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var removedTickers = new[] { "OLD1", "OLD2" };
+        var tickers = new[] { "OLD1", "OLD2", "KEEP1", "KEEP2", "KEEP3" };
+        await SeedAsync(tickers.Select((t, i) => new CoverageEvent
+        {
+            UserId = _userA, Ticker = t, Source = "filing", Reference = $"acc-{t}", Summary = "8-K filed",
+            // OLD* are the oldest, so a page of the newest two (KEEP3, KEEP2) holds neither removal.
+            OccurredAt = at.AddMinutes(i - 10).AddMinutes(removedTickers.Contains(t) ? -60 : 0),
+            Disposition = removedTickers.Contains(t) ? CoverageEventDisposition.Removed : CoverageEventDisposition.Kept,
+            Rescored = i != 2,
+        }).Cast<object>().ToArray());
+        await SeedAsync(new CoverageEvent
+        {
+            UserId = _userB, Ticker = "OTHER", Source = "filing", Reference = "acc-x", Summary = "x", OccurredAt = at,
+            Disposition = CoverageEventDisposition.Removed, Rescored = true,
+        });
+
+        await using var asNoOne = CreateContext();
+        var (events, total, removed, rescored) =
+            await new CoverageRepository(asNoOne).ListEventsUnscopedAsync(_userA, at.AddDays(-1), 2);
+
+        events.Select(e => e.Ticker).Should().Equal("KEEP3", "KEEP2");
+        total.Should().Be(5);
+        removed.Should().Be(2, "both removals sit outside the two newest rows but still count");
+        rescored.Should().Be(4, "KEEP1 was not rescored; another person's row never counts");
+    }
+
+    [DockerRequiredFact]
     public async Task Coverage_evaluation_save_with_no_person_adds_updates_and_removes_only_the_named_users_rows()
     {
         var keep = new CoverageMember { UserId = _userA, Ticker = "KEEP", AddedReason = CoverageReason.Screen };
