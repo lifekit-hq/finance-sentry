@@ -147,21 +147,6 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task MarkAcceptedClearedAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
-    {
-        var now = DateTimeOffset.UtcNow;
-        await AllUsers
-            .Where(a => a.UserId == userId
-                     && a.Type == type
-                     && a.ReferenceId == referenceId
-                     && a.AcknowledgementDecision == "Accept"
-                     && a.IsResolved
-                     && a.ResolvedAt <= a.AcknowledgedAt)
-            .ExecuteUpdateAsync(set => set
-                .SetProperty(a => a.ResolvedAt, now)
-                .SetProperty(a => a.UpdatedAt, now), ct);
-    }
-
     public async Task BumpOccurrenceAsync(Guid alertId, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;

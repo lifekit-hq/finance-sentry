@@ -95,7 +95,7 @@ public class RebalanceProposalEpisodeTests
 
         Notifications.Should().Be(2);
         _repo.Rows.Count(a => !a.IsResolved && !a.IsDismissed).Should().Be(1);
-        _repo.Rows.Single(a => !a.IsResolved).ReferenceLabel.Should().Be("Equities:Sell:2");
+        _repo.Rows.Single(a => !a.IsResolved).DedupKey.Should().Be("Equities:Sell:2");
     }
 
     [Fact]
@@ -174,30 +174,56 @@ public class RebalanceProposalEpisodeTests
     }
 
     [Fact]
-    public async Task AcceptedProposal_ThenDriftClearsAndRecurs_NotifiesAtOnce()
+    public async Task AcceptedProposal_ThenDriftClearsAndRecursWithinAWeek_StaysQuiet()
     {
         await RunJobAsync();
         await AcceptAsync();
         _repo.Age(OneDay);
         await ClearAsync();
-        _repo.Age(OneDay);
+        _repo.Age(TimeSpan.FromDays(2));
         await RunJobAsync();
 
-        Notifications.Should().Be(2);
+        Notifications.Should().Be(1);
     }
 
     [Fact]
-    public async Task AcceptedProposal_DailyClearRunsDoNotRewriteTheClearInstant()
+    public async Task AcceptedProposal_ThenDriftClearsAndRecursAfterAWeek_NotifiesAgain()
     {
         await RunJobAsync();
         await AcceptAsync();
         _repo.Age(OneDay);
         await ClearAsync();
-        _repo.Age(TimeSpan.FromDays(1));
-        var clearedAt = _repo.Rows.Single().ResolvedAt;
-        await ClearAsync();
+        _repo.Age(TimeSpan.FromDays(7));
+        await RunJobAsync();
 
-        _repo.Rows.Single().ResolvedAt.Should().Be(clearedAt);
+        Notifications.Should().Be(2);
+        OpenRows.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AcceptedProposal_ThenTheDriftWorsens_NotifiesAtOnce()
+    {
+        await RunJobAsync("Equities:Sell:1");
+        await AcceptAsync();
+        _repo.Age(OneDay);
+        await RunJobAsync("Equities:Sell:2");
+
+        Notifications.Should().Be(2);
+        OpenRows.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DeferredProposal_ThenDriftClearsAndRecursWithinAWeek_StaysQuiet()
+    {
+        await RunJobAsync();
+        await _repo.AcknowledgeByReferenceAsync(
+            _userId, AlertType.RebalanceProposal, _repo.Rows.Single().ReferenceId!.Value, "Defer");
+        _repo.Age(OneDay);
+        await ClearAsync();
+        _repo.Age(TimeSpan.FromDays(2));
+        await RunJobAsync();
+
+        Notifications.Should().Be(1);
     }
 
     [Fact]
@@ -277,9 +303,10 @@ public class RebalanceProposalEpisodeTests
     }
 
     [Fact]
-    public async Task OpenProposalWearingThePreSignatureLabel_IsBumpedNotDuplicated()
+    public async Task OpenProposalFromBeforeTheDedupKey_IsBumpedNotDuplicated()
     {
-        await RunJobAsync("portfolio");
+        await RunJobAsync();
+        _repo.Rows.Single().DedupKey = null;
         _repo.Age(OneDay);
         await RunJobAsync("Equities:Sell:1");
 
@@ -299,6 +326,34 @@ public class RebalanceProposalEpisodeTests
         await RunJobAsync("Equities:Sell:1");
 
         Notifications.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ProposalLabelStaysTheReadableSubject_AndTheSignatureLivesInTheDedupKey()
+    {
+        await RunJobAsync("Bonds:Buy:1;Equities:Sell:2");
+
+        var row = _repo.Rows.Single();
+        row.ReferenceLabel.Should().Be("portfolio");
+        row.DedupKey.Should().Be("Bonds:Buy:1;Equities:Sell:2");
+    }
+
+    /// <summary>
+    /// Ten breaching sleeves make a signature far past the 200 characters of a label. The stored key is whole, so
+    /// the same drift read back on the next run is the same drift: no spurious second notification.
+    /// </summary>
+    [Fact]
+    public async Task BookWithTenBreachingSleeves_StoresTheWholeSignature_AndStaysQuiet()
+    {
+        var signature = string.Join(';', Enumerable.Range(1, 10).Select(i => $"Sleeve-with-a-long-asset-class-name-{i:00}:Sell:3"));
+        signature.Length.Should().BeGreaterThan(200);
+
+        await RunJobAsync(signature);
+        _repo.Age(OneDay);
+        await RunJobAsync(signature);
+
+        Notifications.Should().Be(1);
+        _repo.Rows.Single().DedupKey.Should().Be(signature);
     }
 
     /// <summary>The slice of <see cref="IAlertRepository"/> the dedup path touches, with the real filters' semantics.</summary>
@@ -353,17 +408,6 @@ public class RebalanceProposalEpisodeTests
             if (alert is null || alert.IsResolved) return Task.CompletedTask;
             alert.IsResolved = true;
             alert.ResolvedAt = resolvedAt;
-            return Task.CompletedTask;
-        }
-
-        public Task MarkAcceptedClearedAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
-        {
-            foreach (var a in Rows.Where(a => a.UserId == userId && a.Type == type && a.ReferenceId == referenceId
-                && a.AcknowledgementDecision == "Accept" && a.IsResolved && a.ResolvedAt <= a.AcknowledgedAt))
-            {
-                a.ResolvedAt = DateTimeOffset.UtcNow;
-            }
-
             return Task.CompletedTask;
         }
 

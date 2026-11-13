@@ -16,17 +16,17 @@ internal static class DriftEpisode
     private const int FieldsPerSleeve = 3;
 
     /// <param name="rows">Every alert raised for the drift, any state.</param>
-    /// <param name="signature">The drift now: <c>Asset:Direction:BandsOut</c> per sleeve, joined by <c>;</c>.</param>
+    /// <param name="signature">The drift now, as stored in <see cref="Alert.DedupKey"/>: <c>Asset:Direction:BandsOut</c> per sleeve, joined by <c>;</c>.</param>
     /// <param name="cadenceStart">Alerts the operator acted on stop holding the episode once created before this.</param>
     public static bool Worsens(IReadOnlyCollection<Alert> rows, string? signature, DateTimeOffset cadenceStart)
     {
         var marks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var row in Holding(rows, cadenceStart))
         {
-            var announced = Parse(row.ReferenceLabel);
+            var announced = Parse(row.DedupKey);
             if (announced.Count == 0)
             {
-                // A label from before alerts named their drift: unreadable, so taken as this same drift.
+                // An alert from before proposals carried a drift key: unreadable, so taken as this same drift.
                 return false;
             }
 
@@ -79,13 +79,12 @@ internal static class DriftEpisode
         => row.ResolvedAt is { } at && successor is not null && at == successor.CreatedAt;
 
     /// <summary>
-    /// Resolved by the system with the drift gone: not a worsening's supersede, not a dismissal, and an accepted
-    /// alert only once the clear path re-stamped it past the instant of its acceptance.
+    /// Resolved by the system with the drift gone: an open proposal nobody acted on, not a worsening's supersede.
+    /// One the operator accepted, deferred or dismissed ages out on the cadence instead.
     /// </summary>
     private static bool IsCleared(Alert row, Alert? successor)
-        => row is { IsResolved: true, IsDismissed: false, ResolvedAt: not null }
-           && !IsSupersededBy(row, successor)
-           && (row.AcknowledgementDecision != "Accept" || row.ResolvedAt > row.AcknowledgedAt);
+        => row is { IsResolved: true, IsDismissed: false, AcknowledgementDecision: null, ResolvedAt: not null }
+           && !IsSupersededBy(row, successor);
 
     private static Dictionary<string, int> Parse(string? signature)
     {

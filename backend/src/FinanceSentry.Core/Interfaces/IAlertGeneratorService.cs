@@ -19,7 +19,7 @@ public enum AlertDedup
     OncePerReference,
 
     /// <summary>
-    /// One alert per drift episode: the alert's reference label names the drift, and it is recorded only when
+    /// One alert per drift episode: the alert's dedupe key names the drift, and it is recorded only when
     /// the drift worsens on what the episode already announced (finance-sentry#1266).
     /// </summary>
     Episode,
@@ -372,8 +372,9 @@ public interface IAlertGeneratorService
     /// answers (<c>Asset:Direction:BandsOut</c> per breaching sleeve, joined by <c>;</c>). One drift episode
     /// notifies once: a later run records a proposal only when some sleeve and direction is new to the episode
     /// or further out than any band multiple it already announced, superseding the open proposal; a shrinking or
-    /// flickering drift stays quiet. A proposal the operator dismissed, deferred or accepted keeps its drift quiet
-    /// for the weekly cadence (finance-sentry#1266).
+    /// flickering drift stays quiet. A proposal the operator accepted, dismissed or deferred keeps its drift quiet
+    /// for 7 days from that proposal's creation, whether or not the drift clears meanwhile; a worsening notifies at
+    /// any time (finance-sentry#1266).
     /// </summary>
     Task GenerateRebalanceProposalAlertAsync(
         Guid userId,
@@ -383,9 +384,10 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing, and marks an accepted
-    /// one as cleared too. That ends the drift episode: a recurrence afterwards notifies at once. A dismissed
-    /// proposal is not touched, so its drift stays quiet for the weekly cadence even across a clear.
+    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing. For a proposal nobody
+    /// acted on that ends the drift episode: a recurrence afterwards notifies at once. An accepted, dismissed or
+    /// deferred proposal is not treated as cleared, so its drift stays quiet for 7 days from the proposal's
+    /// creation even across a clear.
     /// </summary>
     Task ResolveRebalanceProposalAlertAsync(
         Guid userId,

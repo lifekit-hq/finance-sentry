@@ -46,6 +46,9 @@ namespace FinanceSentry.Modules.Alerts.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<string>("DedupKey")
+                        .HasColumnType("text");
+
                     b.Property<string>("HealthState")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");

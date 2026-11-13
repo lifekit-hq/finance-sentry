@@ -42,8 +42,9 @@ the existing Companion → Telegram path.
    accepted, dismissed or deferred keeps the drift quiet for 7 days. A drift that moved a further band width,
    or gained a breaching sleeve or direction not yet announced, supersedes the open proposal and notifies again.
    A drift that shrinks or flickers around a band multiple stays quiet. A drift that cleared (the job resolved
-   the open proposal and marked an accepted one cleared) and recurs is a new episode and notifies at once; a
-   dismissed proposal is not touched by a clear, so its drift stays quiet for the 7 days (#1266).
+   the open proposal) and recurs is a new episode and notifies at once. A proposal the operator accepted,
+   dismissed or deferred is not treated as cleared: the same drift stays quiet for 7 days from that proposal's
+   creation, clear or no clear, and a drift that worsens by a further band width notifies at any time (#1266).
 4. **Given** a user has no IPS, **When** the job runs, **Then** no alert is created for that user.
 5. **Given** the alert fires, **When** the Companion dispatch job runs, **Then** the alert is
    classified as a material `RebalanceProposal` event and routed to Telegram.
@@ -74,12 +75,12 @@ Companion `AcknowledgeCompanionEventsCommand` marks the event as delivered. No o
   `IBookFiguresService` via `GetAllocationDriftQueryHandler`. No independently derived cash/invested
   numbers anywhere in the proposal path.
 - **FR-003**: A proposal that cannot compute order lines from the drift DTO (e.g., no IPS) is NOT sent.
-- **FR-004**: One proposal notifies once per drift episode. Each proposal's reference label is its drift
+- **FR-004**: One proposal notifies once per drift episode. Each proposal's dedupe key (`alerts.alerts."DedupKey"`, never shown) is its drift
   signature, `{asset class}:{Sell|Buy|Review}:{band widths out}` per breaching sleeve. The episode keeps a
   high-water mark of the band multiple announced per asset class and direction, read from the alert rows
   since the drift last cleared, and a run notifies only when some sleeve and direction is new or above its
-  mark (#1266). Proposals the operator acted on stop holding the episode after 7 days (the pulse checklist's
-  weekly cadence).
+  mark (#1266). Proposals the operator acted on (accepted, dismissed, deferred) stop holding the episode 7 days
+  after their creation (the pulse checklist's weekly cadence).
 - **FR-005**: `RebalanceProposal` is a new AlertType constant; it maps to a new `CompanionEventKind`
   value and is registered in `MaterialityPolicy.ClassifyAlert`.
 - **FR-006**: Order sizing: OverBand sleeve → sell notional = `(ActualValueUsd − TargetPct% × TotalUsd)`;

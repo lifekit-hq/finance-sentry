@@ -497,28 +497,16 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
             AlertType.RebalanceProposal, AlertSeverity.Warning,
-            RebalancePortfolioReferenceId(userId), RebalanceLabel(driftSignature),
+            RebalancePortfolioReferenceId(userId), "portfolio",
             $"Rebalance proposal: {orderCount} order(s)", orderSummary)
         {
             Dedup = AlertDedup.Episode,
+            DedupKey = driftSignature.Trim(),
         },
             ct);
 
-    private static string RebalanceLabel(string driftSignature)
-    {
-        var label = driftSignature.Trim();
-        return label.Length <= ReferenceLabelMaxLength ? label : label[..ReferenceLabelMaxLength];
-    }
-
-    /// <summary>Column width of <see cref="Alert.ReferenceLabel"/>.</summary>
-    private const int ReferenceLabelMaxLength = 200;
-
-    public async Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
-    {
-        var reference = RebalancePortfolioReferenceId(userId);
-        await ResolveAsync(userId, AlertType.RebalanceProposal, reference, ct);
-        await _alerts.MarkAcceptedClearedAsync(userId, AlertType.RebalanceProposal, reference, ct);
-    }
+    public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.RebalanceProposal, RebalancePortfolioReferenceId(userId), ct);
 
     public Task GeneratePolicyReviewAlertAsync(
         Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default)
@@ -777,7 +765,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         {
             var rows = await _alerts.GetByReferenceAsync(userId, draft.Type, draft.ReferenceId, ct);
             var open = rows.FirstOrDefault(a => !a.IsResolved && !a.IsDismissed);
-            if (!DriftEpisode.Worsens(rows, draft.ReferenceLabel, createdAt - SilenceWindows[draft.Type]))
+            if (!DriftEpisode.Worsens(rows, draft.DedupKey, createdAt - SilenceWindows[draft.Type]))
             {
                 if (open is not null) await _alerts.BumpOccurrenceAsync(open.Id, ct);
                 return;
@@ -814,6 +802,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             Message = draft.Message,
             ReferenceId = draft.ReferenceId,
             ReferenceLabel = draft.ReferenceLabel,
+            DedupKey = draft.DedupKey,
             AppPath = draft.AppPath ?? AlertAppPath.Resolve(draft.Type, draft.ReferenceId, draft.ReferenceLabel, DateTimeOffset.UtcNow),
             HealthState = draft.HealthState,
         }, ct);
@@ -949,6 +938,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Where the alert opens, for an emitter that knows more than type, reference and label say.</summary>
         public string? AppPath { get; init; }
+
+        /// <summary>The machine dedupe key stored on the alert (<see cref="Alert.DedupKey"/>).</summary>
+        public string? DedupKey { get; init; }
 
         /// <summary>The connection-health state that raised the alert (<see cref="Alert.HealthState"/>).</summary>
         public string? HealthState { get; init; }

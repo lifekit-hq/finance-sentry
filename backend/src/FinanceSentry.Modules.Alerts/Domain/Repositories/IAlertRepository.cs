@@ -48,13 +48,6 @@ public interface IAlertRepository
     Task ResolveAtAsync(Guid alertId, DateTimeOffset resolvedAt, CancellationToken ct = default);
 
     /// <summary>
-    /// Re-stamps <c>ResolvedAt</c> to now on the user's accepted alerts of the type on the reference that still carry
-    /// the instant of their acceptance, so a resolve later than the acceptance reads as "the condition cleared".
-    /// Alerts already re-stamped are left alone.
-    /// </summary>
-    Task MarkAcceptedClearedAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
-
-    /// <summary>
     /// A suppressed repeat of an open alert (finance-sentry#419 S5): increments <c>OccurrenceCount</c>
     /// and refreshes <c>LastOccurredAt</c>/<c>UpdatedAt</c> on the existing row instead of inserting a
     /// new one, so the row count stays at 1 while the recurrence is still recorded.
