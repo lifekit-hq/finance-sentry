@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Scoring;
+using FinanceSentry.Modules.Research.Tests.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -56,6 +57,7 @@ public sealed class PromoteRejectExpireHandlerTests
             new FakeRiskPolicyGate(verdict),
             signals,
             new RecordingThesisEventRecorder(),
+            new InlineResearchWriteScope(),
             save,
             Options.Create(new OpportunityOptions()));
 
@@ -218,6 +220,7 @@ public sealed class PromoteRejectExpireHandlerTests
             gate,
             signals,
             new RecordingThesisEventRecorder(),
+            new InlineResearchWriteScope(),
             save,
             Options.Create(new OpportunityOptions()));
 
@@ -238,7 +241,7 @@ public sealed class PromoteRejectExpireHandlerTests
         var candidate = SeedActive(candidates, userId, "MSFT");
 
         var events = new RecordingThesisEventRecorder();
-        var handler = new RejectCandidateCommandHandler(candidates, events);
+        var handler = new RejectCandidateCommandHandler(candidates, events, new InlineResearchWriteScope());
 
         var result = await handler.Handle(
             new RejectCandidateCommand(userId, candidate.Id, "valuation too rich"), CancellationToken.None);
@@ -259,7 +262,7 @@ public sealed class PromoteRejectExpireHandlerTests
         var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "ok");
         var handler = new PromoteCandidateCommandHandler(
             candidates, new FakeCandidateScoreRepository(), new FakeRiskPolicyGate(allowed),
-            new RecordingRadarSignalWriter(), events, save, Options.Create(new OpportunityOptions()));
+            new RecordingRadarSignalWriter(), events, new InlineResearchWriteScope(), save, Options.Create(new OpportunityOptions()));
         var evidence = new ThesisEvidenceRefs(FilingAccessions: ["0000789019-26-000012"], FundamentalsAsOf: "2026-09-30");
 
         await handler.Handle(
@@ -289,7 +292,7 @@ public sealed class PromoteRejectExpireHandlerTests
         var events = new RecordingThesisEventRecorder();
         var handler = new PromoteCandidateCommandHandler(
             candidates, new FakeCandidateScoreRepository(), new FakeRiskPolicyGate(refused),
-            new RecordingRadarSignalWriter(), events, save, Options.Create(new OpportunityOptions()));
+            new RecordingRadarSignalWriter(), events, new InlineResearchWriteScope(), save, Options.Create(new OpportunityOptions()));
 
         var result = await handler.Handle(
             new PromoteCandidateCommand(userId, candidate.Id, ProposedUsd: 9_000m, Origin: ThesisEventOrigin.Ledger),
@@ -304,13 +307,44 @@ public sealed class PromoteRejectExpireHandlerTests
     }
 
     [Fact]
+    public async Task Promote_ByLedger_WithOverrideRisk_StaysRefused_NoThesisNoSignal_AndSaysOverrideIsOwnerOnly()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+        var refused = new RiskGateVerdict(RiskGateDecision.Refused, "max_position_weight", 0.4m, 0.25m, 5_000m, "too big");
+        var save = new RecordingSaveThesisHandler();
+        var signals = new RecordingRadarSignalWriter();
+        var gate = new FakeRiskPolicyGate(refused);
+        var handler = new PromoteCandidateCommandHandler(
+            candidates, new FakeCandidateScoreRepository(), gate,
+            signals, new RecordingThesisEventRecorder(), new InlineResearchWriteScope(), save,
+            Options.Create(new OpportunityOptions()));
+
+        var result = await handler.Handle(
+            new PromoteCandidateCommand(
+                userId, candidate.Id, OverrideRisk: true, ProposedUsd: 9_000m, Origin: ThesisEventOrigin.Ledger),
+            CancellationToken.None);
+
+        result.ThesisId.Should().BeNull();
+        result.Gate.Decision.Should().Be(RiskGateDecision.Refused);
+        result.Gate.RuleKey.Should().Be("max_position_weight");
+        result.Gate.LimitValue.Should().Be(0.25m);
+        result.Note.Should().Contain("owner");
+        save.Calls.Should().Be(0);
+        signals.Signals.Should().BeEmpty();
+        candidate.Status.Should().Be(CandidateStatus.Active);
+        gate.LastOverrideRisk.Should().BeFalse("the gate is asked without the override Ledger cannot hold");
+    }
+
+    [Fact]
     public async Task Reject_ByLedger_RecordsLedgerOriginAndReasonInTheAudit()
     {
         var candidates = new FakeCandidateRepository();
         var userId = Guid.NewGuid();
         var candidate = SeedActive(candidates, userId, "MSFT");
         var events = new RecordingThesisEventRecorder();
-        var handler = new RejectCandidateCommandHandler(candidates, events);
+        var handler = new RejectCandidateCommandHandler(candidates, events, new InlineResearchWriteScope());
 
         await handler.Handle(
             new RejectCandidateCommand(userId, candidate.Id, "valuation too rich", ThesisEventOrigin.Ledger),

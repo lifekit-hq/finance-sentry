@@ -4,6 +4,7 @@ using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -40,7 +41,7 @@ public sealed class SaveThesisWritePathTests
     private static SaveThesisCommandHandler HandlerOver(
         ThesisSqliteFixture.ThesisOnlySqliteContext ctx, RecordingThesisEventRecorder recorder) =>
         new(
-            new ThesisRepository(ctx), recorder, new ThesisOriginReader(new InMemoryThesisEventRepository()),
+            new ThesisRepository(ctx), recorder, new ResearchWriteScope(ctx), new ThesisOriginReader(new InMemoryThesisEventRepository()),
             NullLogger<SaveThesisCommandHandler>.Instance);
 
     private static async Task<IReadOnlyList<InvestmentThesis>> ReadBackAsync(ThesisSqliteFixture fixture)

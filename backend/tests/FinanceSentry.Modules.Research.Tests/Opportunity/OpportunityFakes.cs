@@ -343,12 +343,14 @@ internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyG
 {
     public string? LastTicker { get; private set; }
     public bool? LastIsPaper { get; private set; }
+    public bool? LastOverrideRisk { get; private set; }
 
     public Task<RiskGateVerdict> CheckProposalAsync(
         Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default)
     {
         LastTicker = ticker;
         LastIsPaper = isPaper;
+        LastOverrideRisk = overrideFlag;
         return Task.FromResult(verdict);
     }
 }

@@ -20,7 +20,8 @@ public sealed record RejectCandidateResult(bool CandidateFound, CandidateStatus 
 
 public sealed class RejectCandidateCommandHandler(
     ICandidateRepository candidateRepo,
-    IThesisEventRecorder eventRecorder)
+    IThesisEventRecorder eventRecorder,
+    IResearchWriteScope writeScope)
     : ICommandHandler<RejectCandidateCommand, RejectCandidateResult>
 {
     public async Task<RejectCandidateResult> Handle(RejectCandidateCommand command, CancellationToken ct)
@@ -38,13 +39,16 @@ public sealed class RejectCandidateCommandHandler(
 
         candidate.Status = CandidateStatus.Rejected;
         candidate.RejectedReason = command.Reason;
-        await candidateRepo.UpdateAsync(candidate, ct);
-
-        await eventRecorder.RecordAuditedAsync(
-            command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
-            ThesisEventType.Rejected, command.Origin,
-            new ThesisAudit(Prior: null, New: null, command.Reason, Evidence: null),
-            command.Reason, ct);
+        await writeScope.RunAsync(command.Origin, async () =>
+        {
+            await candidateRepo.UpdateAsync(candidate, ct);
+            await eventRecorder.RecordAuditedAsync(
+                command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
+                ThesisEventType.Rejected, command.Origin,
+                new ThesisAudit(Prior: null, New: null, command.Reason, Evidence: null),
+                command.Reason, ct);
+            return candidate;
+        }, ct);
 
         return new RejectCandidateResult(CandidateFound: true, CandidateStatus.Rejected);
     }

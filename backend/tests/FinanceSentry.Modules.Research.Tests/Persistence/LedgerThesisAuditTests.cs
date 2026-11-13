@@ -4,6 +4,7 @@ using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -39,7 +40,7 @@ public sealed class LedgerThesisAuditTests
         {
             await using var ctx = fixture.CreateContext(UserId);
             var handler = new SaveThesisCommandHandler(
-                new ThesisRepository(ctx), Recorder(), new ThesisOriginReader(Journal),
+                new ThesisRepository(ctx), Recorder(), new ResearchWriteScope(ctx), new ThesisOriginReader(Journal),
                 NullLogger<SaveThesisCommandHandler>.Instance);
             return await handler.Handle(
                 new SaveThesisCommand(
@@ -51,7 +52,7 @@ public sealed class LedgerThesisAuditTests
         public async Task<RevertThesisRevisionResult> RevertAsync(Guid eventId, ThesisEventOrigin origin, string? rationale = null)
         {
             await using var ctx = fixture.CreateContext(UserId);
-            var handler = new RevertThesisRevisionCommandHandler(new ThesisRepository(ctx), Journal, Recorder());
+            var handler = new RevertThesisRevisionCommandHandler(new ThesisRepository(ctx), Journal, Recorder(), new ResearchWriteScope(ctx));
             return await handler.Handle(
                 new RevertThesisRevisionCommand(UserId, eventId, rationale, origin), CancellationToken.None);
         }
@@ -249,26 +250,49 @@ public sealed class LedgerThesisAuditTests
         (await h.RevertAsync(revision.Id, ThesisEventOrigin.User)).Outcome.Should().Be(RevertOutcome.EventNotFound);
     }
 
+    private static async Task<ThesisDto> SaveWithJournalDownAsync(
+        ThesisSqliteFixture fixture, ThesisEventOrigin origin, Guid? id, string text)
+    {
+        await using var ctx = fixture.CreateContext(UserId);
+        var handler = new SaveThesisCommandHandler(
+            new ThesisRepository(ctx),
+            new RecordingThesisEventRecorder { FailWith = new InvalidOperationException("journal down") },
+            new ResearchWriteScope(ctx),
+            new ThesisOriginReader(new InMemoryThesisEventRepository()),
+            NullLogger<SaveThesisCommandHandler>.Instance);
+        return await handler.Handle(
+            new SaveThesisCommand(UserId, id, Ticker, text, [], [], [Drawdown45], Origin: origin),
+            CancellationToken.None);
+    }
+
     [Fact]
-    public async Task Revise_ByLedger_WhenTheJournalIsDown_SurfacesTheFailure_ButTheOwnersEditDoesNot()
+    public async Task Revise_ByLedger_WhenTheJournalIsDown_FailsAndRollsTheRevisionBack_ButTheOwnersEditSurvives()
     {
         await using var fixture = await ThesisSqliteFixture.CreateAsync();
-        var created = await new Harness(fixture).SaveAsync(ThesisEventOrigin.User, "Original case.", Drawdown30);
+        var h = new Harness(fixture);
+        var created = await h.SaveAsync(ThesisEventOrigin.User, "Original case.", Drawdown30);
 
-        async Task<ThesisDto> ReviseWith(ThesisEventOrigin origin)
-        {
-            await using var ctx = fixture.CreateContext(UserId);
-            var handler = new SaveThesisCommandHandler(
-                new ThesisRepository(ctx),
-                new RecordingThesisEventRecorder { FailWith = new InvalidOperationException("journal down") },
-                new ThesisOriginReader(new InMemoryThesisEventRepository()),
-                NullLogger<SaveThesisCommandHandler>.Instance);
-            return await handler.Handle(
-                new SaveThesisCommand(UserId, created.Id, Ticker, $"Edit by {origin}.", [], [], [Drawdown45], Origin: origin),
-                CancellationToken.None);
-        }
+        await ((Func<Task>)(() => SaveWithJournalDownAsync(fixture, ThesisEventOrigin.Ledger, created.Id, "Edit by Ledger.")))
+            .Should().ThrowAsync<InvalidOperationException>();
 
-        await ((Func<Task>)(() => ReviseWith(ThesisEventOrigin.Ledger))).Should().ThrowAsync<InvalidOperationException>();
-        (await ReviseWith(ThesisEventOrigin.User)).ThesisText.Should().Be("Edit by User.");
+        var afterLedgerFailure = await h.ReadAsync(created.Id);
+        afterLedgerFailure.ThesisText.Should().Be("Original case.", "an unjournaled Ledger change must not persist");
+        afterLedgerFailure.InvalidationTriggers.Should().Equal(Drawdown30);
+
+        (await SaveWithJournalDownAsync(fixture, ThesisEventOrigin.User, created.Id, "Edit by User."))
+            .ThesisText.Should().Be("Edit by User.");
+    }
+
+    [Fact]
+    public async Task Create_ByLedger_WhenTheJournalIsDown_FailsAndLeavesNoThesis_SoARetryCannotDuplicateIt()
+    {
+        await using var fixture = await ThesisSqliteFixture.CreateAsync();
+
+        await ((Func<Task>)(() => SaveWithJournalDownAsync(fixture, ThesisEventOrigin.Ledger, id: null, "Ledger thesis.")))
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        await using var readCtx = fixture.CreateContext(UserId);
+        (await new ThesisRepository(readCtx).FindByTickerAsync(UserId, Ticker, CancellationToken.None))
+            .Should().BeEmpty();
     }
 }

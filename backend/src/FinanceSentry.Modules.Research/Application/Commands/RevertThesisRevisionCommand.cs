@@ -36,7 +36,8 @@ public sealed record RevertThesisRevisionResult(RevertOutcome Outcome, ThesisDto
 public sealed class RevertThesisRevisionCommandHandler(
     IThesisRepository thesisRepo,
     IThesisEventRepository eventRepo,
-    IThesisEventRecorder eventRecorder)
+    IThesisEventRecorder eventRecorder,
+    IResearchWriteScope writeScope)
     : ICommandHandler<RevertThesisRevisionCommand, RevertThesisRevisionResult>
 {
     public async Task<RevertThesisRevisionResult> Handle(RevertThesisRevisionCommand cmd, CancellationToken ct)
@@ -67,14 +68,17 @@ public sealed class RevertThesisRevisionCommandHandler(
         }
 
         prior.ApplyTo(thesis);
-        await thesisRepo.UpsertAsync(thesis, ct);
-
         var rationale = string.IsNullOrWhiteSpace(cmd.Rationale) ? null : cmd.Rationale.Trim();
-        await eventRecorder.RecordAuditedAsync(
-            cmd.UserId, ThesisSubjectType.Thesis, thesis.Id, thesis.Ticker,
-            ThesisEventType.Reverted, cmd.Origin,
-            new ThesisAudit(replaced, prior, rationale, Evidence: null, RevertsEventId: revision.Id),
-            rationale, ct);
+        await writeScope.RunAsync(cmd.Origin, async () =>
+        {
+            await thesisRepo.UpsertAsync(thesis, ct);
+            await eventRecorder.RecordAuditedAsync(
+                cmd.UserId, ThesisSubjectType.Thesis, thesis.Id, thesis.Ticker,
+                ThesisEventType.Reverted, cmd.Origin,
+                new ThesisAudit(replaced, prior, rationale, Evidence: null, RevertsEventId: revision.Id),
+                rationale, ct);
+            return thesis;
+        }, ct);
 
         return new RevertThesisRevisionResult(
             RevertOutcome.Reverted,

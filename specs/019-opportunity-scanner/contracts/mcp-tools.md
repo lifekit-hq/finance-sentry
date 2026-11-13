@@ -39,11 +39,12 @@ thesis's own `Created` event carries the audit payload (see docs/mcp.md); the `P
   `KeyDataPoints` (`direction: "observed"`, `source: "candidate_scorecard"`). A candidate with no scorecard degrades to the
   default text and no data points; it never fails the promotion. Triggers, risk gate and the
   `SaveThesisCommand` path are unchanged; no schema change.
-- **Returns**: `{ thesisId?, gate: RiskGateVerdict }`. Runs `IRiskPolicyGate.CheckProposalAsync`
+- **Returns**: `{ thesisId?, gate: RiskGateVerdict, note? }`. Runs `IRiskPolicyGate.CheckProposalAsync`
   (FR-011b): `Refused` (and no `overrideRisk`) → returns the verdict with the named rule + max compliant
   size, NO thesis created. Otherwise creates the `InvestmentThesis` via `SaveThesisCommand` with prefilled
   triggers (validated by `ThesisTriggerVocabulary`), links the candidate (`PromotedThesisId`, status
-  `Promoted`), records a `Promoted` candidate event (020). An override is recorded as a signal (FR-007).
+  `Promoted`), records a `Promoted` candidate event (020). An override is recorded as a signal (FR-007). `overrideRisk` is
+  owner-only: a Ledger (service-token) call ignores it, stays `Refused`, and `note` says the override is owner-only.
 - **`paper` (finance-sentry#704)**: a paper/tracking-only promotion never draws down real cash, so the
   real-book cash-funding rule (`MinCashBuffer`) has no meaning for it and is skipped when `paper: true`.
   Concentration/sizing rules (`MaxPositionWeight`, `MaxNewPosition`, `Turnover`) still apply unchanged —

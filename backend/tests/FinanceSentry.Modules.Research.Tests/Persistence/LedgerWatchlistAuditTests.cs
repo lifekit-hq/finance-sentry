@@ -55,7 +55,7 @@ public sealed class LedgerWatchlistAuditTests
     public async Task Add_ByLedger_JournalsACreatedWatchlistEvent_WithLedgerOrigin_AndTheListShowsIt()
     {
         var (repo, journal, recorder) = Build();
-        var add = new AddWatchlistItemCommandHandler(repo, recorder, NullLogger<AddWatchlistItemCommandHandler>.Instance);
+        var add = new AddWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<AddWatchlistItemCommandHandler>.Instance);
 
         var added = await add.Handle(
             new AddWatchlistItemCommand(UserId, " amd ", "NASDAQ", "supply-chain read-through", ThesisEventOrigin.Ledger),
@@ -79,7 +79,7 @@ public sealed class LedgerWatchlistAuditTests
     public async Task Add_ByOwner_ReadsAsUser()
     {
         var (repo, journal, recorder) = Build();
-        var add = new AddWatchlistItemCommandHandler(repo, recorder, NullLogger<AddWatchlistItemCommandHandler>.Instance);
+        var add = new AddWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<AddWatchlistItemCommandHandler>.Instance);
 
         await add.Handle(new AddWatchlistItemCommand(UserId, "MSFT", null, null), CancellationToken.None);
 
@@ -92,7 +92,7 @@ public sealed class LedgerWatchlistAuditTests
     public async Task Add_Duplicate_StillRefused_ForLedger()
     {
         var (repo, _, recorder) = Build();
-        var add = new AddWatchlistItemCommandHandler(repo, recorder, NullLogger<AddWatchlistItemCommandHandler>.Instance);
+        var add = new AddWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<AddWatchlistItemCommandHandler>.Instance);
         await add.Handle(new AddWatchlistItemCommand(UserId, "AMD", null, null, ThesisEventOrigin.Ledger), CancellationToken.None);
 
         var again = () => add.Handle(
@@ -105,10 +105,10 @@ public sealed class LedgerWatchlistAuditTests
     public async Task Remove_ByLedger_JournalsAClosedWatchlistEvent_ForTheRemovedEntry()
     {
         var (repo, journal, recorder) = Build();
-        var added = await new AddWatchlistItemCommandHandler(repo, recorder, NullLogger<AddWatchlistItemCommandHandler>.Instance)
+        var added = await new AddWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<AddWatchlistItemCommandHandler>.Instance)
             .Handle(new AddWatchlistItemCommand(UserId, "AMD", null, "thesis broke"), CancellationToken.None);
 
-        var removed = await new RemoveWatchlistItemCommandHandler(repo, recorder, NullLogger<RemoveWatchlistItemCommandHandler>.Instance)
+        var removed = await new RemoveWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<RemoveWatchlistItemCommandHandler>.Instance)
             .Handle(new RemoveWatchlistItemCommand(UserId, added.Id, ThesisEventOrigin.Ledger), CancellationToken.None);
 
         removed.Should().BeTrue();
@@ -125,7 +125,7 @@ public sealed class LedgerWatchlistAuditTests
     {
         var (repo, journal, recorder) = Build();
 
-        var removed = await new RemoveWatchlistItemCommandHandler(repo, recorder, NullLogger<RemoveWatchlistItemCommandHandler>.Instance)
+        var removed = await new RemoveWatchlistItemCommandHandler(repo, recorder, new InlineResearchWriteScope(), NullLogger<RemoveWatchlistItemCommandHandler>.Instance)
             .Handle(new RemoveWatchlistItemCommand(UserId, Guid.NewGuid(), ThesisEventOrigin.Ledger), CancellationToken.None);
 
         removed.Should().BeFalse();

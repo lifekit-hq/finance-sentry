@@ -26,6 +26,7 @@ public record SaveThesisCommand(
 public class SaveThesisCommandHandler(
     IThesisRepository repo,
     IThesisEventRecorder eventRecorder,
+    IResearchWriteScope writeScope,
     ThesisOriginReader originReader,
     ILogger<SaveThesisCommandHandler> logger)
     : ICommandHandler<SaveThesisCommand, ThesisDto>
@@ -60,17 +61,21 @@ public class SaveThesisCommandHandler(
         var current = ThesisVersion.Of(thesis);
         var revised = prior is not null && !prior.SameContentAs(current);
 
-        await repo.UpsertAsync(thesis, ct);
-
         var audit = new ThesisAudit(prior, current, Trimmed(cmd.Rationale) ?? Trimmed(cmd.DecisionNote), cmd.Evidence);
-        if (isNewThesis)
+        await writeScope.RunAsync(cmd.Origin, async () =>
         {
-            await TryRecordCreatedAsync(thesis, cmd, audit, ct);
-        }
-        else if (revised)
-        {
-            await RecordRevisedAsync(thesis, cmd, audit, ct);
-        }
+            await repo.UpsertAsync(thesis, ct);
+            if (isNewThesis)
+            {
+                await RecordAsync(thesis, cmd, ThesisEventType.Created, audit, cmd.DecisionNote, ct);
+            }
+            else if (revised)
+            {
+                await RecordAsync(thesis, cmd, ThesisEventType.Revised, audit, audit.Rationale, ct);
+            }
+
+            return thesis;
+        }, ct);
 
         var origin = isNewThesis || revised
             ? cmd.Origin
@@ -86,57 +91,29 @@ public class SaveThesisCommandHandler(
     private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
-    /// A revision's journal entry is what makes a Ledger change visible and reversible, so unlike the Created append
-    /// it is not swallowed when Ledger made the change: the caller sees the failure and retries, instead of leaving a
-    /// change nothing recorded. The owner's own edit keeps the best-effort treatment.
+    /// FR-001/FR-002: one Created event per thesis, never on update; a Revised event for a content change. When Ledger
+    /// made the change the append is part of the write's transaction and a failure rolls the thesis back, so the caller
+    /// retries a clean write (the audit trail is what makes a Ledger change visible and reversible). The owner's own
+    /// save keeps the journal best-effort: the append runs after the thesis is committed, and failing the call then
+    /// would make the caller retry and write another row, since a create carries a fresh id (issue #626). Logged at
+    /// error, because a lost event has no backfill path (unlike a missing quote, which
+    /// <see cref="ThesisEventRecorder"/> marks PricesPending for the weekly job).
     /// </summary>
-    private async Task RecordRevisedAsync(InvestmentThesis thesis, SaveThesisCommand cmd, ThesisAudit audit, CancellationToken ct)
+    private async Task RecordAsync(
+        InvestmentThesis thesis, SaveThesisCommand cmd, ThesisEventType eventType, ThesisAudit audit, string? decisionNote,
+        CancellationToken ct)
     {
         try
         {
             await eventRecorder.RecordAuditedAsync(
                 thesis.UserId, ThesisSubjectType.Thesis, thesis.Id, thesis.Ticker,
-                ThesisEventType.Revised, cmd.Origin, audit, audit.Rationale, ct);
+                eventType, cmd.Origin, audit, decisionNote, ct);
         }
         catch (Exception ex) when (cmd.Origin == ThesisEventOrigin.User)
         {
             logger.LogError(
-                ex, "Revised-event recording failed for thesis {ThesisId} ({Ticker}) — thesis saved without it",
-                thesis.Id, thesis.Ticker);
-        }
-    }
-
-    /// <summary>
-    /// FR-001/FR-002: one Created event per thesis, never on update. The append runs *after* the
-    /// thesis is committed, so letting it throw fails a call whose thesis is already in the
-    /// database — the caller then retries and every retry writes another row, since a create
-    /// carries a fresh id (issue #626). The journal is best-effort here for the same reason
-    /// <c>RunThesisMonitorCommandHandler.TryRecordEventAsync</c> treats it as best-effort: a
-    /// track-record side-effect must not decide whether the user's thesis was saved. Logged at
-    /// error, because a lost Created event has no backfill path (unlike a missing quote, which
-    /// <see cref="ThesisEventRecorder"/> marks PricesPending for the weekly job).
-    /// </summary>
-    private async Task TryRecordCreatedAsync(
-        InvestmentThesis thesis, SaveThesisCommand cmd, ThesisAudit audit, CancellationToken ct)
-    {
-        try
-        {
-            await eventRecorder.RecordAuditedAsync(
-                thesis.UserId,
-                ThesisSubjectType.Thesis,
-                thesis.Id,
-                thesis.Ticker,
-                ThesisEventType.Created,
-                cmd.Origin,
-                audit,
-                cmd.DecisionNote,
-                ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex, "Created-event recording failed for thesis {ThesisId} ({Ticker}) — thesis saved without it",
-                thesis.Id, thesis.Ticker);
+                ex, "{EventType}-event recording failed for thesis {ThesisId} ({Ticker}) — thesis saved without it",
+                eventType, thesis.Id, thesis.Ticker);
         }
     }
 }
