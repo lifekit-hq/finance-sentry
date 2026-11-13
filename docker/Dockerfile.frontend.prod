@@ -33,6 +33,7 @@ RUN node scripts/precompress.mjs dist/finance-sentry/browser
 # Only the static module is built: it serves the build-time .br files and needs no brotli library.
 FROM nginxinc/nginx-unprivileged:alpine AS brotli-module
 USER root
+ARG APK_REFRESH
 RUN apk upgrade --no-cache \
     && apk add --no-cache build-base curl git linux-headers openssl-dev pcre2-dev zlib-dev
 ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
@@ -59,6 +60,7 @@ USER root
 # libexpat is pinned the same way to the CVE-2026-117610/CVE-2026-118370 fix (2.10.0-r0): the cached upgrade layer kept 2.9.0-r0.
 # brotli-libs likewise to the CVE-2026-111497 fix (1.2.1-r0): the cached upgrade layer kept 1.2.0-r1.
 # libxslt likewise to the CVE-2026-87636/CVE-2026-9947 fix (1.1.43-r4): the cached upgrade layer kept 1.1.43-r3.
+ARG APK_REFRESH
 RUN apk upgrade --no-cache \
     && apk add --no-cache 'tiff>=4.7.2-r0' 'libexpat>=2.10.0-r0' 'brotli-libs>=1.2.1-r0' 'libxslt>=1.1.43-r4'
 

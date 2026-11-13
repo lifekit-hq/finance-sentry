@@ -40,6 +40,7 @@ WORKDIR /app
 # openssh-client: problem reports reach the fleet inbox over the host's kit-relay forced command (ssh only; no sshd).
 # apk upgrade first: the aspnet base image lags Alpine security releases (openssl/libpq CVEs)
 # and the Trivy HIGH/CRITICAL gate in docker-build.yml fails the build until they're patched.
+ARG APK_REFRESH
 RUN apk upgrade --no-cache && \
     apk add --no-cache curl tzdata postgresql16-client age krb5-libs openssh-client
 
