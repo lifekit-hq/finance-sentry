@@ -5,6 +5,7 @@ using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
+using FinanceSentry.Modules.Research.Application.Services.Screens;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -97,6 +98,14 @@ public static class ResearchModule
                 CoverageEvaluationJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
+
+            // Discovery-funnel screens (stage 5): fundamentals, relative strength and dated catalyst over the reference
+            // universe nominate into the candidate path before the 00:00 scan; the 01:10 coverage evaluation reads them.
+            var screenOptions = sp.GetRequiredService<IOptions<ScreenOptions>>().Value;
+            mgr.AddOrUpdate<ScreenNominationJob>(
+                ScreenNominationJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(screenOptions.RunHourUtc, screenOptions.RunMinuteUtc));
 
             mgr.AddOrUpdate<CandidateExpiryJob>(
                 "opportunity-candidate-expiry",
@@ -503,6 +512,17 @@ public static class ResearchModule
         services.AddScoped<CoverageEvaluationJob>();
         services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();
         services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
+
+        // Screens (stage 5 of the discovery funnel): deterministic nominations into the candidate path, tagged with the
+        // screen that fired. The earnings window rides the Finnhub client and key registered above.
+        services.Configure<ScreenOptions>(config.GetSection(ScreenOptions.SectionName));
+        services.AddSingleton<IEarningsWindowSource, FinnhubEarningsWindowSource>();
+        services.AddScoped<ScreenUniverse>();
+        services.AddScoped<IScreen, FundamentalsScreen>();
+        services.AddScoped<IScreen, CatalystScreen>();
+        services.AddScoped<IScreen, RelativeStrengthScreen>();
+        services.AddScoped<ScreenNominator>();
+        services.AddScoped<ScreenNominationJob>();
         services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
 
