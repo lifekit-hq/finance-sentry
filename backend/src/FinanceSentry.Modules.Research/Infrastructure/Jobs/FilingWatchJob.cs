@@ -28,6 +28,11 @@ using Microsoft.Extensions.Logging;
 /// Active candidate on it. Candidate tickers outside the detector's universe are read too, for the notice alone: a candidate
 /// is not a holding, so it earns no FilingLanded alert of its own.
 /// </para>
+/// <para>
+/// Coverage names (<see cref="LookaheadUniverse.CoverageTickersByPriorityAsync"/>, held ones first) are read the same way, for
+/// the notice and the coverage event review alone (<see cref="ReviewDueRaiser.CompleteAsync"/>): a filing on a name we only
+/// cover moves its <c>LastEventAt</c>, re-scores its candidate and runs the coverage remove rules, with no FilingLanded alert.
+/// </para>
 /// </summary>
 public sealed class FilingWatchJob(
     IBankingTotalsReader banking,
@@ -87,6 +92,7 @@ public sealed class FilingWatchJob(
     private async Task ProcessUserAsync(Guid userId, DateOnly today, CancellationToken ct)
     {
         var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        subjects.TrackCoverage(await universe.CoverageTickersByPriorityAsync(userId, ct));
         var detectorTickers = await universe.FilingTickersAsync(userId, ct);
 
         foreach (var ticker in detectorTickers)
@@ -94,10 +100,12 @@ public sealed class FilingWatchJob(
             await ProcessTickerAsync(userId, ticker, today, subjects, raiseFilingAlert: true, ct);
         }
 
-        foreach (var ticker in subjects.Tickers.Where(t => !detectorTickers.Contains(t)).ToList())
+        foreach (var ticker in subjects.WatchedTickers.Where(t => !detectorTickers.Contains(t)).ToList())
         {
             await ProcessTickerAsync(userId, ticker, today, subjects, raiseFilingAlert: false, ct);
         }
+
+        await reviewDue.CompleteAsync(userId, subjects, ct);
     }
 
     private async Task ProcessTickerAsync(

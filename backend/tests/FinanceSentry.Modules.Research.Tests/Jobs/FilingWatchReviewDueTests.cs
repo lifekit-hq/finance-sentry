@@ -37,10 +37,10 @@ public sealed class FilingWatchReviewDueTests
     {
         _job = new FilingWatchJob(
             _banking.Object,
-            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
             _secEdgar.Object,
             _alerts.Object,
-            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object, CoverageStubs.NoReviewer()),
             NullLogger<FilingWatchJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);

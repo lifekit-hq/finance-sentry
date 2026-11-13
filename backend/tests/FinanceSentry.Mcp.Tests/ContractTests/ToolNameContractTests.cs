@@ -64,6 +64,7 @@ public sealed class ToolNameContractTests
         "list_active_alerts",
         "list_candidates",
         "list_coverage",
+        "list_coverage_events",
         "list_ledger_corrections",
         "list_news_sources",
         "list_recommendations",

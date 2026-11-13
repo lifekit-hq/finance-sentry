@@ -15,6 +15,10 @@ public sealed class CoverageToolsTests
     private readonly Mock<IQueryHandler<ListCoverageQuery, CoverageListView>> _list = new();
     private readonly Mock<IQueryHandler<ExplainCoverageQuery, CoverageExplanation>> _explain = new();
 
+    private readonly Mock<IQueryHandler<ListCoverageEventsQuery, CoverageEventDigest>> _events = new();
+
+    private ListCoverageEventsTool CreateEvents(Guid? user) => new(_events.Object, new FakeIdentityResolver { ResolvedUserId = user });
+
     private ListCoverageTool CreateList(Guid? user) => new(_list.Object, new FakeIdentityResolver { ResolvedUserId = user });
 
     private ExplainCoverageTool CreateExplain(Guid? user) => new(_explain.Object, new FakeIdentityResolver { ResolvedUserId = user });
@@ -66,5 +70,34 @@ public sealed class CoverageToolsTests
 
         captured.Should().Be(new ExplainCoverageQuery(UserId, "MU"));
         result.Should().BeSameAs(explanation);
+    }
+
+    [Fact]
+    public async Task ListCoverageEvents_ReturnsAnEmptyDigest_WhenIdentityUnresolved()
+    {
+        var since = new DateTimeOffset(2026, 11, 15, 0, 0, 0, TimeSpan.Zero);
+
+        var result = await CreateEvents(null).ExecuteAsync(since);
+
+        result.Since.Should().Be(since);
+        result.Total.Should().Be(0);
+        result.Events.Should().BeEmpty();
+        _events.Verify(h => h.Handle(It.IsAny<ListCoverageEventsQuery>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListCoverageEvents_QueriesTheWindowAndLimitForTheAuthenticatedUser()
+    {
+        ListCoverageEventsQuery? captured = null;
+        var since = new DateTimeOffset(2026, 11, 15, 0, 0, 0, TimeSpan.Zero);
+        var digest = new CoverageEventDigest(since, since.AddDays(1), 0, 0, 0, false, [], []);
+        _events.Setup(h => h.Handle(It.IsAny<ListCoverageEventsQuery>(), It.IsAny<CancellationToken>()))
+            .Callback<ListCoverageEventsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync(digest);
+
+        var result = await CreateEvents(UserId).ExecuteAsync(since, 25);
+
+        captured.Should().Be(new ListCoverageEventsQuery(UserId, since, 25));
+        result.Should().BeSameAs(digest);
     }
 }

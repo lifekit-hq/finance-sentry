@@ -335,6 +335,82 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("candidate_scores", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Disposition")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Rescored")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ReviewNotice")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rule")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Verdict")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "OccurredAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_coverage_events_user_occurred");
+
+                    b.HasIndex("UserId", "Ticker", "Source", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_coverage_events_identity");
+
+                    b.ToTable("coverage_events", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageJournalEntry", b =>
                 {
                     b.Property<Guid>("Id")

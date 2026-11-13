@@ -33,7 +33,7 @@ public sealed class LookaheadSilenceMonitorJobTests
     {
         _job = new LookaheadSilenceMonitorJob(
             _banking.Object,
-            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
             _fireHistory.Object,
             _schedules.Object,
             _alerts.Object,

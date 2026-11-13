@@ -19,6 +19,13 @@ public sealed record CoverageRunSummary(int Added, int Removed, int Updated, int
         Observations + other.Observations, Members + other.Members);
 }
 
+/// <summary>What the coverage rules decided for one reviewed member.</summary>
+/// <param name="Removed">True when a remove rule fired and the member left coverage.</param>
+/// <param name="Rule">The remove rule that fired (<see cref="CoverageRuleIds"/>); null when kept.</param>
+/// <param name="Detail">The facts the rule read; empty when kept.</param>
+/// <param name="Verdict">The newest verdict word stored for the name; null when it has none.</param>
+public sealed record CoverageTickerReview(string Ticker, bool Removed, string? Rule, string Detail, string? Verdict);
+
 /// <summary>
 /// The coverage evaluation (discovery funnel stage 1): seeds the universe from holdings and the watchlist, applies
 /// the add and remove rules (<see cref="CoverageRules"/>) to the rest, ranks cap-bound adds with the D1 correlation
@@ -65,6 +72,7 @@ public sealed class CoverageEvaluator(
 
         var pruned = await coverage.PruneObservationsUnscopedAsync(
             DateOnly.FromDateTime(asOf.UtcDateTime).AddDays(-_options.ObservationRetentionDays), ct);
+        await coverage.PruneEventsUnscopedAsync(asOf.AddDays(-_options.EventRetentionDays), ct);
 
         logger.LogInformation(
             "Coverage evaluation: users {Users}, added {Added}, removed {Removed}, updated {Updated}, deferred by the cap " +
@@ -82,9 +90,24 @@ public sealed class CoverageEvaluator(
     }
 
     public async Task<CoverageRunSummary> EvaluateUserAsync(Guid userId, DateTimeOffset asOf, CancellationToken ct = default)
+        => (await EvaluateCoreAsync(userId, asOf, null, ct)).Summary;
+
+    /// <summary>
+    /// The event-driven review of members a hit just touched (discovery funnel stage 4): the same snapshot, verdict
+    /// reading, refresh and remove rules as the nightly run, restricted to <paramref name="tickers"/>. The add rules do
+    /// not run here: a member is already covered, and a name removed by this review rejoins only through the nightly
+    /// run's removal cutoff (newer evidence only). A ticker that is not a member is ignored.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, CoverageTickerReview>> ReviewTickersAsync(
+        Guid userId, IReadOnlyCollection<string> tickers, DateTimeOffset asOf, CancellationToken ct = default)
+        => (await EvaluateCoreAsync(userId, asOf, tickers.ToHashSet(StringComparer.OrdinalIgnoreCase), ct)).Reviews;
+
+    private async Task<(CoverageRunSummary Summary, IReadOnlyDictionary<string, CoverageTickerReview> Reviews)> EvaluateCoreAsync(
+        Guid userId, DateTimeOffset asOf, IReadOnlySet<string>? only, CancellationToken ct)
     {
         var snapshot = await snapshots.ReadAsync(userId, asOf, ct);
-        var observations = await RecordVerdictsAsync(userId, snapshot, ct);
+        var observations = await RecordVerdictsAsync(userId, snapshot, only, ct);
+        var reviews = new Dictionary<string, CoverageTickerReview>(StringComparer.OrdinalIgnoreCase);
 
         var correlations = new Dictionary<string, (decimal? Value, int Penalty)>(StringComparer.OrdinalIgnoreCase);
         var book = snapshot.Holdings.Select(h => new CorrelationReference(h.Symbol, h.UsdValue)).ToList();
@@ -95,10 +118,16 @@ public sealed class CoverageEvaluator(
         var journal = new List<CoverageJournalEntry>();
 
         // Members first: refresh their facts and apply the remove rules.
-        var catalysts = await NextEarningsAsync(snapshot, asOf, ct);
+        var catalysts = await NextEarningsAsync(snapshot, asOf, only, ct);
         var keep = new List<CoverageMember>();
         foreach (var member in snapshot.Members)
         {
+            if (only is not null && !only.Contains(member.Ticker))
+            {
+                keep.Add(member);
+                continue;
+            }
+
             var facts = MemberFacts(snapshot, member, catalysts);
             var (corr, penalty) = await CorrelationAsync(correlations, member.Ticker, book, ct);
             facts = facts with { CorrelationToBook = corr, CorrelationPenalty = penalty };
@@ -108,6 +137,8 @@ public sealed class CoverageEvaluator(
                 removed.Add(member);
                 journal.Add(Entry(userId, member.Ticker, CoverageAction.Removed, decision.Rule, member.AddedReason,
                     decision.Detail, asOf, corr, null));
+                reviews[member.Ticker] = new CoverageTickerReview(
+                    member.Ticker, true, decision.Rule, decision.Detail, LatestVerdict(snapshot, member.Ticker));
                 continue;
             }
 
@@ -116,6 +147,17 @@ public sealed class CoverageEvaluator(
             {
                 updated.Add(member);
             }
+
+            reviews[member.Ticker] = new CoverageTickerReview(
+                member.Ticker, false, null, string.Empty, LatestVerdict(snapshot, member.Ticker));
+        }
+
+        if (only is not null)
+        {
+            // A review of named members stops here: it never adds, and the cap, ranking and contender reads
+            // belong to the nightly run.
+            await coverage.SaveEvaluationAsync(userId, [], updated, removed, journal, ct);
+            return (new CoverageRunSummary(0, removed.Count, updated.Count, 0, observations, keep.Count), reviews);
         }
 
         // Then the names not yet covered: pinned ones always join, ranked ones compete for the free slots.
@@ -182,21 +224,28 @@ public sealed class CoverageEvaluator(
 
         await coverage.SaveEvaluationAsync(userId, added, updated, removed, journal, ct);
 
-        return new CoverageRunSummary(
-            added.Count, removed.Count, updated.Count, deferred, observations, keep.Count + added.Count);
+        return (new CoverageRunSummary(
+            added.Count, removed.Count, updated.Count, deferred, observations, keep.Count + added.Count), reviews);
     }
+
+    private static string? LatestVerdict(CoverageSnapshot snapshot, string ticker)
+        => snapshot.Verdicts.TryGetValue(ticker, out var days) && days.Count > 0
+            ? days.OrderByDescending(d => d.Day).First().Verdict
+            : null;
 
     /// <summary>
     /// Records today's verdict for each Active candidate that was scored inside the window, once per day: members
     /// first, then the most recently scored, up to <see cref="CoverageOptions.MaxVerdictReadsPerRun"/>.
     /// </summary>
-    private async Task<int> RecordVerdictsAsync(Guid userId, CoverageSnapshot snapshot, CancellationToken ct)
+    private async Task<int> RecordVerdictsAsync(
+        Guid userId, CoverageSnapshot snapshot, IReadOnlySet<string>? only, CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(snapshot.AsOf.UtcDateTime);
         var since = snapshot.AsOf.AddDays(-_options.BuyWindowDays);
         var memberTickers = snapshot.Members.Select(m => m.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var due = snapshot.ActiveCandidateIds
+            .Where(c => only is null || only.Contains(c.Key))
             .Where(c => snapshot.LatestScores.TryGetValue(c.Key, out var score) && score.ScoredAt >= since)
             .Where(c => !(snapshot.Verdicts.GetValueOrDefault(c.Key)?.Any(v => v.Day == today) ?? false))
             .OrderByDescending(c => memberTickers.Contains(c.Key))
@@ -252,9 +301,11 @@ public sealed class CoverageEvaluator(
     /// The next earnings date for each idle, unprotected member (one batched read); a failed read marks the names
     /// "catalyst unknown" so the no-event rule holds off rather than removing a name on a missing answer.
     /// </summary>
-    private async Task<CatalystLookup> NextEarningsAsync(CoverageSnapshot snapshot, DateTimeOffset asOf, CancellationToken ct)
+    private async Task<CatalystLookup> NextEarningsAsync(
+        CoverageSnapshot snapshot, DateTimeOffset asOf, IReadOnlySet<string>? only, CancellationToken ct)
     {
         var idle = snapshot.Members
+            .Where(m => only is null || only.Contains(m.Ticker))
             .Where(m => !snapshot.Held.Contains(m.Ticker) && !snapshot.Watchlist.Contains(m.Ticker)
                 && !snapshot.HasThesis(m.Ticker))
             .Where(m => (LastEvent(snapshot, m) ?? m.AddedAt).AddDays(_options.NoEventDays) <= asOf)
