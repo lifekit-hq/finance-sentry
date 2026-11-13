@@ -354,3 +354,18 @@ internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyG
         return Task.FromResult(verdict);
     }
 }
+
+/// <summary>Correlation reader double returning a fixed read (default: every reference not evaluable for lack of bars).</summary>
+internal sealed class FakeReturnCorrelationReader(Func<string, IReadOnlyCollection<CorrelationReference>, TickerCorrelation>? read = null)
+    : IReturnCorrelationReader
+{
+    public List<(string Ticker, IReadOnlyCollection<CorrelationReference> Book, int TopHoldings, decimal MinBookCoverage)> Calls { get; } = [];
+
+    public Task<TickerCorrelation> GetAsync(
+        string ticker, IReadOnlyCollection<CorrelationReference> book, int topHoldings, decimal minBookCoverage, CancellationToken ct = default)
+    {
+        Calls.Add((ticker, book, topHoldings, minBookCoverage));
+        return Task.FromResult(read?.Invoke(ticker, book) ?? new TickerCorrelation(
+            ticker, 63, [], new BookCorrelation(null, 0, 0m, CorrelationReasons.NoBars)));
+    }
+}

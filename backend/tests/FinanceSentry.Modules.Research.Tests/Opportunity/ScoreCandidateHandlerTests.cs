@@ -18,7 +18,9 @@ public sealed class ScoreCandidateHandlerTests
         IReadOnlyList<BrokerageHoldingSummary>? holdings = null,
         IReadOnlyList<FundamentalFact>? facts = null,
         MarketStructureSnapshot? structure = null,
-        MarketRegimeSnapshot? regime = null)
+        MarketRegimeSnapshot? regime = null,
+        FakeReturnCorrelationReader? correlation = null,
+        OpportunityOptions? options = null)
         => new(
             candidates,
             scores,
@@ -27,11 +29,12 @@ public sealed class ScoreCandidateHandlerTests
             new FakeIpsRepository(ips),
             new FakePositionCapSource(maxPositionCap),
             new FakeBrokerageHoldingsReader(holdings),
+            correlation ?? new FakeReturnCorrelationReader(),
             new RecordingRadarSignalWriter(),
             new FakeMarketRegimeSource(regime),
             new RecordingThesisEventRecorder(),
             new FakeOpportunityAlertGenerator(),
-            Options.Create(new OpportunityOptions()));
+            Options.Create(options ?? new OpportunityOptions()));
 
     [Fact]
     public async Task Handle_ReScore_AppendsCandidateScore_WithoutDuplicatingCandidate()

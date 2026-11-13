@@ -35,3 +35,5 @@
 ## R8 — Acknowledgement + worsening-step semantics (FR-003, SC-002)
 
 **Decision**: `PolicyViolationAck` stores `(RuleKey, Subject, AcknowledgedAt, RemediationNote, WorseningStepPct)`. On each check run, if a matching violation exists and its excess (`observed - limit`) has grown by more than `WorseningStepPct` since acknowledgement, the violation's `Status` flips from `Acknowledged` back to `New` and a fresh alert fires; otherwise it reports `Acknowledged` silently (`SC-002`: the 46%-vs-25% DRAM case produces exactly one alert, then survives re-runs once acknowledged). Default `WorseningStepPct` is a configurable field on the ack (not hardcoded), consistent with "the system never invents limits" (spec Assumptions).
+
+> **Status (2026-11-13, #558 stage 2)**: the pairwise facts are computed by `IMarketStructureReader.GetPairwiseCorrelationsAsync` and read by `CheckRiskRulesQuery`. The same 63-day return maths now also backs `IReturnCorrelationReader` (a ticker against the top five holdings and the book; Radar `ReturnCorrelation`), which feeds the `score_candidate` correlation fact (019 contracts) and the D1 add-rule penalty.

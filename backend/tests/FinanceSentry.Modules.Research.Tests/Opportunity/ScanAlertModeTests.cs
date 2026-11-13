@@ -108,6 +108,7 @@ public sealed class ScanAlertModeTests
             new FakeIpsRepository(),
             new FakePositionCapSource(),
             new FakeBrokerageHoldingsReader(),
+            new FakeReturnCorrelationReader(),
             signals,
             new FakeMarketRegimeSource(),
             new RecordingThesisEventRecorder(),
