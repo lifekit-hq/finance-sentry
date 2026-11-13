@@ -42,7 +42,7 @@ public class ActionTicketsGeneratorJobTests
 
         _driftQuery.Verify(q => q.Handle(It.IsAny<GetAllocationDriftQuery>(), default), Times.Never);
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class ActionTicketsGeneratorJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class ActionTicketsGeneratorJobTests
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
             .ReturnsAsync((RiskRuleSetDto?)null);
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
 
@@ -106,7 +106,7 @@ public class ActionTicketsGeneratorJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class ActionTicketsGeneratorJobTests
         string? capturedSummary = null;
         int? capturedOrderCount = null;
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-                _userId, It.IsAny<int>(), It.IsAny<string>(), default))
-            .Callback<Guid, int, string, CancellationToken>((_, count, summary, _) =>
+                _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback<Guid, int, string, string, CancellationToken>((_, count, summary, _, _) =>
             {
                 capturedOrderCount = count;
                 capturedSummary = summary;
@@ -135,7 +135,7 @@ public class ActionTicketsGeneratorJobTests
 
         await _job.ExecuteAsync();
 
-        _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(_userId, 1, It.IsAny<string>(), default), Times.Once);
+        _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(_userId, 1, It.IsAny<string>(), It.IsAny<string>(), default), Times.Once);
         Assert.Equal(1, capturedOrderCount);
         Assert.Contains("Sell", capturedSummary);
         Assert.Contains("Equities", capturedSummary);
@@ -158,8 +158,8 @@ public class ActionTicketsGeneratorJobTests
 
         string? capturedSummary = null;
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-                _userId, It.IsAny<int>(), It.IsAny<string>(), default))
-            .Callback<Guid, int, string, CancellationToken>((_, _, summary, _) => capturedSummary = summary)
+                _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback<Guid, int, string, string, CancellationToken>((_, _, summary, _, _) => capturedSummary = summary)
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
@@ -185,8 +185,8 @@ public class ActionTicketsGeneratorJobTests
 
         string? capturedSummary = null;
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-                _userId, It.IsAny<int>(), It.IsAny<string>(), default))
-            .Callback<Guid, int, string, CancellationToken>((_, _, summary, _) => capturedSummary = summary)
+                _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback<Guid, int, string, string, CancellationToken>((_, _, summary, _, _) => capturedSummary = summary)
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
@@ -213,8 +213,8 @@ public class ActionTicketsGeneratorJobTests
 
         int? capturedOrderCount = null;
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-                _userId, It.IsAny<int>(), It.IsAny<string>(), default))
-            .Callback<Guid, int, string, CancellationToken>((_, count, _, _) => capturedOrderCount = count)
+                _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback<Guid, int, string, string, CancellationToken>((_, count, _, _, _) => capturedOrderCount = count)
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
@@ -242,15 +242,15 @@ public class ActionTicketsGeneratorJobTests
             .ReturnsAsync((RiskRuleSetDto?)null);
 
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
 
         // user2 still gets a proposal despite user1 failing
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            user2, It.IsAny<int>(), It.IsAny<string>(), default), Times.Once);
+            user2, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Once);
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            user1, It.IsAny<int>(), It.IsAny<string>(), default), Times.Never);
+            user1, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
     // ── US2: Cash-sweep proposal ─────────────────────────────────────────────
@@ -370,16 +370,102 @@ public class ActionTicketsGeneratorJobTests
             .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
 
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
         _alerts.Setup(a => a.GenerateCashSweepProposalAlertAsync(
             It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default)).Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
-            _userId, It.IsAny<int>(), It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Once);
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
             _userId, 20_000m, 10_000m, 10_000m, default), Times.Once);
+    }
+
+    // ── #1266: one proposal per drift episode ────────────────────────────────
+
+    private async Task<string> SignatureOfAsync(AllocationDriftDto drift)
+    {
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default)).ReturnsAsync(drift);
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default)).ReturnsAsync((RiskRuleSetDto?)null);
+
+        string? signature = null;
+        _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
+                _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback<Guid, int, string, string, CancellationToken>((_, _, _, sig, _) => signature = sig)
+            .Returns(Task.CompletedTask);
+
+        await _job.ExecuteAsync();
+        _alerts.Invocations.Clear();
+        return signature!;
+    }
+
+    [Fact]
+    public async Task Signature_SameDriftOnADifferentMarketDay_IsUnchanged()
+    {
+        // 60% target, 5-point band: 75% and 76% are both three bands out; only the book total and notionals moved.
+        var day1 = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand") };
+        var day2 = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 76m, 79_800m, 16m, "OverBand") };
+
+        var first = await SignatureOfAsync(BuildDrift(true, day1));
+        var second = await SignatureOfAsync(BuildDrift(true, day2, totalValueUsd: 105_000m));
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public async Task Signature_DriftOneBandWidthFurtherOut_Changes()
+    {
+        var near = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 69m, 69_000m, 9m, "OverBand") };
+        var far = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand") };
+
+        Assert.NotEqual(
+            await SignatureOfAsync(BuildDrift(true, near)),
+            await SignatureOfAsync(BuildDrift(true, far)));
+    }
+
+    [Fact]
+    public async Task Signature_AnotherSleeveBreaches_Changes()
+    {
+        var one = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand") };
+        var two = new List<AllocationSleeveDrift>
+        {
+            new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
+            new("Bonds", 30m, 25m, 35m, 20m, 20_000m, -10m, "UnderBand"),
+        };
+
+        Assert.NotEqual(
+            await SignatureOfAsync(BuildDrift(true, one)),
+            await SignatureOfAsync(BuildDrift(true, two)));
+    }
+
+    [Fact]
+    public async Task Signature_SleeveOrderOfTheDriftQuery_DoesNotMatter()
+    {
+        var a = new List<AllocationSleeveDrift>
+        {
+            new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
+            new("Bonds", 30m, 25m, 35m, 20m, 20_000m, -10m, "UnderBand"),
+        };
+        var b = a.AsEnumerable().Reverse().ToList();
+
+        Assert.Equal(
+            await SignatureOfAsync(BuildDrift(true, a)),
+            await SignatureOfAsync(BuildDrift(true, b)));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StaleBook_NeitherProposesNorResolves()
+    {
+        var sleeves = new List<AllocationSleeveDrift> { new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand") };
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(true, sleeves, isStale: true));
+
+        await _job.ExecuteAsync();
+
+        _alerts.VerifyNoOtherCalls();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -389,8 +475,9 @@ public class ActionTicketsGeneratorJobTests
         IReadOnlyList<AllocationSleeveDrift> sleeves,
         bool hasIps = true,
         decimal totalValueUsd = 100_000m,
-        decimal cashUsd = 10_000m)
-        => new(hasIps, totalValueUsd, cashUsd, totalValueUsd - cashUsd, needsRebalance, sleeves, "quarterly");
+        decimal cashUsd = 10_000m,
+        bool isStale = false)
+        => new(hasIps, totalValueUsd, cashUsd, totalValueUsd - cashUsd, needsRebalance, sleeves, "quarterly", isStale);
 
     private static RiskRuleSetDto BuildRules(decimal? minCashBufferPct) =>
         new(Guid.NewGuid(), 1, null, null, minCashBufferPct, null, null, null, DateTimeOffset.UtcNow);

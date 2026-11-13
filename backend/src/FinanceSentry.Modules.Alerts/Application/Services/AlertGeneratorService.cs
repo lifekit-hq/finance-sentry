@@ -49,8 +49,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         [AlertType.CategorySpike] = TimeSpan.FromDays(7),
         // 7-day backstop; the daily detector doesn't spam while the routing pattern persists.
         [AlertType.FxSpread] = TimeSpan.FromDays(7),
-        // One proposal per user per day; mirrors LowBalance/ThesisBroken cadence.
-        [AlertType.RebalanceProposal] = TimeSpan.FromHours(24),
+        // The pulse checklist's cadence: how long a proposal the operator acted on (accepted, dismissed, deferred)
+        // keeps its drift quiet. An open proposal holds its drift for as long as it stays open (see DriftEpisode).
+        [AlertType.RebalanceProposal] = TimeSpan.FromDays(7),
         [AlertType.CashSweepProposal] = TimeSpan.FromHours(24),
         // Backstop only — the reference id already carries the event date, so a re-run within the
         // 3-day lookahead resolves to the same reference and is caught by the active-alert check
@@ -493,11 +494,15 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     }
 
     public Task GenerateRebalanceProposalAlertAsync(
-        Guid userId, int orderCount, string orderSummary, CancellationToken ct = default)
+        Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
             AlertType.RebalanceProposal, AlertSeverity.Warning,
             RebalancePortfolioReferenceId(userId), "portfolio",
-            $"Rebalance proposal: {orderCount} order(s)", orderSummary),
+            $"Rebalance proposal: {orderCount} order(s)", orderSummary)
+        {
+            Dedup = AlertDedup.Episode,
+            DedupKey = driftSignature.Trim(),
+        },
             ct);
 
     public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
@@ -755,6 +760,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             }
         }
 
+        var createdAt = DateTimeOffset.UtcNow;
+        if (draft.Dedup == AlertDedup.Episode)
+        {
+            var rows = await _alerts.GetByReferenceAsync(userId, draft.Type, draft.ReferenceId, ct);
+            var open = rows.FirstOrDefault(a => !a.IsResolved && !a.IsDismissed);
+            if (!DriftEpisode.Worsens(rows, draft.DedupKey, createdAt - SilenceWindows[draft.Type]))
+            {
+                if (open is not null) await _alerts.BumpOccurrenceAsync(open.Id, ct);
+                return;
+            }
+
+            // The open proposal is superseded, not cleared: it and its successor share the instant, which is how
+            // the episode tells a worsening from the drift ending. idx_alert_dedup allows one open row per reference.
+            if (open is not null) await _alerts.ResolveAtAsync(open.Id, createdAt, ct);
+        }
+
         if (draft.Dedup is AlertDedup.ActiveThenSilence or AlertDedup.SilenceOnly)
         {
             var window = draft.SilenceWindow ?? SilenceWindows[draft.Type];
@@ -774,12 +795,14 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         await _alerts.AddAsync(new Alert
         {
             UserId = userId,
+            CreatedAt = createdAt,
             Type = draft.Type,
             Severity = draft.Severity,
             Title = draft.Title,
             Message = draft.Message,
             ReferenceId = draft.ReferenceId,
             ReferenceLabel = draft.ReferenceLabel,
+            DedupKey = draft.DedupKey,
             AppPath = draft.AppPath ?? AlertAppPath.Resolve(draft.Type, draft.ReferenceId, draft.ReferenceLabel, DateTimeOffset.UtcNow),
             HealthState = draft.HealthState,
         }, ct);
@@ -915,6 +938,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Where the alert opens, for an emitter that knows more than type, reference and label say.</summary>
         public string? AppPath { get; init; }
+
+        /// <summary>The machine dedupe key stored on the alert (<see cref="Alert.DedupKey"/>).</summary>
+        public string? DedupKey { get; init; }
 
         /// <summary>The connection-health state that raised the alert (<see cref="Alert.HealthState"/>).</summary>
         public string? HealthState { get; init; }

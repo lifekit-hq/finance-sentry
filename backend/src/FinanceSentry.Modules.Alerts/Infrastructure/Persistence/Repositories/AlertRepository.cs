@@ -90,6 +90,15 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
                         && a.CreatedAt >= createdAfter, ct);
     }
 
+    public async Task<IReadOnlyList<Alert>> GetByReferenceAsync(
+        Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
+    {
+        return await AllUsers.AsNoTracking()
+            .Where(a => a.UserId == userId && a.Type == type && a.ReferenceId == referenceId)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> MarkReadAsync(Guid userId, Guid alertId, CancellationToken ct = default)
     {
         var alert = await _db.Alerts.FirstOrDefaultAsync(a => a.Id == alertId && a.UserId == userId, ct);
@@ -126,6 +135,15 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         var now = DateTimeOffset.UtcNow;
         alert.IsResolved = true;
         alert.ResolvedAt = now;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task ResolveAtAsync(Guid alertId, DateTimeOffset resolvedAt, CancellationToken ct = default)
+    {
+        var alert = await AllUsers.FirstOrDefaultAsync(a => a.Id == alertId, ct);
+        if (alert is null || alert.IsResolved) return;
+        alert.IsResolved = true;
+        alert.ResolvedAt = resolvedAt;
         await _db.SaveChangesAsync(ct);
     }
 

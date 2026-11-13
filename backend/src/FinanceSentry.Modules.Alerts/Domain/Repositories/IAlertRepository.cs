@@ -25,6 +25,14 @@ public interface IAlertRepository
         Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Every alert of <paramref name="type"/> on <paramref name="referenceId"/> for the user, whatever its state
+    /// (open, dismissed, accepted, resolved). Read-only: the generator works out a drift episode from these rows
+    /// (finance-sentry#1266).
+    /// </summary>
+    Task<IReadOnlyList<Alert>> GetByReferenceAsync(
+        Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
+
     Task<bool> MarkReadAsync(Guid userId, Guid alertId, CancellationToken ct = default);
 
     Task MarkAllReadAsync(Guid userId, CancellationToken ct = default);
@@ -32,6 +40,12 @@ public interface IAlertRepository
     Task<bool> DismissAsync(Guid userId, Guid alertId, CancellationToken ct = default);
 
     Task ResolveAsync(Guid alertId, CancellationToken ct = default);
+
+    /// <summary>
+    /// <see cref="ResolveAsync(Guid, CancellationToken)"/> stamped with the instant the caller also gives the alert
+    /// that supersedes it, so the pair can be told apart from a resolve that ended the condition.
+    /// </summary>
+    Task ResolveAtAsync(Guid alertId, DateTimeOffset resolvedAt, CancellationToken ct = default);
 
     /// <summary>
     /// A suppressed repeat of an open alert (finance-sentry#419 S5): increments <c>OccurrenceCount</c>

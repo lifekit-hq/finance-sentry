@@ -950,7 +950,7 @@ public class RunThesisMonitorHandlerTests
             decimal impliedRate, decimal marketRate, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, CancellationToken ct = default)
+        public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
