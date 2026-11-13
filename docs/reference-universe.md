@@ -58,7 +58,7 @@ populate it earlier.
 
 - **`Sp500ConstituentSource`** (the `IIndexConstituentSource` port that feeds Radar's broad universe and the analyst-actions universe) reads the `sp500` list from the table (cached 30 minutes) and falls back to the embedded `sp500-constituents.json` (regenerated 2026-11-13) whenever the table is empty, holds fewer than 400 members, or cannot be read.
 - **`IReferenceUniverseReader`**: `GetListsAsync`, `GetMembersAsync(list)`, `GetListsForTickerAsync(ticker)`, `GetStatusAsync()`.
-- **MCP `get_reference_universe(list?, ticker?, limit?)`**: catalogue with no arguments, members of a list, or the lists a ticker belongs to.
+- **MCP `get_reference_universe(list?, ticker?, limit?, offset?)`**: catalogue with no arguments, members of a list (ordered by ticker, `limit` 1-1000 default 200, `offset` default 0 to page; `memberCount` is the full total), or the lists a ticker belongs to.
 
 ## Not here
 

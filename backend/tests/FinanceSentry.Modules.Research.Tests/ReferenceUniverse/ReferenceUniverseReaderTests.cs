@@ -133,4 +133,36 @@ public sealed class ReferenceUniverseReaderTests
         forTicker.Members.Should().BeNull("a ticker query takes precedence over the list");
         unknown.Note.Should().Contain("No list 'theme:nope'");
     }
+
+    [Fact]
+    public async Task Query_PagesAMemberListPastTheMaxLimitWithNoOverlapAndFullCoverage()
+    {
+        using var db = NewDb();
+        var clock = new ReferenceClock(Start);
+        var tickers = Enumerable.Range(0, 2300).Select(i => $"T{i:D4}").ToArray();
+        var feeds = new IReferenceListFeed[]
+        {
+            new ScriptedFeed(ReferenceSources.FinanceDatabase) { Next = () => [ScriptedFeed.List("sector:Financials", tickers)] },
+        };
+        await Refresher(db, clock, null, feeds).RefreshAsync();
+        var handler = new GetReferenceUniverseQueryHandler(Reader(db, clock));
+        var max = GetReferenceUniverseQueryHandler.MaxLimit;
+
+        var pages = new List<ReferenceUniverseView>();
+        for (var offset = 0; offset < tickers.Length; offset += max)
+        {
+            pages.Add(await handler.Handle(new GetReferenceUniverseQuery("sector:Financials", null, max, offset), default));
+        }
+
+        pages.Should().HaveCount(3);
+        pages.Should().OnlyContain(p => p.MemberCount == 2300, "memberCount stays the true total on every page");
+        pages.SelectMany(p => p.Members!).Select(m => m.Ticker).Should().Equal(tickers, "pages concatenate in ticker order with no gap or overlap");
+
+        var past = await handler.Handle(new GetReferenceUniverseQuery("sector:Financials", null, 10, 5000), default);
+        past.Members.Should().BeEmpty();
+        past.MemberCount.Should().Be(2300);
+
+        var negative = await handler.Handle(new GetReferenceUniverseQuery("sector:Financials", null, 3, -4), default);
+        negative.Members!.Select(m => m.Ticker).Should().Equal("T0000", "T0001", "T0002");
+    }
 }

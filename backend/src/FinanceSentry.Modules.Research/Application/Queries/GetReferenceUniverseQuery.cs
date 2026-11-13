@@ -6,9 +6,10 @@ using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
 /// <summary>
 /// The reference universe read (stage A of the discovery funnel). With neither argument: the catalogue of lists
 /// and each dataset's freshness. With <see cref="List"/>: that list's members. With <see cref="Ticker"/>: the
-/// lists that ticker belongs to. <see cref="Limit"/> caps a member listing.
+/// lists that ticker belongs to. <see cref="Limit"/> caps a member listing; <see cref="Offset"/> skips that many
+/// members (ordered by ticker) to reach the next page.
 /// </summary>
-public record GetReferenceUniverseQuery(string? List, string? Ticker, int? Limit) : IQuery<ReferenceUniverseView>;
+public record GetReferenceUniverseQuery(string? List, string? Ticker, int? Limit, int? Offset = null) : IQuery<ReferenceUniverseView>;
 
 public sealed record ReferenceUniverseView(
     IReadOnlyList<ReferenceListInfo>? Lists,
@@ -49,7 +50,8 @@ public class GetReferenceUniverseQueryHandler(IReferenceUniverseReader reader)
             }
 
             var limit = Math.Clamp(query.Limit ?? DefaultLimit, 1, MaxLimit);
-            return new ReferenceUniverseView(null, query.List.Trim(), members.Count, members.Take(limit).ToList(),
+            var offset = Math.Max(query.Offset ?? 0, 0);
+            return new ReferenceUniverseView(null, query.List.Trim(), members.Count, members.Skip(offset).Take(limit).ToList(),
                 null, null, sources, note);
         }
 
