@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Application.Services;
 
 using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Domain;
 
 /// <summary>
@@ -66,6 +67,8 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "ConnectionDormant" => CompanionEventKind.ConnectionDormant,
         "AccountRetired" => CompanionEventKind.AccountRetired,
         "CoverageGap" => CompanionEventKind.CoverageGap,
+        "ThesisReviewDue" => CompanionEventKind.ThesisReviewDue,
+        "CandidateReviewDue" => CompanionEventKind.CandidateReviewDue,
         _ => null,
     };
 
@@ -79,8 +82,20 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
     };
 
     public EventDisposition DispositionFor(
-        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null)
+        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null,
+        string? reviewSource = null)
     {
+        // A review notice is realtime when a filing, a break or an unbreak raised it (the mode rule, quiet hours and the
+        // hourly cap apply downstream unchanged) and digest material otherwise. A notice whose source cannot be read is
+        // held too: waking Ledger on a guess costs more than a pulse's delay.
+        if (kind is CompanionEventKind.ThesisReviewDue or CompanionEventKind.CandidateReviewDue)
+        {
+            if (ReviewDueSource.IsRealtime(reviewSource))
+                return DispositionForMode(mode);
+
+            return mode == NotificationMode.Quiet ? EventDisposition.SuppressedByMode : EventDisposition.HeldForDigest;
+        }
+
         // Only the person can fix a lost credential, so the reconnect ask is never held or silenced (decided 2026-10-06:
         // a confirmed credential loss goes out proactively, and Quiet still surfaces it).
         if (kind == CompanionEventKind.SyncFailure && healthState == nameof(ConnectionHealthState.ActionRequired))

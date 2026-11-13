@@ -48,4 +48,15 @@ public enum CompanionEventKind
 
     /// <summary>An account's day-to-day spend has nearly stopped while its syncs succeed: spend may be moving off-book.</summary>
     CoverageGap,
+
+    /// <summary>
+    /// Something deterministic happened to a thesis's name (a filing, a passed earnings or catalyst date, a news cluster, a
+    /// break or an unbreak): Ledger should re-read the thesis. Its own kind, never folded into <see cref="NewsCluster"/> or
+    /// <see cref="FilingLanded"/>, so batching those can never swallow it. Filing, break and unbreak are realtime; news,
+    /// earnings and catalyst ride the digest lane.
+    /// </summary>
+    ThesisReviewDue,
+
+    /// <summary>The same for an Active candidate with no thesis (a watchlist name); same lanes.</summary>
+    CandidateReviewDue,
 }

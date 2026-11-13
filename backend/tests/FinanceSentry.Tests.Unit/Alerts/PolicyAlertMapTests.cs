@@ -51,6 +51,8 @@ public class PolicyAlertMapTests
         AlertType.RelativeUnderperformance,
         AlertType.MacroEventAhead,
         AlertType.MacroEventReleased,
+        AlertType.ThesisReviewDue,
+        AlertType.CandidateReviewDue,
     };
 
     private static readonly string[] AllAlertTypes = typeof(AlertType)

@@ -649,6 +649,17 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             $"{ticker} news clustered on {day:yyyy-MM-dd}: {reason}"),
             ct);
 
+    public Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            review.Subject == ReviewSubjectKind.Thesis ? AlertType.ThesisReviewDue : AlertType.CandidateReviewDue,
+            // A break is the one source that is bad news by itself; the rest only ask for a look.
+            review.Source == ReviewDueSource.Break ? AlertSeverity.Warning : AlertSeverity.Info,
+            ReviewDueReferenceId(review), review.Ticker,
+            $"{(review.Subject == ReviewSubjectKind.Thesis ? "Thesis" : "Candidate")} review due: {review.Ticker} ({review.Source})",
+            ReviewDueMessage.Compose(review))
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
     public Task GenerateBudgetNearLimitAlertAsync(
         Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
         int year, int month, CancellationToken ct = default)
@@ -854,6 +865,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
                 ? $"{change.Firm} {verb} to {rating}"
                 : $"{change.Firm} {verb}";
     }
+
+    /// <summary>Stable per-(subject, source, reference) synthetic GUID - a review notice is raised once ever for the same event.</summary>
+    private static Guid ReviewDueReferenceId(ReviewDue review)
+        => DerivedReferenceId($"review-due:{ReviewDueMessage.SubjectKey(review.Subject)}:{review.SubjectId:N}:{review.Source}:{review.Reference}");
 
     /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
     private static Guid NewsClusterReferenceId(string ticker, DateOnly day)

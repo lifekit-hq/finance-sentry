@@ -524,6 +524,17 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Raises the "look at this again" notice for a thesis (<c>ThesisReviewDue</c>) or an Active candidate
+    /// (<c>CandidateReviewDue</c>) when something deterministic happened to its name: a filing, an earnings or catalyst
+    /// date passed, a news cluster, a break or an unbreak. Raised once ever per (subject, source, reference) - the
+    /// reference identity is derived from all three, so a detector re-reading the same event is a no-op even after the
+    /// notice is dismissed. The alert opens the subject's ticker dossier; its message carries the subject id, source and
+    /// evidence references (<c>ReviewDueMessage</c>), which Companion relays to Ledger and uses to pick the lane:
+    /// realtime for filing, break and unbreak, the digest for the rest.
+    /// </summary>
+    Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default);
+
+    /// <summary>
     /// Raises a Warning alert that a monthly budget's month-to-date spend has reached 90% of its
     /// limit (C2, ledger-heartbeat design). Deduped per (<paramref name="budgetId"/>,
     /// <paramref name="year"/>, <paramref name="month"/>) — a budget crosses 90% at most once per

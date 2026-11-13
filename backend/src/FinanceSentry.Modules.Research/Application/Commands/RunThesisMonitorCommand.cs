@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Application.Commands;
 
+using System.Globalization;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
@@ -63,13 +64,14 @@ public class RunThesisMonitorCommandHandler(
                 // Bug fix: a thesis with zero triggers must not retain an orphaned break.
                 // Previously this path unconditionally skipped, leaving BrokenAt/BrokenReason
                 // stuck even after the offending trigger was deleted.
-                if (thesis.BrokenAt is not null)
+                if (thesis.BrokenAt is { } clearedAt)
                 {
                     thesis.BrokenAt = null;
                     thesis.BrokenReason = null;
                     await thesisRepo.UpsertAsync(thesis, ct);
                     await alertGenerator.ResolveThesisBreakAlertAsync(thesis.UserId, thesis.Id, ct);
                     await TryRecordEventAsync(thesis, ThesisEventType.Unbroken, decisionNote: null, ct);
+                    await TryRaiseReviewAsync(thesis, ReviewDueSource.Unbreak, clearedAt, "its break cleared", ct);
                     breaksCleared++;
                 }
                 else
@@ -117,13 +119,15 @@ public class RunThesisMonitorCommandHandler(
                         thesis.UserId, thesis.Id, thesis.Ticker, thesis.BrokenReason, ct);
                     await TryRecordEventAsync(
                         thesis, ThesisEventType.Broken, thesis.BrokenReason, ct);
+                    await TryRaiseReviewAsync(
+                        thesis, ReviewDueSource.Break, thesis.BrokenAt.Value, $"thesis broke: {thesis.BrokenReason}", ct);
                     breaksRaised++;
                 }
                 else if (firstBreach is null && allNonEvaluable)
                 {
                     skipped++;
                 }
-                else if (firstBreach is null && thesis.BrokenAt is not null && CanUnbreak(thesis, evaluations))
+                else if (firstBreach is null && thesis.BrokenAt is { } brokenAt && CanUnbreak(thesis, evaluations))
                 {
                     // Broken→cleared: none breached, not all-non-evaluable, AND the trigger that
                     // originally broke the thesis was itself re-evaluated on fresh data. "Cleared
@@ -134,6 +138,7 @@ public class RunThesisMonitorCommandHandler(
                     await thesisRepo.UpsertAsync(thesis, ct);
                     await alertGenerator.ResolveThesisBreakAlertAsync(thesis.UserId, thesis.Id, ct);
                     await TryRecordEventAsync(thesis, ThesisEventType.Unbroken, decisionNote: null, ct);
+                    await TryRaiseReviewAsync(thesis, ReviewDueSource.Unbreak, brokenAt, "its break cleared", ct);
                     breaksCleared++;
                 }
 
@@ -251,6 +256,24 @@ public class RunThesisMonitorCommandHandler(
             logger.LogWarning(ex, "Raising the {Alert} notice failed for user {UserId}", what, userId);
         }
     }
+
+    /// <summary>
+    /// The thesis-review notice for a break or an unbreak: realtime, so Ledger re-reads the thesis the moment its state
+    /// flips. The reference is the break's own timestamp (an unbreak names the break it clears), so each break and each
+    /// clear is raised once. Like the other notices this run raises, it can never abort the run.
+    /// </summary>
+    private Task TryRaiseReviewAsync(
+        InvestmentThesis thesis, string source, DateTimeOffset brokenAt, string what, CancellationToken ct)
+        => TryAlertAsync(
+            () => alertGenerator.GenerateReviewDueAlertAsync(
+                thesis.UserId,
+                new ReviewDue(
+                    ReviewSubjectKind.Thesis, thesis.Id, thesis.Ticker, source,
+                    brokenAt.UtcDateTime.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture),
+                    [$"thesis:{thesis.Id}", $"break:{brokenAt.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}"],
+                    Truncate($"{thesis.Ticker}: {what}", MaxAlertSummaryLength)),
+                ct),
+            thesis.UserId, $"review-due-{source}", ct);
 
     private static string DescribeBlindSpots(IReadOnlyList<UnmonitorableThesis> unmonitorable)
         => string.Join(

@@ -22,12 +22,19 @@ using Microsoft.Extensions.Logging;
 /// submissions cache shorter than the hourly cadence and never caches a failed fetch), so a provider
 /// hiccup here means no alert this run, never a job failure. Rare by design (~0.2 fires/day in
 /// earnings weeks).
+/// <para>
+/// The same filing also raises the thesis-review notice (<see cref="ReviewDueRaiser"/>, source
+/// <c>filing</c>, reference = the accession number) for every thesis the ticker is the ticker or a trigger proxy of, and for an
+/// Active candidate on it. Candidate tickers outside the detector's universe are read too, for the notice alone: a candidate
+/// is not a holding, so it earns no FilingLanded alert of its own.
+/// </para>
 /// </summary>
 public sealed class FilingWatchJob(
     IBankingTotalsReader banking,
     LookaheadUniverse universe,
     ISecEdgarService secEdgar,
     IAlertGeneratorService alerts,
+    ReviewDueRaiser reviewDue,
     ILogger<FilingWatchJob> logger)
 {
     /// <summary>The Hangfire recurring-job id this detector is scheduled under.</summary>
@@ -79,13 +86,22 @@ public sealed class FilingWatchJob(
 
     private async Task ProcessUserAsync(Guid userId, DateOnly today, CancellationToken ct)
     {
-        foreach (var ticker in await universe.FilingTickersAsync(userId, ct))
+        var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        var detectorTickers = await universe.FilingTickersAsync(userId, ct);
+
+        foreach (var ticker in detectorTickers)
         {
-            await ProcessTickerAsync(userId, ticker, today, ct);
+            await ProcessTickerAsync(userId, ticker, today, subjects, raiseFilingAlert: true, ct);
+        }
+
+        foreach (var ticker in subjects.Tickers.Where(t => !detectorTickers.Contains(t)).ToList())
+        {
+            await ProcessTickerAsync(userId, ticker, today, subjects, raiseFilingAlert: false, ct);
         }
     }
 
-    private async Task ProcessTickerAsync(Guid userId, string ticker, DateOnly today, CancellationToken ct)
+    private async Task ProcessTickerAsync(
+        Guid userId, string ticker, DateOnly today, ReviewSubjects subjects, bool raiseFilingAlert, CancellationToken ct)
     {
         IReadOnlyList<EdgarFiling> filings;
         try
@@ -110,8 +126,21 @@ public sealed class FilingWatchJob(
                 continue;
             }
 
-            await alerts.GenerateFilingLandedAlertAsync(
-                userId, ticker, filing.Form, filing.FilingDate, filing.AccessionNumber, filing.DocumentUrl, ct);
+            if (raiseFilingAlert)
+            {
+                await alerts.GenerateFilingLandedAlertAsync(
+                    userId, ticker, filing.Form, filing.FilingDate, filing.AccessionNumber, filing.DocumentUrl, ct);
+            }
+
+            List<string> evidence = [$"filing:{filing.AccessionNumber}"];
+            if (!string.IsNullOrWhiteSpace(filing.DocumentUrl))
+            {
+                evidence.Add($"url:{filing.DocumentUrl}");
+            }
+
+            await reviewDue.RaiseAsync(
+                userId, subjects, ticker, ReviewDueSource.Filing, filing.AccessionNumber, evidence,
+                $"{filing.Form} filed {filing.FilingDate:yyyy-MM-dd}", ct);
         }
     }
 

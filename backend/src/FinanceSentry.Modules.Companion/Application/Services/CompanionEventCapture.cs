@@ -23,6 +23,7 @@ public sealed class CompanionEventCapture(
     private const string AlertSource = "alerts";
     private const string AnalystSource = "analyst-actions";
     private const int BatchLimit = 200;
+    private const int SummaryMaxLength = 500;
 
     private readonly CompanionOptions _options = options.Value;
 
@@ -64,18 +65,27 @@ public sealed class CompanionEventCapture(
             var staleness = kind == CompanionEventKind.SyncFailure
                 ? await SourceStalenessAsync(a, accountsByUser, ct)
                 : null;
+            // A review notice carries its subject id, source and evidence references in the alert text; the event hands
+            // them to Ledger (summary, reference id = the thesis or candidate id) and the source picks the lane.
+            ReviewDue? review = null;
+            if (kind is CompanionEventKind.ThesisReviewDue or CompanionEventKind.CandidateReviewDue
+                && ReviewDueMessage.TryParse(a.Message, out var parsed))
+            {
+                review = parsed;
+            }
+
             var evt = new CompanionEvent
             {
                 UserId = a.UserId,
                 Kind = kind.Value,
                 Subject = Trim(a.ReferenceLabel ?? a.Title, 128),
                 Severity = Trim(a.Severity, 16),
-                Summary = Trim(a.Title, 500),
+                Summary = review is null ? Trim(a.Title, 500) : ReviewDueMessage.Summarize(review, SummaryMaxLength),
                 DedupKey = policy.AlertDedupKey(a.AlertId),
-                ReferenceId = a.ReferenceId ?? a.AlertId,
+                ReferenceId = review?.SubjectId ?? a.ReferenceId ?? a.AlertId,
                 AppPath = a.AppPath,
                 SourceModule = "alerts",
-                Disposition = policy.DispositionFor(mode, kind.Value, staleness, a.HealthState),
+                Disposition = policy.DispositionFor(mode, kind.Value, staleness, a.HealthState, review?.Source),
                 OccurredAt = a.CreatedAt,
             };
 
