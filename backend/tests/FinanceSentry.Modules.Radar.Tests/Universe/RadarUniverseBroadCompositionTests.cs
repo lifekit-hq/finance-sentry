@@ -103,7 +103,21 @@ public sealed class RadarUniverseBroadCompositionTests
         upserted.Single(m => m.Ticker == "SPY").Kind.Should().Be(UniverseKind.Benchmark);
     }
 
-    private static Composition BuildService(bool broadEnabled, string[] shortlisted, string[]? thesisTickers = null)
+    [Fact]
+    public async Task Sync_IngestsACoverageMemberOutsideEveryOtherSourceAndKeepsOwnershipKinds()
+    {
+        var (service, _, _, _) = BuildService(
+            broadEnabled: false, shortlisted: [], coverageTickers: [" nvda ", "NVDA", "AAPL", "TSLA"]);
+
+        var active = await service.SyncAsync();
+
+        active.Single(m => m.Ticker == "NVDA").Should().Match<RadarUniverseMember>(m =>
+            m.Kind == UniverseKind.Coverage && m.Source == UniverseSource.Auto && m.Active);
+        active.Single(m => m.Ticker == "AAPL").Kind.Should().Be(UniverseKind.Holding);
+        active.Single(m => m.Ticker == "TSLA").Kind.Should().Be(UniverseKind.Watchlist);
+    }
+
+    private static Composition BuildService(bool broadEnabled, string[] shortlisted, string[]? thesisTickers = null, string[]? coverageTickers = null)
     {
         var upserted = new List<RadarUniverseMember>();
         var deactivated = new List<string>();
@@ -138,9 +152,14 @@ public sealed class RadarUniverseBroadCompositionTests
 
         var source = new FakeShortlistSource { Tickers = shortlisted };
 
+        var coverage = new Mock<ICoverageUniverseReader>();
+        coverage.Setup(c => c.ListTickersAsync(User, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coverageTickers ?? []);
+
         var options = TestSupport.Options(new RadarOptions { BroadUniverseEnabled = broadEnabled });
         var service = new RadarUniverseService(
-            repo.Object, brokerage.Object, watchlist.Object, thesis.Object, banking.Object, options, source);
+            repo.Object, brokerage.Object, watchlist.Object, thesis.Object, banking.Object, options, source,
+            coverage.Object);
 
         return new Composition(service, upserted, source, deactivated);
     }

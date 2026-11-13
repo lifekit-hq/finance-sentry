@@ -7,7 +7,8 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Composes the Radar universe: seed members (benchmark + sectors + industry) ∪ equity holdings
-/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ thesis tickers ∪ — when
+/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ thesis tickers ∪ coverage
+/// universe tickers ∪ — when
 /// <see cref="RadarOptions.BroadUniverseEnabled"/> is set — the stage-1 scan shortlist (#558).
 /// Membership is persisted and auto-synced; departed tickers are de-activated (history retained).
 ///
@@ -22,7 +23,8 @@ public sealed class RadarUniverseService(
     IThesisTickerReader thesisReader,
     IBankingTotalsReader bankingTotals,
     IOptions<RadarOptions> options,
-    IScanShortlistSource? shortlistSource = null) : IRadarUniverseService
+    IScanShortlistSource? shortlistSource = null,
+    ICoverageUniverseReader? coverageReader = null) : IRadarUniverseService
 {
     private const string EquityInstrumentType = "STK";
 
@@ -59,6 +61,16 @@ public sealed class RadarUniverseService(
             foreach (var ticker in await thesisReader.ListTickersAsync(userId, ct))
             {
                 Add(resolved, ticker, UniverseKind.Thesis, UniverseSource.Auto);
+            }
+
+            // Coverage members are graded from these bars (the Ledger scoreboard), so a name added by the
+            // pipeline that is neither held, watched nor under a thesis still has to be ingested.
+            if (coverageReader is not null)
+            {
+                foreach (var ticker in await coverageReader.ListTickersAsync(userId, ct))
+                {
+                    Add(resolved, ticker, UniverseKind.Coverage, UniverseSource.Auto);
+                }
             }
         }
 
