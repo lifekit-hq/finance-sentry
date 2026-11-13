@@ -59,7 +59,7 @@ public sealed class ReviewDueRaiser(
                 : $"{subject.Ticker}: {what} (on {hitTicker.ToUpperInvariant()}, a trigger proxy)";
             await alerts.GenerateReviewDueAlertAsync(
                 userId,
-                new ReviewDue(subject.Kind, subject.Id, subject.Ticker, source, reference, evidence, headline),
+                new ReviewDue(subject.Kind, subject.Id, subject.Ticker, source, reference, evidence, headline, subject.NarrativeFalsifiers),
                 ct);
             raised++;
         }
@@ -94,7 +94,8 @@ public sealed class ReviewDueRaiser(
 public sealed record CoverageHit(string Ticker, string Source, string Reference, string What, string? Notice = null);
 
 /// <summary>A thesis or an Active candidate that a ticker hit maps to.</summary>
-public sealed record ReviewSubject(ReviewSubjectKind Kind, Guid Id, string Ticker);
+public sealed record ReviewSubject(
+    ReviewSubjectKind Kind, Guid Id, string Ticker, IReadOnlyList<string>? NarrativeFalsifiers = null);
 
 /// <summary>
 /// The names that have something to review, and which subject each maps to. A thesis maps from its own ticker and from every
@@ -119,7 +120,9 @@ public sealed class ReviewSubjects
             }
 
             thesisOwnTickers.Add(thesis.Ticker);
-            var subject = new ReviewSubject(ReviewSubjectKind.Thesis, thesis.Id, thesis.Ticker);
+            var subject = new ReviewSubject(
+                ReviewSubjectKind.Thesis, thesis.Id, thesis.Ticker,
+                thesis.NarrativeFalsifiers.Count > 0 ? thesis.NarrativeFalsifiers.ToList() : null);
             Add(thesis.Ticker, subject);
             foreach (var proxy in thesis.InvalidationTriggers
                          .Select(t => t.ProxyTicker)

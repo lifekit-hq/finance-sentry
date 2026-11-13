@@ -86,6 +86,6 @@ public sealed class RevertThesisRevisionCommandHandler(
                 thesis.Id, thesis.Ticker, thesis.ThesisText,
                 thesis.KeyDataPoints, thesis.Catalysts, thesis.InvalidationTriggers,
                 thesis.CreatedAt, thesis.UpdatedAt, thesis.BrokenAt, thesis.BrokenReason, thesis.EntryPrice,
-                cmd.Origin.ToString()));
+                cmd.Origin.ToString(), thesis.NarrativeFalsifiers.ToList()));
     }
 }

@@ -31,16 +31,25 @@ public static class ReviewDueMessage
     public static string Compose(ReviewDue review, int maxLength = MaxMessageLength)
     {
         var evidence = review.Evidence.Select(Clean).Where(e => e.Length > 0).ToList();
+        var falsifiers = CleanAll(review.NarrativeFalsifiers);
         while (true)
         {
-            var tail = Tail(review, evidence);
+            var tail = Tail(review, evidence, falsifiers);
             var room = maxLength - tail.Length;
-            if (room >= Math.Min(review.Headline.Length, MinHeadlineRoom) || evidence.Count == 0)
+            if (room >= Math.Min(review.Headline.Length, MinHeadlineRoom) || (evidence.Count == 0 && falsifiers.Count == 0))
             {
                 return Truncate(review.Headline, Math.Max(room, 0)) + tail;
             }
 
-            evidence.RemoveAt(evidence.Count - 1);
+            // Evidence goes first: a falsifier is the one thing on the notice Ledger cannot re-derive from a read.
+            if (evidence.Count > 0)
+            {
+                evidence.RemoveAt(evidence.Count - 1);
+            }
+            else
+            {
+                falsifiers.RemoveAt(falsifiers.Count - 1);
+            }
         }
     }
 
@@ -53,6 +62,30 @@ public static class ReviewDueMessage
         var lead = $"{(review.Subject == ReviewSubjectKind.Thesis ? "Thesis" : "Candidate")} review due: {review.Ticker} ({review.Source})";
         var core = $" | subject={SubjectKey(review.Subject)}:{review.SubjectId:D} | source={review.Source} | ref={Clean(review.Reference)}";
         var summary = new StringBuilder(lead).Append(core);
+
+        var falsifiers = CleanAll(review.NarrativeFalsifiers);
+        if (falsifiers.Count > 0)
+        {
+            const string falsifierLead = " | falsifiers=";
+            var keptFalsifiers = new List<string>();
+            var usedByFalsifiers = summary.Length + falsifierLead.Length;
+            foreach (var item in falsifiers)
+            {
+                var cost = item.Length + (keptFalsifiers.Count > 0 ? 1 : 0);
+                if (usedByFalsifiers + cost > maxLength)
+                {
+                    break;
+                }
+
+                keptFalsifiers.Add(item);
+                usedByFalsifiers += cost;
+            }
+
+            if (keptFalsifiers.Count > 0)
+            {
+                summary.Append(falsifierLead).Append(string.Join(EvidenceSeparator, keptFalsifiers));
+            }
+        }
 
         var evidence = review.Evidence.Select(Clean).Where(e => e.Length > 0).ToList();
         if (evidence.Count > 0)
@@ -134,17 +167,29 @@ public static class ReviewDueMessage
         var evidence = fields.TryGetValue("evidence", out var raw)
             ? raw.Split(EvidenceSeparator, StringSplitOptions.RemoveEmptyEntries)
             : [];
-        review = new ReviewDue(kind, subjectId, ticker, source, reference, evidence, headline);
+        // Absent on a candidate notice and on a thesis without any, and on every message written before the field existed.
+        IReadOnlyList<string>? falsifiers = fields.TryGetValue("falsifiers", out var rawFalsifiers)
+            ? rawFalsifiers.Split(EvidenceSeparator, StringSplitOptions.RemoveEmptyEntries)
+            : null;
+        review = new ReviewDue(kind, subjectId, ticker, source, reference, evidence, headline, falsifiers);
         return true;
     }
 
-    private static string Tail(ReviewDue review, List<string> evidence)
+    private static List<string> CleanAll(IReadOnlyList<string>? values)
+        => (values ?? []).Select(Clean).Where(v => v.Length > 0).ToList();
+
+    private static string Tail(ReviewDue review, List<string> evidence, List<string> falsifiers)
     {
         var tail = new StringBuilder(TailOpen)
             .Append(CultureInfo.InvariantCulture, $"subject={SubjectKey(review.Subject)}:{review.SubjectId:D}")
             .Append(" ticker=").Append(Clean(review.Ticker))
             .Append(" source=").Append(Clean(review.Source))
             .Append(" ref=").Append(Clean(review.Reference));
+        if (falsifiers.Count > 0)
+        {
+            tail.Append(" falsifiers=").Append(string.Join(EvidenceSeparator, falsifiers));
+        }
+
         if (evidence.Count > 0)
         {
             tail.Append(" evidence=").Append(string.Join(EvidenceSeparator, evidence));

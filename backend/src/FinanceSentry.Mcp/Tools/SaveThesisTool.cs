@@ -28,6 +28,7 @@ public sealed class SaveThesisTool(
         [Description("Optional contemporaneous reasoning captured at creation time (FR-008b decision journal). Only applied on create.")] string? decisionNote = null,
         [Description("Why the thesis is being created or revised; kept in the audit trail.")] string? rationale = null,
         [Description("References the change rests on: newsArticleIds, filingAccessions, eventIds, fundamentalsAsOf. Kept in the audit trail.")] ThesisEvidenceRefs? evidence = null,
+        [Description("Narrative falsifiers: free-text kill-switches no metric can express (a lost customer, a ruling, a management change). Not monitored by any job: they are model-checked, and handed to Ledger on every thesis review. Omit to leave the stored ones unchanged on an update; pass [] to clear them. At most 20, 500 characters each.")] IReadOnlyList<string>? narrativeFalsifiers = null,
         CancellationToken cancellationToken = default)
     {
         var effective = identity.GetUserId();
@@ -49,7 +50,8 @@ public sealed class SaveThesisTool(
                 decisionNote,
                 McpCallerOrigin.Of(httpContextAccessor),
                 rationale,
-                evidence),
+                evidence,
+                narrativeFalsifiers),
             cancellationToken);
     }
 }

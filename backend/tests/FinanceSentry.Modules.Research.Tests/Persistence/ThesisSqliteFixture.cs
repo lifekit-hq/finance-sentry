@@ -84,6 +84,7 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
             thesis.Property(x => x.UpdatedAt).HasDefaultValueSql(null);
             thesis.Property(x => x.EntryPrice).HasColumnType(null);
             thesis.Property(x => x.InvalidationTriggers).HasColumnType(null);
+            thesis.Property(x => x.NarrativeFalsifiers).HasColumnType(null).HasDefaultValueSql(null);
 
             thesis.ToTable(t => t.HasCheckConstraint(
                 ThesisTextLengthCheckConstraint,

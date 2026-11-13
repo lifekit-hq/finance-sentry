@@ -15,7 +15,8 @@ public record ResearchContextThesisDto(
     string Ticker,
     string Summary,
     bool IsBroken,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<string>? NarrativeFalsifiers = null);
 
 public record ResearchContextGroupDto(
     string Name,

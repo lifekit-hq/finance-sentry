@@ -57,6 +57,7 @@ public class ThesisRepository(ResearchDbContext db) : IThesisRepository
             existing.KeyDataPoints = thesis.KeyDataPoints;
             existing.Catalysts = thesis.Catalysts;
             existing.InvalidationTriggers = thesis.InvalidationTriggers;
+            existing.NarrativeFalsifiers = thesis.NarrativeFalsifiers;
             existing.EntryPrice = thesis.EntryPrice;
             existing.BrokenAt = thesis.BrokenAt;
             existing.BrokenReason = thesis.BrokenReason;

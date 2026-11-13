@@ -19,7 +19,8 @@ public class GetThesesQueryHandler(IThesisRepository repo, ThesisOriginReader or
                 t.Id, t.Ticker, t.ThesisText,
                 t.KeyDataPoints, t.Catalysts, t.InvalidationTriggers,
                 t.CreatedAt, t.UpdatedAt, t.BrokenAt, t.BrokenReason, t.EntryPrice,
-                ThesisOriginReader.Resolve(origins, t.Id).ToString()))
+                ThesisOriginReader.Resolve(origins, t.Id).ToString(),
+                t.NarrativeFalsifiers.ToList()))
             .ToList();
     }
 }
