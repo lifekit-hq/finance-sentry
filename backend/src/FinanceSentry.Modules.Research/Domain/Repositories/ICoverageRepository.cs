@@ -31,6 +31,9 @@ public interface ICoverageRepository
     Task<IReadOnlyList<CoverageJournalEntry>> ListJournalUnscopedAsync(
         Guid userId, string? ticker, int take, CancellationToken ct = default);
 
+    /// <summary>When the journal last recorded a removal, per ticker (only tickers that were removed). Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyDictionary<string, DateTimeOffset>> ListLastRemovalsUnscopedAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>The user's verdict readings since <paramref name="since"/> (inclusive), ascending by day. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<CoverageVerdictObservation>> ListObservationsUnscopedAsync(
         Guid userId, DateOnly since, CancellationToken ct = default);

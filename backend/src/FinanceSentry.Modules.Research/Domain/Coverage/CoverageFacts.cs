@@ -40,6 +40,9 @@ public sealed record CoverageTickerFacts(
     decimal? CorrelationToBook,
     int CorrelationPenalty)
 {
+    /// <summary>When the journal last recorded the name's removal; null when it was never removed. Only verdict readings after that day count toward an add.</summary>
+    public DateTimeOffset? LastRemovedAt { get; init; }
+
     /// <summary>Held, watchlisted or carrying an active thesis: the remove rules cannot touch the name.</summary>
     public bool Protected => Held || Watchlisted || HasActiveThesis;
 

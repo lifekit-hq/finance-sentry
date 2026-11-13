@@ -121,6 +121,15 @@ public sealed class CoverageSnapshotReader(
             days.Add(new CoverageVerdictDay(observation.ObservedOn, observation.Verdict));
         }
 
+        var lastRemovals = new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase);
+        if (!flagsOnly)
+        {
+            foreach (var (removedTicker, removedAt) in await coverage.ListLastRemovalsUnscopedAsync(userId, ct))
+            {
+                Latest(lastRemovals, Normalize(removedTicker), removedAt);
+            }
+        }
+
         return new CoverageSnapshot
         {
             AsOf = asOf,
@@ -135,6 +144,7 @@ public sealed class CoverageSnapshotReader(
             LastEvents = lastEvents,
             Verdicts = verdicts,
             ActiveCandidateIds = activeIds,
+            LastRemovals = lastRemovals,
         };
     }
 

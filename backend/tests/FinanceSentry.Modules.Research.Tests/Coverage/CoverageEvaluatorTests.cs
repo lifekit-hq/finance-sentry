@@ -459,4 +459,50 @@ public sealed class CoverageEvaluatorTests
         (await h.MembersAsync()).Single().AddedReason.Should().Be(CoverageReason.Watchlist);
         (await h.JournalAsync()).Select(e => e.Action).Should().Equal(CoverageAction.Removed, CoverageAction.Added);
     }
+
+    [Fact]
+    public async Task ARemovedName_IsNotAddedBackByASingleFreshBuy_ButByTwo()
+    {
+        var h = new CoverageHarness();
+        await h.CandidateAsync("MU");
+
+        async Task RunDayAsync(int day, string verdict)
+        {
+            h.Verdicts.Verdicts["MU"] = verdict;
+            await h.RunAsync(Day1.AddDays(day));
+        }
+
+        await RunDayAsync(0, "Buy");
+        await RunDayAsync(1, "Buy");
+        (await h.TickersAsync()).Should().Equal("MU");
+
+        await RunDayAsync(2, "Avoid");
+        await RunDayAsync(3, "Avoid");
+        (await h.TickersAsync()).Should().BeEmpty();
+
+        await RunDayAsync(4, "Buy");
+        (await h.TickersAsync()).Should().BeEmpty("the Buy readings from before the removal no longer count");
+
+        await RunDayAsync(5, "Buy");
+        (await h.TickersAsync()).Should().Equal("MU");
+        (await h.JournalAsync()).Select(e => (e.Action, e.Rule)).Should().Equal(
+            (CoverageAction.Added, CoverageRuleIds.BuyTwice),
+            (CoverageAction.Removed, CoverageRuleIds.AvoidTwice),
+            (CoverageAction.Added, CoverageRuleIds.BuyTwice));
+    }
+
+    [Fact]
+    public async Task AFailedSave_LeavesNothingTrackedForTheNextUsersSave()
+    {
+        var h = new CoverageHarness();
+        var first = new CoverageMember { UserId = CoverageHarness.UserId, Ticker = "AAA" };
+        var duplicate = new CoverageMember { Id = first.Id, UserId = CoverageHarness.UserId, Ticker = "AAA" };
+        var next = new CoverageMember { UserId = CoverageHarness.UserId, Ticker = "BBB" };
+
+        var failing = () => h.Coverage.SaveEvaluationAsync(CoverageHarness.UserId, [first, duplicate], [], [], []);
+        await failing.Should().ThrowAsync<InvalidOperationException>();
+        await h.Coverage.SaveEvaluationAsync(CoverageHarness.UserId, [next], [], [], []);
+
+        (await h.TickersAsync()).Should().Equal("BBB");
+    }
 }

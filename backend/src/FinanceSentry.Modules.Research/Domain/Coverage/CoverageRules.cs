@@ -73,12 +73,16 @@ public static class CoverageRules
         return null;
     }
 
-    /// <summary>Distinct days inside the window on which the verdict read Buy or StrongBuy.</summary>
+    /// <summary>
+    /// Distinct days inside the window on which the verdict read Buy or StrongBuy, counting only readings after the
+    /// day of the name's last removal: evidence a removal already overruled never earns the name back in.
+    /// </summary>
     public static int BuyDaysInWindow(CoverageTickerFacts facts, CoverageOptions options, DateTimeOffset asOf)
     {
         var from = DateOnly.FromDateTime(asOf.UtcDateTime).AddDays(-options.BuyWindowDays);
+        var removedOn = facts.LastRemovedAt is { } removedAt ? DateOnly.FromDateTime(removedAt.UtcDateTime) : (DateOnly?)null;
         return facts.Verdicts
-            .Where(v => v.Day >= from && v.Verdict is BuyVerdict or StrongBuyVerdict)
+            .Where(v => v.Day >= from && (removedOn is null || v.Day > removedOn) && v.Verdict is BuyVerdict or StrongBuyVerdict)
             .Select(v => v.Day)
             .Distinct()
             .Count();

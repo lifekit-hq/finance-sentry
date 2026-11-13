@@ -38,6 +38,9 @@ public sealed class CoverageSnapshot
     /// <summary>Stored verdict readings per ticker, ascending by day.</summary>
     public required Dictionary<string, List<CoverageVerdictDay>> Verdicts { get; init; }
 
+    /// <summary>When the journal last recorded each ticker's removal.</summary>
+    public required Dictionary<string, DateTimeOffset> LastRemovals { get; init; }
+
     /// <summary>The ticker's Active candidate id, when it has one.</summary>
     public required Dictionary<string, Guid> ActiveCandidateIds { get; init; }
 
@@ -68,7 +71,10 @@ public sealed class CoverageSnapshot
             catalystKnown || thesisCatalyst != default,
             RankBase(score),
             correlation,
-            correlationPenalty);
+            correlationPenalty)
+        {
+            LastRemovedAt = LastRemovals.TryGetValue(ticker, out var removedAt) ? removedAt : null,
+        };
     }
 
     private static int? RankBase(CandidateScore? score)

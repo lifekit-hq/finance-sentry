@@ -34,23 +34,30 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
             return;
         }
 
-        db.CoverageMembers.AddRange(added);
-        db.CoverageMembers.UpdateRange(updated);
-
-        // A removed row is deleted by its key: the member came from a no-tracking read.
-        var removedIds = removed.Select(m => m.Id).ToList();
-        if (removedIds.Count > 0)
+        // The context is shared by every user of a run: whatever this save leaves tracked, success or not, must not reach the next one.
+        try
         {
-            var rows = await db.CoverageMembers
-                .IgnoreQueryFilters([OwnerQueryFilter.Name])
-                .Where(m => m.UserId == userId && removedIds.Contains(m.Id))
-                .ToListAsync(ct);
-            db.CoverageMembers.RemoveRange(rows);
-        }
+            db.CoverageMembers.AddRange(added);
+            db.CoverageMembers.UpdateRange(updated);
 
-        db.CoverageJournal.AddRange(journal);
-        await db.SaveChangesAsync(ct);
-        db.ChangeTracker.Clear();
+            // A removed row is deleted by its key: the member came from a no-tracking read.
+            var removedIds = removed.Select(m => m.Id).ToList();
+            if (removedIds.Count > 0)
+            {
+                var rows = await db.CoverageMembers
+                    .IgnoreQueryFilters([OwnerQueryFilter.Name])
+                    .Where(m => m.UserId == userId && removedIds.Contains(m.Id))
+                    .ToListAsync(ct);
+                db.CoverageMembers.RemoveRange(rows);
+            }
+
+            db.CoverageJournal.AddRange(journal);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
     }
 
     public async Task<IReadOnlyList<CoverageJournalEntry>> ListJournalUnscopedAsync(
@@ -66,6 +73,18 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
         }
 
         return await query.OrderByDescending(e => e.At).Take(take).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> ListLastRemovalsUnscopedAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        var removals = await db.CoverageJournal.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(e => e.UserId == userId && e.Action == CoverageAction.Removed)
+            .GroupBy(e => e.Ticker)
+            .Select(g => new { Ticker = g.Key, At = g.Max(e => e.At) })
+            .ToListAsync(ct);
+        return removals.ToDictionary(r => r.Ticker, r => r.At);
     }
 
     public async Task<IReadOnlyList<CoverageVerdictObservation>> ListObservationsUnscopedAsync(
@@ -87,9 +106,16 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
             return false;
         }
 
-        db.CoverageVerdictObservations.Add(observation);
-        await db.SaveChangesAsync(ct);
-        db.ChangeTracker.Clear();
+        try
+        {
+            db.CoverageVerdictObservations.Add(observation);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+
         return true;
     }
 
@@ -99,9 +125,16 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(o => o.ObservedOn < before)
             .ToListAsync(ct);
-        db.CoverageVerdictObservations.RemoveRange(old);
-        await db.SaveChangesAsync(ct);
-        db.ChangeTracker.Clear();
+        try
+        {
+            db.CoverageVerdictObservations.RemoveRange(old);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+
         return old.Count;
     }
 }

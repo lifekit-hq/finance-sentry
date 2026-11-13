@@ -90,6 +90,16 @@ public sealed class CoverageRulesTests
     }
 
     [Fact]
+    public void BuyReadings_OnOrBeforeTheDayOfTheLastRemoval_DoNotCount()
+    {
+        var facts = Facts(candidates: [Candidate()], verdicts: [V(5, "Buy"), V(4, "Buy"), V(3, "Avoid"), V(2, "Avoid"), V(1, "Buy")])
+            with { LastRemovedAt = AsOf.AddDays(-2) };
+
+        CoverageRules.BuyDaysInWindow(facts, Options, AsOf).Should().Be(1);
+        CoverageRules.EvaluateAdd(facts, Options, AsOf).Should().BeNull();
+    }
+
+    [Fact]
     public void ABuyHistory_WithoutAnActiveCandidate_DoesNotAdd()
     {
         var facts = Facts(candidates: [Candidate(status: CandidateStatus.Expired)], verdicts: [V(5, "Buy"), V(1, "Buy")]);
