@@ -9,7 +9,7 @@
 | User iteration | `IIpsRepository.GetUserIdsWithCurrentIpsAsync()` | Same precedent as `OpportunityScanJob` — only users with an IPS get proposals |
 | Drift source | Inject `IQueryHandler<GetAllocationDriftQuery, AllocationDriftDto>` | CQRS handlers are auto-registered; already used in MCP tool + Integration adapter |
 | Alert dedup referenceId | MD5(`"rebalance:portfolio:{userId}"`) | Portfolio-wide alert needs stable per-user anchor, no natural entity reference; mirrors `ViolationReferenceId` pattern |
-| Silence window | 24 h | One proposal per day; mirrors LowBalance/ThesisBroken cadence |
+| Silence window | One notification per drift episode; 7 days for an accepted, dismissed or deferred proposal | The drift signature in `alerts.alerts."DedupKey"` and the episode's high-water mark decide a repeat (spec FR-004, #1266); the earlier 24 h window re-notified a persisting drift daily |
 | Cron slot | `Cron.Daily(4)` (04:00 UTC) | After PortfolioScanner (02:00) and Research macro (03:00) |
 | Order sizing | `|ActualValueUsd − TargetPct% × TotalUsd|` | Direct from drift DTO; no additional API calls |
 
