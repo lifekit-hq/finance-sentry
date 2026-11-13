@@ -94,6 +94,7 @@ public static class RadarModule
         services.AddScoped<ISubjectSignalReader, SubjectSignalReader>();
         services.AddScoped<IMarketStructureReader, MarketStructureReader>();
         services.AddScoped<IReturnCorrelationReader, ReturnCorrelationReader>();
+        services.AddScoped<IAdjustedCloseReader, AdjustedCloseReader>();
 
         services.AddScoped<IBookPerformanceService, BookPerformanceService>();
         services.AddCompanionLinks();

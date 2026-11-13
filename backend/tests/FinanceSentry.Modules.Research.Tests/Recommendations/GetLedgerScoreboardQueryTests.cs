@@ -27,8 +27,12 @@ public sealed class GetLedgerScoreboardQueryTests
     {
         var events = new Mock<IThesisEventRepository>();
         events.Setup(e => e.ListUnscopedAsync(User, null, It.IsAny<CancellationToken>())).ReturnsAsync(() => _journal);
+        var coverage = new Mock<ICoverageRepository>();
+        coverage.Setup(c => c.ListMembersUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        coverage.Setup(c => c.ListJournalUnscopedAsync(It.IsAny<Guid>(), null, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         var handler = new GetLedgerScoreboardQueryHandler(
-            _recommendations, _candidates, events.Object, new ThesisPerformanceCalculator(), Options.Create(new FrictionConfig()));
+            _recommendations, _candidates, events.Object, new ThesisPerformanceCalculator(), Options.Create(new FrictionConfig()),
+            coverage.Object, new Mock<FinanceSentry.Core.Interfaces.IAdjustedCloseReader>().Object);
         return await handler.Handle(new GetLedgerScoreboardQuery(User, AsOf), CancellationToken.None);
     }
 

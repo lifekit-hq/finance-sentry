@@ -1,10 +1,13 @@
 namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -25,7 +28,9 @@ public sealed class GetLedgerScoreboardQueryHandler(
     ICandidateRepository candidates,
     IThesisEventRepository events,
     IThesisPerformanceCalculator calculator,
-    IOptions<FrictionConfig> frictionOptions)
+    IOptions<FrictionConfig> frictionOptions,
+    ICoverageRepository coverage,
+    IAdjustedCloseReader closes)
     : IQueryHandler<GetLedgerScoreboardQuery, LedgerScoreboardDto>
 {
     public const string LedgerAsProposed = "LedgerAsProposed";
@@ -91,7 +96,97 @@ public sealed class GetLedgerScoreboardQueryHandler(
             ScoreRecommendationOutcomesCommandHandler.HorizonDays,
             GetTrackRecordQueryHandler.MinimumClosedSampleSize,
             contestants,
-            undecided);
+            undecided,
+            await GradeCoverageAsync(query, picks, ct));
+    }
+
+    /// <summary>
+    /// The coverage universe against the S&amp;P 500 (<see cref="CoverageGrader"/>): every add is a membership graded from
+    /// its date, a removal ends it, and a name still covered with no journal add counts from its member row.
+    /// </summary>
+    private async Task<CoverageVsBenchmarkDto> GradeCoverageAsync(
+        GetLedgerScoreboardQuery query, IReadOnlyList<OpportunityCandidate> picks, CancellationToken ct)
+    {
+        var members = await coverage.ListMembersUnscopedAsync(query.UserId, ct);
+        var journal = await coverage.ListJournalUnscopedAsync(query.UserId, null, int.MaxValue, ct);
+
+        var memberships = new List<CoverageMembership>();
+        foreach (var byTicker in journal.GroupBy(e => e.Ticker.Trim().ToUpperInvariant()))
+        {
+            CoverageJournalEntry? open = null;
+            foreach (var entry in byTicker.OrderBy(e => e.At))
+            {
+                if (entry.Action == CoverageAction.Added)
+                {
+                    if (open is not null)
+                    {
+                        memberships.Add(Membership(byTicker.Key, open, entry.At, picks));
+                    }
+
+                    open = entry;
+                }
+                else if (open is not null)
+                {
+                    memberships.Add(Membership(byTicker.Key, open, entry.At, picks));
+                    open = null;
+                }
+            }
+
+            if (open is not null)
+            {
+                memberships.Add(Membership(byTicker.Key, open, null, picks));
+            }
+        }
+
+        var covered = memberships.Where(m => m.End is null).Select(m => m.Ticker).ToHashSet(StringComparer.Ordinal);
+        foreach (var member in members)
+        {
+            var ticker = member.Ticker.Trim().ToUpperInvariant();
+            if (!covered.Contains(ticker))
+            {
+                memberships.Add(new CoverageMembership(
+                    ticker, member.AddedAt, null, member.AddedReason, ScreenTag(ticker, member.AddedReason, member.AddedAt, picks)));
+            }
+        }
+
+        var benchmarkTicker = ThesisEventRecorder.DefaultBenchmarkTicker;
+        var benchmark = new List<AdjustedClose>();
+        var bars = new Dictionary<string, IReadOnlyList<AdjustedClose>>(StringComparer.Ordinal);
+        if (memberships.Count > 0)
+        {
+            var since = DateOnly.FromDateTime(memberships.Min(m => m.Start).UtcDateTime);
+            benchmark.AddRange(await closes.GetSinceAsync(benchmarkTicker, since, ct));
+            foreach (var ticker in memberships.Select(m => m.Ticker).Distinct(StringComparer.Ordinal))
+            {
+                bars[ticker] = await closes.GetSinceAsync(ticker, since, ct);
+            }
+        }
+
+        return CoverageGrader.Grade(
+            memberships, members.Count, bars, benchmark, query.AsOf, Benchmark, benchmarkTicker,
+            GetTrackRecordQueryHandler.MinimumClosedSampleSize);
+    }
+
+    private static CoverageMembership Membership(
+        string ticker, CoverageJournalEntry added, DateTimeOffset? end, IReadOnlyList<OpportunityCandidate> picks)
+        => new(ticker, added.At, end, added.Reason, ScreenTag(ticker, added.Reason, added.At, picks));
+
+    /// <summary>
+    /// The nominating screen's tag where the candidate carries one: a <c>Screen</c> add is traced to the newest candidate
+    /// for the ticker created by the add (else the earliest), and its first nomination reason names the screen.
+    /// </summary>
+    private static string? ScreenTag(string ticker, CoverageReason reason, DateTimeOffset at, IReadOnlyList<OpportunityCandidate> picks)
+    {
+        if (reason != CoverageReason.Screen)
+        {
+            return null;
+        }
+
+        var forTicker = picks
+            .Where(c => string.Equals(c.Ticker, ticker, StringComparison.OrdinalIgnoreCase) && c.NominationReasons.Count > 0)
+            .ToList();
+        var candidate = forTicker.Where(c => c.CreatedAt <= at).MaxBy(c => c.CreatedAt) ?? forTicker.MinBy(c => c.CreatedAt);
+        return candidate?.NominationReasons[0];
     }
 
     /// <summary>
