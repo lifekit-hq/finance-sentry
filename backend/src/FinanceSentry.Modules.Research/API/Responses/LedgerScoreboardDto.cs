@@ -17,13 +17,18 @@ namespace FinanceSentry.Modules.Research.API.Responses;
 /// row per candidate source (User, Ledger, Scan).
 /// </param>
 /// <param name="EndedWithoutDecision">Proposals that expired or were superseded before a decision, newest first.</param>
+/// <param name="Coverage">
+/// The coverage universe ("our own index") graded against the S&amp;P 500 from each member's add date: does the list
+/// beat the index. Null only when the read has no coverage or price source wired.
+/// </param>
 public sealed record LedgerScoreboardDto(
     string Benchmark,
     string BenchmarkTicker,
     int HorizonDays,
     int MinimumSampleSize,
     IReadOnlyList<ScoreboardContestantDto> Contestants,
-    IReadOnlyList<UndecidedProposalDto> EndedWithoutDecision);
+    IReadOnlyList<UndecidedProposalDto> EndedWithoutDecision,
+    CoverageVsBenchmarkDto? Coverage = null);
 
 /// <summary>One contestant's row on the scoreboard.</summary>
 /// <param name="Contestant"><c>LedgerAsProposed</c>, <c>OwnerAsDecided</c> or <c>PaperPicks</c>.</param>
@@ -82,3 +87,59 @@ public sealed record UndecidedProposalDto(
     string Action,
     string Status,
     DateTimeOffset CreatedAt);
+
+/// <summary>
+/// The coverage universe against the S&amp;P 500, deterministic from stored daily bars (no model call). Each membership
+/// (an add, to its removal or today) is one equal-weight observation graded from its add date over each horizon; the
+/// list return is the mean of those returns and the benchmark return the mean of the S&amp;P 500's over the same
+/// windows, so <c>ExcessPct</c> is the list's average edge in percentage points. A horizon with no member old enough
+/// reads "not enough history yet" and carries no figures.
+/// </summary>
+/// <param name="Benchmark">"S&amp;P 500".</param>
+/// <param name="BenchmarkTicker">"SPY".</param>
+/// <param name="HeadlineHorizonDays">The horizon the answer is read at (90).</param>
+/// <param name="MinimumSampleSize">Graded memberships a figure needs before it can tell skill from luck.</param>
+/// <param name="CurrentMembers">Members covered now.</param>
+/// <param name="Horizons">One block per horizon, shortest first; the headline one is flagged.</param>
+public sealed record CoverageVsBenchmarkDto(
+    string Benchmark,
+    string BenchmarkTicker,
+    int HeadlineHorizonDays,
+    int MinimumSampleSize,
+    int CurrentMembers,
+    IReadOnlyList<CoverageHorizonDto> Horizons);
+
+/// <summary>One horizon: the whole list, then each source (add reason and screen tag) on its own.</summary>
+public sealed record CoverageHorizonDto(
+    int HorizonDays,
+    bool IsHeadline,
+    CoverageGradeDto Overall,
+    IReadOnlyList<CoverageSourceGradeDto> BySource);
+
+/// <summary>Grades of the memberships one reason (and screen tag) nominated.</summary>
+/// <param name="Source">The <c>CoverageReason</c>: Held, Watchlist, Screen, Ledger or User.</param>
+/// <param name="ScreenTag">The nominating screen's first nomination reason where the candidate carries one; null otherwise.</param>
+public sealed record CoverageSourceGradeDto(string Source, string? ScreenTag, CoverageGradeDto Grade);
+
+/// <summary>Equal-weight figures over memberships at one horizon; percentages are points, figures null without a graded membership.</summary>
+/// <param name="Memberships">Memberships considered (each add is one; a re-added name counts again).</param>
+/// <param name="Graded">Memberships with a return over the window (full horizon, or to removal).</param>
+/// <param name="ThroughRemoval">Of those, memberships that ended before the horizon: graded to the removal date, kept as history.</param>
+/// <param name="Awaiting">Memberships whose horizon has not elapsed, or whose closing bar has not landed.</param>
+/// <param name="NotPriced">Memberships with no stored bar at entry or exit, so no return.</param>
+/// <param name="Status"><c>Graded</c> or <c>NotEnoughHistory</c>.</param>
+/// <param name="Message">"not enough history yet" while <c>NotEnoughHistory</c>; null otherwise.</param>
+public sealed record CoverageGradeDto(
+    int Memberships,
+    int Graded,
+    int ThroughRemoval,
+    int Awaiting,
+    int NotPriced,
+    decimal? ListReturnPct,
+    decimal? BenchmarkReturnPct,
+    decimal? ExcessPct,
+    decimal? BeatBenchmarkSharePct,
+    string Status,
+    string? Message,
+    bool TooFewToTell,
+    string? Caveat);
