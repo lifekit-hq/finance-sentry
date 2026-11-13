@@ -55,7 +55,8 @@ public static class ReviewDueSource
 /// <param name="Source">One of <see cref="ReviewDueSource.All"/>.</param>
 /// <param name="Reference">Stable key of the event behind the notice; part of the once-only identity.</param>
 /// <param name="Evidence">Typed references Ledger can read the evidence from: <c>filing:&lt;accession&gt;</c>,
-/// <c>article:&lt;id&gt;</c>, <c>event:&lt;id&gt;</c>, <c>earnings:&lt;date&gt;</c>, <c>catalyst:&lt;date&gt;</c>.</param>
+/// <c>url:&lt;document url&gt;</c>, <c>article:&lt;id&gt;</c>, <c>earnings:&lt;ticker&gt;:&lt;date&gt;</c>,
+/// <c>catalyst:&lt;date&gt;</c>, <c>thesis:&lt;id&gt;</c>, <c>break:&lt;timestamp&gt;</c>.</param>
 /// <param name="Headline">One human sentence for the alert text.</param>
 public sealed record ReviewDue(
     ReviewSubjectKind Subject,
