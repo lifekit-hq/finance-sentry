@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.Research;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
@@ -83,7 +84,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(11);
+        perUser.Should().HaveCount(14);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -259,6 +260,79 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         await using var asA = CreateContext(_userA);
         (await asA.Theses.SingleAsync()).ThesisText.Should().Be("Revised.");
         (await asA.OpportunityCandidates.CountAsync()).Should().Be(1);
+    }
+
+    [DockerRequiredFact]
+    public async Task Coverage_reads_follow_the_acting_person_and_the_unscoped_reads_serve_the_evaluation_job()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var memberA = new CoverageMember { UserId = _userA, Ticker = "NVDA", AddedReason = CoverageReason.Held };
+        var memberB = new CoverageMember { UserId = _userB, Ticker = "NVDA", AddedReason = CoverageReason.Watchlist };
+        await SeedAsync(
+            memberA, memberB,
+            new CoverageJournalEntry { UserId = _userA, Ticker = "NVDA", Action = CoverageAction.Added, Rule = CoverageRuleIds.Held, Reason = CoverageReason.Held, Detail = "Held in the book." },
+            new CoverageJournalEntry { UserId = _userB, Ticker = "NVDA", Action = CoverageAction.Added, Rule = CoverageRuleIds.Watchlist, Reason = CoverageReason.Watchlist, Detail = "On the watchlist." },
+            new CoverageVerdictObservation { UserId = _userA, Ticker = "NVDA", ObservedOn = today, Verdict = "Buy", FiredRuleId = "buy" },
+            new CoverageVerdictObservation { UserId = _userB, Ticker = "NVDA", ObservedOn = today, Verdict = "Wait", FiredRuleId = "otherwise" });
+
+        await using (var asA = CreateContext(_userA))
+        {
+            (await asA.CoverageMembers.Select(m => m.Id).ToListAsync()).Should().Equal(memberA.Id);
+            (await asA.CoverageJournal.Select(e => e.UserId).ToListAsync()).Should().Equal(_userA);
+            (await asA.CoverageVerdictObservations.Select(o => o.Verdict).ToListAsync()).Should().Equal("Buy");
+            (await asA.CoverageMembers.AnyAsync(m => m.UserId == _userB)).Should().BeFalse(
+                "the filter holds even when a query names another person explicitly");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.CoverageMembers.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+        (await asNoOne.CoverageJournal.AnyAsync()).Should().BeFalse();
+        (await asNoOne.CoverageVerdictObservations.AnyAsync()).Should().BeFalse();
+
+        var noPerson = new CoverageRepository(asNoOne);
+        (await noPerson.ListMembersUnscopedAsync(_userA)).Should().ContainSingle(m => m.Id == memberA.Id);
+        (await noPerson.ListMembersUnscopedAsync(_userB)).Should().ContainSingle(m => m.Id == memberB.Id, "each opted-out read keeps its UserId predicate");
+        (await noPerson.ListUserIdsUnscopedAsync()).Should().Contain([_userA, _userB]);
+        (await noPerson.ListJournalUnscopedAsync(_userA, "NVDA", 10)).Should().ContainSingle(e => e.UserId == _userA);
+        (await noPerson.ListObservationsUnscopedAsync(_userA, today.AddDays(-1))).Should().ContainSingle(o => o.UserId == _userA);
+        (await noPerson.AddObservationUnscopedAsync(new CoverageVerdictObservation
+        {
+            UserId = _userA, Ticker = "NVDA", ObservedOn = today, Verdict = "Avoid", FiredRuleId = "weak_structure",
+        })).Should().BeFalse("a filtered existence check would find nothing and insert a duplicate for the day");
+    }
+
+    [DockerRequiredFact]
+    public async Task Coverage_evaluation_save_with_no_person_adds_updates_and_removes_only_the_named_users_rows()
+    {
+        var keep = new CoverageMember { UserId = _userA, Ticker = "KEEP", AddedReason = CoverageReason.Screen };
+        var drop = new CoverageMember { UserId = _userA, Ticker = "DROP", AddedReason = CoverageReason.Screen };
+        var other = new CoverageMember { UserId = _userB, Ticker = "DROP", AddedReason = CoverageReason.Screen };
+        await SeedAsync(keep, drop, other);
+
+        await using (var ctx = CreateContext())
+        {
+            var repository = new CoverageRepository(ctx);
+            var tracked = (await repository.ListMembersUnscopedAsync(_userA)).Single(m => m.Ticker == "KEEP");
+            tracked.CorrelationToBook = 0.31m;
+            await repository.SaveEvaluationAsync(
+                _userA,
+                added: [new CoverageMember { UserId = _userA, Ticker = "NEW", AddedReason = CoverageReason.Held }],
+                updated: [tracked],
+                removed: [(await repository.ListMembersUnscopedAsync(_userA)).Single(m => m.Ticker == "DROP")],
+                journal: [new CoverageJournalEntry
+                {
+                    UserId = _userA, Ticker = "DROP", Action = CoverageAction.Removed, Rule = CoverageRuleIds.NoEvent,
+                    Reason = CoverageReason.Screen, Detail = "No event.",
+                }]);
+        }
+
+        await using var verify = CreateContext();
+        var members = await new CoverageRepository(verify).ListMembersUnscopedAsync(_userA);
+        members.Select(m => m.Ticker).Should().Equal("KEEP", "NEW");
+        members.Single(m => m.Ticker == "KEEP").CorrelationToBook.Should().Be(0.31m);
+        (await new CoverageRepository(verify).ListMembersUnscopedAsync(_userB)).Should().ContainSingle(m => m.Ticker == "DROP",
+            "another person's row for the same ticker is untouched");
+        (await new CoverageRepository(verify).ListJournalUnscopedAsync(_userA, "DROP", 10)).Should().ContainSingle();
     }
 
     [DockerRequiredFact]

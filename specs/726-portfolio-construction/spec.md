@@ -66,7 +66,7 @@ the brokerage holdings reader.
 
 | Requirement | Status in this slice | Where |
 |---|---|---|
-| FR-001 | Partial: the universe is built per request from the viewer's holdings, watchlist and a configured curated list, and one scorecard per symbol is shared through the cache; it is not yet a persisted shared scoring run. | `GetUniverseScreenQuery`, `ResearchUniverseScorecardAdapter` |
+| FR-001 | Partial: the universe is built per request from the viewer's holdings, watchlist and the coverage universe (`ICoverageUniverseReader`, `docs/coverage-universe.md`; there is no hard-coded list any more), and one scorecard per symbol is shared through the cache; it is not yet a persisted shared scoring run. | `GetUniverseScreenQuery`, `ResearchUniverseScorecardAdapter` |
 | FR-002 | Covered: rows come from the existing scorecard read; no parallel formula. | `IScorecardSnapshotReader` |
 | FR-003 | Covered: the universe is capped (`MaxUniverseSize`, 40) and no index-wide structure scan runs. Shortlist members (OQ-1) are not included. | `PortfolioConstructionOptions` |
 | FR-012 | Covered: archetypes `growth` and `balanced` are configuration (gate per axis, ordering, name count, cap, sleeves, cash floor); a list or dictionary a configured archetype names replaces the shipped one rather than merging into it. | `Archetype`, `PortfolioConstructionOptions` |
@@ -282,7 +282,7 @@ missing names, the over- or under-weight on the held ones, and the cash differen
   ineligible for construction but still listed on the screen.
 - **Scoring failed for one name**: the row shows the failure reason. The rest of the universe and the
   construction still render.
-- **Universe empty** (the scan shortlist failed and no curated list is configured): the screen shows an
+- **Universe empty** (the scan shortlist failed and the coverage universe is empty): the screen shows an
   explicit empty state, and construction refuses with a reason.
 - **IPS targets an asset class the universe cannot fill** (bonds, real estate): the sleeve appears at its
   target weight with no names and a note "not built from the universe in v1".
@@ -369,7 +369,7 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 ### Key Entities
 
 - **UniverseMember** _(new)_: a symbol in the scored universe, with its membership source (scan shortlist,
-  curated list, held, watchlist) and when it joined.
+  coverage universe, held, watchlist) and when it joined.
 - **UniverseScorecard** _(new, shared corpus, append-only)_: symbol, scored at, structure, fundamentals,
   crowding, `ScoreEvidence`, `FormulaVersion`, plus a reference to the valuation snapshot used. It mirrors
   `CandidateScore` without `CandidateId` or `IpsFit`, both of which are per-user.

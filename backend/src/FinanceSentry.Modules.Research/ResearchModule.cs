@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain;
@@ -89,6 +90,13 @@ public static class ResearchModule
                 ReferenceUniverseRefreshJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Weekly(DayOfWeek.Sunday, 4));
+
+            // Coverage universe evaluation (discovery funnel stage 1): after the 00:00 candidate expiry and scan it reads.
+            var coverageOptions = sp.GetRequiredService<IOptions<CoverageOptions>>().Value;
+            mgr.AddOrUpdate<CoverageEvaluationJob>(
+                CoverageEvaluationJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
 
             mgr.AddOrUpdate<CandidateExpiryJob>(
                 "opportunity-candidate-expiry",
@@ -482,6 +490,17 @@ public static class ResearchModule
         services.AddScoped<IReferenceUniverseRepository, ReferenceUniverseRepository>();
         services.AddScoped<ReferenceUniverseRefresher>();
         services.AddScoped<ReferenceUniverseRefreshJob>();
+
+        // Coverage universe ("our own index", stage 1 of the discovery funnel): capped list of companies with
+        // deterministic add and remove rules, evaluated daily. The Core port feeds the construction screen.
+        services.Configure<CoverageOptions>(config.GetSection(CoverageOptions.SectionName));
+        services.AddScoped<ICoverageRepository, CoverageRepository>();
+        services.AddScoped<ICoverageVerdictSource, ScorecardCoverageVerdictSource>();
+        services.AddScoped<CoverageSnapshotReader>();
+        services.AddScoped<CoverageEvaluator>();
+        services.AddScoped<CoverageExplainer>();
+        services.AddScoped<CoverageEvaluationJob>();
+        services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();
         services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
         services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
