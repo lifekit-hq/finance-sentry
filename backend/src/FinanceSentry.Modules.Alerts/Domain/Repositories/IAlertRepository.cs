@@ -25,6 +25,15 @@ public interface IAlertRepository
         Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// <see cref="HasRecentAsync"/> that skips alerts the system itself resolved (the raising condition
+    /// cleared, or a newer alert superseded it) — those ended their episode, so they no longer silence a
+    /// recurrence. An alert the user dismissed, accepted or deferred still counts (finance-sentry#1266).
+    /// </summary>
+    Task<bool> HasRecentUnclearedAsync(
+        Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
+        CancellationToken ct = default);
+
     Task<bool> MarkReadAsync(Guid userId, Guid alertId, CancellationToken ct = default);
 
     Task MarkAllReadAsync(Guid userId, CancellationToken ct = default);

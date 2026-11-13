@@ -90,6 +90,19 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
                         && a.CreatedAt >= createdAfter, ct);
     }
 
+    public Task<bool> HasRecentUnclearedAsync(
+        Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
+        CancellationToken ct = default)
+    {
+        return AllUsers.AsNoTracking()
+            .AnyAsync(a => a.UserId == userId
+                        && a.Type == type
+                        && a.ReferenceId == referenceId
+                        && a.ReferenceLabel == referenceLabel
+                        && a.CreatedAt >= createdAfter
+                        && !(a.IsResolved && !a.IsDismissed && a.AcknowledgementDecision == null), ct);
+    }
+
     public async Task<bool> MarkReadAsync(Guid userId, Guid alertId, CancellationToken ct = default)
     {
         var alert = await _db.Alerts.FirstOrDefaultAsync(a => a.Id == alertId && a.UserId == userId, ct);

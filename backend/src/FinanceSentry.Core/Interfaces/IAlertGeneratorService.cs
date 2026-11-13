@@ -362,16 +362,23 @@ public interface IAlertGeneratorService
     /// <summary>
     /// Raises a Warning alert proposing a concrete rebalance order list when IPS bands are breached
     /// (432). <paramref name="orderCount"/> is the number of order lines; <paramref name="orderSummary"/>
-    /// is the human-readable formatted list. Silenced 24 hours so the daily job doesn't re-propose
-    /// while a prior one is still open or was recently dismissed.
+    /// is the human-readable formatted list. <paramref name="driftSignature"/> names the drift the
+    /// proposal answers (breaching sleeves, direction, and how many band widths out): one drift episode
+    /// notifies once. A changed signature supersedes the open proposal and notifies again; the same one
+    /// stays quiet, whatever the operator did with the earlier proposal, for the weekly cadence
+    /// (finance-sentry#1266).
     /// </summary>
     Task GenerateRebalanceProposalAlertAsync(
         Guid userId,
         int orderCount,
         string orderSummary,
+        string driftSignature,
         CancellationToken ct = default);
 
-    /// <summary>Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing.</summary>
+    /// <summary>
+    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing. That ends the
+    /// drift episode: a recurrence afterwards notifies at once, not after the weekly cadence.
+    /// </summary>
     Task ResolveRebalanceProposalAlertAsync(
         Guid userId,
         CancellationToken ct = default);

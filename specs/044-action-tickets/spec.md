@@ -37,8 +37,10 @@ the existing Companion → Telegram path.
    notional.
 2. **Given** `NeedsRebalance = false`, **When** the job runs for that user, **Then** no alert is
    created or updated.
-3. **Given** a proposal was generated in the last 24 hours, **When** the job runs again, **Then**
-   no duplicate alert is created (24-hour silence window + active-alert dedup).
+3. **Given** a proposal was generated for a drift in the last 7 days (open, accepted or dismissed), **When**
+   the job runs again against the same drift, **Then** no duplicate alert is created (7-day silence window +
+   active-alert dedup). A drift that moved a further band width, or gained or lost a breaching sleeve, supersedes
+   the open proposal and notifies again; a drift that cleared and recurs is a new episode (#1266).
 4. **Given** a user has no IPS, **When** the job runs, **Then** no alert is created for that user.
 5. **Given** the alert fires, **When** the Companion dispatch job runs, **Then** the alert is
    classified as a material `RebalanceProposal` event and routed to Telegram.
@@ -69,8 +71,10 @@ Companion `AcknowledgeCompanionEventsCommand` marks the event as delivered. No o
   `IBookFiguresService` via `GetAllocationDriftQueryHandler`. No independently derived cash/invested
   numbers anywhere in the proposal path.
 - **FR-003**: A proposal that cannot compute order lines from the drift DTO (e.g., no IPS) is NOT sent.
-- **FR-004**: Proposal alert is suppressed for 24 hours after the most recent one for the same user,
-  using the existing `FindActiveAsync` + `HasRecentAsync` dedup pattern.
+- **FR-004**: Proposal alert is suppressed for 7 days (the pulse checklist's weekly cadence) after the most
+  recent one for the same drift signature, using the existing `FindActiveAsync` + silence-window dedup pattern.
+  The signature is `{asset class}:{Sell|Buy|Review}:{band widths out}` per breaching sleeve, so a change of one
+  IPS band width is the materiality threshold (#1266).
 - **FR-005**: `RebalanceProposal` is a new AlertType constant; it maps to a new `CompanionEventKind`
   value and is registered in `MaterialityPolicy.ClassifyAlert`.
 - **FR-006**: Order sizing: OverBand sleeve → sell notional = `(ActualValueUsd − TargetPct% × TotalUsd)`;
