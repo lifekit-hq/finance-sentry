@@ -419,6 +419,8 @@ public static class ResearchModule
         services.AddScoped<IMarketNewsService, RssMarketNewsService>();
         services.AddScoped<IMacroCalendarService, MacroCalendarService>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
+        services.AddScoped<IResearchWriteScope, ResearchWriteScope>();
+        services.AddScoped<ThesisOriginReader>();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
         services.Configure<FrictionConfig>(config.GetSection(FrictionConfig.SectionName));
         services.Configure<RelativePerformanceConfig>(config.GetSection(RelativePerformanceConfig.SectionName));

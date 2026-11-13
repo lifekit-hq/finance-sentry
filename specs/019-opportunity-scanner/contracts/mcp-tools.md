@@ -2,7 +2,7 @@
 
 All: `[McpServerToolType]`, primary-ctor DI of a CQRS handler + `IIdentityResolver`,
 `[McpServerTool(Name=…)]` + `[Description]`, resolve `userId ?? identity.GetUserId()`.
-Allowlist 43 → 47; register injected deps (`IMarketStructureReader`, `IRiskPolicyGate`, candidate
+Allowlist 43 → 47 (plus `revert_thesis_revision` for Ledger-made revisions); register injected deps (`IMarketStructureReader`, `IRiskPolicyGate`, candidate
 repos, scorers) in `ToolParityTests`.
 
 ## `score_candidate`
@@ -18,21 +18,33 @@ repos, scorers) in `ToolParityTests`.
 - **Params**: `status?` (Active|Promoted|Rejected|Expired), `source?` (User|Scan), `userId?`
 - **Returns**: candidates with their latest score + status/links. Rejected/expired remain listed (SC-005).
 
+## Authorization and origin (owner ruling 2026-11-13)
+`promote_candidate`, `reject_candidate` and `save_thesis` are open to the service token (Ledger): the owner's only
+decision is buy or not, so Ledger nominates, promotes and rejects without a confirm step. The write is stamped
+`origin` (`Ledger` for a service token, `User` for the owner's session and stdio) on its `thesis_events` row
+(`ThesisEvent.Origin`, migration M024), and `list_candidates` shows it as `decisionOrigin` (the origin of the
+latest `Promoted`/`Rejected` event; `User` while Active). The risk gate, trigger validation and the one-thesis rules
+are unchanged for every caller. `delete_thesis` and everything on the IPS stay owner-session only. A promoted
+thesis's own `Created` event carries the audit payload (see docs/mcp.md); the `Promoted` event carries the
+`decisionNote` as `audit.rationale`. Pinned by `ResearchWriteAuthorizationTests`.
+
 ## `promote_candidate`
 - **Params**: `id: Guid`, `triggers?: ThesisInvalidationTrigger[]` (override the deterministic prefill),
   `overrideRisk?: bool`, `proposedUsd?: decimal`, `decisionNote?: string`, `userId?`, `paper?: bool`
-  (finance-sentry#704, default `false`)
+  (finance-sentry#704, default `false`), `evidence?: { newsArticleIds?, filingAccessions?, eventIds?, fundamentalsAsOf? }`
+  (kept in the audit payload)
 - **Evidence at entry**: the created thesis carries the candidate's latest scorecard summary (structure /
   fundamentals scores, crowding class, scored date) and the `decisionNote` in `ThesisText`, and the
   scorecard's observed figures (structure/fundamentals score, revenue YoY, gross margin, EPS YoY) as
   `KeyDataPoints` (`direction: "observed"`, `source: "candidate_scorecard"`). A candidate with no scorecard degrades to the
   default text and no data points; it never fails the promotion. Triggers, risk gate and the
   `SaveThesisCommand` path are unchanged; no schema change.
-- **Returns**: `{ thesisId?, gate: RiskGateVerdict }`. Runs `IRiskPolicyGate.CheckProposalAsync`
+- **Returns**: `{ thesisId?, gate: RiskGateVerdict, note? }`. Runs `IRiskPolicyGate.CheckProposalAsync`
   (FR-011b): `Refused` (and no `overrideRisk`) → returns the verdict with the named rule + max compliant
   size, NO thesis created. Otherwise creates the `InvestmentThesis` via `SaveThesisCommand` with prefilled
   triggers (validated by `ThesisTriggerVocabulary`), links the candidate (`PromotedThesisId`, status
-  `Promoted`), records a `Promoted` candidate event (020). An override is recorded as a signal (FR-007).
+  `Promoted`), records a `Promoted` candidate event (020). An override is recorded as a signal (FR-007). `overrideRisk` is
+  owner-only: a Ledger (service-token) call ignores it, stays `Refused`, and `note` says the override is owner-only.
 - **`paper` (finance-sentry#704)**: a paper/tracking-only promotion never draws down real cash, so the
   real-book cash-funding rule (`MinCashBuffer`) has no meaning for it and is skipped when `paper: true`.
   Concentration/sizing rules (`MaxPositionWeight`, `MaxNewPosition`, `Turnover`) still apply unchanged —
@@ -42,7 +54,7 @@ repos, scorers) in `ToolParityTests`.
 
 ## `reject_candidate`
 - **Params**: `id: Guid`, `reason: string`, `userId?`
-- **Returns**: updated candidate (status `Rejected`, reason kept). Records a `Rejected` event; remains
+- **Returns**: updated candidate (status `Rejected`, reason kept). Records a `Rejected` event (with `origin`, `audit.rationale` = the reason); remains
   queryable for counterfactuals (SC-004/020).
 
 ## Cross-module contracts (not MCP)

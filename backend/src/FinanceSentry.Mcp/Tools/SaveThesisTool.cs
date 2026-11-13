@@ -1,11 +1,10 @@
 using System.ComponentModel;
-using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -13,11 +12,11 @@ namespace FinanceSentry.Mcp.Tools;
 [McpServerToolType]
 public sealed class SaveThesisTool(
     ICommandHandler<SaveThesisCommand, ThesisDto> handler,
-    IIdentityResolver identity)
+    IIdentityResolver identity,
+    IHttpContextAccessor httpContextAccessor)
 {
-    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "save_thesis")]
-    [Description("Creates or updates an investment thesis. Pass id=null to create; pass an existing id to update. At least one invalidationTrigger is expected for thesis-break detection to work. Provide entryPrice so that price_drawdown triggers are anchored to your entry, not the asset's historical peak.")]
+    [Description("Creates or updates an investment thesis. Pass id=null to create; pass an existing id to update. Every create and revision is journaled (origin User or Ledger, prior and new version, rationale, evidence) and a revision can be undone with revert_thesis_revision. Pass rationale (why) and evidence (the news article ids, filing accessions, event ids and fundamentals as-of it rests on) so the trail says what the change rested on. At least one invalidationTrigger is expected for thesis-break detection to work. Provide entryPrice so that price_drawdown triggers are anchored to your entry, not the asset's historical peak.")]
     public async Task<ThesisDto?> ExecuteAsync(
         [Description("Ticker symbol the thesis is about.")] string ticker,
         [Description("Free-form thesis narrative — the investment case in Denys's words.")] string thesisText,
@@ -27,6 +26,8 @@ public sealed class SaveThesisTool(
         [Description("Entry price per share (the price you paid, not the asset's historical peak). Required for price_drawdown triggers to be anchored to entry.")] decimal? entryPrice = null,
         [Description("Thesis id when updating; null to create.")] Guid? id = null,
         [Description("Optional contemporaneous reasoning captured at creation time (FR-008b decision journal). Only applied on create.")] string? decisionNote = null,
+        [Description("Why the thesis is being created or revised; kept in the audit trail.")] string? rationale = null,
+        [Description("References the change rests on: newsArticleIds, filingAccessions, eventIds, fundamentalsAsOf. Kept in the audit trail.")] ThesisEvidenceRefs? evidence = null,
         CancellationToken cancellationToken = default)
     {
         var effective = identity.GetUserId();
@@ -45,7 +46,10 @@ public sealed class SaveThesisTool(
                 catalysts ?? [],
                 invalidationTriggers ?? [],
                 entryPrice,
-                decisionNote),
+                decisionNote,
+                McpCallerOrigin.Of(httpContextAccessor),
+                rationale,
+                evidence),
             cancellationToken);
     }
 }

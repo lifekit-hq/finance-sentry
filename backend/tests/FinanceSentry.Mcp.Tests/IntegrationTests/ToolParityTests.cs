@@ -165,6 +165,9 @@ public sealed class ToolParityTests
         services.AddSingleton<IMarketDataService>(new FakeMarketDataService(quotesByTicker, closesByTicker));
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
+        services.AddScoped<IResearchWriteScope, ResearchWriteScope>();
+        services.AddScoped<ThesisOriginReader>();
+        services.AddHttpContextAccessor();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
         services.Configure<FrictionConfig>(_ => { });
         services.AddScoped<IBenchmarkRelativeRecordRepository, BenchmarkRelativeRecordRepository>();

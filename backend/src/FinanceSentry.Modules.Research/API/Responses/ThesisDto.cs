@@ -13,4 +13,6 @@ public record ThesisDto(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? BrokenAt,
     string? BrokenReason,
-    decimal? EntryPrice = null);
+    decimal? EntryPrice = null,
+    // Who made the last write: "User" (the owner's session) or "Ledger" (its service token).
+    string Origin = "User");

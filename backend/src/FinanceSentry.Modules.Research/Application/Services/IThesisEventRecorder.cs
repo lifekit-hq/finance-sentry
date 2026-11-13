@@ -17,4 +17,20 @@ public interface IThesisEventRecorder
         ThesisEventType eventType,
         string? decisionNote = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Appends an event that also carries its <see cref="ThesisEventOrigin"/> and, for a thesis write, its
+    /// <see cref="ThesisAudit"/>. <see cref="ThesisEventType.Revised"/> and <see cref="ThesisEventType.Reverted"/>
+    /// are not price-stamped: they are edits, not points on the track-record curve.
+    /// </summary>
+    Task RecordAuditedAsync(
+        Guid userId,
+        ThesisSubjectType subjectType,
+        Guid subjectId,
+        string ticker,
+        ThesisEventType eventType,
+        ThesisEventOrigin origin,
+        ThesisAudit? audit,
+        string? decisionNote = null,
+        CancellationToken ct = default);
 }

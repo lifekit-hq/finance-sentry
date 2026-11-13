@@ -228,11 +228,23 @@ internal sealed class RecordingThesisEventRecorder : IThesisEventRecorder
 {
     public List<ThesisEventType> Events { get; } = [];
 
+    public List<(ThesisSubjectType SubjectType, ThesisEventType EventType, ThesisEventOrigin Origin, ThesisAudit? Audit)> Audited { get; } = [];
+
     public Task RecordAsync(
         Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
         ThesisEventType eventType, string? decisionNote = null, CancellationToken ct = default)
     {
         Events.Add(eventType);
+        return Task.CompletedTask;
+    }
+
+    public Task RecordAuditedAsync(
+        Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
+        ThesisEventType eventType, ThesisEventOrigin origin, ThesisAudit? audit,
+        string? decisionNote = null, CancellationToken ct = default)
+    {
+        Events.Add(eventType);
+        Audited.Add((subjectType, eventType, origin, audit));
         return Task.CompletedTask;
     }
 }
@@ -331,12 +343,14 @@ internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyG
 {
     public string? LastTicker { get; private set; }
     public bool? LastIsPaper { get; private set; }
+    public bool? LastOverrideRisk { get; private set; }
 
     public Task<RiskGateVerdict> CheckProposalAsync(
         Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default)
     {
         LastTicker = ticker;
         LastIsPaper = isPaper;
+        LastOverrideRisk = overrideFlag;
         return Task.FromResult(verdict);
     }
 }

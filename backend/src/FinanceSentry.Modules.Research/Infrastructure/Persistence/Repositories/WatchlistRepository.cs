@@ -26,6 +26,10 @@ public class WatchlistRepository(ResearchDbContext db) : IWatchlistRepository
         => db.WatchlistItems
             .FirstOrDefaultAsync(w => w.UserId == userId && w.Ticker == ticker, ct);
 
+    public Task<WatchlistItem?> FindByIdAsync(Guid userId, Guid itemId, CancellationToken ct = default)
+        => db.WatchlistItems.AsNoTracking()
+            .FirstOrDefaultAsync(w => w.UserId == userId && w.Id == itemId, ct);
+
     public async Task AddAsync(WatchlistItem item, CancellationToken ct = default)
     {
         db.WatchlistItems.Add(item);

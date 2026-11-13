@@ -263,6 +263,13 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         teb.Property(x => x.BenchmarkTicker).IsRequired().HasMaxLength(20).HasDefaultValue("SPY");
         teb.Property(x => x.PricesPending).IsRequired();
         teb.Property(x => x.DecisionNote).HasMaxLength(4000);
+        teb.Property(x => x.Origin).IsRequired().HasMaxLength(20).HasDefaultValue(ThesisEventOrigin.User)
+            .HasConversion<string>();
+        teb.Property(x => x.Audit)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, jsonOptions),
+                v => v == null ? null : JsonSerializer.Deserialize<ThesisAudit>(v, jsonOptions));
         teb.HasIndex(x => new { x.SubjectType, x.SubjectId, x.Timestamp })
             .HasDatabaseName("idx_thesis_events_subject");
         teb.HasIndex(x => new { x.UserId, x.PricesPending })

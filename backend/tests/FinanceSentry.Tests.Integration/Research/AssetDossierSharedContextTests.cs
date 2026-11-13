@@ -82,7 +82,7 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
             Mock.Of<IBookFiguresService>(),
             Mock.Of<IHoldingTaxLotsReader>(),
             Mock.Of<IAssetSignalReader>(),
-            new GetThesesQueryHandler(new ThesisRepository(db)),
+            new GetThesesQueryHandler(new ThesisRepository(db), new ThesisOriginReader(new ThesisEventRepository(db))),
             Mock.Of<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>(),
             new GetAnalystActionsQueryHandler(
                 new AnalystActionRepository(db),

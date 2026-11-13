@@ -27,7 +27,9 @@ public class ListThesisEventsQueryHandler(IThesisEventRepository repo)
                 e.BenchmarkPrice,
                 e.BenchmarkTicker,
                 e.PricesPending,
-                e.DecisionNote))
+                e.DecisionNote,
+                e.Origin.ToString(),
+                e.Audit))
             .ToList();
     }
 }

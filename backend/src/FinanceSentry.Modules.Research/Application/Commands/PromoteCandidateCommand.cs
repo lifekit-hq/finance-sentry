@@ -13,7 +13,9 @@ using Microsoft.Extensions.Options;
 /// Promotes an Active candidate into a monitored <see cref="InvestmentThesis"/> (US3/FR-011).
 /// The 022 risk gate always runs first (FR-011b): a Refused verdict aborts with the named rule
 /// unless the caller passes <see cref="OverrideRisk"/>, in which case the override is recorded as a
-/// signal (never silent — FR-007). Invalidation triggers are the caller's when supplied, else the
+/// signal (never silent — FR-007). Overriding is the owner's call alone: <see cref="OverrideRisk"/> is ignored
+/// when <see cref="Origin"/> is <see cref="ThesisEventOrigin.Ledger"/>, so a Ledger promotion the gate refused stays
+/// refused (no thesis, no override signal) and the result says the override is owner-only. Invalidation triggers are the caller's when supplied, else the
 /// deterministic <see cref="TriggerPrefill"/> derived from the candidate's latest scorecard.
 /// Evidence at entry: the latest scorecard summary and the <see cref="DecisionNote"/> are carried into
 /// the thesis text and key data points. No scorecard degrades to an empty carry (the default text, no
@@ -30,12 +32,15 @@ public record PromoteCandidateCommand(
     bool OverrideRisk = false,
     decimal ProposedUsd = 0m,
     string? DecisionNote = null,
-    bool Paper = false) : ICommand<PromoteCandidateResult>;
+    bool Paper = false,
+    ThesisEventOrigin Origin = ThesisEventOrigin.User,
+    ThesisEvidenceRefs? Evidence = null) : ICommand<PromoteCandidateResult>;
 
 public sealed record PromoteCandidateResult(
     Guid? ThesisId,
     RiskGateVerdict Gate,
-    bool CandidateFound);
+    bool CandidateFound,
+    string? Note = null);
 
 public sealed class PromoteCandidateCommandHandler(
     ICandidateRepository candidateRepo,
@@ -43,6 +48,7 @@ public sealed class PromoteCandidateCommandHandler(
     IRiskPolicyGate riskGate,
     IRadarSignalWriter signalWriter,
     IThesisEventRecorder eventRecorder,
+    IResearchWriteScope writeScope,
     ICommandHandler<SaveThesisCommand, API.Responses.ThesisDto> saveThesis,
     IOptions<OpportunityOptions> options)
     : ICommandHandler<PromoteCandidateCommand, PromoteCandidateResult>
@@ -54,6 +60,8 @@ public sealed class PromoteCandidateCommandHandler(
     private const string ScorecardSource = "candidate_scorecard";
     private const string ObservedDirection = "observed";
     private const int MaxThesisTextLength = 4000;
+    private const string OwnerOnlyOverrideNote =
+        "The risk gate refused this promotion and overriding it is the owner's decision; Ledger cannot override it.";
 
     private readonly OpportunityOptions _options = options.Value;
 
@@ -66,15 +74,17 @@ public sealed class PromoteCandidateCommandHandler(
             return new PromoteCandidateResult(null, notFound, CandidateFound: candidate is not null);
         }
 
+        var overrideRisk = command.OverrideRisk && command.Origin != ThesisEventOrigin.Ledger;
         var gate = await riskGate.CheckProposalAsync(
-            command.UserId, candidate.Ticker, command.ProposedUsd, command.OverrideRisk, command.Paper, ct);
+            command.UserId, candidate.Ticker, command.ProposedUsd, overrideRisk, command.Paper, ct);
 
-        if (gate.Decision == RiskGateDecision.Refused && !command.OverrideRisk)
+        if (gate.Decision == RiskGateDecision.Refused && !overrideRisk)
         {
-            return new PromoteCandidateResult(null, gate, CandidateFound: true);
+            var note = command.OverrideRisk ? OwnerOnlyOverrideNote : null;
+            return new PromoteCandidateResult(null, gate, CandidateFound: true, note);
         }
 
-        if (gate.Decision == RiskGateDecision.Refused && command.OverrideRisk)
+        if (gate.Decision == RiskGateDecision.Refused)
         {
             await signalWriter.AppendSignalAsync(new RadarSignalRequest(
                 Scanner,
@@ -90,26 +100,36 @@ public sealed class PromoteCandidateCommandHandler(
         var latest = await scoreRepo.LatestForCandidateAsync(candidate.Id, ct);
         var triggers = command.Triggers ?? BuildPrefilledTriggers(latest);
 
-        var thesis = await saveThesis.Handle(
-            new SaveThesisCommand(
-                command.UserId,
-                Id: null,
-                candidate.Ticker,
-                BuildThesisText(latest, command.DecisionNote),
-                BuildKeyDataPoints(latest),
-                [],
-                InvalidationTriggers: triggers,
-                EntryPrice: null,
-                DecisionNote: command.DecisionNote),
-            ct);
+        var thesis = await writeScope.RunAsync(command.Origin, async () =>
+        {
+            var saved = await saveThesis.Handle(
+                new SaveThesisCommand(
+                    command.UserId,
+                    Id: null,
+                    candidate.Ticker,
+                    BuildThesisText(latest, command.DecisionNote),
+                    BuildKeyDataPoints(latest),
+                    [],
+                    InvalidationTriggers: triggers,
+                    EntryPrice: null,
+                    DecisionNote: command.DecisionNote,
+                    Origin: command.Origin,
+                    Rationale: command.DecisionNote,
+                    Evidence: command.Evidence),
+                ct);
 
-        candidate.PromotedThesisId = thesis.Id;
-        candidate.Status = CandidateStatus.Promoted;
-        await candidateRepo.UpdateAsync(candidate, ct);
+            candidate.PromotedThesisId = saved.Id;
+            candidate.Status = CandidateStatus.Promoted;
+            await candidateRepo.UpdateAsync(candidate, ct);
 
-        await eventRecorder.RecordAsync(
-            command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
-            ThesisEventType.Promoted, command.DecisionNote, ct);
+            await eventRecorder.RecordAuditedAsync(
+                command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
+                ThesisEventType.Promoted, command.Origin,
+                new ThesisAudit(Prior: null, New: null, command.DecisionNote, command.Evidence),
+                command.DecisionNote, ct);
+
+            return saved;
+        }, ct);
 
         return new PromoteCandidateResult(thesis.Id, gate, CandidateFound: true);
     }

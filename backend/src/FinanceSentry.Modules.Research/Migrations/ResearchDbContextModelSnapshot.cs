@@ -1372,6 +1372,9 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<string>("Audit")
+                        .HasColumnType("jsonb");
+
                     b.Property<decimal?>("BenchmarkPrice")
                         .HasColumnType("numeric(18,6)");
 
@@ -1390,6 +1393,13 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("User");
 
                     b.Property<bool>("PricesPending")
                         .HasColumnType("boolean");
