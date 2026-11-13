@@ -44,7 +44,7 @@ public sealed class AnalystRatingChangeAlertJobTests
 
         _job = new AnalystRatingChangeAlertJob(
             _banking.Object,
-            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
             _actions,
             _prefs.Object,
             alerts.Object,

@@ -13,11 +13,13 @@ using Microsoft.Extensions.Logging;
 /// the numbers. Digest lane: the notice is held for the pulse. The window is wider than a day so a restarted scheduler or a
 /// missed run loses nothing, and the generator's once-only identity makes the overlap a no-op. A crypto asset ticker is left
 /// out (no earnings; the bare symbol resolves to an unrelated listed name), and the calendar feed is an external
-/// dependency with no contract: a failed fetch is no signal this run, never a job failure.
+/// dependency with no contract: a failed fetch is no signal this run, never a job failure. Coverage names are read too
+/// (<see cref="LookaheadUniverse.CoverageTickersByPriorityAsync"/>): passed earnings are the event the coverage review acts on.
 /// </summary>
 public sealed class EarningsPassedJob(
     IBankingTotalsReader banking,
     ICryptoHoldingsReader crypto,
+    LookaheadUniverse universe,
     IEarningsCalendarService earningsCalendar,
     ReviewDueRaiser reviewDue,
     ILogger<EarningsPassedJob> logger)
@@ -57,10 +59,11 @@ public sealed class EarningsPassedJob(
     private async Task ProcessUserAsync(Guid userId, DateOnly today, CancellationToken ct)
     {
         var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        subjects.TrackCoverage(await universe.CoverageTickersByPriorityAsync(userId, ct));
         var cryptoAssets = (await crypto.GetHoldingsAsync(userId, ct))
             .Select(h => h.Asset)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var tickers = subjects.Tickers.Where(t => !cryptoAssets.Contains(t)).ToList();
+        var tickers = subjects.WatchedTickers.Where(t => !cryptoAssets.Contains(t)).ToList();
         if (tickers.Count == 0)
         {
             return;
@@ -86,5 +89,7 @@ public sealed class EarningsPassedJob(
                 [$"earnings:{evt.Ticker.ToUpperInvariant()}:{evt.EventDate:yyyy-MM-dd}"],
                 $"earnings date {evt.EventDate:yyyy-MM-dd} has passed", ct);
         }
+
+        await reviewDue.CompleteAsync(userId, subjects, ct);
     }
 }

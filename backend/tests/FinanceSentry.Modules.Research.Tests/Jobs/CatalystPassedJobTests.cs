@@ -27,7 +27,7 @@ public sealed class CatalystPassedJobTests
     {
         _job = new CatalystPassedJob(
             _banking.Object, _theses.Object,
-            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object, CoverageStubs.NoReviewer()),
             NullLogger<CatalystPassedJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);

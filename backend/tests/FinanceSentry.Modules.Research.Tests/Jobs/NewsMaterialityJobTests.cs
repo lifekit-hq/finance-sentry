@@ -22,6 +22,8 @@ public sealed class NewsMaterialityJobTests
 
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
+    private readonly Mock<IWatchlistReader> _watchlist = new();
+    private readonly Mock<ICryptoHoldingsReader> _crypto = new();
     private readonly Mock<IThesisRepository> _theses = new();
     private readonly Mock<ICandidateRepository> _candidates = new();
     private readonly Mock<INewsRepository> _news = new();
@@ -38,11 +40,12 @@ public sealed class NewsMaterialityJobTests
         _job = new NewsMaterialityJob(
             _banking.Object,
             _brokerage.Object,
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
             _theses.Object,
             _news.Object,
             _materialityTerms.Object,
             _alerts.Object,
-            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object, CoverageStubs.NoReviewer()),
             NullLogger<NewsMaterialityJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
@@ -292,9 +295,11 @@ public sealed class NewsMaterialityJobTests
             .ReturnsAsync((string? _, string? _, Guid? _, DateTimeOffset? since, int _, CancellationToken _)
                 => history.Where(a => a.PublishedAt >= since && a.PublishedAt <= since + TimeSpan.FromHours(2)).ToList());
         var job = new NewsMaterialityJob(
-            _banking.Object, _brokerage.Object, _theses.Object, _news.Object,
+            _banking.Object, _brokerage.Object,
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
+            _theses.Object, _news.Object,
             _materialityTerms.Object, _alerts.Object,
-            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object, CoverageStubs.NoReviewer()),
             NullLogger<NewsMaterialityJob>.Instance, threshold);
         var firedDays = new HashSet<DateOnly>();
         _alerts.Setup(a => a.GenerateNewsClusterAlertAsync(

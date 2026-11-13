@@ -30,10 +30,16 @@ using Microsoft.Extensions.Logging;
 /// article ids). Active-candidate tickers outside the held and thesis names are scanned for that notice alone: a candidate
 /// is not a holding, so it earns no NewsCluster alert of its own.
 /// </para>
+/// <para>
+/// Coverage names (<see cref="LookaheadUniverse.CoverageTickersByPriorityAsync"/>) are scanned the same way, for the notice and
+/// the coverage event review alone (<see cref="ReviewDueRaiser.CompleteAsync"/>): a cluster on a name we only cover moves its
+/// <c>LastEventAt</c>, re-scores its candidate and runs the coverage remove rules, with no NewsCluster alert.
+/// </para>
 /// </summary>
 public sealed class NewsMaterialityJob(
     IBankingTotalsReader banking,
     IBrokerageHoldingsReader brokerage,
+    LookaheadUniverse universe,
     IThesisRepository theses,
     INewsRepository news,
     IMaterialityTermRepository materialityTerms,
@@ -120,8 +126,9 @@ public sealed class NewsMaterialityJob(
         }
 
         var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        subjects.TrackCoverage(await universe.CoverageTickersByPriorityAsync(userId, ct));
         var reviewOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var ticker in subjects.Tickers)
+        foreach (var ticker in subjects.WatchedTickers)
         {
             if (tickerThesisIds.TryAdd(ticker, []))
             {
@@ -135,6 +142,8 @@ public sealed class NewsMaterialityJob(
             await ProcessTickerAsync(
                 userId, ticker, thesisIds, since, day, terms, subjects, raiseClusterAlert: !reviewOnly.Contains(ticker), ct);
         }
+
+        await reviewDue.CompleteAsync(userId, subjects, ct);
     }
 
     private static void AddThesisTicker(Dictionary<string, HashSet<Guid>> map, string ticker, Guid thesisId)

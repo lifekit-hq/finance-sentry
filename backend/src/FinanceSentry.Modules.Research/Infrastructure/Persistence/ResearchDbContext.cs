@@ -72,6 +72,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
 
     public DbSet<CoverageVerdictObservation> CoverageVerdictObservations { get; set; } = null!;
 
+    public DbSet<CoverageEvent> CoverageEvents { get; set; } = null!;
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
@@ -418,6 +420,25 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         cvo.HasIndex(x => new { x.UserId, x.Ticker, x.ObservedOn }).IsUnique()
             .HasDatabaseName("ux_coverage_observations_user_ticker_day");
         cvo.HasIndex(x => x.ObservedOn).HasDatabaseName("idx_coverage_observations_day");
+
+        var cve = modelBuilder.Entity<CoverageEvent>();
+        cve.ToTable("coverage_events");
+        cve.HasKey(x => x.Id);
+        cve.Property(x => x.UserId).IsRequired();
+        cve.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cve.Property(x => x.Source).IsRequired().HasMaxLength(20);
+        cve.Property(x => x.Reference).IsRequired().HasMaxLength(200);
+        cve.Property(x => x.Summary).IsRequired().HasMaxLength(500);
+        cve.Property(x => x.OccurredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cve.Property(x => x.Disposition).IsRequired().HasMaxLength(10);
+        cve.Property(x => x.ReviewNotice).HasMaxLength(60);
+        cve.Property(x => x.Verdict).HasMaxLength(20);
+        cve.Property(x => x.Rule).HasMaxLength(40);
+        cve.Property(x => x.Detail).IsRequired().HasMaxLength(1000);
+        cve.HasIndex(x => new { x.UserId, x.Ticker, x.Source, x.Reference }).IsUnique()
+            .HasDatabaseName("ux_coverage_events_identity");
+        cve.HasIndex(x => new { x.UserId, x.OccurredAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_coverage_events_user_occurred");
 
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");

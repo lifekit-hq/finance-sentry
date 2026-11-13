@@ -16,12 +16,19 @@ using Microsoft.Extensions.Logging;
 /// job failure. <see cref="IAlertGeneratorService.GenerateEarningsAheadAlertAsync"/> dedups per
 /// (ticker, event type, event date), so re-running the job on the days leading up to the event never
 /// re-alerts it — rare, low-noise by design (~0.1 fires/day).
+/// <para>
+/// Coverage names (<see cref="LookaheadUniverse.CoverageTickersByPriorityAsync"/>) are looked up in the same call. An
+/// earnings date inside the window on one is an event for the coverage review (it moves <c>LastEventAt</c> and re-scores the
+/// candidate before the report) but raises no EarningsAhead alert unless the name is in the alert universe above, and no
+/// review notice: the date is a catalyst, not a reason to reopen a thesis.
+/// </para>
 /// </summary>
 public sealed class EarningsAheadJob(
     IBankingTotalsReader banking,
     LookaheadUniverse universe,
     IEarningsCalendarService earningsCalendar,
     IAlertGeneratorService alerts,
+    ReviewDueRaiser reviewDue,
     ILogger<EarningsAheadJob> logger)
 {
     /// <summary>The Hangfire recurring-job id this detector is scheduled under.</summary>
@@ -66,15 +73,20 @@ public sealed class EarningsAheadJob(
     private async Task ProcessUserAsync(Guid userId, DateOnly today, DateOnly horizon, CancellationToken ct)
     {
         var tickers = await universe.EarningsTickersAsync(userId, ct);
-        if (tickers.Count == 0)
+        var coverage = await universe.CoverageTickersByPriorityAsync(userId, ct);
+        if (tickers.Count == 0 && coverage.Count == 0)
         {
             return;
         }
 
+        var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        subjects.TrackCoverage(coverage);
+        IReadOnlyCollection<string> lookup = coverage.Any(t => !tickers.Contains(t)) ? [.. tickers.Concat(coverage).Distinct(StringComparer.OrdinalIgnoreCase)] : tickers;
+
         IReadOnlyList<EarningsEvent> events;
         try
         {
-            events = await earningsCalendar.GetForTickersAsync(tickers, today, horizon, null, ct);
+            events = await earningsCalendar.GetForTickersAsync(lookup, today, horizon, null, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -86,7 +98,25 @@ public sealed class EarningsAheadJob(
 
         foreach (var evt in events)
         {
-            await RaiseAsync(userId, evt, ct);
+            if (tickers.Contains(evt.Ticker))
+            {
+                await RaiseAsync(userId, evt, ct);
+            }
+
+            if (evt.EventType == EarningsEventType.Earnings)
+            {
+                reviewDue.NoteCoverageOnly(
+                    subjects, evt.Ticker, ReviewDueSource.Earnings,
+                    $"ahead:{evt.Ticker.ToUpperInvariant()}:{evt.EventDate:yyyy-MM-dd}",
+                    $"earnings {evt.EventDate:yyyy-MM-dd} ahead");
+            }
+        }
+
+        await reviewDue.CompleteAsync(userId, subjects, ct);
+
+        if (tickers.Count == 0)
+        {
+            return;
         }
 
         IReadOnlyList<EarningsEvent> pastEvents;

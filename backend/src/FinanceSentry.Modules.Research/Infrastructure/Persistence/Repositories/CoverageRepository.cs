@@ -4,6 +4,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 public sealed class CoverageRepository(ResearchDbContext db) : ICoverageRepository
 {
@@ -128,6 +129,122 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
         try
         {
             db.CoverageVerdictObservations.RemoveRange(old);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+
+        return old.Count;
+    }
+
+    public async Task<IReadOnlyList<CoverageEvent>> AddEventsUnscopedAsync(
+        Guid userId, IReadOnlyCollection<CoverageEvent> events, CancellationToken ct = default)
+    {
+        var added = new List<CoverageEvent>();
+        foreach (var coverageEvent in events)
+        {
+            var ticker = coverageEvent.Ticker;
+            var source = coverageEvent.Source;
+            var reference = coverageEvent.Reference;
+            var exists = await db.CoverageEvents
+                .IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .AnyAsync(e => e.UserId == userId && e.Ticker == ticker && e.Source == source && e.Reference == reference, ct);
+            if (exists)
+            {
+                continue;
+            }
+
+            try
+            {
+                coverageEvent.UserId = userId;
+                db.CoverageEvents.Add(coverageEvent);
+                await db.SaveChangesAsync(ct);
+                added.Add(coverageEvent);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // A concurrent run recorded the same event between the check and the insert: that run owns its review.
+            }
+            finally
+            {
+                db.ChangeTracker.Clear();
+            }
+        }
+
+        return added;
+    }
+
+    public async Task TouchMembersUnscopedAsync(
+        Guid userId, IReadOnlyDictionary<string, DateTimeOffset> lastEventAt, CancellationToken ct = default)
+    {
+        if (lastEventAt.Count == 0)
+        {
+            return;
+        }
+
+        var tickers = lastEventAt.Keys.ToList();
+        try
+        {
+            var members = await db.CoverageMembers
+                .IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .Where(m => m.UserId == userId && tickers.Contains(m.Ticker))
+                .ToListAsync(ct);
+            foreach (var member in members)
+            {
+                if (lastEventAt.TryGetValue(member.Ticker, out var at) && (member.LastEventAt is null || at > member.LastEventAt))
+                {
+                    member.LastEventAt = at;
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+    }
+
+    public async Task UpdateEventsUnscopedAsync(IReadOnlyCollection<CoverageEvent> events, CancellationToken ct = default)
+    {
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            db.CoverageEvents.UpdateRange(events);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+    }
+
+    public async Task<(IReadOnlyList<CoverageEvent> Events, int Total)> ListEventsUnscopedAsync(
+        Guid userId, DateTimeOffset since, int take, CancellationToken ct = default)
+    {
+        var query = db.CoverageEvents.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(e => e.UserId == userId && e.OccurredAt >= since);
+        var total = await query.CountAsync(ct);
+        var rows = await query.OrderByDescending(e => e.OccurredAt).ThenBy(e => e.Ticker).Take(take).ToListAsync(ct);
+        return (rows, total);
+    }
+
+    public async Task<int> PruneEventsUnscopedAsync(DateTimeOffset before, CancellationToken ct = default)
+    {
+        var old = await db.CoverageEvents
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(e => e.OccurredAt < before)
+            .ToListAsync(ct);
+        try
+        {
+            db.CoverageEvents.RemoveRange(old);
             await db.SaveChangesAsync(ct);
         }
         finally

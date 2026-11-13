@@ -46,4 +46,28 @@ public interface ICoverageRepository
 
     /// <summary>Deletes verdict readings older than <paramref name="before"/> for every user. Opts out of the Owner query filter.</summary>
     Task<int> PruneObservationsUnscopedAsync(DateOnly before, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records coverage events the user has not recorded yet (identity: ticker, source and reference) and returns the ones
+    /// newly inserted; a repeat of an event already recorded is dropped. Opts out of the Owner query filter.
+    /// </summary>
+    Task<IReadOnlyList<CoverageEvent>> AddEventsUnscopedAsync(
+        Guid userId, IReadOnlyCollection<CoverageEvent> events, CancellationToken ct = default);
+
+    /// <summary>Moves each named member's <c>LastEventAt</c> forward (never back) to the given instant. Opts out of the Owner query filter.</summary>
+    Task TouchMembersUnscopedAsync(
+        Guid userId, IReadOnlyDictionary<string, DateTimeOffset> lastEventAt, CancellationToken ct = default);
+
+    /// <summary>Saves the reviewed state of events returned by <see cref="AddEventsUnscopedAsync"/>. Opts out of the Owner query filter.</summary>
+    Task UpdateEventsUnscopedAsync(IReadOnlyCollection<CoverageEvent> events, CancellationToken ct = default);
+
+    /// <summary>
+    /// The user's coverage events at or after <paramref name="since"/>, newest first, at most <paramref name="take"/>, with the
+    /// total that match. Opts out of the Owner query filter.
+    /// </summary>
+    Task<(IReadOnlyList<CoverageEvent> Events, int Total)> ListEventsUnscopedAsync(
+        Guid userId, DateTimeOffset since, int take, CancellationToken ct = default);
+
+    /// <summary>Deletes coverage events older than <paramref name="before"/> for every user. Opts out of the Owner query filter.</summary>
+    Task<int> PruneEventsUnscopedAsync(DateTimeOffset before, CancellationToken ct = default);
 }

@@ -19,6 +19,7 @@ using FinanceSentry.Modules.Events.Domain;
 using FinanceSentry.Modules.Events.Infrastructure.Persistence;
 using FinanceSentry.Modules.Events.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
@@ -155,7 +156,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         var calendar = new YahooEarningsCalendarService(
             new FixtureHttpClientFactory(), TimeProvider.System, NullLogger<YahooEarningsCalendarService>.Instance);
         var job = new EarningsAheadJob(
-            _banking.Object, Universe(), calendar, Generator(alerts), NullLogger<EarningsAheadJob>.Instance);
+            _banking.Object, Universe(), calendar, Generator(alerts), Raiser(alerts), NullLogger<EarningsAheadJob>.Instance);
 
         await job.ExecuteAsync(nowUtc);
     }
@@ -166,7 +167,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         var edgar = new SecEdgarService(new FixtureHttpClientFactory(), TimeProvider.System, NullLogger<SecEdgarService>.Instance);
         var job = new FilingWatchJob(
             _banking.Object, Universe(), edgar, Generator(alerts),
-            new ReviewDueRaiser(_theses.Object, _candidates.Object, Generator(alerts)), NullLogger<FilingWatchJob>.Instance);
+            Raiser(alerts), NullLogger<FilingWatchJob>.Instance);
 
         await job.ExecuteAsync(nowUtc);
     }
@@ -221,7 +222,17 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     }
 
     private LookaheadUniverse Universe() =>
-        new(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object);
+        new(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, NoCoverage());
+
+    private static ICoverageRepository NoCoverage()
+    {
+        var coverage = new Mock<ICoverageRepository>();
+        coverage.Setup(c => c.ListMembersUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        return coverage.Object;
+    }
+
+    private ReviewDueRaiser Raiser(AlertsDbContext alerts)
+        => new(_theses.Object, _candidates.Object, Generator(alerts), Mock.Of<ICoverageEventReviewer>());
 
     private AlertGeneratorService Generator(AlertsDbContext db) => new(new AlertRepository(db), _policyAcks.Object);
 

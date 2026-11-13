@@ -5,10 +5,11 @@
 Stage 1 of the discovery funnel. It is distinct from the [reference universe](reference-universe.md), which is
 the pool candidates are drawn from, not the list being watched.
 
-## Store (`research` schema, Research migration M026)
+## Store (`research` schema, Research migrations M026 and M027)
 
 - `coverage_members` - `Ticker`, `AddedAt`, `AddedReason` (`Held`, `Watchlist`, `Screen`, `Ledger`; `User` is reserved), `LastEventAt`, `LastScoreId`, `CorrelationToBook` (63-day, rule D1, null when the bars cannot support it), `RemoveAfter`. Unique per (user, ticker).
 - `coverage_journal` - one row per add or remove with the rule that fired, the reason, a detail sentence, and the correlation and rank when a cap-bound add was ranked. Never rewritten.
+- `coverage_events` (M027) - one row per deterministic hit on a covered name and what the review did about it (see Events). Unique per (user, ticker, source, reference); retained `Coverage:EventRetentionDays` (120).
 - `coverage_verdict_observations` - one scorecard verdict reading per (user, ticker, day), retained `Coverage:ObservationRetentionDays` (120). The scorecard is computed on demand, so "Buy twice" and "two consecutive Avoids" need a stored history; this is it.
 
 ## Rules (`CoverageRules`, pure; ids in `CoverageRuleIds`)
@@ -33,10 +34,21 @@ A removed name rejoins by a ranked rule only on evidence created after its last 
 
 ## Evaluation
 
-`coverage-evaluation` (Hangfire, daily `Coverage:EvaluationHourUtc:EvaluationMinuteUtc`, 01:10 UTC; `CoverageEvaluationJob`) - deterministic, no model call. Per user: record verdicts, refresh each member (last event, last score, correlation, `RemoveAfter`), apply the remove rules, then the adds. A failure for one user does not stop the rest; the run then fails so Hangfire records it. Event sources for `LastEventAt` are the thesis journal (excluding the weekly `Snapshot`) and candidate scores; event watching on coverage names is a later stage.
+`coverage-evaluation` (Hangfire, daily `Coverage:EvaluationHourUtc:EvaluationMinuteUtc`, 01:10 UTC; `CoverageEvaluationJob`) - deterministic, no model call. Per user: record verdicts, refresh each member (last event, last score, correlation, `RemoveAfter`), apply the remove rules, then the adds. A failure for one user does not stop the rest; the run then fails so Hangfire records it. Event sources for `LastEventAt` are the thesis journal (excluding the weekly `Snapshot`), candidate scores and the events below.
+
+## Events on coverage names
+
+The look-ahead detectors read the coverage set too (`LookaheadUniverse.CoverageTickersAsync`; held names first, crypto assets out). A coverage name that is not otherwise in a detector's alert universe earns no alert of its own - no `FilingLanded`, `EarningsAhead` or `NewsCluster` - only the steps below; a held, thesis or watchlist name keeps its alert as before.
+
+- `FilingWatchJob` (hourly), `EarningsAheadJob` (an earnings date within 3 days), `EarningsPassedJob` and `NewsMaterialityJob` (a cluster) note each hit on a covered name. `NewsIngestionJob` reads the news: the book (holdings, then thesis and watchlist names) keeps its 60 places, and coverage names the book does not name are read on top in rotating slices of `Coverage:NewsCoverageTickersPerRun` (40) every `Coverage:NewsRotationMinutes` (30), so 100 names are all read every three runs.
+- Once the user's pass ends (`ReviewDueRaiser.CompleteAsync` -> `CoverageEventReviewer`), each hit not seen before (ticker, source, reference) is recorded as a `coverage_events` row, moves the member's `LastEventAt` to now, re-scores the member's Active candidate (the `score_candidate` path: market structure and fundamentals read, no model) and runs the remove rules through `CoverageEvaluator.ReviewTickersAsync` (the same `CoverageRules`, same journal). The adds stay with the nightly run and its removal cutoff: a name a review removed rejoins only on evidence newer than the removal.
+- The review-due notice (`CandidateReviewDue` for an Active candidate, `ThesisReviewDue` for a thesis) is still raised by the detector, once per subject, source and reference. A covered name with neither (held without a thesis, watchlisted) is recorded and keeps its `LastEventAt` but raises no notice and is not re-scored: it has no candidate, and a review would create one.
+- A repeat of a hit already recorded returns before anything runs. A rescore that fails is recorded on the row (`Rescored` false) and the rules still run. Nothing here calls a model.
+
+The disposition digest is `list_coverage_events(sinceUtc?, limit?)` ([mcp.md](mcp.md)): the events since the time (newest first, `total` counts all), each with its `disposition` (`Kept`, `Removed`, `Pending`), and the coverage adds and removes in the same span, so the pulse reads one list instead of being woken per event.
 
 ## Consumers
 
 - `ICoverageUniverseReader` (Core port; freshest activity first, then by ticker) - the portfolio-construction universe screen reads it instead of the old hard-coded list (`PortfolioConstructionOptions.CuratedUniverse` is gone).
-- MCP `list_coverage` and `explain_coverage(ticker)` ([mcp.md](mcp.md)).
+- MCP `list_coverage`, `explain_coverage(ticker)` and `list_coverage_events` ([mcp.md](mcp.md)).
 - A coverage name may carry a Ledger thesis, not only a scorecard; an active thesis protects it from removal.

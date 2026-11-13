@@ -498,6 +498,7 @@ public static class ResearchModule
         services.AddScoped<ICoverageVerdictSource, ScorecardCoverageVerdictSource>();
         services.AddScoped<CoverageSnapshotReader>();
         services.AddScoped<CoverageEvaluator>();
+        services.AddScoped<ICoverageEventReviewer, CoverageEventReviewer>();
         services.AddScoped<CoverageExplainer>();
         services.AddScoped<CoverageEvaluationJob>();
         services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();

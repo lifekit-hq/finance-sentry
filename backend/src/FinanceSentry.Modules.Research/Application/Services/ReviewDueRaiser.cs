@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -11,11 +12,17 @@ using FinanceSentry.Modules.Research.Domain.Repositories;
 /// a single alert call per subject: whether anything actually changed is Ledger's call, never this class's, and no model is
 /// consulted. Once-only is the alert generator's job (<see cref="IAlertGeneratorService.GenerateReviewDueAlertAsync"/>
 /// keys on subject, source and reference).
+/// <para>
+/// A hit on a covered name (a job that opted in through <see cref="ReviewSubjects.TrackCoverage"/>) is also noted on the
+/// subjects, even when the name maps to no thesis or candidate, and <see cref="CompleteAsync"/> hands the noted hits to the
+/// coverage event review once the user's pass is over.
+/// </para>
 /// </summary>
 public sealed class ReviewDueRaiser(
     IThesisRepository theses,
     ICandidateRepository candidates,
-    IAlertGeneratorService alerts)
+    IAlertGeneratorService alerts,
+    ICoverageEventReviewer coverageReview)
 {
     /// <summary>Loads the user's subjects once, so a detector pass over many tickers reads them once.</summary>
     public async Task<ReviewSubjects> LoadSubjectsAsync(Guid userId, CancellationToken ct = default)
@@ -42,6 +49,8 @@ public sealed class ReviewDueRaiser(
         string what,
         CancellationToken ct = default)
     {
+        subjects.NoteCoverageHit(hitTicker, source, reference, what);
+
         var raised = 0;
         foreach (var subject in subjects.For(hitTicker))
         {
@@ -57,7 +66,32 @@ public sealed class ReviewDueRaiser(
 
         return raised;
     }
+
+    /// <summary>
+    /// Notes a hit on a covered name without raising a review notice: for a signal that is an event for coverage (an
+    /// earnings date a few days out) but is no reason to ask Ledger for a fresh look at a thesis.
+    /// </summary>
+    public void NoteCoverageOnly(ReviewSubjects subjects, string hitTicker, string source, string reference, string what)
+        => subjects.NoteCoverageHit(hitTicker, source, reference, what);
+
+    /// <summary>
+    /// Ends a user's detector pass: the covered-name hits noted along the way are recorded once, move the members'
+    /// <c>LastEventAt</c>, re-score the Active candidates behind them and run the coverage remove rules (no model call).
+    /// A no-op when nothing was noted.
+    /// </summary>
+    public async Task CompleteAsync(Guid userId, ReviewSubjects subjects, CancellationToken ct = default)
+    {
+        if (subjects.CoverageHits.Count == 0)
+        {
+            return;
+        }
+
+        await coverageReview.ReviewAsync(userId, subjects, ct);
+    }
 }
+
+/// <summary>A deterministic hit on a covered name, as a detector noted it.</summary>
+public sealed record CoverageHit(string Ticker, string Source, string Reference, string What);
 
 /// <summary>A thesis or an Active candidate that a ticker hit maps to.</summary>
 public sealed record ReviewSubject(ReviewSubjectKind Kind, Guid Id, string Ticker);
@@ -71,6 +105,8 @@ public sealed record ReviewSubject(ReviewSubjectKind Kind, Guid Id, string Ticke
 public sealed class ReviewSubjects
 {
     private readonly Dictionary<string, List<ReviewSubject>> _byTicker = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _coverage = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<CoverageHit> _hits = [];
 
     public ReviewSubjects(IEnumerable<InvestmentThesis> theses, IEnumerable<OpportunityCandidate> activeCandidates)
     {
@@ -105,6 +141,38 @@ public sealed class ReviewSubjects
 
     /// <summary>Every ticker whose hit raises a notice: thesis tickers, trigger proxies and Active candidate tickers.</summary>
     public IReadOnlyCollection<string> Tickers => _byTicker.Keys;
+
+    /// <summary>The covered names this pass watches (coverage members that are not crypto), empty until a job opts in.</summary>
+    public IReadOnlyCollection<string> CoverageTickers => _coverage;
+
+    /// <summary>Every ticker a detector should read: the notice tickers and the covered names.</summary>
+    public IReadOnlyCollection<string> WatchedTickers => [.. _byTicker.Keys.Concat(_coverage).Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    /// <summary>The covered-name hits noted so far, once each, in the order they were found.</summary>
+    public IReadOnlyList<CoverageHit> CoverageHits => _hits;
+
+    /// <summary>Opts the pass into covered names: hits on them are noted for the coverage event review.</summary>
+    public void TrackCoverage(IEnumerable<string> tickers)
+    {
+        foreach (var ticker in tickers.Where(t => !string.IsNullOrWhiteSpace(t)))
+        {
+            _coverage.Add(ticker.Trim());
+        }
+    }
+
+    internal void NoteCoverageHit(string ticker, string source, string reference, string what)
+    {
+        if (!_coverage.Contains(ticker.Trim()))
+        {
+            return;
+        }
+
+        var hit = new CoverageHit(ticker.Trim().ToUpperInvariant(), source, reference, what);
+        if (!_hits.Any(h => h.Ticker == hit.Ticker && h.Source == hit.Source && h.Reference == hit.Reference))
+        {
+            _hits.Add(hit);
+        }
+    }
 
     /// <summary>The subjects a hit on <paramref name="ticker"/> raises a notice for; empty for any other name.</summary>
     public IReadOnlyList<ReviewSubject> For(string ticker)

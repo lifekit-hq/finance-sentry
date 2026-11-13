@@ -3,12 +3,14 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 public sealed class NewsIngestionJob(
     ResearchDbContext research,
@@ -20,61 +22,97 @@ public sealed class NewsIngestionJob(
     NewsSourceFetcher fetcher,
     IAlertGeneratorService alerts,
     IBankingTotalsReader banking,
+    LookaheadUniverse universe,
+    IOptions<CoverageOptions> coverageOptions,
+    TimeProvider clock,
     ILogger<NewsIngestionJob> logger)
 {
+    /// <summary>The budget of held, thesis and watchlist names per run; coverage names ride on top of it (<see cref="CoverageOptions.NewsCoverageTickersPerRun"/>).</summary>
     private const int MaxTickersPerRun = 60;
 
     // Holding rows whose symbol is not an exchange ticker: broker cash ledgers ("USD Cash") and Inzhur's
     // fund/bond names. Querying news for them only spends the per-run ticker budget.
     private static readonly HashSet<string> NonTickerInstrumentTypes = new(StringComparer.OrdinalIgnoreCase) { "CASH", "REIT", "BOND" };
 
+    /// <summary>
+    /// Reads news for the book first (holdings, then thesis and watchlist names, at most <c>MaxTickersPerRun</c>), then for a
+    /// rotating slice of the coverage universe the book does not already name, so a coverage list of 100 neither starves a
+    /// held name nor goes unread: every covered name is read once every few runs.
+    /// </summary>
     public async Task IngestTickersAsync(CancellationToken ct = default)
     {
-        var tickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        var watchlistTickers = await research.WatchlistItems.AsNoTracking()
-            .IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .Select(w => w.Ticker)
-            .ToListAsync(ct);
-        foreach (var t in watchlistTickers)
+        var priority = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string ticker)
         {
-            tickers.Add(t);
+            if (!string.IsNullOrWhiteSpace(ticker) && seen.Add(ticker))
+            {
+                priority.Add(ticker);
+            }
         }
 
         var thesisTickers = await research.Theses.AsNoTracking()
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(t => t.Ticker)
             .ToListAsync(ct);
-        foreach (var t in thesisTickers)
-        {
-            tickers.Add(t);
-        }
+        var watchlistTickers = await research.WatchlistItems.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Select(w => w.Ticker)
+            .ToListAsync(ct);
 
         var userIds = await research.WatchlistItems.AsNoTracking()
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(w => w.UserId)
             .Union(research.Theses.AsNoTracking().IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(t => t.UserId))
+            .Union(research.CoverageMembers.AsNoTracking().IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(m => m.UserId))
             .Distinct()
             .ToListAsync(ct);
 
+        var coverageTickers = new List<string>();
         foreach (var userId in userIds)
         {
             foreach (var h in await brokerage.GetHoldingsAsync(userId, ct))
             {
                 if (NonTickerInstrumentTypes.Contains(h.InstrumentType)) continue;
-                tickers.Add(h.Symbol);
+                Add(h.Symbol);
             }
 
             foreach (var h in await crypto.GetHoldingsAsync(userId, ct))
             {
                 if (h.IsVenueFiat) continue;
-                tickers.Add(h.Asset + "-USD");
+                Add(h.Asset + "-USD");
             }
+
+            coverageTickers.AddRange(await universe.CoverageTickersByPriorityAsync(userId, ct));
         }
 
-        var toFetch = tickers.Take(MaxTickersPerRun).ToArray();
-        var inserted = await news.IngestForTickersAsync(toFetch, ct);
-        logger.LogInformation("NewsIngestionJob (tickers) ingested {Count} new articles across {Tickers} tickers", inserted, toFetch.Length);
+        foreach (var t in thesisTickers)
+        {
+            Add(t);
+        }
+
+        foreach (var t in watchlistTickers)
+        {
+            Add(t);
+        }
+
+        var toFetch = priority.Take(MaxTickersPerRun).ToList();
+
+        // Coverage names the book does not already name, held-first within each user and then in ticker order, read in
+        // rotating slices so a long list is covered across runs without taking the book's budget.
+        var options = coverageOptions.Value;
+        var extras = coverageTickers
+            .Where(t => !seen.Contains(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var slice = TickerRotation.Slice(
+            extras, options.NewsCoverageTickersPerRun, TickerRotation.RunIndex(clock.GetUtcNow(), options.NewsRotationMinutes));
+        toFetch.AddRange(slice);
+
+        var inserted = await news.IngestForTickersAsync(toFetch.ToArray(), ct);
+        logger.LogInformation(
+            "NewsIngestionJob (tickers) ingested {Count} new articles across {Tickers} tickers ({Coverage} of {CoverageTotal} coverage names this run)",
+            inserted, toFetch.Count, slice.Count, extras.Count);
 
         // Registered market-wide + thesis sources ride the same 30-min cadence (feature 030, R9).
         await IngestRegisteredSourcesAsync(ct);

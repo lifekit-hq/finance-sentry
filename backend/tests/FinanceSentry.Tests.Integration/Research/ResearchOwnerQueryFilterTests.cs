@@ -84,7 +84,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(14);
+        perUser.Should().HaveCount(15);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -299,6 +299,47 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         {
             UserId = _userA, Ticker = "NVDA", ObservedOn = today, Verdict = "Avoid", FiredRuleId = "weak_structure",
         })).Should().BeFalse("a filtered existence check would find nothing and insert a duplicate for the day");
+    }
+
+    [DockerRequiredFact]
+    public async Task Coverage_events_follow_the_acting_person_and_the_review_writes_are_scoped_to_the_named_user()
+    {
+        var at = DateTimeOffset.UtcNow;
+        await SeedAsync(
+            new CoverageMember { UserId = _userA, Ticker = "NVDA", AddedReason = CoverageReason.Held },
+            new CoverageMember { UserId = _userB, Ticker = "NVDA", AddedReason = CoverageReason.Watchlist });
+
+        CoverageEvent Event(string reference) => new()
+        {
+            Ticker = "NVDA", Source = "filing", Reference = reference, Summary = "10-Q filed", OccurredAt = at,
+        };
+
+        await using var asNoOne = CreateContext();
+        var repository = new CoverageRepository(asNoOne);
+
+        (await repository.AddEventsUnscopedAsync(_userA, [Event("acc-1")])).Should().ContainSingle();
+        (await repository.AddEventsUnscopedAsync(_userA, [Event("acc-1")])).Should().BeEmpty(
+            "a filtered existence check would find nothing and insert the repeat; the opted-out check sees it");
+        (await repository.AddEventsUnscopedAsync(_userB, [Event("acc-1")])).Should().ContainSingle(
+            "the identity is per person");
+
+        await repository.TouchMembersUnscopedAsync(_userA, new Dictionary<string, DateTimeOffset> { ["NVDA"] = at });
+        (await repository.ListMembersUnscopedAsync(_userA)).Single().LastEventAt.Should().NotBeNull();
+        (await repository.ListMembersUnscopedAsync(_userB)).Single().LastEventAt.Should().BeNull(
+            "a touch for one person never moves another's member");
+
+        var (events, total) = await repository.ListEventsUnscopedAsync(_userA, at.AddMinutes(-1), 10);
+        total.Should().Be(1);
+        events.Should().ContainSingle().Which.UserId.Should().Be(_userA);
+
+        await using (var asA = CreateContext(_userA))
+        {
+            (await asA.CoverageEvents.Select(e => e.UserId).ToListAsync()).Should().Equal(_userA);
+        }
+
+        (await asNoOne.CoverageEvents.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+
+        (await repository.PruneEventsUnscopedAsync(at.AddMinutes(1))).Should().Be(2);
     }
 
     [DockerRequiredFact]

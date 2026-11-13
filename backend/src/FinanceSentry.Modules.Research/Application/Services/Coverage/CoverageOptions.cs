@@ -55,4 +55,20 @@ public sealed class CoverageOptions
 
     /// <summary>Most members the MCP <c>list_coverage</c> and the construction screen read in one call.</summary>
     public int MaxListed { get; set; } = 500;
+
+    /// <summary>
+    /// Coverage names the news ingestion reads beyond its own <c>MaxTickersPerRun</c> budget of held, thesis and watchlist
+    /// names, per run. A coverage list longer than this is read in rotating slices
+    /// (<see cref="NewsRotationMinutes"/> apart), so the book keeps its place and every covered name is still read.
+    /// </summary>
+    public int NewsCoverageTickersPerRun { get; set; } = 40;
+
+    /// <summary>Minutes between news ingestion runs, the period the coverage rotation advances by.</summary>
+    public int NewsRotationMinutes { get; set; } = 30;
+
+    /// <summary>Days of coverage events kept for the disposition digest; older rows are pruned by the evaluation run.</summary>
+    public int EventRetentionDays { get; set; } = 120;
+
+    /// <summary>Most coverage events one digest read returns (newest first); the total that match is always reported.</summary>
+    public int MaxDigestEvents { get; set; } = 200;
 }
