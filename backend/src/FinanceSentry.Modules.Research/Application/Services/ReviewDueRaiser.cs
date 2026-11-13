@@ -49,7 +49,7 @@ public sealed class ReviewDueRaiser(
         string what,
         CancellationToken ct = default)
     {
-        subjects.NoteCoverageHit(hitTicker, source, reference, what);
+        subjects.NoteCoverageHit(hitTicker, source, reference, what, subjects.NoticeFor(hitTicker));
 
         var raised = 0;
         foreach (var subject in subjects.For(hitTicker))
@@ -72,7 +72,7 @@ public sealed class ReviewDueRaiser(
     /// earnings date a few days out) but is no reason to ask Ledger for a fresh look at a thesis.
     /// </summary>
     public void NoteCoverageOnly(ReviewSubjects subjects, string hitTicker, string source, string reference, string what)
-        => subjects.NoteCoverageHit(hitTicker, source, reference, what);
+        => subjects.NoteCoverageHit(hitTicker, source, reference, what, null);
 
     /// <summary>
     /// Ends a user's detector pass: the covered-name hits noted along the way are recorded once, move the members'
@@ -90,8 +90,8 @@ public sealed class ReviewDueRaiser(
     }
 }
 
-/// <summary>A deterministic hit on a covered name, as a detector noted it.</summary>
-public sealed record CoverageHit(string Ticker, string Source, string Reference, string What);
+/// <summary>A deterministic hit on a covered name, as a detector noted it; <paramref name="Notice"/> is the review-due notice the detector raised for it, null when it raised none.</summary>
+public sealed record CoverageHit(string Ticker, string Source, string Reference, string What, string? Notice = null);
 
 /// <summary>A thesis or an Active candidate that a ticker hit maps to.</summary>
 public sealed record ReviewSubject(ReviewSubjectKind Kind, Guid Id, string Ticker);
@@ -160,14 +160,14 @@ public sealed class ReviewSubjects
         }
     }
 
-    internal void NoteCoverageHit(string ticker, string source, string reference, string what)
+    internal void NoteCoverageHit(string ticker, string source, string reference, string what, string? notice)
     {
         if (!_coverage.Contains(ticker.Trim()))
         {
             return;
         }
 
-        var hit = new CoverageHit(ticker.Trim().ToUpperInvariant(), source, reference, what);
+        var hit = new CoverageHit(ticker.Trim().ToUpperInvariant(), source, reference, what, notice);
         if (!_hits.Any(h => h.Ticker == hit.Ticker && h.Source == hit.Source && h.Reference == hit.Reference))
         {
             _hits.Add(hit);
@@ -177,6 +177,16 @@ public sealed class ReviewSubjects
     /// <summary>The subjects a hit on <paramref name="ticker"/> raises a notice for; empty for any other name.</summary>
     public IReadOnlyList<ReviewSubject> For(string ticker)
         => _byTicker.TryGetValue(ticker.Trim(), out var subjects) ? subjects : [];
+
+    internal string? NoticeFor(string ticker)
+    {
+        var kinds = For(ticker)
+            .Select(s => s.Kind == ReviewSubjectKind.Thesis ? "ThesisReviewDue" : "CandidateReviewDue")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        return kinds.Count == 0 ? null : string.Join(',', kinds);
+    }
 
     private void Add(string ticker, ReviewSubject subject)
     {

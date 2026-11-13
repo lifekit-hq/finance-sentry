@@ -194,6 +194,28 @@ public sealed class CoverageEventsTests
     }
 
     [Fact]
+    public async Task An_earnings_date_ahead_on_a_covered_candidate_records_no_notice_because_none_is_raised()
+    {
+        await CoveredCandidateAsync("MU");
+        var calendar = new Mock<IEarningsCalendarService>();
+        calendar.Setup(c => c.GetForTickersAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), null, default, false))
+            .ReturnsAsync((IReadOnlyCollection<string> _, DateOnly from, DateOnly _, string? _, CancellationToken _, bool _) =>
+                from == Today ? [new EarningsEvent("MU", EarningsEventType.Earnings, Today.AddDays(2), false, "yahoo")] : []);
+        var job = new EarningsAheadJob(
+            _h.Banking.Object, Universe, calendar.Object, _alerts.Object,
+            new ReviewDueRaiser(new ThesisRepository(_h.Db), new CandidateRepository(_h.Db), _alerts.Object, Reviewer),
+            NullLogger<EarningsAheadJob>.Instance);
+
+        await job.ExecuteAsync(MondayUtc);
+
+        _reviews.Should().BeEmpty();
+        var evt = (await EventsAsync()).Should().ContainSingle().Subject;
+        evt.Source.Should().Be(ReviewDueSource.Earnings);
+        evt.ReviewNotice.Should().BeNull();
+    }
+
+    [Fact]
     public async Task A_thesis_name_in_coverage_raises_the_thesis_notice_and_is_recorded()
     {
         var thesis = await _h.ThesisAsync("MU");
@@ -326,6 +348,8 @@ public sealed class CoverageEventsTests
         var capped = await handler.Handle(new ListCoverageEventsQuery(CoverageHarness.UserId, _clock.Now.AddHours(-1), 1), default);
         capped.Events.Should().ContainSingle();
         capped.Total.Should().Be(2);
+        capped.Removed.Should().Be(1, "the aggregates cover every match, not only the returned page");
+        capped.Rescored.Should().Be(2);
         capped.Truncated.Should().BeTrue();
     }
 

@@ -225,15 +225,17 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
         }
     }
 
-    public async Task<(IReadOnlyList<CoverageEvent> Events, int Total)> ListEventsUnscopedAsync(
+    public async Task<(IReadOnlyList<CoverageEvent> Events, int Total, int Removed, int Rescored)> ListEventsUnscopedAsync(
         Guid userId, DateTimeOffset since, int take, CancellationToken ct = default)
     {
         var query = db.CoverageEvents.AsNoTracking()
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(e => e.UserId == userId && e.OccurredAt >= since);
         var total = await query.CountAsync(ct);
+        var removed = await query.CountAsync(e => e.Disposition == CoverageEventDisposition.Removed, ct);
+        var rescored = await query.CountAsync(e => e.Rescored, ct);
         var rows = await query.OrderByDescending(e => e.OccurredAt).ThenBy(e => e.Ticker).Take(take).ToListAsync(ct);
-        return (rows, total);
+        return (rows, total, removed, rescored);
     }
 
     public async Task<int> PruneEventsUnscopedAsync(DateTimeOffset before, CancellationToken ct = default)

@@ -112,8 +112,12 @@ public sealed class EarningsAheadJob(
             }
         }
 
+        await ResolvePastAsync(userId, tickers, today, ct);
         await reviewDue.CompleteAsync(userId, subjects, ct);
+    }
 
+    private async Task ResolvePastAsync(Guid userId, IReadOnlyCollection<string> tickers, DateOnly today, CancellationToken ct)
+    {
         if (tickers.Count == 0)
         {
             return;

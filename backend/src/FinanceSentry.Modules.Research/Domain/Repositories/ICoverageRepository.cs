@@ -63,9 +63,9 @@ public interface ICoverageRepository
 
     /// <summary>
     /// The user's coverage events at or after <paramref name="since"/>, newest first, at most <paramref name="take"/>, with the
-    /// total that match. Opts out of the Owner query filter.
+    /// total, removed and re-scored counts over every match (not only the returned page). Opts out of the Owner query filter.
     /// </summary>
-    Task<(IReadOnlyList<CoverageEvent> Events, int Total)> ListEventsUnscopedAsync(
+    Task<(IReadOnlyList<CoverageEvent> Events, int Total, int Removed, int Rescored)> ListEventsUnscopedAsync(
         Guid userId, DateTimeOffset since, int take, CancellationToken ct = default);
 
     /// <summary>Deletes coverage events older than <paramref name="before"/> for every user. Opts out of the Owner query filter.</summary>

@@ -328,7 +328,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         (await repository.ListMembersUnscopedAsync(_userB)).Single().LastEventAt.Should().BeNull(
             "a touch for one person never moves another's member");
 
-        var (events, total) = await repository.ListEventsUnscopedAsync(_userA, at.AddMinutes(-1), 10);
+        var (events, total, _, _) = await repository.ListEventsUnscopedAsync(_userA, at.AddMinutes(-1), 10);
         total.Should().Be(1);
         events.Should().ContainSingle().Which.UserId.Should().Be(_userA);
 

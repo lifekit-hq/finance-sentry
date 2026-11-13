@@ -2,7 +2,6 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.Application.Services.Coverage;
-using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.Extensions.Options;
 
@@ -60,7 +59,7 @@ public sealed class ListCoverageEventsQueryHandler(
         var since = query.Since ?? now - DefaultWindow;
         var take = Math.Clamp(query.Limit ?? config.MaxDigestEvents, 1, config.MaxDigestEvents);
 
-        var (events, total) = await coverage.ListEventsUnscopedAsync(query.UserId, since, take, ct);
+        var (events, total, removed, rescored) = await coverage.ListEventsUnscopedAsync(query.UserId, since, take, ct);
         var snapshot = await snapshots.ReadAsync(query.UserId, now, ct, flagsOnly: true);
         var journal = await coverage.ListJournalUnscopedAsync(query.UserId, null, config.MaxDigestEvents, ct);
 
@@ -68,8 +67,8 @@ public sealed class ListCoverageEventsQueryHandler(
             since,
             now,
             total,
-            Removed: events.Count(e => e.Disposition == CoverageEventDisposition.Removed),
-            Rescored: events.Count(e => e.Rescored),
+            Removed: removed,
+            Rescored: rescored,
             Truncated: total > events.Count,
             [.. events.Select(e => new CoverageEventView(
                 e.OccurredAt, e.Ticker, e.Source, e.Reference, e.Summary, e.Disposition.ToString(), e.Rescored,

@@ -24,8 +24,8 @@ public interface ICoverageEventReviewer
 /// <item>writes the outcome back on the event row.</item>
 /// </list>
 /// The review-due notice (<c>CandidateReviewDue</c> / <c>ThesisReviewDue</c>) is raised by the detector through
-/// <see cref="ReviewDueRaiser.RaiseAsync"/>, once per subject, source and reference; this class only reports which one the hit
-/// maps to. A repeat of a recorded hit returns before touching anything, so a detector that re-reads the same filing or
+/// <see cref="ReviewDueRaiser.RaiseAsync"/>, once per subject, source and reference; the hit carries the notice it raised, which this class
+/// records on the event. A repeat of a recorded hit returns before touching anything, so a detector that re-reads the same filing or
 /// the same day's cluster every run costs one lookup. No model is called anywhere here.
 /// </summary>
 public sealed class CoverageEventReviewer(
@@ -61,7 +61,7 @@ public sealed class CoverageEventReviewer(
                 Reference = Truncate(h.Reference, MaxReferenceLength),
                 Summary = Truncate(h.What, MaxSummaryLength),
                 OccurredAt = now,
-                ReviewNotice = NoticeFor(subjects, h.Ticker),
+                ReviewNotice = h.Notice,
             })
             .ToList();
         if (candidates.Count == 0)
@@ -142,16 +142,6 @@ public sealed class CoverageEventReviewer(
             logger.LogWarning(ex, "Coverage event rescore failed for {Ticker}", ticker);
             return $"Re-score failed: {ex.GetType().Name}.";
         }
-    }
-
-    private static string? NoticeFor(ReviewSubjects subjects, string ticker)
-    {
-        var kinds = subjects.For(ticker)
-            .Select(s => s.Kind == ReviewSubjectKind.Thesis ? "ThesisReviewDue" : "CandidateReviewDue")
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToList();
-        return kinds.Count == 0 ? null : string.Join(',', kinds);
     }
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
