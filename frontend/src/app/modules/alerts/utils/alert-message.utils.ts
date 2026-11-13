@@ -2,6 +2,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 const LONG_DECIMAL = /\d+\.\d{3,}/g;
 const DISPLAY_DECIMALS = 2;
 const TRAILING_SEC_URL = /\s*(https:\/\/(?:[\w-]+\.)*sec\.gov\/\S*)\s*$/;
+const TRAILING_REVIEW_TAIL = /\s*\[review subject=(?:thesis|candidate):[^\]]*\]\s*$/;
 // `Charged 2× for 9.99 EUR at <statement merchant> within the detection window.`
 const DUPLICATE_CHARGE_MERCHANT =
   /^Charged \d+× for \S+ \S+ at (.+) within the detection window\.$/;
@@ -18,6 +19,11 @@ export class AlertMessageUtils {
   /** Message text without a trailing sec.gov URL (the URL is exposed by `filingUrl`). */
   public static stripFilingUrl(message: Nullable<string>): string {
     return message ? message.replace(TRAILING_SEC_URL, '') : '';
+  }
+
+  /** Message text without the trailing `[review subject=… evidence=…]` machine tail of a review-due alert. */
+  public static stripReviewTail(message: Nullable<string>): string {
+    return message ? message.replace(TRAILING_REVIEW_TAIL, '') : '';
   }
 
   /** The trailing sec.gov URL of a filing alert message, or null when there is none. */

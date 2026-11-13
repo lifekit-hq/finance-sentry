@@ -29,8 +29,14 @@ public interface IMaterialityPolicy
     /// provider the policy drives; null keeps the kind's own rule. A sync failure raised as <c>ActionRequired</c> - a
     /// confirmed credential loss only the person can fix - is relayed at once in every mode, Quiet included.
     /// </param>
+    /// <param name="reviewSource">
+    /// The <c>ReviewDueSource</c> that raised a <see cref="CompanionEventKind.ThesisReviewDue"/> or
+    /// <see cref="CompanionEventKind.CandidateReviewDue"/> notice: filing, break and unbreak keep the mode rule
+    /// (realtime), news, earnings and catalyst are held for the digest, and an unreadable source is held too.
+    /// </param>
     EventDisposition DispositionFor(
-        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null);
+        NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null,
+        string? reviewSource = null);
 
     /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest:
     /// at capture the source's time since its last successful sync, at delivery (<c>ISyncFailureReconciler</c>) how long

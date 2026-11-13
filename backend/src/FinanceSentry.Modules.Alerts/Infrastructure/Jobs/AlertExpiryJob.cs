@@ -53,6 +53,10 @@ public sealed class AlertExpiryJob(
         [AlertType.EarningsAhead] = TimeSpan.FromDays(2), // floor; the exact event date already resolves it (§3.1)
         [AlertType.MacroEventAhead] = TimeSpan.FromDays(3), // only meaningful up to the release
         [AlertType.MacroEventReleased] = TimeSpan.FromDays(2),
+        // A review notice is a point event Ledger reads within a pulse or two; the 90-day purge keeps the row (and so the
+        // once-ever identity) far longer than any detector's re-read window.
+        [AlertType.ThesisReviewDue] = TimeSpan.FromDays(14),
+        [AlertType.CandidateReviewDue] = TimeSpan.FromDays(14),
     };
 
     /// <summary>

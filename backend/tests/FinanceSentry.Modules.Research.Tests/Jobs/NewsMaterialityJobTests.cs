@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Research.Tests.Jobs;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
@@ -22,6 +23,7 @@ public sealed class NewsMaterialityJobTests
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IThesisRepository> _theses = new();
+    private readonly Mock<ICandidateRepository> _candidates = new();
     private readonly Mock<INewsRepository> _news = new();
     private readonly Mock<IMaterialityTermRepository> _materialityTerms = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
@@ -40,11 +42,13 @@ public sealed class NewsMaterialityJobTests
             _news.Object,
             _materialityTerms.Object,
             _alerts.Object,
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
             NullLogger<NewsMaterialityJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _materialityTerms.Setup(m => m.ListEnabledTermsAsync(default)).ReturnsAsync(DefaultTerms);
         _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
+        _candidates.Setup(c => c.ListAllUnscopedAsync(_userId, default)).ReturnsAsync([]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
@@ -289,7 +293,9 @@ public sealed class NewsMaterialityJobTests
                 => history.Where(a => a.PublishedAt >= since && a.PublishedAt <= since + TimeSpan.FromHours(2)).ToList());
         var job = new NewsMaterialityJob(
             _banking.Object, _brokerage.Object, _theses.Object, _news.Object,
-            _materialityTerms.Object, _alerts.Object, NullLogger<NewsMaterialityJob>.Instance, threshold);
+            _materialityTerms.Object, _alerts.Object,
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object),
+            NullLogger<NewsMaterialityJob>.Instance, threshold);
         var firedDays = new HashSet<DateOnly>();
         _alerts.Setup(a => a.GenerateNewsClusterAlertAsync(
                 _userId, "AAPL", It.IsAny<string>(), It.IsAny<DateOnly>(), default))
@@ -400,6 +406,7 @@ public sealed class NewsMaterialityJobTests
         _brokerage.Setup(b => b.GetHoldingsAsync(userId2, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _theses.Setup(t => t.ListUnscopedAsync(userId2, default)).ReturnsAsync([]);
+        _candidates.Setup(c => c.ListAllUnscopedAsync(userId2, default)).ReturnsAsync([]);
         _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
             .ReturnsAsync([Article("src:Reuters", "AAPL headline one"), Article("src:Bloomberg", "AAPL headline two")]);
 

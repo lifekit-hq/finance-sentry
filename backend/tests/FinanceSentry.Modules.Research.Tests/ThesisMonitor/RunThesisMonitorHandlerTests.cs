@@ -70,6 +70,111 @@ public class RunThesisMonitorHandlerTests
     }
 
     [Fact]
+    public async Task Break_RaisesARealtimeBreakReviewNoticeForTheThesis_ReferencedByTheBreakTimestamp()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts);
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var review = alerts.ReviewDues.Should().ContainSingle().Subject;
+        review.Subject.Should().Be(ReviewSubjectKind.Thesis);
+        review.SubjectId.Should().Be(thesis.Id);
+        review.Ticker.Should().Be("MU");
+        review.Source.Should().Be(ReviewDueSource.Break);
+        ReviewDueSource.IsRealtime(review.Source).Should().BeTrue();
+        review.Reference.Should().Be(thesis.BrokenAt!.Value.UtcDateTime.ToString("yyyyMMddTHHmmssZ"));
+        review.Evidence.Should().Contain($"thesis:{thesis.Id}");
+        review.Headline.Should().Contain(thesis.BrokenReason!);
+    }
+
+    [Fact]
+    public async Task StillBroken_RaisesNoSecondBreakReviewNotice()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        thesis.BrokenAt = DateTimeOffset.UtcNow.AddDays(-3);
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q2]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.ReviewDues.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConditionCleared_RaisesARealtimeUnbreakReviewNotice_NamingTheBreakItClears()
+    {
+        var healthyFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var brokenAt = new DateTimeOffset(2026, 9, 1, 8, 30, 15, TimeSpan.Zero);
+        thesis.BrokenAt = brokenAt;
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q1]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(healthyFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var review = alerts.ReviewDues.Should().ContainSingle().Subject;
+        review.Source.Should().Be(ReviewDueSource.Unbreak);
+        ReviewDueSource.IsRealtime(review.Source).Should().BeTrue();
+        review.SubjectId.Should().Be(thesis.Id);
+        review.Reference.Should().Be("20260901T083015Z");
+    }
+
+    [Fact]
+    public async Task ZeroTriggers_BrokenThesis_RaisesTheUnbreakReviewNotice()
+    {
+        var thesis = Thesis([]);
+        thesis.BrokenAt = new DateTimeOffset(2026, 9, 1, 8, 30, 15, TimeSpan.Zero);
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q1]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService([]), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.ReviewDues.Should().ContainSingle(r => r.Source == ReviewDueSource.Unbreak && r.Reference == "20260901T083015Z");
+    }
+
+    [Fact]
+    public async Task ReviewNoticeFailure_NeverAbortsTheRun_AndTheBreakStillLands()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var alerts = new FakeAlertGeneratorService { ReviewDueThrows = true };
+
+        var summary = await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.BreaksRaised.Should().Be(1);
+        summary.Errors.Should().Be(0);
+        thesis.BrokenAt.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task ConditionCleared_ClearsBrokenState_AndResolvesAlert()
     {
         var healthyFacts = new List<FundamentalFact>
@@ -695,6 +800,19 @@ public class RunThesisMonitorHandlerTests
         public int BlindResolveCalls { get; private set; }
         public List<(Guid ThesisId, string Ticker, string Reason)> DegradedAlerts { get; } = [];
         public bool BlindAlertThrows { get; set; }
+        public List<ReviewDue> ReviewDues { get; } = [];
+        public bool ReviewDueThrows { get; set; }
+
+        public Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default)
+        {
+            if (ReviewDueThrows)
+            {
+                throw new InvalidOperationException("alert store down");
+            }
+
+            ReviewDues.Add(review);
+            return Task.CompletedTask;
+        }
 
         public Task GenerateThesisMonitoringBlindAlertAsync(
             Guid userId, string summary, bool infraBlind, CancellationToken ct = default)

@@ -77,6 +77,7 @@ public static partial class AlertAppPath
                 ("to", day.ToString(IsoDate, CultureInfo.InvariantCulture))),
 
             "ThesisBroken" or "MarketStructure" or "Opportunity" or "EarningsAhead" or "FilingLanded" or "NewsCluster"
+                or "ThesisReviewDue" or "CandidateReviewDue"
                 => label is { } symbol && IsSymbol(symbol) ? Asset(symbol) : null,
 
             "AnalystRatingChange" => ForAnalystCoverage(label),

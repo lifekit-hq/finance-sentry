@@ -147,6 +147,17 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(6));
 
+            // Thesis-review triggers for dates that have passed: earnings (the counterpart of earnings-ahead) and
+            // thesis catalysts. Daily, after earnings-ahead has settled its own resolves.
+            mgr.AddOrUpdate<EarningsPassedJob>(
+                EarningsPassedJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                "30 6 * * *");
+            mgr.AddOrUpdate<CatalystPassedJob>(
+                CatalystPassedJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                "35 6 * * *");
+
             // Filing-landed detector (ledger-heartbeat T2), hourly.
             mgr.AddOrUpdate<FilingWatchJob>(
                 FilingWatchJob.RecurringJobId,
@@ -507,6 +518,9 @@ public static class ResearchModule
         services.AddScoped<LookaheadUniverse>();
         services.AddSingleton<IRecurringJobAgeReader, HangfireRecurringJobAgeReader>();
         services.AddScoped<EarningsAheadJob>();
+        services.AddScoped<ReviewDueRaiser>();
+        services.AddScoped<EarningsPassedJob>();
+        services.AddScoped<CatalystPassedJob>();
         services.AddScoped<FilingWatchJob>();
         services.AddScoped<AnalystRatingChangeAlertJob>();
         services.AddScoped<LookaheadSilenceMonitorJob>();

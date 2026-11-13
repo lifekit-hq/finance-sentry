@@ -1476,7 +1476,7 @@ public class AlertGeneratorServiceTests
         // Raised once per observed change by its caller, so the change is the dedup and no window applies.
         var perObservedChange = new[] { AlertType.PriceHike };
         // Deduped once per reference, ever — no silence window applies.
-        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.ConnectionDormant };
+        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.ConnectionDormant, AlertType.ThesisReviewDue, AlertType.CandidateReviewDue };
         // The silent-detector and thesis-monitoring-blind alerts are the windowed generators on JobFailure and set their own window per draft; the coverage-degraded one records every occurrence.
         var windowPerDraft = new[] { AlertType.JobFailure };
 

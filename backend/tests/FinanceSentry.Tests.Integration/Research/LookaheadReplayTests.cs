@@ -61,6 +61,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IWatchlistReader> _watchlist = new();
     private readonly Mock<IThesisRepository> _theses = new();
+    private readonly Mock<ICandidateRepository> _candidates = new();
     private readonly Mock<ICryptoHoldingsReader> _crypto = new();
     private readonly Mock<IPolicyAckReader> _policyAcks = new();
     private readonly Mock<IAnalystActionFeedReader> _analystActions = new();
@@ -83,6 +84,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
         _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync([]);
         _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
+        _candidates.Setup(c => c.ListAllUnscopedAsync(_userId, default)).ReturnsAsync([]);
         _crypto.Setup(c => c.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
         _analystActions.Setup(a => a.GetNewSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<int>(), default))
             .ReturnsAsync([]);
@@ -163,7 +165,8 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         await using var alerts = AlertsContext();
         var edgar = new SecEdgarService(new FixtureHttpClientFactory(), TimeProvider.System, NullLogger<SecEdgarService>.Instance);
         var job = new FilingWatchJob(
-            _banking.Object, Universe(), edgar, Generator(alerts), NullLogger<FilingWatchJob>.Instance);
+            _banking.Object, Universe(), edgar, Generator(alerts),
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, Generator(alerts)), NullLogger<FilingWatchJob>.Instance);
 
         await job.ExecuteAsync(nowUtc);
     }
