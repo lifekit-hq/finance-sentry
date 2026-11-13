@@ -17,7 +17,7 @@ public sealed class PortfolioConstructionOptions
 
     /// <summary>
     /// Binds the section onto the shipped defaults. A list or dictionary the configuration names replaces the
-    /// shipped one (the configuration binder would append to it), so a configured archetype or curated list means
+    /// shipped one (the configuration binder would append to it), so a configured archetype or list means
     /// exactly what it says; a key it does not name keeps the shipped value.
     /// </summary>
     public static void Bind(IConfiguration section, PortfolioConstructionOptions options)
