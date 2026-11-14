@@ -251,6 +251,9 @@ public sealed class SecEdgarService(
             var primaryDocs = recent.GetProperty("primaryDocument");
             var descriptions = recent.GetProperty("primaryDocDescription");
             var isXbrl = recent.GetProperty("isXBRL");
+            var items = recent.TryGetProperty("items", out var itemsColumn) && itemsColumn.ValueKind == JsonValueKind.Array
+                ? itemsColumn
+                : (JsonElement?)null;
             var cikNoPad = cik.TrimStart('0');
 
             var count = forms.GetArrayLength();
@@ -278,7 +281,8 @@ public sealed class SecEdgarService(
                     Blank(descriptions[i].GetString()),
                     accession,
                     documentUrl,
-                    isXbrl[i].ValueKind == JsonValueKind.Number && isXbrl[i].GetInt32() == 1));
+                    isXbrl[i].ValueKind == JsonValueKind.Number && isXbrl[i].GetInt32() == 1,
+                    ItemsAt(items, i)));
             }
 
             // EDGAR returns recent filings newest-first already, but sort defensively.
@@ -433,6 +437,18 @@ public sealed class SecEdgarService(
     }
 
     public DataSourceHealth Read() => tickerMap.Read();
+
+    // The 8-K item codes of row i of the submissions "items" column ("2.02,9.01"); null when the column is absent or the row empty.
+    private static IReadOnlyList<string>? ItemsAt(JsonElement? column, int i)
+    {
+        if (column is not { } items || i >= items.GetArrayLength() || items[i].ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var parsed = Domain.Catalyst.CatalystRules.ParseItems([items[i].GetString()]);
+        return parsed.Count == 0 ? null : parsed;
+    }
 
     private static DateOnly? ParseDate(string? value)
         => DateOnly.TryParse(value, CultureInfo.InvariantCulture, out var d) ? d : null;

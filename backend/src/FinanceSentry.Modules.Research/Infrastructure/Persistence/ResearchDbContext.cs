@@ -5,6 +5,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.ReferenceUniverse;
@@ -73,6 +74,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
     public DbSet<CoverageVerdictObservation> CoverageVerdictObservations { get; set; } = null!;
 
     public DbSet<CoverageEvent> CoverageEvents { get; set; } = null!;
+
+    public DbSet<CatalystEvent> CatalystEvents { get; set; } = null!;
+
+    public DbSet<ThemeAttentionDay> ThemeAttentionDays { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -450,6 +455,39 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasDatabaseName("ux_coverage_events_identity");
         cve.HasIndex(x => new { x.UserId, x.OccurredAt }).IsDescending(false, true)
             .HasDatabaseName("idx_coverage_events_user_occurred");
+
+        // Catalyst detection (discovery funnel stage 7): one row per 8-K filing handled for a user, once ever.
+        var cat = modelBuilder.Entity<CatalystEvent>();
+        cat.ToTable("catalyst_events");
+        cat.HasKey(x => x.Id);
+        cat.Property(x => x.UserId).IsRequired();
+        cat.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cat.Property(x => x.Accession).IsRequired().HasMaxLength(30);
+        cat.Property(x => x.Form).IsRequired().HasMaxLength(10);
+        cat.Property(x => x.Items).IsRequired().HasMaxLength(60);
+        cat.Property(x => x.Summary).IsRequired().HasMaxLength(200);
+        cat.Property(x => x.DocumentUrl).IsRequired().HasMaxLength(500);
+        cat.Property(x => x.Source).IsRequired().HasMaxLength(12);
+        cat.Property(x => x.DetectedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cat.Property(x => x.Disposition).IsRequired().HasMaxLength(16);
+        cat.Property(x => x.Tag).HasMaxLength(100);
+        cat.Property(x => x.Detail).IsRequired().HasMaxLength(500);
+        cat.HasIndex(x => new { x.UserId, x.Ticker, x.Accession }).IsUnique()
+            .HasDatabaseName("ux_catalyst_events_identity");
+        cat.HasIndex(x => new { x.UserId, x.DetectedAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_catalyst_events_user_detected");
+
+        // GDELT article volume per theme phrase (shared market data, no UserId): one row per (theme, phrase, day).
+        var tad = modelBuilder.Entity<ThemeAttentionDay>();
+        tad.ToTable("theme_attention_days");
+        tad.HasKey(x => x.Id);
+        tad.Property(x => x.Theme).IsRequired().HasMaxLength(60);
+        tad.Property(x => x.Phrase).IsRequired().HasMaxLength(120);
+        tad.Property(x => x.Source).IsRequired().HasMaxLength(12);
+        tad.Property(x => x.MeasuredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        tad.HasIndex(x => new { x.Theme, x.Phrase, x.Day }).IsUnique()
+            .HasDatabaseName("ux_theme_attention_days_identity");
+        tad.HasIndex(x => x.Day).HasDatabaseName("idx_theme_attention_days_day");
 
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");
