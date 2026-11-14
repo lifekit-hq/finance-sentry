@@ -385,6 +385,23 @@ public sealed class GetCompsValuationQueryTests
         result.Flags.Should().NotContain(CompsFlags.NetDebtUnavailable);
     }
 
+    [Theory]
+    [InlineData("Insurance - Life", true)]
+    [InlineData("Insurance - Property & Casualty", true)]
+    [InlineData("Insurance Brokers", false)]
+    public async Task Only_insurers_not_brokers_are_financial_sector(string industry, bool financial)
+    {
+        var data = Seed(
+            Company("INS", industry: industry),
+            Company("I1", industry: industry), Company("I2", industry: industry),
+            Company("I3", industry: industry), Company("I4", industry: industry));
+
+        var result = await Run(data, "INS");
+
+        result.Flags.Contains(CompsFlags.FinancialSector).Should().Be(financial);
+        result.Multiples!.EvToEbitda.NotEvaluable.Should().Be(financial);
+    }
+
     [Fact]
     public async Task Non_financial_target_has_no_price_to_book_measure()
     {

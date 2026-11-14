@@ -172,7 +172,7 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
     private static bool IsFinancial(string? industry)
         => industry is not null
             && (industry.StartsWith("Banks", StringComparison.OrdinalIgnoreCase)
-                || industry.StartsWith("Insurance", StringComparison.OrdinalIgnoreCase));
+                || industry.StartsWith("Insurance -", StringComparison.OrdinalIgnoreCase));
 
     private static CompsMeasure FinancialNotEvaluable() => new(
         Target: null, NotEvaluable: true, CompsReasons.FinancialSector, UsableCount: 0,
