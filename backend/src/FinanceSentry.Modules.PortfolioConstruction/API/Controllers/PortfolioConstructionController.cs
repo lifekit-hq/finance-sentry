@@ -19,6 +19,7 @@ using Microsoft.Extensions.Options;
 [Route("portfolio-construction")]
 public class PortfolioConstructionController(
     IQueryHandler<GetUniverseScreenQuery, UniverseScreenResult> handler,
+    IQueryHandler<GetGapModeQuery, GapModeResult> gapHandler,
     IOptions<PortfolioConstructionOptions> options) : ControllerBase
 {
     [HttpGet("universe")]
@@ -30,5 +31,20 @@ public class PortfolioConstructionController(
         }
 
         return Ok(await handler.Handle(new GetUniverseScreenQuery(User.RequireUserId(), archetype), ct));
+    }
+
+    /// <summary>
+    /// Gap mode (spec 726 US4): the viewer's book against the archetype's constructed target. Same owner gate as the
+    /// screen it reads; informational, and it never trades.
+    /// </summary>
+    [HttpGet("gap")]
+    public async Task<IActionResult> GetGap([FromQuery] string? archetype, CancellationToken ct)
+    {
+        if (!GetUniverseScreenQueryHandler.TryResolve(options.Value, archetype, out _))
+        {
+            return BadRequest(new { errorCode = "UNKNOWN_ARCHETYPE", message = $"Unknown archetype '{archetype}'." });
+        }
+
+        return Ok(await gapHandler.Handle(new GetGapModeQuery(User.RequireUserId(), archetype), ct));
     }
 }

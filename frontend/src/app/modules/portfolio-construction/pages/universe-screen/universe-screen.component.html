@@ -103,6 +103,13 @@
             }
           </cmn-card>
 
+          <fns-gap-mode
+            [gap]="store.gap()"
+            [loading]="store.isGapLoading()"
+            [errorMessage]="store.gapErrorMessage()"
+            (retry)="store.loadGap()"
+          />
+
           @if (screen.truncated) {
             <cmn-alert variant="info">{{ truncatedNote }}</cmn-alert>
           }

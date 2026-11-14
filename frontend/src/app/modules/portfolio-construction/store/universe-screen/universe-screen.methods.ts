@@ -1,6 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {type GapMode} from '../../models/gap-mode/gap-mode.model';
 import {
   type UniverseScreen,
   type UniverseSortKey,
@@ -12,6 +13,9 @@ export function universeScreenMethods(store: WritableStateSource<UniverseScreenS
   return {
     setScreen(screen: UniverseScreen): void {
       patchState(store, {screen});
+    },
+    setGap(gap: Nullable<GapMode>): void {
+      patchState(store, {gap});
     },
     setArchetype(archetype: Nullable<string>): void {
       patchState(store, {archetype});

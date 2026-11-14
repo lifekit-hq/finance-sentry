@@ -23,6 +23,7 @@ import {
 } from '../../../../shared/constants/scorecard/scorecard.constants';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {GapModeComponent} from '../../components/gap-mode/gap-mode.component';
 import {
   UNIVERSE_ARCHETYPE_LABEL,
   UNIVERSE_EMPTY_COPY,
@@ -54,6 +55,7 @@ import {UniverseScreenStore} from '../../store/universe-screen/universe-screen.s
     DecimalPipe,
     EmptyStateComponent,
     FormsModule,
+    GapModeComponent,
     PageContainerComponent,
     PageScrollComponent,
     RouterLink,

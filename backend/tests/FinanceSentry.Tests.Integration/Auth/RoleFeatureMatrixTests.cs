@@ -33,6 +33,7 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
     private const string ScorecardVerdicts = "scorecard-verdicts";
     private const string Decisions = "decisions";
     private const string UniverseScreen = "universe-screen";
+    private const string GapMode = "gap-mode";
 
     /// <summary>Feature, permission it needs, and the request that reaches it.</summary>
     private static readonly Dictionary<string, (string Permission, HttpMethod Method, string Path)> Features = new()
@@ -49,6 +50,8 @@ public class RoleFeatureMatrixTests(AssetDossierApiFactory factory) : IClassFixt
         [Decisions] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/research/recommendations"),
         // The ranked universe screen carries a verdict word and a suggested weight per name: the same gate.
         [UniverseScreen] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/portfolio-construction/universe"),
+        // Gap mode reads the same construction against the owner's book: the same gate.
+        [GapMode] = (Permissions.AiUse, HttpMethod.Get, "/api/v1/portfolio-construction/gap"),
     };
 
     public static TheoryData<string> AllFeatures() => [.. Features.Keys];
