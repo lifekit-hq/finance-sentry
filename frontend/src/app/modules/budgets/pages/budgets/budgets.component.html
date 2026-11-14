@@ -96,7 +96,7 @@
           <span
             [class.text-status-warning]="store.isCurrentMonth() && behind"
             [class.text-text-primary]="!(store.isCurrentMonth() && behind)"
-            class="tabular-nums text-cmn-xl font-bold"
+            class="tabular-nums text-cmn-lg font-bold"
             data-testid="budgets-expected"
           >
             {{ store.expectedMonthEnd() | money }}
