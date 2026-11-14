@@ -1,5 +1,5 @@
 {
-  "_comment": "Example claude_desktop_config.json snippet. Merge the 'mcpServers' block into your real config at: %APPDATA%/Claude/claude_desktop_config.json (Windows) or ~/.config/Claude/claude_desktop_config.json (Linux/macOS). Browser-based MCP OAuth login is easiest when the stdio process runs on the host rather than through docker exec. Restart Claude Desktop after editing.",
+  "_comment": "Example claude_desktop_config.json snippet for a LOCAL dev stack (the finance-sentry-mcp container must run on this machine; for a deployed instance use scripts/mcp-stdio.sh over ssh, see the README MCP section). Merge the 'mcpServers' block into your real config at: %APPDATA%/Claude/claude_desktop_config.json (Windows) or ~/.config/Claude/claude_desktop_config.json (Linux/macOS). Browser-based MCP OAuth login is easiest when the stdio process runs on the host rather than through docker exec. Restart Claude Desktop after editing.",
   "mcpServers": {
     "finance-sentry": {
       "command": "docker",

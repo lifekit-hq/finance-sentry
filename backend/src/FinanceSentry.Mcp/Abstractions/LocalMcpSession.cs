@@ -11,6 +11,7 @@ public sealed class LocalMcpSession(
     LocalMcpCredentialStore credentialStore,
     McpOAuthTokenClient tokenClient,
     IOptions<JwtOptions> jwtOptions,
+    TimeProvider clock,
     ILogger<LocalMcpSession> logger)
 {
     private const string ExpectedAudience = "mcp";
@@ -23,7 +24,9 @@ public sealed class LocalMcpSession(
     {
         lock (_sync)
         {
-            return _cachedExpiresAt > DateTime.UtcNow.Add(RefreshSkew)
+            // The skew only decides when to refresh: the token stays usable until it actually expires, so a
+            // session started inside the refresh window keeps its identity until the refresh loop renews it.
+            return _cachedExpiresAt > clock.GetUtcNow().UtcDateTime
                 ? _cachedPrincipal
                 : null;
         }
@@ -52,7 +55,7 @@ public sealed class LocalMcpSession(
             return;
         }
 
-        if (credentials.ExpiresAt <= DateTime.UtcNow.Add(RefreshSkew))
+        if (credentials.ExpiresAt <= clock.GetUtcNow().UtcDateTime.Add(RefreshSkew))
         {
             credentials = await TryRefreshAsync(credentials, cancellationToken);
             if (credentials is null)

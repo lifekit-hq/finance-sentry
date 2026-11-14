@@ -164,11 +164,11 @@ public class GetFinancialProfileQueryHandler(
         var userId = query.UserId;
         var asOf = clock.GetUtcNow();
 
-        var cashflowRead = await ReadAsync("cashflow", () => cashflow.Handle(new GetCashflowProfileQuery(userId), cancellationToken));
-        var goalsRead = await ReadAsync("goals", () => goals.Handle(new GetGoalsProgressQuery(userId), cancellationToken));
-        var incomeRead = await ReadAsync("income", () => income.Handle(new GetIncomeProfileQuery(userId), cancellationToken));
-        var careerRead = await ReadAsync("career", () => career.Handle(new GetCareerTimelineQuery(userId), cancellationToken));
-        var taxRead = await ReadAsync("disposal tax", () => disposalTax.ReadAsync(userId, cancellationToken));
+        var cashflowRead = await ReadAsync("cashflow", async () => await cashflow.Handle(new GetCashflowProfileQuery(userId), cancellationToken));
+        var goalsRead = await ReadAsync("goals", async () => await goals.Handle(new GetGoalsProgressQuery(userId), cancellationToken));
+        var incomeRead = await ReadAsync("income", async () => await income.Handle(new GetIncomeProfileQuery(userId), cancellationToken));
+        var careerRead = await ReadAsync("career", async () => await career.Handle(new GetCareerTimelineQuery(userId), cancellationToken));
+        var taxRead = await ReadAsync("disposal tax", async () => await disposalTax.ReadAsync(userId, cancellationToken));
         var riskRead = await ReadAsync("risk", () => risk.GetCurrentAsync(userId, cancellationToken));
         var spreadRead = await ReadAsync("income spread", async () => IncomeSpreadOf(await inputs.ReadAsync(userId, cancellationToken)));
 

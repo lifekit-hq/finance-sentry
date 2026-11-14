@@ -183,9 +183,10 @@ public sealed class GetSyncHealthTool(
                 return new SyncHealthEntry("monobank", null, "never_synced", null);
 
             // MonobankCredential has no LastSyncError; derive error state from associated accounts.
+            // A closed account is no longer synced, so the failure it was left with is history, not health.
             var failedAccount = await _bankSync.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.UserId == userId && a.Provider == "monobank"
+                .Where(a => a.UserId == userId && a.Provider == "monobank" && a.ClosedAt == null
                     && (a.SyncStatus == "failed" || a.SyncStatus == ReauthRequiredStatus))
                 .Select(a => new { a.SyncStatus, a.LastSyncError })
                 .FirstOrDefaultAsync(ct);
@@ -207,13 +208,38 @@ public sealed class GetSyncHealthTool(
         }
     }
 
+    // A query filter can only be ignored at the query root, so the removed accounts are read on their own.
+    private async Task<bool> HasLapsedTrueLayerConnectionAsync(Guid userId, CancellationToken ct)
+    {
+        var expiredIds = await _bankSync.TrueLayerConnections
+            .AsNoTracking()
+            .Where(c => c.UserId == userId && c.Status == ExpiredConnectionStatus)
+            .Select(c => (Guid?)c.Id)
+            .ToListAsync(ct);
+        if (expiredIds.Count == 0)
+            return false;
+
+        var accounts = await _bankSync.BankAccounts
+            .IgnoreQueryFilters([BankSyncDbContext.AccountActiveFilterName])
+            .AsNoTracking()
+            .Where(a => a.UserId == userId && expiredIds.Contains(a.TrueLayerConnectionId))
+            .Select(a => new { a.TrueLayerConnectionId, Live = a.IsActive && a.ClosedAt == null })
+            .ToListAsync(ct);
+
+        return expiredIds.Any(id =>
+        {
+            var owned = accounts.Where(a => a.TrueLayerConnectionId == id).ToList();
+            return owned.Count == 0 || owned.Any(a => a.Live);
+        });
+    }
+
     private async Task<SyncHealthEntry> GetTrueLayerHealthAsync(Guid userId, CancellationToken ct)
     {
         try
         {
             var accounts = await _bankSync.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.UserId == userId && a.Provider == "truelayer")
+                .Where(a => a.UserId == userId && a.Provider == "truelayer" && a.ClosedAt == null)
                 .Select(a => new { a.SyncStatus, a.LastSyncError, a.UpdatedAt })
                 .ToListAsync(ct);
 
@@ -231,9 +257,9 @@ public sealed class GetSyncHealthTool(
             // A lapsed consent surfaces as reauth_required accounts and/or an EXPIRED connection;
             // neither is "active" or "failed", so check them explicitly. A connection can expire
             // before its first discovery leaves any account behind, so this precedes never_synced.
-            var hasExpiredConnection = await _bankSync.TrueLayerConnections
-                .AsNoTracking()
-                .AnyAsync(c => c.UserId == userId && c.Status == ExpiredConnectionStatus, ct);
+            // An expired connection whose accounts were all removed or closed is retired, not lapsed:
+            // reconnecting it would bring back nothing the person still keeps.
+            var hasExpiredConnection = await HasLapsedTrueLayerConnectionAsync(userId, ct);
 
             if (hasExpiredConnection || accounts.Any(a => a.SyncStatus == ReauthRequiredStatus))
                 return new SyncHealthEntry("truelayer", lastSyncAt, "error", ReauthRequiredMessage);

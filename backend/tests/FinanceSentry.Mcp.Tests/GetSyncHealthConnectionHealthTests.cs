@@ -209,6 +209,89 @@ public sealed class GetSyncHealthConnectionHealthTests
     }
 
     [Fact]
+    public async Task A_closed_Monobank_account_left_failed_does_not_report_an_error()
+    {
+        await using var sp = BuildProvider();
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankSyncDbContext>();
+        var token = new FinanceSentry.Modules.BankSync.Domain.MonobankCredential(_userId, [1], [2], [3], 1)
+        {
+            LastSyncAt = DateTime.UtcNow,
+        };
+        var live = MonobankAccount(token.Id, "ext-live");
+        var closed = MonobankAccount(token.Id, "ext-closed");
+        closed.BeginSync();
+        closed.MarkFailed("MONOBANK_HTTP_ERROR: invalid 'account'");
+        closed.Retire(DateTimeOffset.UtcNow, "absent");
+        db.MonobankCredentials.Add(token);
+        db.BankAccounts.AddRange(live, closed);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "monobank");
+
+        entry.Status.Should().Be("ok");
+        entry.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task An_expired_TrueLayer_connection_whose_accounts_were_all_removed_does_not_ask_for_a_reconnect()
+    {
+        await using var sp = BuildProvider();
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankSyncDbContext>();
+        var retired = new FinanceSentry.Modules.BankSync.Domain.TrueLayerConnection(_userId, "mock", "Mock", "ref-a");
+        retired.MarkExpired();
+        var removed = TrueLayerAccount(retired.Id, "ext-removed");
+        var working = new FinanceSentry.Modules.BankSync.Domain.TrueLayerConnection(_userId, "bank-b", "Bank B", "ref-b");
+        working.MarkLinked(DateTime.UtcNow.AddDays(60));
+        var live = TrueLayerAccount(working.Id, "ext-live");
+        live.SyncStatus = "active";
+        db.TrueLayerConnections.AddRange(retired, working);
+        db.BankAccounts.AddRange(removed, live);
+        await db.SaveChangesAsync();
+        // Removed the way the app does it: a soft delete of a stored row (false on insert reads as the default, true).
+        removed.IsActive = false;
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "truelayer");
+
+        entry.ErrorMessage.Should().BeNull();
+        entry.Status.Should().Be("ok");
+    }
+
+    [Fact]
+    public async Task An_expired_TrueLayer_connection_with_no_accounts_yet_still_asks_for_a_reconnect()
+    {
+        await using var sp = BuildProvider();
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankSyncDbContext>();
+        var expired = new FinanceSentry.Modules.BankSync.Domain.TrueLayerConnection(_userId, "bank-a", "Bank A", "ref-a");
+        expired.MarkExpired();
+        db.TrueLayerConnections.Add(expired);
+        await db.SaveChangesAsync();
+
+        var entry = (await scope.ServiceProvider.GetRequiredService<GetSyncHealthTool>().ExecuteAsync())
+            .Single(e => e.Provider == "truelayer");
+
+        entry.Status.Should().Be("error");
+        entry.ErrorMessage.Should().Be("Reconnection required.");
+    }
+
+    private FinanceSentry.Modules.BankSync.Domain.BankAccount MonobankAccount(Guid credentialId, string externalId)
+        => new(_userId, externalId, "Monobank", "checking", "1111", "Owner", "UAH", _userId, "monobank")
+        {
+            MonobankCredentialId = credentialId,
+        };
+
+    private FinanceSentry.Modules.BankSync.Domain.BankAccount TrueLayerAccount(Guid connectionId, string externalId)
+        => new(_userId, externalId, "Bank", "checking", "2222", "Owner", "EUR", _userId, "truelayer")
+        {
+            TrueLayerConnectionId = connectionId,
+        };
+
+    [Fact]
     public async Task With_the_switch_empty_every_entry_is_as_before()
     {
         var entry = await IbkrEntryAsync(ConnectionHealthState.ActionRequired);

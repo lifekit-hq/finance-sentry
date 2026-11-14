@@ -50,7 +50,11 @@ export class McpConnectComponent {
         return;
       }
 
-      const authorizeUrl = new URL(`${environment.apiBaseUrl}/auth/mcp/authorize`);
+      // Production's apiBaseUrl is the relative '/api/v1', so it needs the page origin as its base.
+      const authorizeUrl = new URL(
+        `${environment.apiBaseUrl}/auth/mcp/authorize`,
+        window.location.origin
+      );
       authorizeUrl.searchParams.set('redirectUri', redirectUri);
       authorizeUrl.searchParams.set('state', state);
       window.location.assign(authorizeUrl.toString());
