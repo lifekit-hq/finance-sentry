@@ -5,6 +5,7 @@ import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
+import {GapModeFixtures} from '../../models/gap-mode/gap-mode.fixtures';
 import {UniverseScreenFixtures} from '../../models/universe-screen/universe-screen.fixtures';
 import {PortfolioConstructionService} from '../../services/portfolio-construction.service';
 import {UniverseScreenStore} from './universe-screen.store';
@@ -13,7 +14,10 @@ function setup(service: Partial<Record<keyof PortfolioConstructionService, unkno
   TestBed.configureTestingModule({
     providers: [
       UniverseScreenStore,
-      {provide: PortfolioConstructionService, useValue: service},
+      {
+        provide: PortfolioConstructionService,
+        useValue: {getGap: vi.fn().mockReturnValue(of(GapModeFixtures.gap())), ...service},
+      },
       {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
     ],
   });
@@ -98,5 +102,53 @@ describe('UniverseScreenStore', () => {
     });
 
     expect(store.loadErrorMessage()).toBe('Failed to load the universe.');
+  });
+
+  it('loads how the book compares for the archetype the screen built', () => {
+    const getGap = vi.fn().mockReturnValue(of(GapModeFixtures.gap()));
+    const store = setup({
+      getUniverse: vi.fn().mockReturnValue(of(UniverseScreenFixtures.screen())),
+      getGap,
+    });
+
+    expect(getGap).toHaveBeenCalledWith('growth');
+    expect(store.gap()?.summary.missingNames).toEqual(['BBB']);
+    expect(store.isGapLoading()).toBe(false);
+  });
+
+  it('reloads the gap when the archetype changes', () => {
+    const getGap = vi.fn().mockReturnValue(of(GapModeFixtures.gap()));
+    const store = setup({
+      getUniverse: vi
+        .fn()
+        .mockReturnValueOnce(of(UniverseScreenFixtures.screen()))
+        .mockReturnValueOnce(of(UniverseScreenFixtures.screen({archetype: 'balanced'}))),
+      getGap,
+    });
+
+    store.setArchetype('balanced');
+    store.load();
+
+    expect(getGap).toHaveBeenLastCalledWith('balanced');
+  });
+
+  it('keeps the screen when the gap cannot be loaded, and can retry it', () => {
+    const getGap = vi
+      .fn()
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({status: 500})))
+      .mockReturnValueOnce(of(GapModeFixtures.gap()));
+    const store = setup({
+      getUniverse: vi.fn().mockReturnValue(of(UniverseScreenFixtures.screen())),
+      getGap,
+    });
+
+    expect(store.screen()).not.toBeNull();
+    expect(store.gap()).toBeNull();
+    expect(store.gapErrorMessage()).toBe('Failed to load how your book compares.');
+
+    store.loadGap();
+
+    expect(store.gap()).not.toBeNull();
+    expect(store.gapErrorMessage()).toBe('');
   });
 });

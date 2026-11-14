@@ -107,12 +107,88 @@ const SCREEN = {
   ],
 };
 
+const GAP = {
+  archetype: 'growth',
+  generatedAt: '2026-11-14T08:00:00Z',
+  label:
+    'Informational only: what you hold against a rules-built target. It is not a recommendation to buy or sell, and nothing here places or prepares a trade.',
+  hasBook: true,
+  bookValueUsd: 10000,
+  bookStale: false,
+  staleSources: [],
+  refusal: null,
+  summary: {
+    headline: 'Missing: BBB. Overweight: ZZZ.',
+    missingNames: ['BBB'],
+    underweightNames: [],
+    overweightNames: ['ZZZ'],
+    onTargetCount: 1,
+  },
+  sleeves: [
+    {
+      assetClass: 'Equities',
+      status: 'Overweight',
+      currentPct: 17,
+      targetPct: 12,
+      gapPct: -5,
+      currentUsd: 1700,
+      targetUsd: 1200,
+      gapUsd: -500,
+    },
+  ],
+  sectors: [],
+  names: [
+    {
+      symbol: 'BBB',
+      sector: 'Energy',
+      verdict: 'Buy',
+      status: 'Missing',
+      heldOutsideTarget: false,
+      currentPct: 0,
+      targetPct: 12,
+      gapPct: 12,
+      currentUsd: 0,
+      targetUsd: 1200,
+      gapUsd: 1200,
+      reason: 'Target 12%. Not held.',
+    },
+    {
+      symbol: 'ZZZ',
+      sector: null,
+      verdict: 'Avoid',
+      status: 'Overweight',
+      heldOutsideTarget: true,
+      currentPct: 5,
+      targetPct: 0,
+      gapPct: -5,
+      currentUsd: 500,
+      targetUsd: 0,
+      gapUsd: -500,
+      reason: 'Held outside the target: 5% of the book.',
+    },
+  ],
+  notes: [],
+};
+
 test.describe('Construction', () => {
   test.beforeEach(async ({page}) => {
     await mockApis(page);
     await page.route(`${API}/portfolio-construction/universe*`, route =>
       route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(SCREEN)})
     );
+    await page.route(`${API}/portfolio-construction/gap*`, route =>
+      route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(GAP)})
+    );
+  });
+
+  test('shows the book against the target as missing and overweight, labelled informational', async ({
+    page,
+  }) => {
+    await page.goto('/construction');
+    await expect(page.getByTestId('gap-label')).toContainText('not a recommendation');
+    await expect(page.getByTestId('gap-headline')).toHaveText('Missing: BBB. Overweight: ZZZ.');
+    await expect(page.getByTestId('gap-text').first()).toHaveText('missing');
+    await expect(page.getByTestId('gap-outside')).toHaveText('Held, not in target');
   });
 
   test('shows each name with its verdict, weight and the rule behind it', async ({page}) => {

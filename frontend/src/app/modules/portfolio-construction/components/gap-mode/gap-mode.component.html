@@ -1,0 +1,128 @@
+<cmn-card class="block" data-testid="gap-mode">
+  <h2 class="mb-cmn-1 font-label text-cmn-sm font-semibold text-text-primary">{{ title }}</h2>
+  <cmn-async-state
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
+    [emptySubMessage]="noBookCopy"
+    [keepContent]="false"
+    [crossfade]="false"
+    (retry)="retry.emit()"
+    class="block space-y-cmn-3"
+    errorPlacement="above"
+    retryable
+  >
+    <div skeleton data-testid="gap-skeleton">
+      <cmn-skeleton [count]="skeletonRowCount" shape="row" />
+    </div>
+
+    @if (gap(); as gap) {
+      <p class="text-cmn-xs text-text-secondary" data-testid="gap-label">{{ gap.label }}</p>
+
+      @if (gap.refusal; as refusal) {
+        <cmn-alert variant="warning" data-testid="gap-refusal">{{ refusal }}</cmn-alert>
+      } @else {
+        <p class="text-cmn-sm text-text-primary" data-testid="gap-headline">
+          {{ gap.summary.headline }}
+        </p>
+        @if (!gap.hasBook) {
+          <p class="text-cmn-xs text-text-secondary" data-testid="gap-no-book">{{ noBookCopy }}</p>
+        }
+        @if (gap.bookStale) {
+          <cmn-alert variant="info" data-testid="gap-stale"
+            >Some of your figures are stale ({{ gap.staleSources.join(', ') }}), so the held side
+            may be incomplete.</cmn-alert
+          >
+        }
+
+        <section class="space-y-cmn-1" data-testid="gap-names">
+          <h3 class="text-cmn-sm font-medium text-text-primary">{{ namesHeading }}</h3>
+          <ul class="space-y-cmn-2">
+            @for (name of gap.names; track name.symbol) {
+              <li
+                class="flex flex-col gap-cmn-1 border-b border-border-subtle pb-cmn-2 last:border-b-0"
+                data-testid="gap-name"
+              >
+                <span class="flex flex-wrap items-center gap-x-cmn-2 gap-y-cmn-1">
+                  <a
+                    [routerLink]="['/assets', name.symbol]"
+                    class="text-cmn-base font-semibold text-text-primary hover:underline"
+                    data-testid="gap-symbol"
+                    >{{ name.symbol }}</a
+                  >
+                  <cmn-tag [variant]="statusVariant[name.status]" data-testid="gap-status">{{
+                    statusLabel[name.status]
+                  }}</cmn-tag>
+                  @if (name.heldOutsideTarget) {
+                    <cmn-tag variant="neutral" data-testid="gap-outside">{{
+                      heldOutsideLabel
+                    }}</cmn-tag>
+                  }
+                  @if (name.verdict; as verdict) {
+                    <cmn-tag [variant]="wordVariant[verdict]" data-testid="gap-verdict">{{
+                      wordLabel[verdict]
+                    }}</cmn-tag>
+                  }
+                  <span class="text-cmn-xs text-text-secondary" data-testid="gap-sector">{{
+                    name.sector ?? 'No sector'
+                  }}</span>
+                  <span
+                    class="ml-auto text-cmn-sm font-semibold tabular-nums text-text-primary"
+                    data-testid="gap-text"
+                    >{{ gapText(name) }}</span
+                  >
+                </span>
+                <span
+                  class="text-cmn-xs tabular-nums text-text-secondary"
+                  data-testid="gap-figures"
+                >
+                  {{ name.currentPct | number: '1.0-2' }}% held,
+                  {{ name.targetPct | number: '1.0-2' }}% target
+                  @if (name.targetUsd !== null) {
+                    ({{ name.currentUsd | money: 'USD' }} of {{ name.targetUsd | money: 'USD' }})
+                  }
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+
+        <section class="space-y-cmn-1" data-testid="gap-sleeves">
+          <h3 class="text-cmn-sm font-medium text-text-primary">{{ sleevesHeading }}</h3>
+          <dl class="grid grid-cols-[1fr_auto] gap-x-cmn-3 gap-y-cmn-1 text-cmn-sm">
+            @for (sleeve of gap.sleeves; track sleeve.assetClass) {
+              <dt class="text-text-secondary">{{ sleeve.assetClass }}</dt>
+              <dd
+                [attr.data-testid]="'gap-sleeve-' + sleeve.assetClass"
+                class="text-right tabular-nums text-text-primary"
+              >
+                {{ sleeve.currentPct | number: '1.0-2' }}% of
+                {{ sleeve.targetPct | number: '1.0-2' }}%, {{ gapText(sleeve) }}
+              </dd>
+            }
+          </dl>
+        </section>
+
+        @if (gap.sectors.length > 0) {
+          <section class="space-y-cmn-1" data-testid="gap-sectors">
+            <h3 class="text-cmn-sm font-medium text-text-primary">{{ sectorsHeading }}</h3>
+            <dl class="grid grid-cols-[1fr_auto] gap-x-cmn-3 gap-y-cmn-1 text-cmn-sm">
+              @for (sector of gap.sectors; track sector.sector) {
+                <dt [attr.title]="sector.symbols.join(', ')" class="text-text-secondary">
+                  {{ sector.sector }}
+                </dt>
+                <dd class="text-right tabular-nums text-text-primary">
+                  {{ sector.currentPct | number: '1.0-2' }}% of
+                  {{ sector.targetPct | number: '1.0-2' }}%, {{ gapText(sector) }}
+                </dd>
+              }
+            </dl>
+          </section>
+        }
+
+        @for (note of gap.notes; track $index) {
+          <p class="text-cmn-xs text-text-secondary">{{ note }}</p>
+        }
+      }
+    }
+  </cmn-async-state>
+</cmn-card>
