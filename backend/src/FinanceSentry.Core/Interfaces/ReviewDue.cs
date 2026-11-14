@@ -58,6 +58,8 @@ public static class ReviewDueSource
 /// <c>url:&lt;document url&gt;</c>, <c>article:&lt;id&gt;</c>, <c>earnings:&lt;ticker&gt;:&lt;date&gt;</c>,
 /// <c>catalyst:&lt;date&gt;</c>, <c>thesis:&lt;id&gt;</c>, <c>break:&lt;timestamp&gt;</c>.</param>
 /// <param name="Headline">One human sentence for the alert text.</param>
+/// <param name="NarrativeFalsifiers">A thesis subject's free-text kill-switches, handed to Ledger on every review because no
+/// job monitors them. Null or empty for a candidate or a thesis without any.</param>
 public sealed record ReviewDue(
     ReviewSubjectKind Subject,
     Guid SubjectId,
@@ -65,4 +67,5 @@ public sealed record ReviewDue(
     string Source,
     string Reference,
     IReadOnlyList<string> Evidence,
-    string Headline);
+    string Headline,
+    IReadOnlyList<string>? NarrativeFalsifiers = null);

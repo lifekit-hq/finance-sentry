@@ -76,6 +76,22 @@ public sealed class FilingWatchReviewDueTests
     };
 
     [Fact]
+    public async Task A_thesis_notice_carries_the_thesis_narrative_falsifiers_and_a_thesis_without_any_carries_none()
+    {
+        var withFalsifiers = Thesis("NVDA");
+        withFalsifiers.NarrativeFalsifiers = ["Loses the contract"];
+        var legacy = Thesis("AMD");
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([withFalsifiers, legacy]);
+        FilingsFor("NVDA", Filing("NVDA"));
+        FilingsFor("AMD", Filing("AMD", accession: "0001-26-000456"));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _reviews.Single(r => r.Ticker == "NVDA").NarrativeFalsifiers.Should().Equal("Loses the contract");
+        _reviews.Single(r => r.Ticker == "AMD").NarrativeFalsifiers.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task A_filing_on_a_thesis_ticker_raises_a_thesis_review_notice_and_still_the_filing_alert()
     {
         var thesis = Thesis("NVDA");

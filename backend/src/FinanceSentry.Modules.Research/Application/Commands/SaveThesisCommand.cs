@@ -21,7 +21,10 @@ public record SaveThesisCommand(
     string? DecisionNote = null,
     ThesisEventOrigin Origin = ThesisEventOrigin.User,
     string? Rationale = null,
-    ThesisEvidenceRefs? Evidence = null) : ICommand<ThesisDto>;
+    ThesisEvidenceRefs? Evidence = null,
+    // Null leaves the stored falsifiers as they are (a caller that does not know the field must not wipe them);
+    // an empty list clears them; on create null means none.
+    IReadOnlyList<string>? NarrativeFalsifiers = null) : ICommand<ThesisDto>;
 
 public class SaveThesisCommandHandler(
     IThesisRepository repo,
@@ -34,6 +37,9 @@ public class SaveThesisCommandHandler(
     public async Task<ThesisDto> Handle(SaveThesisCommand cmd, CancellationToken ct)
     {
         ThesisTriggerVocabulary.Validate(cmd.InvalidationTriggers);
+        var narrativeFalsifiers = cmd.NarrativeFalsifiers is null
+            ? null
+            : NarrativeFalsifierRules.Normalize(cmd.NarrativeFalsifiers);
 
         InvestmentThesis thesis;
         var isNewThesis = cmd.Id is null;
@@ -57,6 +63,10 @@ public class SaveThesisCommandHandler(
         thesis.KeyDataPoints = cmd.KeyDataPoints.ToList();
         thesis.Catalysts = cmd.Catalysts.ToList();
         thesis.InvalidationTriggers = cmd.InvalidationTriggers.ToList();
+        if (narrativeFalsifiers is not null)
+        {
+            thesis.NarrativeFalsifiers = narrativeFalsifiers.ToList();
+        }
 
         var current = ThesisVersion.Of(thesis);
         var revised = prior is not null && !prior.SameContentAs(current);
@@ -85,7 +95,7 @@ public class SaveThesisCommandHandler(
             thesis.Id, thesis.Ticker, thesis.ThesisText,
             thesis.KeyDataPoints, thesis.Catalysts, thesis.InvalidationTriggers,
             thesis.CreatedAt, thesis.UpdatedAt, thesis.BrokenAt, thesis.BrokenReason, thesis.EntryPrice,
-            origin.ToString());
+            origin.ToString(), thesis.NarrativeFalsifiers.ToList());
     }
 
     private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

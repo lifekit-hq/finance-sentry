@@ -82,7 +82,8 @@ public class GetResearchContextQueryHandler(
                     thesis.Ticker,
                     Truncate(thesis.ThesisText, ThesisSummaryLength),
                     thesis.BrokenAt is not null,
-                    thesis.UpdatedAt),
+                    thesis.UpdatedAt,
+                    thesis.NarrativeFalsifiers.ToList()),
             groups,
             Math.Max(0, result.TotalMatched - result.Hits.Count),
             DateTimeOffset.UtcNow);

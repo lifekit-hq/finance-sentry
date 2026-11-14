@@ -15,7 +15,8 @@ public sealed class GetThesisEvaluabilityTool(
     [Description(
         "Reports, per thesis, how many invalidation triggers are actually evaluable versus rejected for an "
         + "unsupported metric or missing direction/period scaffolding. Use this to find a thesis that appears "
-        + "monitored but whose falsifiers never run.")]
+        + "monitored but whose falsifiers never run. A thesis's narrativeFalsifiers are listed beside the "
+        + "triggers as 'model-checked, not monitored': no job evaluates them, and they do not count toward coverage.")]
     public async Task<IReadOnlyList<ThesisEvaluabilityReport>?> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {

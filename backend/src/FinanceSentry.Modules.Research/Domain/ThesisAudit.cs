@@ -18,7 +18,9 @@ public sealed record ThesisVersion(
     decimal? EntryPrice,
     IReadOnlyList<ThesisDataPoint> KeyDataPoints,
     IReadOnlyList<ThesisCatalyst> Catalysts,
-    IReadOnlyList<ThesisInvalidationTrigger> InvalidationTriggers)
+    IReadOnlyList<ThesisInvalidationTrigger> InvalidationTriggers,
+    // Null in an audit written before narrative falsifiers existed; those theses had none.
+    IReadOnlyList<string>? NarrativeFalsifiers = null)
 {
     public static ThesisVersion Of(InvestmentThesis thesis) => new(
         thesis.Ticker,
@@ -26,7 +28,8 @@ public sealed record ThesisVersion(
         thesis.EntryPrice,
         thesis.KeyDataPoints.ToList(),
         thesis.Catalysts.ToList(),
-        thesis.InvalidationTriggers.ToList());
+        thesis.InvalidationTriggers.ToList(),
+        thesis.NarrativeFalsifiers.ToList());
 
     /// <summary>Structural equality (the lists compare by element), which the record's own equality does not give.</summary>
     public bool SameContentAs(ThesisVersion other) =>
@@ -35,7 +38,8 @@ public sealed record ThesisVersion(
         && EntryPrice == other.EntryPrice
         && KeyDataPoints.SequenceEqual(other.KeyDataPoints)
         && Catalysts.SequenceEqual(other.Catalysts)
-        && InvalidationTriggers.SequenceEqual(other.InvalidationTriggers);
+        && InvalidationTriggers.SequenceEqual(other.InvalidationTriggers)
+        && (NarrativeFalsifiers ?? []).SequenceEqual(other.NarrativeFalsifiers ?? []);
 
     public void ApplyTo(InvestmentThesis thesis)
     {
@@ -45,6 +49,7 @@ public sealed record ThesisVersion(
         thesis.KeyDataPoints = KeyDataPoints.ToList();
         thesis.Catalysts = Catalysts.ToList();
         thesis.InvalidationTriggers = InvalidationTriggers.ToList();
+        thesis.NarrativeFalsifiers = (NarrativeFalsifiers ?? []).ToList();
     }
 }
 

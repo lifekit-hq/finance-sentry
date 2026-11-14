@@ -130,6 +130,17 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasConversion(
                 v => JsonSerializer.Serialize(v, jsonOptions),
                 v => JsonSerializer.Deserialize<List<ThesisInvalidationTrigger>>(v, jsonOptions) ?? new());
+        // Free-text kill-switches (P7). Additive column: a row written before it reads back as [].
+        tb.Property(x => x.NarrativeFalsifiers)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
+            .HasDefaultValueSql("'[]'::jsonb")
+            .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                (a, b) => a!.SequenceEqual(b!),
+                v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
+                v => v.ToList()));
         // The monitor's last-run coverage (#1375): a small JSON document, nullable for every thesis
         // that has not been monitored since the column was added.
         tb.Property(x => x.MonitorSnapshot)

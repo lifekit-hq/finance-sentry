@@ -15,4 +15,6 @@ public record ThesisDto(
     string? BrokenReason,
     decimal? EntryPrice = null,
     // Who made the last write: "User" (the owner's session) or "Ledger" (its service token).
-    string Origin = "User");
+    string Origin = "User",
+    // Free-text kill-switches outside the metric vocabulary; model-checked on each review, never monitored.
+    IReadOnlyList<string>? NarrativeFalsifiers = null);

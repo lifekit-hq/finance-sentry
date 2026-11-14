@@ -58,7 +58,8 @@ public class ThesesController(
                 body.ThesisText,
                 body.KeyDataPoints ?? [],
                 body.Catalysts ?? [],
-                body.InvalidationTriggers ?? []),
+                body.InvalidationTriggers ?? [],
+                NarrativeFalsifiers: body.NarrativeFalsifiers),
             ct);
         return Ok(saved);
     }
@@ -82,4 +83,5 @@ public record SaveThesisRequest(
     string ThesisText,
     IReadOnlyList<ThesisDataPoint>? KeyDataPoints,
     IReadOnlyList<ThesisCatalyst>? Catalysts,
-    IReadOnlyList<ThesisInvalidationTrigger>? InvalidationTriggers);
+    IReadOnlyList<ThesisInvalidationTrigger>? InvalidationTriggers,
+    IReadOnlyList<string>? NarrativeFalsifiers = null);

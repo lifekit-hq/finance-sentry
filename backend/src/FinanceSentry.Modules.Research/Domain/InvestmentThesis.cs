@@ -15,6 +15,9 @@ public class InvestmentThesis : IHasUpdatedAt, IUserOwned
     public List<ThesisDataPoint> KeyDataPoints { get; set; } = [];
     public List<ThesisCatalyst> Catalysts { get; set; } = [];
     public List<ThesisInvalidationTrigger> InvalidationTriggers { get; set; } = [];
+    // Kill-switches no metric can express (a customer loss, a regulatory ruling). Free text, outside the closed
+    // trigger vocabulary: the monitor never evaluates them, Ledger checks them against the news on each review.
+    public List<string> NarrativeFalsifiers { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? BrokenAt { get; set; }

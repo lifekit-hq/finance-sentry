@@ -718,6 +718,12 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<string>("MonitorSnapshot")
                         .HasColumnType("jsonb");
 
+                    b.Property<string>("NarrativeFalsifiers")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<string>("ThesisText")
                         .IsRequired()
                         .HasMaxLength(4000)

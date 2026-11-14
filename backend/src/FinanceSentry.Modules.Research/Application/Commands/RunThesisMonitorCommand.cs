@@ -271,7 +271,8 @@ public class RunThesisMonitorCommandHandler(
                     ReviewSubjectKind.Thesis, thesis.Id, thesis.Ticker, source,
                     brokenAt.UtcDateTime.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture),
                     [$"thesis:{thesis.Id}", $"break:{brokenAt.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}"],
-                    Truncate($"{thesis.Ticker}: {what}", MaxAlertSummaryLength)),
+                    Truncate($"{thesis.Ticker}: {what}", MaxAlertSummaryLength),
+                    thesis.NarrativeFalsifiers),
                 ct),
             thesis.UserId, $"review-due-{source}", ct);
 
