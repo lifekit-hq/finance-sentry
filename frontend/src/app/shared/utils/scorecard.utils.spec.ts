@@ -447,3 +447,114 @@ describe('ScorecardUtils.humanize', () => {
     expect(ScorecardUtils.humanize('Extended')).toBe('Extended');
   });
 });
+
+describe('ScorecardUtils.lookThrough', () => {
+  it('is null for a name that is not an ETF', () => {
+    expect(ScorecardUtils.lookThrough(card)).toBeNull();
+    expect(ScorecardUtils.lookThrough(ScorecardFixtures.etf({lookThrough: null}))).toBeNull();
+  });
+
+  it('reads the share against the bar, the source and each holding with its word', () => {
+    const view = ScorecardUtils.lookThrough(ScorecardFixtures.etf());
+
+    expect(view?.headline).toBe(
+      '60% of the top-10 weight reads BUY or better · BUY needs more than 50%'
+    );
+    expect(view?.sourceLine).toBe('Yahoo Finance · the top 10 cover 100% of the fund');
+    expect(view?.degraded).toBe(false);
+    expect(view?.note).toBeNull();
+    expect(view?.holdings).toHaveLength(10);
+    expect(view?.holdings[0]).toEqual({
+      label: 'H1',
+      name: 'Holding 1',
+      weight: '10%',
+      word: 'Buy',
+      scored: true,
+    });
+    expect(view?.holdings[9].word).toBe('Wait');
+  });
+
+  it('names the issuer file as the source when Yahoo listed none', () => {
+    const view = ScorecardUtils.lookThrough(
+      ScorecardFixtures.etf({lookThrough: ScorecardFixtures.lookThrough({source: 'issuer'})})
+    );
+
+    expect(view?.sourceLine).toContain('Issuer holdings file');
+  });
+
+  it('marks a partial look-through degraded and shows a holding that could not be scored as NOT SCORED', () => {
+    const base = ScorecardFixtures.lookThrough();
+    const lookThrough = ScorecardFixtures.lookThrough({
+      status: 'partial',
+      note: '1 of 10 listed holdings could not be scored and count against the fund.',
+      holdings: [{...base.holdings[0], word: null, firedRuleId: null}, ...base.holdings.slice(1)],
+    });
+
+    const view = ScorecardUtils.lookThrough(ScorecardFixtures.etf({lookThrough}));
+
+    expect(view?.degraded).toBe(true);
+    expect(view?.note).toBe(
+      '1 of 10 listed holdings could not be scored and count against the fund.'
+    );
+    expect(view?.holdings[0]).toMatchObject({word: 'NotScored', scored: false});
+  });
+
+  it('says the look-through was not applied when no holdings were found', () => {
+    const lookThrough = ScorecardFixtures.lookThrough({
+      status: 'unavailable',
+      source: null,
+      asOf: null,
+      coveredWeightPct: 0,
+      buyWeightPct: 0,
+      buyWeightSharePct: null,
+      holdings: [],
+      note: 'Holdings for this fund could not be read from Yahoo or an issuer file.',
+    });
+
+    const view = ScorecardUtils.lookThrough(ScorecardFixtures.etf({lookThrough}));
+
+    expect(view?.headline).toBe('No holdings found: the look-through was not applied.');
+    expect(view?.sourceLine).toBeNull();
+    expect(view?.degraded).toBe(true);
+    expect(view?.holdings).toEqual([]);
+  });
+
+  it('labels a line without a symbol by its name, and one with neither as unlisted', () => {
+    const base = ScorecardFixtures.lookThrough();
+    const lookThrough = ScorecardFixtures.lookThrough({
+      holdings: [
+        {symbol: null, name: 'Cash', weightPct: 5.25, word: null, firedRuleId: null},
+        {symbol: null, name: null, weightPct: 4, word: null, firedRuleId: null},
+        ...base.holdings.slice(2),
+      ],
+    });
+
+    const view = ScorecardUtils.lookThrough(ScorecardFixtures.etf({lookThrough}));
+
+    expect(view?.holdings[0]).toMatchObject({label: 'Cash', name: null, weight: '5.3%'});
+    expect(view?.holdings[1].label).toBe('Unlisted line');
+  });
+});
+
+describe('ScorecardUtils.rules for an ETF', () => {
+  it('words a look-through condition against the share of top-10 weight', () => {
+    const rule = ScorecardUtils.rules(ScorecardFixtures.etf().verdict).find(
+      r => r.id === 'etf_buy'
+    );
+
+    expect(rule?.conditions.map(c => c.text)).toEqual([
+      'Adjusted structure ≥ 50',
+      'Crowding is not Extended',
+      'Top-10 weight reading BUY or better > 50%',
+    ]);
+    expect(rule?.conditions[2].actual).toBe('60%');
+  });
+
+  it('words a missing look-through as an explicit rule', () => {
+    const rule = ScorecardUtils.rules(ScorecardFixtures.etf().verdict).find(
+      r => r.id === 'etf_no_data'
+    );
+
+    expect(rule?.conditions[1].text).toBe('Look-through is missing');
+  });
+});

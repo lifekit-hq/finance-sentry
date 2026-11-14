@@ -2,8 +2,8 @@ import {type Nullable} from '@lifekit-hq/ui';
 /** The verdict vocabulary (spec 726 OQ-3); `NotScored` is the non-verdict. */
 export type VerdictWord = 'StrongBuy' | 'Buy' | 'Wait' | 'Avoid' | 'NotScored';
 
-/** The scorecard axis a verdict condition reads. */
-export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation' | 'Growth';
+/** The scorecard axis a verdict condition reads; `LookThrough` is the ETF table's share of top-10 weight reading BUY or better. */
+export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation' | 'Growth' | 'LookThrough';
 
 /** The yardstick the valuation conditions read: the P/E against its own history, or the forward P/E against peers. */
 export type VerdictPriceLens = 'own_history' | 'peers';
@@ -137,6 +137,39 @@ export interface ScorecardValuationAxis {
   priceLens?: Nullable<VerdictPriceLens>;
 }
 
+/** How much of an ETF's top-10 look-through could be read: every holding scored, some not, or no holdings found. */
+export type LookThroughStatus = 'complete' | 'partial' | 'unavailable';
+
+/** Where the holdings came from: Yahoo `topHoldings`, or the issuer's published holdings file. */
+export type LookThroughSource = 'yahoo' | 'issuer';
+
+/** One top holding of an ETF with the word the single-name rules gave it; `word` is null when it could not be scored. */
+export interface LookThroughHoldingDto {
+  symbol: Nullable<string>;
+  name: Nullable<string>;
+  /** Percent of the fund (7.7 = 7.7%). */
+  weightPct: number;
+  word: Nullable<VerdictWord>;
+  firedRuleId: Nullable<string>;
+}
+
+/**
+ * The basis of an ETF verdict (issue #1324): the fund's top holdings, each scored by the single-name rules, and the
+ * share of their weight reading BUY or better. Weights and shares are percents. `unavailable` means no holdings were
+ * found, so the look-through was not applied and the word cannot reach BUY; `note` says what is missing in words.
+ */
+export interface ScorecardLookThroughDto {
+  status: LookThroughStatus;
+  source: Nullable<LookThroughSource>;
+  asOf: Nullable<string>;
+  coveredWeightPct: number;
+  buyWeightPct: number;
+  buyWeightSharePct: Nullable<number>;
+  buyWeightSharePctRequired: number;
+  holdings: LookThroughHoldingDto[];
+  note: Nullable<string>;
+}
+
 /**
  * One symbol's four axes and the verdict word they map to (spec 726 US2). There is no composite
  * number: the axes stay separate and the word comes from a published rule table.
@@ -150,6 +183,8 @@ export interface ScorecardDto {
   crowding: ScorecardCrowdingAxis;
   valuation: ScorecardValuationAxis;
   verdict: VerdictDto;
+  /** Set for an ETF only: the top holdings its word was read through. Absent from older API builds. */
+  lookThrough?: Nullable<ScorecardLookThroughDto>;
 }
 
 /** One fact behind an axis, already formatted for display. */
@@ -187,4 +222,22 @@ export interface VerdictRuleView {
   matched: boolean;
   fired: boolean;
   conditions: VerdictConditionView[];
+}
+
+/** One look-through holding as the basis shows it. */
+export interface LookThroughHoldingView {
+  label: string;
+  name: Nullable<string>;
+  weight: string;
+  word: VerdictWord;
+  scored: boolean;
+}
+
+/** An ETF's look-through basis as the drill-down shows it; `degraded` when it is not the full top 10 read. */
+export interface LookThroughView {
+  headline: string;
+  sourceLine: Nullable<string>;
+  degraded: boolean;
+  note: Nullable<string>;
+  holdings: LookThroughHoldingView[];
 }

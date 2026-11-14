@@ -11,15 +11,17 @@ import {
 } from '../../constants/scorecard/scorecard.constants';
 import {type ScorecardDto} from '../../models/scorecard/scorecard.model';
 import {ScorecardUtils} from '../../utils/scorecard.utils';
+import {LookThroughComponent} from '../look-through/look-through.component';
 
 /**
  * A scorecard's verdict word (spec 726 US2) and its drill-down: the four axes with the facts behind
  * each, and the whole ordered rule table with the rule that fired, every condition's threshold and the
- * value it read. The word is a research verdict, never an order: nothing here places a trade.
+ * value it read. For an ETF it also shows the look-through basis (issue #1324) beside the word. The word is a
+ * research verdict, never an order: nothing here places a trade.
  */
 @Component({
   selector: 'fns-scorecard-verdict',
-  imports: [TagComponent],
+  imports: [LookThroughComponent, TagComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block'},
   templateUrl: './scorecard-verdict.component.html',

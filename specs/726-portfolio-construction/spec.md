@@ -151,6 +151,29 @@ Rules 1 to 4 as above (price lens = the trailing P/E premium only); 5 `structure
 
 </details>
 
+### ETF rule table v1 (look-through, issue #1324)
+
+A non-equity that Yahoo types as an ETF is not `outside_universe`: it is read through its top 10 holdings. Each
+holding is scored by the single-name table above (a holding that is itself a fund, has no symbol, or cannot be
+scored counts as not BUY), and the fund takes its word from this small table (`Verdict` section: the fund's
+structure bars reuse `AvoidStructureBelow` / `BuyStructureAtLeast`; `EtfBuyWeightSharePctAbove` and
+`EtfRulesVersion` are its own). The share is the weight of holdings reading BUY or better over the whole listed
+top-10 weight. First match fires; there is no STRONG BUY rule, so an ETF word is capped at BUY in v1.
+
+| # | Rule id | Word | Fires when |
+|---|---|---|---|
+| 1 | `etf_no_data` | NOT SCORED | the fund's structure and the look-through are both missing |
+| 2 | `etf_weak_structure` | AVOID | the fund's structure < 30 |
+| 3 | `etf_structure_missing` | WAIT | the fund's structure is missing |
+| 4 | `etf_buy` | BUY | the fund's structure ≥ 50, crowding known and not `Extended`, and more than 50% of the top-10 weight reads BUY or better |
+| 5 | `etf_otherwise` | WAIT | no earlier rule matched |
+
+Holdings come from Yahoo `topHoldings`, then the issuer's holdings CSV mapped per fund in `FundHoldings:IssuerFiles`
+(nothing mapped by default), cached for a day. The scorecard carries the basis (`lookThrough`: source, read time,
+covered weight, the share against its bar, each holding with its word). When holdings are missing the basis says
+so (`unavailable`, or `partial` when some holding could not be scored): the word cannot reach BUY, though AVOID on
+the fund's own structure still applies. A symbol the source cannot type at all keeps `outside_universe`.
+
 ## Context
 
 Finance Sentry already judges single names and critiques an existing book:
@@ -323,8 +346,8 @@ missing names, the over- or under-weight on the held ones, and the cash differen
   construction.
 - **Fundamentals null on a name otherwise strong**: the rule table decides. The default rule caps the
   verdict one step below the top word, so a missing axis is never read as a passing one.
-- **Valuation not applicable** (crypto, a fund): the name is outside the v1 universe, which is single
-  equities only.
+- **Valuation not applicable** (crypto, a non-ETF fund): the name is outside the v1 universe, which is single
+  equities only. An ETF is the exception: it is read through its top 10 holdings (ETF rule table above).
 - **Stale score or stale quote**: the stale marker shows. A name staler than the construction window is
   ineligible for construction but still listed on the screen.
 - **Scoring failed for one name**: the row shows the failure reason. The rest of the universe and the

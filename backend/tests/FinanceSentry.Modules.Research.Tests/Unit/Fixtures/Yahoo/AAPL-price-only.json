@@ -1,0 +1,16 @@
+{
+  "quoteSummary": {
+    "result": [
+      {
+        "price": {
+          "quoteType": "EQUITY",
+          "symbol": "AAPL",
+          "shortName": "Apple Inc.",
+          "longName": "Apple Inc.",
+          "currency": "USD"
+        }
+      }
+    ],
+    "error": null
+  }
+}

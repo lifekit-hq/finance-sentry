@@ -42,6 +42,11 @@ public static class VerdictReasons
 
     public static VerdictExplanation Explain(Verdict verdict)
     {
+        if (EtfVerdictRules.Reads(verdict))
+        {
+            return ExplainEtf(verdict);
+        }
+
         if (verdict.FiredRuleId == VerdictRules.OutsideUniverse)
         {
             return new VerdictExplanation(
@@ -65,6 +70,95 @@ public static class VerdictReasons
         var turnsBuy = verdict.Word is VerdictWord.Wait or VerdictWord.Avoid ? TurnsBuyWhen(bars) : null;
         return new VerdictExplanation(reasons, turnsBuy);
     }
+
+    /// <summary>
+    /// The reasons for an ETF word (issue #1324): the fund's own structure and crowding, and the look-through, one
+    /// sentence each, every number and bar lifted from the ETF rule table.
+    /// </summary>
+    private static VerdictExplanation ExplainEtf(Verdict verdict)
+    {
+        var fired = verdict.Rules.First(r => r.Id == verdict.FiredRuleId);
+        var avoidBelow = Int(EtfCondition(verdict, EtfVerdictRules.WeakStructure, VerdictAxis.Structure).Threshold) ?? 0;
+        var buyStructure = EtfCondition(verdict, EtfVerdictRules.Buy, VerdictAxis.Structure);
+        var buyBar = Int(buyStructure.Threshold) ?? 0;
+        var structure = Int(buyStructure.Actual);
+        var crowding = EtfCondition(verdict, EtfVerdictRules.Buy, VerdictAxis.Crowding).Actual;
+        var lookThrough = EtfCondition(verdict, EtfVerdictRules.Buy, VerdictAxis.LookThrough);
+        var share = Dec(lookThrough.Actual);
+        var shareBar = Dec(lookThrough.Threshold) ?? 0m;
+        var failedBuyBar = fired.Id == EtfVerdictRules.Otherwise;
+
+        var (structureStatus, structureText) = structure switch
+        {
+            null => (VerdictReasonStatus.Missing, "Fund structure: no score could be read, so no word above WAIT is possible."),
+            { } s when s < avoidBelow => (VerdictReasonStatus.Fail, $"Fund structure {s} is below the AVOID line of {avoidBelow}."),
+            { } s when s < buyBar => (VerdictReasonStatus.Fail, $"Fund structure {s} is below the BUY bar of {buyBar}."),
+            { } s => (VerdictReasonStatus.Pass, $"Fund structure {s} clears the BUY bar of {buyBar}."),
+        };
+        var (crowdingStatus, crowdingText) = crowding switch
+        {
+            null => (VerdictReasonStatus.Missing, "Fund crowding: no extension data to classify, so BUY is out of reach."),
+            nameof(Opportunity.CrowdingClass.Extended) => (VerdictReasonStatus.Fail, "Fund crowding is Extended: BUY needs it not Extended."),
+            var c => (VerdictReasonStatus.Pass, $"Fund crowding is {c}, not Extended."),
+        };
+        var (lookStatus, lookText) = share switch
+        {
+            null => (VerdictReasonStatus.Missing,
+                "Look-through: the fund's top holdings could not be read, so BUY is out of reach."),
+            { } p when p <= shareBar => (VerdictReasonStatus.Fail,
+                $"{Plain(p)}% of the top-10 weight reads BUY or better; BUY needs more than {Plain(shareBar)}%."),
+            { } p => (VerdictReasonStatus.Pass,
+                $"{Plain(p)}% of the top-10 weight reads BUY or better, above the {Plain(shareBar)}% BUY needs."),
+        };
+
+        var reasons = new[]
+        {
+            new VerdictReason(nameof(VerdictAxis.Structure), structureStatus, structureText,
+                Decisive(fired, VerdictAxis.Structure, failedBuyBar && structureStatus == VerdictReasonStatus.Fail)),
+            new VerdictReason(nameof(VerdictAxis.Crowding), crowdingStatus, crowdingText,
+                Decisive(fired, VerdictAxis.Crowding, failedBuyBar && crowdingStatus != VerdictReasonStatus.Pass)),
+            new VerdictReason(nameof(VerdictAxis.LookThrough), lookStatus, lookText,
+                Decisive(fired, VerdictAxis.LookThrough, failedBuyBar && lookStatus != VerdictReasonStatus.Pass)),
+        };
+
+        var needs = new List<string>();
+        if (structure is null)
+        {
+            needs.Add($"a structure score for the fund can be read and reaches {buyBar}");
+        }
+        else if (structure < buyBar)
+        {
+            needs.Add($"the fund's structure reaches {buyBar} (reads {structure})");
+        }
+
+        if (crowding == nameof(Opportunity.CrowdingClass.Extended))
+        {
+            needs.Add("the fund's crowding is no longer Extended");
+        }
+
+        if (share is null)
+        {
+            needs.Add($"the fund's top holdings can be read and more than {Plain(shareBar)}% of their weight reads BUY or better");
+        }
+        else if (share <= shareBar)
+        {
+            needs.Add($"more than {Plain(shareBar)}% of the top-10 weight reads BUY or better (reads {Plain(share.Value)}%)");
+        }
+
+        var turnsBuy = verdict.Word is VerdictWord.Wait or VerdictWord.Avoid && needs.Count > 0
+            ? string.Join(" and ", needs)
+            : null;
+        return new VerdictExplanation(reasons, turnsBuy);
+    }
+
+    private static VerdictCondition EtfCondition(Verdict verdict, string ruleId, VerdictAxis axis) =>
+        verdict.Rules.First(r => r.Id == ruleId).Conditions.First(c => c.Axis == axis);
+
+    private static int? Int(string? text) =>
+        int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    private static decimal? Dec(string? text) =>
+        decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : null;
 
     private static bool Decisive(VerdictRuleOutcome fired, VerdictAxis axis, bool extra) =>
         extra || fired.Conditions.Any(c => c.Axis == axis);

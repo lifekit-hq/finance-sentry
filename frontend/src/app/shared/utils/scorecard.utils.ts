@@ -1,6 +1,9 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {
+  LOOK_THROUGH_SOURCE_LABEL,
+  LOOK_THROUGH_UNAVAILABLE,
+  LOOK_THROUGH_UNLISTED,
   SCORECARD_MISSING,
   SCORECARD_NOT_APPLICABLE,
   SCORECARD_NOT_SCORED,
@@ -16,11 +19,15 @@ import {
   VERDICT_TURNS_BUY_PREFIX,
 } from '../constants/scorecard/scorecard.constants';
 import {
+  type LookThroughHoldingDto,
+  type LookThroughHoldingView,
+  type LookThroughView,
   type ScorecardAxisView,
   type ScorecardCrowdingAxis,
   type ScorecardDto,
   type ScorecardFact,
   type ScorecardFundamentalsAxis,
+  type ScorecardLookThroughDto,
   type ScorecardStructureAxis,
   type ScorecardValuationAxis,
   type VerdictConditionDto,
@@ -54,6 +61,25 @@ export class ScorecardUtils {
       ScorecardUtils.crowding(card.crowding),
       ScorecardUtils.valuation(card.valuation),
     ];
+  }
+
+  /**
+   * An ETF's look-through basis (issue #1324): the share of top-10 weight reading BUY or better against the bar, where the
+   * holdings came from, and each holding with its own word. Null for every other name. `degraded` marks a basis that is
+   * not the full top 10 read (some holding unscored, fewer than ten listed, or none found), with the backend's `note`.
+   */
+  public static lookThrough(card: ScorecardDto): Nullable<LookThroughView> {
+    const basis = card.lookThrough;
+    if (!basis) {
+      return null;
+    }
+    return {
+      headline: ScorecardUtils.lookThroughHeadline(basis),
+      sourceLine: ScorecardUtils.lookThroughSource(basis),
+      degraded: basis.status !== 'complete',
+      note: basis.note,
+      holdings: basis.holdings.map(ScorecardUtils.lookThroughHolding),
+    };
   }
 
   /** The whole ordered rule table, each condition in words with the value it read. */
@@ -103,6 +129,40 @@ export class ScorecardUtils {
   /** A snake_case reason code as words: "no_regime_data" → "no regime data". */
   public static humanize(code: string): string {
     return code.replaceAll('_', ' ');
+  }
+
+  private static lookThroughHeadline(basis: ScorecardLookThroughDto): string {
+    if (basis.buyWeightSharePct === null) {
+      return LOOK_THROUGH_UNAVAILABLE;
+    }
+    return (
+      `${ScorecardUtils.percentOfFund(basis.buyWeightSharePct)} of the top-10 weight reads BUY or better · ` +
+      `BUY needs more than ${ScorecardUtils.percentOfFund(basis.buyWeightSharePctRequired)}`
+    );
+  }
+
+  private static lookThroughSource(basis: ScorecardLookThroughDto): Nullable<string> {
+    if (basis.source === null || basis.holdings.length === 0) {
+      return null;
+    }
+    return (
+      `${LOOK_THROUGH_SOURCE_LABEL[basis.source]} · the top ${basis.holdings.length} ` +
+      `cover ${ScorecardUtils.percentOfFund(basis.coveredWeightPct)} of the fund`
+    );
+  }
+
+  private static lookThroughHolding(holding: LookThroughHoldingDto): LookThroughHoldingView {
+    return {
+      label: holding.symbol ?? holding.name ?? LOOK_THROUGH_UNLISTED,
+      name: holding.symbol === null ? null : holding.name,
+      weight: ScorecardUtils.percentOfFund(holding.weightPct),
+      word: holding.word ?? 'NotScored',
+      scored: holding.word !== null && holding.word !== 'NotScored',
+    };
+  }
+
+  private static percentOfFund(percent: number): string {
+    return `${Number.isInteger(percent) ? percent : percent.toFixed(PERCENT_DIGITS)}%`;
   }
 
   private static condition(

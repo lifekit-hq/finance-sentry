@@ -1,0 +1,109 @@
+{
+  "quoteSummary": {
+    "result": [
+      {
+        "price": {
+          "quoteType": "ETF",
+          "symbol": "SPY",
+          "shortName": "State Street SPDR S&P 500 ETF T",
+          "longName": "State Street SPDR S&P 500 ETF Trust",
+          "currency": "USD"
+        },
+        "topHoldings": {
+          "maxAge": 1,
+          "cashPosition": {
+            "raw": 0.00059999997,
+            "fmt": "0.06%"
+          },
+          "stockPosition": {
+            "raw": 0.9994,
+            "fmt": "99.94%"
+          },
+          "holdings": [
+            {
+              "symbol": "AAPL",
+              "holdingName": "Apple Inc",
+              "holdingPercent": {
+                "raw": 0.0770069,
+                "fmt": "7.70%"
+              }
+            },
+            {
+              "symbol": "NVDA",
+              "holdingName": "NVIDIA Corp",
+              "holdingPercent": {
+                "raw": 0.0758232,
+                "fmt": "7.58%"
+              }
+            },
+            {
+              "symbol": "MSFT",
+              "holdingName": "Microsoft Corp",
+              "holdingPercent": {
+                "raw": 0.0593322,
+                "fmt": "5.93%"
+              }
+            },
+            {
+              "symbol": "AMZN",
+              "holdingName": "Amazon.com Inc",
+              "holdingPercent": {
+                "raw": 0.0361188,
+                "fmt": "3.61%"
+              }
+            },
+            {
+              "symbol": "GOOGL",
+              "holdingName": "Alphabet Inc Class A",
+              "holdingPercent": {
+                "raw": 0.0251408,
+                "fmt": "2.51%"
+              }
+            },
+            {
+              "symbol": "AVGO",
+              "holdingName": "Broadcom Inc",
+              "holdingPercent": {
+                "raw": 0.0237518,
+                "fmt": "2.38%"
+              }
+            },
+            {
+              "symbol": "META",
+              "holdingName": "Meta Platforms Inc Class A",
+              "holdingPercent": {
+                "raw": 0.020762898,
+                "fmt": "2.08%"
+              }
+            },
+            {
+              "symbol": "GOOG",
+              "holdingName": "Alphabet Inc Class C",
+              "holdingPercent": {
+                "raw": 0.020247199,
+                "fmt": "2.02%"
+              }
+            },
+            {
+              "symbol": "LLY",
+              "holdingName": "Eli Lilly and Co",
+              "holdingPercent": {
+                "raw": 0.0173671,
+                "fmt": "1.74%"
+              }
+            },
+            {
+              "symbol": "TSLA",
+              "holdingName": "Tesla Inc",
+              "holdingPercent": {
+                "raw": 0.017252099,
+                "fmt": "1.73%"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

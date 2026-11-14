@@ -48,4 +48,16 @@ public sealed class VerdictOptions
     /// lens is missing, never a median of one or two names.
     /// </summary>
     public int MinPeersForPriceLens { get; set; } = 3;
+
+    /// <summary>
+    /// Version of the ETF rule table (<c>EtfVerdictRules</c>), carried on an ETF verdict. The ETF table reads
+    /// <see cref="AvoidStructureBelow"/> and <see cref="BuyStructureAtLeast"/> for the fund's own structure.
+    /// </summary>
+    public int EtfRulesVersion { get; set; } = 1;
+
+    /// <summary>
+    /// More than this share (percent) of an ETF's top-10 weight must read BUY or better for the fund to read BUY
+    /// ("most of the top-10 weight").
+    /// </summary>
+    public decimal EtfBuyWeightSharePctAbove { get; set; } = 50m;
 }
