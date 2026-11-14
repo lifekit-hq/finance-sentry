@@ -130,8 +130,8 @@
   root.setAttribute('data-theme', theme);
   try {
     var preset = localStorage.getItem('cmn-preset');
-    if (preset && preset !== 'carbon' && /^[a-z][a-z0-9-]*$/.test(preset))
-      root.setAttribute('data-preset', preset);
+    if (preset === 'carbon') root.removeAttribute('data-preset');
+    else if (preset && /^[a-z][a-z0-9-]*$/.test(preset)) root.setAttribute('data-preset', preset);
   } catch (e) {}
   try {
     var seed = JSON.parse(localStorage.getItem('cmn-theme-seed'));

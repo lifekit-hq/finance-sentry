@@ -260,7 +260,7 @@
                   @if (size.capMarkPct !== null) {
                     <span
                       [style.left.%]="size.capMarkPct"
-                      class="absolute -inset-y-1 w-0.5 bg-text-primary"
+                      class="absolute -inset-y-cmn-1 w-0.5 bg-text-primary"
                       data-testid="size-cap-mark"
                     ></span>
                   }
@@ -510,7 +510,7 @@
               <aside class="lg:sticky lg:top-[4.5rem] lg:order-last">
                 <cmn-card
                   [id]="sectionId.checks"
-                  class="block scroll-mt-20"
+                  class="block scroll-mt-cmn-16"
                   data-testid="dossier-checks"
                 >
                   <div class="flex items-baseline justify-between gap-cmn-3">
@@ -578,7 +578,7 @@
                             <li class="flex items-start gap-cmn-2 text-cmn-sm">
                               <span
                                 [class]="ruleTickClass[rule.state]"
-                                class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                                class="mt-cmn-2 h-2 w-2 shrink-0 rounded-full"
                               ></span>
                               <div class="min-w-0">
                                 <p class="text-text-primary">
@@ -611,7 +611,11 @@
           <div class="space-y-cmn-5 lg:col-span-2">
             <!-- How has it moved? 1Y by default, the S&P 500 rebased onto its first close, the user's fills and average cost. -->
             @if (dossier.performance) {
-              <cmn-card [id]="sectionId.chart" class="block scroll-mt-20" data-testid="price-chart">
+              <cmn-card
+                [id]="sectionId.chart"
+                class="block scroll-mt-cmn-16"
+                data-testid="price-chart"
+              >
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -724,7 +728,11 @@
 
             <!-- Where did the return come from? Held only; legs the ledger cannot state say so. -->
             @if (store.returnsView(); as returns) {
-              <cmn-card [id]="sectionId.returns" class="block scroll-mt-20" data-testid="returns">
+              <cmn-card
+                [id]="sectionId.returns"
+                class="block scroll-mt-cmn-16"
+                data-testid="returns"
+              >
                 <div class="flex items-baseline justify-between gap-cmn-3">
                   <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                     Where did the return come from?
@@ -774,7 +782,7 @@
             @if (store.hasValuationCard()) {
               <cmn-card
                 [id]="sectionId.valuation"
-                class="block scroll-mt-20"
+                class="block scroll-mt-cmn-16"
                 data-testid="valuation"
               >
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
@@ -829,7 +837,7 @@
                           "
                           [style.left.%]="marker.leftPct"
                           [attr.data-testid]="'target-marker-' + marker.key"
-                          class="absolute -top-4 h-5 w-0.5 -translate-x-1/2"
+                          class="absolute -top-cmn-4 h-5 w-0.5 -translate-x-1/2"
                         ></span>
                       }
                     </div>
@@ -1037,7 +1045,7 @@
 
             <!-- What do analysts say? -->
             @if (store.hasAnalysts() && dossier.analysts; as analysts) {
-              <cmn-card [id]="sectionId.analysts" class="block scroll-mt-20">
+              <cmn-card [id]="sectionId.analysts" class="block scroll-mt-cmn-16">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1121,7 +1129,7 @@
                             }}</span>
                           }
                           <span
-                            class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
+                            class="rounded-md bg-surface-raised px-cmn-2 py-cmn-0.5 text-cmn-xs text-text-secondary"
                           >
                             {{ action.actionType | analystActionLabel }}
                           </span>
@@ -1148,7 +1156,7 @@
 
             <!-- What's the plan? The investment thesis. -->
             @if (dossier.thesis; as thesis) {
-              <cmn-card [id]="sectionId.thesis" class="block scroll-mt-20">
+              <cmn-card [id]="sectionId.thesis" class="block scroll-mt-cmn-16">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1224,7 +1232,7 @@
 
             <!-- What's next? -->
             @if (dossier.nextEarnings; as earnings) {
-              <cmn-card [id]="sectionId.earnings" class="block scroll-mt-20">
+              <cmn-card [id]="sectionId.earnings" class="block scroll-mt-cmn-16">
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                   What's next?
                 </h2>
@@ -1245,7 +1253,7 @@
               @if (moves.moves.length > 0) {
                 <cmn-card
                   [id]="sectionId.moves"
-                  class="block scroll-mt-20"
+                  class="block scroll-mt-cmn-16"
                   data-testid="notable-moves"
                 >
                   <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1328,7 +1336,7 @@
 
             <!-- Recent News -->
             @if (dossier.recentNews.length > 0) {
-              <cmn-card [id]="sectionId.news" class="block scroll-mt-20">
+              <cmn-card [id]="sectionId.news" class="block scroll-mt-cmn-16">
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                   Recent News
                 </h2>
@@ -1355,7 +1363,7 @@
 
             <!-- Radar Signals -->
             @if (dossier.radarSignals.length > 0) {
-              <cmn-card [id]="sectionId.signals" class="block scroll-mt-20">
+              <cmn-card [id]="sectionId.signals" class="block scroll-mt-cmn-16">
                 <div class="flex items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1423,7 +1431,7 @@
             @if (!store.isCrypto()) {
               <cmn-card
                 [id]="sectionId.ownership"
-                class="block scroll-mt-20"
+                class="block scroll-mt-cmn-16"
                 data-testid="ownership"
               >
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -1437,7 +1445,7 @@
             <section
               [id]="sectionId.dataStatus"
               aria-labelledby="data-status-heading"
-              class="scroll-mt-20 border-t border-border-default pt-cmn-4"
+              class="scroll-mt-cmn-16 border-t border-border-default pt-cmn-4"
               data-testid="data-status"
             >
               <h2
