@@ -4,7 +4,7 @@ import {RouterOutlet} from '@angular/router';
 import {
   CmnDialogService,
   CmnPageActionsService,
-  PageContainerComponent,
+  PageComponent,
   PageScrollComponent,
 } from '@lifekit-hq/ui';
 
@@ -17,17 +17,17 @@ import {ConnectStore} from '../../store/connect/connect.store';
 // share one instance: the connect forms reload the accounts store they find above them.
 @Component({
   selector: 'fns-accounts-shell',
-  imports: [PageContainerComponent, PageScrollComponent, RouterOutlet],
+  imports: [PageComponent, PageScrollComponent, RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [AccountsStore, ConnectStore],
   template: `
-    <cmn-page-container spacing="none" fill>
+    <cmn-page kind="list" fill>
       <p class="text-cmn-sm text-text-secondary">Balances and holdings across every provider</p>
 
       <cmn-page-scroll class="mt-cmn-6" label="Accounts">
         <router-outlet />
       </cmn-page-scroll>
-    </cmn-page-container>
+    </cmn-page>
   `,
 })
 export class AccountsShellComponent {

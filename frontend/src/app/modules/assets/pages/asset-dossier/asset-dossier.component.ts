@@ -24,7 +24,7 @@ import {
   InputComponent,
   InstitutionAvatarComponent,
   LineChartComponent,
-  PageContainerComponent,
+  PageComponent,
   RelativeTimePipe,
   SegmentedComponent,
   SkeletonComponent,
@@ -94,7 +94,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   imports: [
     RecommendationCardComponent,
     RecommendationOutcomePipe,
-    PageContainerComponent,
+    PageComponent,
     AlertComponent,
     AnalystActionLabelPipe,
     AreaChartComponent,

@@ -6,10 +6,18 @@ export default createEslintConfig({
   selectorPrefix: 'fns',
   extraConfigs: [
     {
-      // lifekit-common 4.4 warns on every routed page not rooted on `cmn-page` (24 today), and lint
-      // runs with --max-warnings 0. Pages adopt the template area by area (the route list in
-      // e2e/screens/routes.ts names each page's kind), so the rule stays off until the last
-      // area has adopted it; then delete this entry and the rule is the library's warning again.
+      // Routed surfaces that are not shell pages, so `cmn-page` (title, gutter, column) does not
+      // describe them: the chat canvas fills the shell (routes.ts kind `null`), the accounts list
+      // renders inside accounts-shell's `cmn-page`, and sign-in, access-denied, MCP consent and the
+      // legal reading pages are centred cards outside the shell. Moving the signed-out screens onto
+      // `cmn-page` (kind form/detail in routes.ts) is a visual change for its own PR.
+      files: [
+        'src/app/modules/agent/pages/ledger-chat/**',
+        'src/app/modules/agent/pages/ledger-shell/**',
+        'src/app/modules/auth/pages/**',
+        'src/app/modules/bank-sync/pages/accounts-list/**',
+        'src/app/modules/legal/pages/**',
+      ],
       rules: {'lifekit/page-root': 'off'},
     },
     {

@@ -17,7 +17,7 @@ import {
   CardComponent,
   IconComponent,
   LineChartComponent,
-  PageContainerComponent,
+  PageComponent,
   SkeletonComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
@@ -63,7 +63,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
 @Component({
   selector: 'fns-dashboard',
   imports: [
-    PageContainerComponent,
+    PageComponent,
     AlertComponent,
     AllocationBarComponent,
     AreaChartComponent,
@@ -84,7 +84,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DashboardStore, provideDashboardBridgeWindow()],
   template: `
-    <cmn-page-container spacing="none">
+    <cmn-page kind="overview">
       <div>
         @if (view().offlineNotice; as notice) {
           <cmn-alert variant="info" class="mb-cmn-3 block" data-testid="offline-notice">{{
@@ -384,7 +384,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
           <fns-top-alert />
         </cmn-async-state>
       </div>
-    </cmn-page-container>
+    </cmn-page>
   `,
 })
 export class DashboardComponent {

@@ -1,4 +1,4 @@
-<cmn-page-container spacing="none" fill>
+<cmn-page kind="list" fill>
   <!-- One line is held while the figures load, so their arrival does not push the list down. -->
   <p class="mb-cmn-4 min-h-[1lh] text-cmn-sm text-text-secondary" data-testid="ledger-summary">
     @if (store.outflow(); as outflow) {
@@ -134,4 +134,4 @@
       </lk-infinite-list>
     </cmn-async-state>
   </cmn-page-scroll>
-</cmn-page-container>
+</cmn-page>
