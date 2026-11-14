@@ -22,6 +22,9 @@ public enum VerdictAxis
     Fundamentals,
     Crowding,
     Valuation,
+
+    /// <summary>Revenue growth year over year (rules v2 growth gate on STRONG BUY).</summary>
+    Growth,
 }
 
 /// <summary>
@@ -43,14 +46,50 @@ public enum VerdictOperator
 /// The axis facts the verdict reads. <see cref="StructureScore"/> is the regime-adjusted structure score
 /// (spec 726 OQ-8). <see cref="Crowding"/> is null when the crowding axis has no extension data to
 /// classify. <see cref="ValuationPremiumPct"/> is the trailing P/E's premium over its own five-year
-/// average, in percent; null when either side is missing.
+/// average, in percent; null when either side is missing. From rules v2, when that history is missing the
+/// forward P/E's premium over the peer median stands in for it: <see cref="ValuationPremiumPct"/> is then the
+/// peer premium and <see cref="PriceLens"/> names which yardstick it is. <see cref="RevenueYoyPct"/> is revenue
+/// growth year over year in percent, null when not evaluable.
 /// </summary>
 public sealed record VerdictInputs(
     int? StructureScore,
     int? FundamentalsScore,
     CrowdingClass? Crowding,
     bool ValuationNotApplicable,
-    decimal? ValuationPremiumPct);
+    decimal? ValuationPremiumPct,
+    decimal? RevenueYoyPct = null,
+    string? PriceLens = null);
+
+/// <summary>The yardsticks the price lens can read (<see cref="Verdict.PriceLens"/>).</summary>
+public static class PriceLenses
+{
+    /// <summary>The trailing P/E against the ticker's own five-year average.</summary>
+    public const string OwnHistory = "own_history";
+
+    /// <summary>The forward P/E against the median of its peers (the fallback when the own history is missing).</summary>
+    public const string Peers = "peers";
+}
+
+/// <summary>
+/// Why a WAIT waits, in a code and a short label. Every rule that returns WAIT names one, so a WAIT is never a
+/// bare word.
+/// </summary>
+public static class WaitReasons
+{
+    public const string StrongBusinessWeakTrend = "strong_business_weak_trend";
+    public const string TrendWithoutBusiness = "trend_without_business";
+    public const string NotEnoughData = "not_enough_data";
+    public const string ShortOfBuyBar = "short_of_buy_bar";
+
+    public static string? Label(string? reason) => reason switch
+    {
+        StrongBusinessWeakTrend => "Strong business, weak trend",
+        TrendWithoutBusiness => "Trend without the business",
+        NotEnoughData => "Not enough data",
+        ShortOfBuyBar => "Short of the BUY bar",
+        _ => null,
+    };
+}
 
 /// <summary>
 /// One threshold test inside a rule, with the value it read. Values are invariant-culture strings so a
@@ -70,15 +109,20 @@ public sealed record VerdictRuleOutcome(
     VerdictWord Word,
     string Description,
     IReadOnlyList<VerdictCondition> Conditions,
-    bool Matched);
+    bool Matched,
+    string? WaitReason = null);
 
 /// <summary>
 /// A verdict word with the rule table that produced it: the rules version, the first rule that matched
 /// (the one that fired) and every rule's outcome in order (spec 726 FR-005/FR-006). Never a number
-/// (FR-007).
+/// (FR-007). <see cref="WaitReason"/> is the named reason of a WAIT (a <see cref="WaitReasons"/> code), null for
+/// every other word; <see cref="PriceLens"/> is the yardstick the valuation conditions read (a
+/// <see cref="PriceLenses"/> code), null when the price lens had nothing to read.
 /// </summary>
 public sealed record Verdict(
     VerdictWord Word,
     int RulesVersion,
     string FiredRuleId,
-    IReadOnlyList<VerdictRuleOutcome> Rules);
+    IReadOnlyList<VerdictRuleOutcome> Rules,
+    string? WaitReason = null,
+    string? PriceLens = null);

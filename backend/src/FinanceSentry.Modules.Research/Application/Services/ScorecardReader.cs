@@ -23,10 +23,14 @@ public sealed class ScorecardReader(
 {
     public const string NoExtensionData = "no_extension_data";
 
+    private const int PercentScale = 100;
+
     /// <summary>
     /// The scorecard for <paramref name="symbol"/>. <paramref name="facts"/> reuses fundamentals the caller
     /// already read (at least <see cref="FundamentalsScorer.FactsPerConcept"/> per concept); null reads them.
     /// A name outside the v1 universe skips the fundamentals read, since its verdict is NOT SCORED anyway.
+    /// <paramref name="peerForwardPes"/> are the peers' forward P/Es for the fallback price lens; it applies only
+    /// where the own-history premium is missing, and null means no peers were read.
     /// </summary>
     public async Task<ScorecardResult> ReadAsync(
         string symbol,
@@ -34,7 +38,8 @@ public sealed class ScorecardReader(
         IReadOnlyList<FundamentalFact>? facts,
         CancellationToken ct,
         string? sector = null,
-        string? industry = null)
+        string? industry = null,
+        IReadOnlyList<decimal?>? peerForwardPes = null)
     {
         var structure = await structureReader.GetStructureAsync(symbol, ct);
         facts ??= valuation.NotApplicable
@@ -43,7 +48,13 @@ public sealed class ScorecardReader(
         var regime = await regimeSource.GetLatestAsync(ct);
 
         var composed = ScorecardComposer.Compose(structure, facts, regime, opportunityOptions.Value);
-        return Build(symbol, composed, valuation, opportunityOptions.Value, verdictOptions.Value, DateTimeOffset.UtcNow, sector, industry);
+        var options = verdictOptions.Value;
+        if (peerForwardPes is not null)
+        {
+            valuation = valuation.WithPeerLens(peerForwardPes, options.MinPeersForPriceLens);
+        }
+
+        return Build(symbol, composed, valuation, opportunityOptions.Value, options, DateTimeOffset.UtcNow, sector, industry);
     }
 
     /// <summary>Projects a composed scorecard and its valuation facts into the published shape and verdict.</summary>
@@ -69,7 +80,9 @@ public sealed class ScorecardReader(
                 composed.FundamentalsScore,
                 crowding,
                 valuation.NotApplicable,
-                valuation.PremiumPct),
+                valuation.LensPremium(),
+                evidence.RevenueYoy is { } growth ? decimal.Round(growth * PercentScale, 1) : null,
+                valuation.PriceLens),
             verdictOptions);
         var structureBasis = regime.Rationale.Contains(RegimeScoreAdjuster.NoRegimeData)
             ? VerdictDto.RawBasis
@@ -103,7 +116,8 @@ public sealed class ScorecardReader(
                 evidence.GrossMarginTrend,
                 evidence.EpsYoy,
                 evidence.FundamentalsBasis,
-                evidence.FundamentalsNotEvaluableReasons),
+                evidence.FundamentalsNotEvaluableReasons,
+                evidence.EpsYoyBasis),
             new ScorecardCrowdingAxis(
                 crowding?.ToString(),
                 evidence.ExtensionFromMa50,

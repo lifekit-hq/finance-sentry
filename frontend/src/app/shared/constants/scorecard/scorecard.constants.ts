@@ -29,6 +29,7 @@ export const VERDICT_AXIS_LABEL: Readonly<Record<VerdictAxis, string>> = {
   Fundamentals: 'Fundamentals',
   Crowding: 'Crowding',
   Valuation: 'Valuation',
+  Growth: 'Growth',
 };
 
 /** What a condition on each axis reads, as the rule table names it. */
@@ -37,7 +38,11 @@ export const VERDICT_CONDITION_SUBJECT: Readonly<Record<VerdictAxis, string>> = 
   Fundamentals: 'Fundamentals',
   Crowding: 'Crowding',
   Valuation: 'P/E premium to its 5-year average',
+  Growth: 'Revenue growth year over year',
 };
+
+/** The valuation condition's subject when the verdict read the peer lens instead of the own history. */
+export const VERDICT_PEER_LENS_SUBJECT = 'Forward P/E premium to the peer median';
 
 /** Unit appended to a condition's threshold and value, per axis. */
 export const VERDICT_CONDITION_UNIT: Readonly<Record<VerdictAxis, string>> = {
@@ -45,6 +50,7 @@ export const VERDICT_CONDITION_UNIT: Readonly<Record<VerdictAxis, string>> = {
   Fundamentals: '',
   Crowding: '',
   Valuation: '%',
+  Growth: '%',
 };
 
 export const VERDICT_OPERATOR_LABEL: Readonly<Record<VerdictOperator, string>> = {

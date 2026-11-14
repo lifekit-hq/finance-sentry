@@ -12,6 +12,7 @@ import {
   VERDICT_CONDITION_UNIT,
   VERDICT_HELD_ROW_PREFIX,
   VERDICT_OPERATOR_LABEL,
+  VERDICT_PEER_LENS_SUBJECT,
   VERDICT_TURNS_BUY_PREFIX,
 } from '../constants/scorecard/scorecard.constants';
 import {
@@ -25,6 +26,7 @@ import {
   type VerdictConditionDto,
   type VerdictConditionView,
   type VerdictDto,
+  type VerdictPriceLens,
   type VerdictRuleView,
   type VerdictTrailStep,
 } from '../models/scorecard/scorecard.model';
@@ -62,7 +64,7 @@ export class ScorecardUtils {
       description: rule.description,
       matched: rule.matched,
       fired: rule.fired,
-      conditions: rule.conditions.map(ScorecardUtils.condition),
+      conditions: rule.conditions.map(c => ScorecardUtils.condition(c, verdict.priceLens)),
     }));
   }
 
@@ -103,13 +105,19 @@ export class ScorecardUtils {
     return code.replaceAll('_', ' ');
   }
 
-  private static condition(condition: VerdictConditionDto): VerdictConditionView {
+  private static condition(
+    condition: VerdictConditionDto,
+    priceLens: Nullable<VerdictPriceLens> | undefined
+  ): VerdictConditionView {
     const unit = VERDICT_CONDITION_UNIT[condition.axis];
     const operator = VERDICT_OPERATOR_LABEL[condition.operator];
     const unary = UNARY_OPERATORS.has(condition.operator);
-    const subject = unary
+    let subject = unary
       ? VERDICT_AXIS_LABEL[condition.axis]
       : VERDICT_CONDITION_SUBJECT[condition.axis];
+    if (!unary && condition.axis === 'Valuation' && priceLens === 'peers') {
+      subject = VERDICT_PEER_LENS_SUBJECT;
+    }
     const threshold =
       condition.threshold === null
         ? ''
@@ -188,7 +196,10 @@ export class ScorecardUtils {
             ? null
             : ScorecardUtils.signed(axis.grossMarginTrend * PERCENT, ' pp')
         ),
-        ScorecardUtils.fact('EPS YoY', ScorecardUtils.signedPercent(axis.epsYoy)),
+        ScorecardUtils.fact(
+          axis.epsYoyBasis === 'annual_fallback' ? 'EPS YoY (fiscal year)' : 'EPS YoY',
+          ScorecardUtils.signedPercent(axis.epsYoy)
+        ),
         ScorecardUtils.fact('Basis', axis.basis && ScorecardUtils.humanize(axis.basis)),
       ]),
       notes: axis.notEvaluableReasons.map(ScorecardUtils.humanize),
@@ -217,6 +228,17 @@ export class ScorecardUtils {
     };
   }
 
+  /** The own-history premium, else the forward P/E against peers (the fallback the verdict reads), else unknown. */
+  private static valuationSummary(axis: ScorecardValuationAxis): string {
+    if (axis.premiumPct !== null) {
+      return `P/E ${ScorecardUtils.signed(axis.premiumPct, '%')} vs its own average`;
+    }
+    if (axis.peerPremiumPct !== null && axis.peerPremiumPct !== undefined) {
+      return `Forward P/E ${ScorecardUtils.signed(axis.peerPremiumPct, '%')} vs peers`;
+    }
+    return SCORECARD_UNKNOWN;
+  }
+
   private static valuation(axis: ScorecardValuationAxis): ScorecardAxisView {
     if (axis.notApplicable) {
       return {
@@ -235,14 +257,17 @@ export class ScorecardUtils {
     return {
       axis: 'Valuation',
       label: VERDICT_AXIS_LABEL.Valuation,
-      summary:
-        axis.premiumPct === null
-          ? SCORECARD_UNKNOWN
-          : `P/E ${ScorecardUtils.signed(axis.premiumPct, '%')} vs its own average`,
+      summary: ScorecardUtils.valuationSummary(axis),
       facts: ScorecardUtils.present([
         ScorecardUtils.fact('Trailing P/E', ScorecardUtils.fixed(axis.trailingPe, PE_DIGITS)),
         ScorecardUtils.fact(average, ScorecardUtils.fixed(axis.trailingPeFiveYearAvg, PE_DIGITS)),
         ScorecardUtils.fact('Forward P/E', ScorecardUtils.fixed(axis.forwardPe, PE_DIGITS)),
+        ScorecardUtils.fact(
+          axis.peerCount
+            ? `Peer median forward P/E (${axis.peerCount} peers)`
+            : 'Peer median forward P/E',
+          ScorecardUtils.fixed(axis.peerForwardPeMedian ?? null, PE_DIGITS)
+        ),
         ScorecardUtils.fact(
           'Price',
           axis.price === null ? null : MoneyUtils.format(axis.price, axis.currency)

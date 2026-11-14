@@ -31,9 +31,9 @@ new is stored and there is no migration.
 | FR-002 | Covered for the single-symbol read: one `ScorecardComposer` feeds both candidate scoring and the scorecard. | `Domain/Scoring/ScorecardComposer.cs` |
 | FR-004 | Covered: valuation is raw facts (trailing P/E, own average, premium, forward P/E, price, target). | `ScorecardValuationAxis` |
 | FR-005 | Covered: one word per scorecard from an ordered rule table; deterministic. | `Domain/Scoring/VerdictRules.cs`, `VerdictRulesTests` |
-| FR-006 | Covered: the whole table, the rules version and the fired rule travel in every payload and are tabled below. | `VerdictDto`, [Verdict rule table v1](#verdict-rule-table-v1) |
+| FR-006 | Covered: the whole table, the rules version and the fired rule travel in every payload and are tabled below. | `VerdictDto`, [Verdict rule table v2](#verdict-rule-table-v2) |
 | FR-007 / 019 FR-007 amendment | Covered: the word is categorical; no composite, weighted or rank field exists (contract test). | `ScorecardReaderTests.Scorecard_CarriesNoCompositeNumber` |
-| FR-008 | Covered: every null axis has an explicit rule; a comparison against a missing axis is never met. | rules `no_axis_data`, `structure_missing`, `buy_fundamentals_missing` |
+| FR-008 | Covered: every null axis has an explicit rule; a comparison against a missing axis is never met. | rules `no_axis_data`, `not_enough_data`, `buy_fundamentals_missing`, `weak_trend_business_unread` |
 | FR-009 | Partial: four per-axis rows, each expandable to its evidence, no radar or single shape. Not yet the lifekit chip strip. | `fns-scorecard-verdict` |
 | FR-010 | Partial: one shared component used on both surfaces; composed from `cmn-tag` and native disclosure, no new primitive. Lifting it into lifekit-common is a follow-up. | `shared/components/scorecard-verdict/` |
 | FR-011 | Covered: raw beside adjusted, the verdict reads adjusted, and the drill-down names which value the rules read (raw when there is no regime reading). | `ScorecardStructureAxis`, `VerdictDto.StructureBasis` |
@@ -104,23 +104,52 @@ A gap is target minus current, from the two rounded percentages (and the two rou
 always subtracts exactly; a column may differ from its total by a rounding residual. A gap within 0.5 point is
 OnTarget. A refused policy (IPS targets over 100%) gives no gap.
 
-### Verdict rule table v1
+### Verdict rule table v2
 
+Issue #1325 (rules version 2), the owner's call on the table below: the same five words, three changes to v1.
 Thresholds are configuration (`Verdict` section, `VerdictOptions`); any change bumps the rules version.
-Structure is the regime-adjusted score (raw when there is no regime reading). Premium is the trailing P/E's
-distance from its own five-year average, in percent. A comparison against a missing axis is never met.
+Structure is the regime-adjusted score (raw when there is no regime reading). The **price lens** is the trailing
+P/E's distance from its own five-year average, in percent; when that history is missing, the **fallback price lens**
+is the forward P/E's distance from the median forward P/E of its peers (Yahoo's similar names, at most 6, only those
+with a positive forward P/E, at least 3 of them, and only for a name with a positive forward P/E). The verdict
+carries which lens it read (`priceLens`: `own_history` or `peers`); where peer data exists the scorecard's
+valuation axis also shows the peer median and the premium as facts beside the own-history figure, and the verdict
+reads them only when that history is missing. **Growth** is revenue growth year over year, in
+percent. A comparison against a missing axis is never met. Recommend-only: the word never places or sizes a trade.
 
 | # | Rule id | Word | Fires when |
 |---|---|---|---|
 | 1 | `outside_universe` | NOT SCORED | valuation does not apply (not a single equity) |
 | 2 | `no_axis_data` | NOT SCORED | structure, fundamentals, crowding and valuation are all missing |
 | 3 | `weak_structure` | AVOID | structure < 30 |
-| 4 | `extended_and_rich` | AVOID | crowding is `Extended` and premium > 0% |
-| 5 | `structure_missing` | WAIT | structure is missing |
-| 6 | `strong_buy` | STRONG BUY | structure ≥ 70, fundamentals ≥ 70, crowding known and not `Extended`, premium ≤ 10% |
+| 4 | `extended_and_rich` | AVOID | crowding is `Extended` and the price lens > 0% |
+| 5 | `not_enough_data` | WAIT | structure is missing |
+| 6 | `strong_buy` | STRONG BUY | structure ≥ 70, fundamentals ≥ 70, crowding known and not `Extended`, price lens ≤ 10%, **growth ≥ 10%** |
 | 7 | `buy` | BUY | structure ≥ 50 and fundamentals ≥ 50 |
 | 8 | `buy_fundamentals_missing` | BUY | structure ≥ 50 and fundamentals missing (capped at BUY, FR-008) |
-| 9 | `otherwise` | WAIT | no earlier rule matched |
+| 9 | `strong_business_weak_trend` | WAIT | fundamentals ≥ 70 and structure < 50 |
+| 10 | `trend_without_business` | WAIT | structure ≥ 50 and fundamentals < 50 |
+| 11 | `weak_trend_business_unread` | WAIT | structure < 50 and fundamentals missing |
+| 12 | `otherwise` | WAIT | no earlier rule matched (structure 30 to 49, fundamentals 50 to 69 or below 50) |
+
+Every WAIT names its reason, in the verdict (`waitReason`, `waitReasonLabel`) and on the dossier beside the word:
+rule 5 and 11 read "Not enough data", rule 9 "Strong business, weak trend", rule 10 "Trend without the business",
+rule 12 "Short of the BUY bar".
+
+Changes from v1, and nothing else: (a) STRONG BUY also needs growth ≥ 10%, so a clean leader that is not growing, or
+whose growth cannot be read, reads BUY; (b) the price lens falls back to the forward P/E against peers where v1 had
+no premium to read, in rules 4 and 6; (c) the v1 WAIT rules are split by reason, with no change of word.
+`VerdictRulesTests.Calibration_V2DiffersFromV1OnlyWhereAChangeApplies` pins that over a grid of readings against the
+v1 table restated in the test. The fundamentals axis carries two data fixes the verdict inherits: gross margin is
+derived as revenue less cost of revenue where a filer tags no gross profit (#1327), and a 20-F filer whose provider
+quarters cannot resolve EPS growth reads it from fiscal years (`epsYoyBasis` `annual_fallback`).
+
+<details><summary>Verdict rule table v1 (superseded)</summary>
+
+Rules 1 to 4 as above (price lens = the trailing P/E premium only); 5 `structure_missing` WAIT; 6 `strong_buy`
+(no growth condition); 7 `buy`; 8 `buy_fundamentals_missing`; 9 `otherwise` WAIT.
+
+</details>
 
 ## Context
 

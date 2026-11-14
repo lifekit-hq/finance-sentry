@@ -3,7 +3,10 @@ import {type Nullable} from '@lifekit-hq/ui';
 export type VerdictWord = 'StrongBuy' | 'Buy' | 'Wait' | 'Avoid' | 'NotScored';
 
 /** The scorecard axis a verdict condition reads. */
-export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation';
+export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation' | 'Growth';
+
+/** The yardstick the valuation conditions read: the P/E against its own history, or the forward P/E against peers. */
+export type VerdictPriceLens = 'own_history' | 'peers';
 
 export type VerdictOperator =
   'LessThan' | 'GreaterThan' | 'AtLeast' | 'AtMost' | 'Is' | 'IsNot' | 'IsMissing';
@@ -51,6 +54,12 @@ export interface VerdictDto {
   reasons: VerdictReasonDto[];
   /** What has to change for the BUY rules to fire; null when already BUY or better, or not scored. */
   turnsBuyWhen: Nullable<string>;
+  /** Why a WAIT waits (a code); absent for every other word and on payloads from before rules v2. */
+  waitReason?: Nullable<string>;
+  /** The short label of `waitReason`, ready to show beside the word. */
+  waitReasonLabel?: Nullable<string>;
+  /** Which yardstick the valuation conditions read; null when the price lens had nothing to read. */
+  priceLens?: Nullable<VerdictPriceLens>;
 }
 
 /** One symbol's verdict word from the batch read behind the Accounts rows, with what would turn it into BUY. */
@@ -60,6 +69,8 @@ export interface ScorecardVerdictSummary {
   firedRuleId: string;
   /** The same line the full scorecard carries; null when there is no bar to name (BUY or better, or not scored). */
   turnsBuyWhen: Nullable<string>;
+  /** The named reason of a WAIT, as a short label. */
+  waitReasonLabel?: Nullable<string>;
 }
 
 /** Fractions stay fractions (0.12 = 12%); window keys are trading days. */
@@ -89,6 +100,8 @@ export interface ScorecardFundamentalsAxis {
   grossMarginTrend: Nullable<number>;
   epsYoy: Nullable<number>;
   basis: Nullable<string>;
+  /** `annual_fallback` when EPS growth was read from fiscal years because the quarters could not resolve it. */
+  epsYoyBasis?: Nullable<string>;
   notEvaluableReasons: string[];
 }
 
@@ -117,6 +130,11 @@ export interface ScorecardValuationAxis {
   currency: Nullable<string>;
   isStale: boolean;
   notEvaluableReason: Nullable<string>;
+  /** The median forward P/E of the peers, their count and the forward P/E's premium over it; set only when the own history is missing. */
+  peerForwardPeMedian?: Nullable<number>;
+  peerCount?: Nullable<number>;
+  peerPremiumPct?: Nullable<number>;
+  priceLens?: Nullable<VerdictPriceLens>;
 }
 
 /**

@@ -116,6 +116,15 @@ describe('VerdictBlockComponent', () => {
     expect(reasons[2].textContent).toContain('Falls short');
   });
 
+  it('names why a WAIT waits beside the word, and nothing for other words', () => {
+    const waiting = card('Wait');
+    waiting.verdict.waitReason = 'strong_business_weak_trend';
+    waiting.verdict.waitReasonLabel = 'Strong business, weak trend';
+
+    expect(text(render(waiting), 'verdict-wait-reason')).toBe('Strong business, weak trend');
+    expect(has(render(card('Buy')), 'verdict-wait-reason')).toBe(false);
+  });
+
   it('shows the turns-BUY line only when the backend sent one', () => {
     const waiting = render(card('Wait', 'structure reaches 50 (reads 39)'));
     const buying = render(card('Buy'));

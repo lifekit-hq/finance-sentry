@@ -39,6 +39,9 @@ public static class FundamentalsScorer
     // year, margin trend = latest fiscal year vs the one before (lookback 1).
     private const int MarginTrendLookbackYears = 1;
 
+    /// <summary><see cref="FundamentalsScoreResult.EpsYoyBasis"/> when the EPS growth was read from fiscal years instead of quarters.</summary>
+    public const string EpsAnnualFallback = "annual_fallback";
+
     public static (
         int? Score,
         decimal? RevenueYoy,
@@ -102,7 +105,18 @@ public static class FundamentalsScorer
             reasons.Add("gross_margin_trend_not_evaluable");
         }
 
-        var epsYoy = FundamentalMath.LatestYoy(facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.EpsYoy], periodType);
+        var epsConcept = FundamentalMath.YoyConceptByMetric[ThesisMetric.EpsYoy];
+        var epsYoy = FundamentalMath.LatestYoy(facts, epsConcept, periodType);
+        string? epsBasis = null;
+        if (epsYoy is null && ReadsProviderQuarters(facts, annual))
+        {
+            // F4: a foreign private issuer's quarters come from a provider (Yahoo) that serves about five of
+            // them, so quarterly EPS growth often cannot resolve while the filed fiscal years can. Only that
+            // case falls back: a filer with filed quarters (10-Q) scores exactly as before.
+            epsYoy = FundamentalMath.LatestYoy(facts, epsConcept, ThesisPeriodType.Annual);
+            epsBasis = epsYoy is null ? null : EpsAnnualFallback;
+        }
+
         if (epsYoy is { } eps)
         {
             components.Add(Clamp(Midpoint + (eps * YoyScaleFactor)));
@@ -114,11 +128,24 @@ public static class FundamentalsScorer
 
         if (components.Count == 0)
         {
-            return new FundamentalsScoreResult(null, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis);
+            return new FundamentalsScoreResult(null, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis) { EpsYoyBasis = epsBasis };
         }
 
         var score = (int)Math.Round(components.Average(), MidpointRounding.AwayFromZero);
-        return new FundamentalsScoreResult(score, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis);
+        return new FundamentalsScoreResult(score, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis) { EpsYoyBasis = epsBasis };
+    }
+
+    // Quarterly facts exist, none of them from a filing (a provider's own normalization, empty Form): the
+    // 20-F / 40-F filer whose interim results are only furnished on 6-K.
+    private static bool ReadsProviderQuarters(IReadOnlyList<FundamentalFact> facts, bool annualBasis)
+    {
+        if (annualBasis)
+        {
+            return false;
+        }
+
+        var quarters = facts.Where(f => FundamentalMath.MatchesPeriodType(f, ThesisPeriodType.Quarter)).ToList();
+        return quarters.Count > 0 && quarters.All(f => string.IsNullOrEmpty(f.Form));
     }
 
     private static decimal Clamp(decimal value) => Math.Clamp(value, MinScore, MaxScore);
@@ -132,4 +159,11 @@ public sealed record FundamentalsScoreResult(
     decimal? GrossMarginTrend,
     decimal? EpsYoy,
     IReadOnlyList<string> NotEvaluableReasons,
-    string Basis);
+    string Basis)
+{
+    /// <summary>
+    /// <see cref="FundamentalsScorer.EpsAnnualFallback"/> when <see cref="EpsYoy"/> was read from fiscal years
+    /// because the quarters could not resolve it (a 20-F filer's provider quarters); null otherwise.
+    /// </summary>
+    public string? EpsYoyBasis { get; init; }
+}

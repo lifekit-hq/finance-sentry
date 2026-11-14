@@ -33,7 +33,7 @@ public sealed record VerdictExplanation(IReadOnlyList<VerdictReason> Reasons, st
 /// <summary>
 /// Explains a <see cref="Verdict"/> in words, deterministically (spec 726 US2): every number and bar comes from
 /// the rule table the evaluator already returned, so the text can never disagree with the word and carries no
-/// model-written copy. There is one reason per axis (three to five reads for a scored name; a name outside the
+/// model-written copy. There is one reason per axis (up to five reads for a scored name; a name outside the
 /// v1 universe gets the single reason that the rules do not apply). It adds no rule and moves no threshold.
 /// </summary>
 public static class VerdictReasons
@@ -59,6 +59,7 @@ public static class VerdictReasons
             FundamentalsReason(bars, Decisive(fired, VerdictAxis.Fundamentals, failedBuyBar && bars.FundamentalsBelowBuy)),
             CrowdingReason(bars, Decisive(fired, VerdictAxis.Crowding, false)),
             ValuationReason(bars, Decisive(fired, VerdictAxis.Valuation, false)),
+            GrowthReason(bars, Decisive(fired, VerdictAxis.Growth, false)),
         };
 
         var turnsBuy = verdict.Word is VerdictWord.Wait or VerdictWord.Avoid ? TurnsBuyWhen(bars) : null;
@@ -107,17 +108,34 @@ public static class VerdictReasons
 
     private static VerdictReason ValuationReason(Bars b, bool decisive)
     {
+        var yardstick = b.Lens == PriceLenses.Peers ? "forward P/E premium to the peer median" : "P/E premium to its 5-year average";
         var (status, text) = b.Premium switch
         {
             null => (VerdictReasonStatus.Missing,
-                "Valuation: no P/E premium to its own 5-year average could be read, so STRONG BUY is out of reach."),
+                "Valuation: no P/E premium to its own 5-year average and no forward P/E against peers could be read, so STRONG BUY is out of reach."),
             { } p when p > b.StrongMaxPremium => (VerdictReasonStatus.Fail,
-                $"P/E premium to its 5-year average is {Signed(p)}%: STRONG BUY allows at most {Plain(b.StrongMaxPremium)}%."),
+                $"{Capitalise(yardstick)} is {Signed(p)}%: STRONG BUY allows at most {Plain(b.StrongMaxPremium)}%."),
             { } p => (VerdictReasonStatus.Pass,
-                $"P/E premium to its 5-year average is {Signed(p)}%, within the STRONG BUY limit of {Plain(b.StrongMaxPremium)}%."),
+                $"{Capitalise(yardstick)} is {Signed(p)}%, within the STRONG BUY limit of {Plain(b.StrongMaxPremium)}%."),
         };
         return new VerdictReason(nameof(VerdictAxis.Valuation), status, text, decisive);
     }
+
+    private static VerdictReason GrowthReason(Bars b, bool decisive)
+    {
+        var (status, text) = b.RevenueYoy switch
+        {
+            null => (VerdictReasonStatus.Missing,
+                "Growth: no revenue growth year over year could be read, so STRONG BUY is out of reach."),
+            { } g when g < b.StrongMinRevenueYoy => (VerdictReasonStatus.Fail,
+                $"Revenue growth is {Signed(g)}% year over year: STRONG BUY needs at least {Plain(b.StrongMinRevenueYoy)}%."),
+            { } g => (VerdictReasonStatus.Pass,
+                $"Revenue growth is {Signed(g)}% year over year, clearing the STRONG BUY gate of {Plain(b.StrongMinRevenueYoy)}%."),
+        };
+        return new VerdictReason(nameof(VerdictAxis.Growth), status, text, decisive);
+    }
+
+    private static string Capitalise(string text) => char.ToUpperInvariant(text[0]) + text[1..];
 
     /// <summary>
     /// What has to change for the BUY rules to fire: each BUY-side bar the name misses today, plus the
@@ -160,12 +178,15 @@ public static class VerdictReasons
         int? Fundamentals,
         string? Crowding,
         decimal? Premium,
+        decimal? RevenueYoy,
+        string? Lens,
         int AvoidBelow,
         int BuyStructure,
         int BuyFundamentals,
         int StrongStructure,
         int StrongFundamentals,
-        decimal StrongMaxPremium)
+        decimal StrongMaxPremium,
+        decimal StrongMinRevenueYoy)
     {
         public bool StructureBelowBuy => Structure is { } s && s < BuyStructure;
 
@@ -180,18 +201,22 @@ public static class VerdictReasons
             var strongFundamentals = Condition(verdict, VerdictRules.StrongBuy, VerdictAxis.Fundamentals);
             var strongCrowding = Condition(verdict, VerdictRules.StrongBuy, VerdictAxis.Crowding);
             var strongValuation = Condition(verdict, VerdictRules.StrongBuy, VerdictAxis.Valuation);
+            var strongGrowth = Condition(verdict, VerdictRules.StrongBuy, VerdictAxis.Growth);
 
             return new Bars(
                 Int(buyStructure.Actual),
                 Int(buyFundamentals.Actual),
                 strongCrowding.Actual,
                 Dec(strongValuation.Actual),
+                Dec(strongGrowth.Actual),
+                verdict.PriceLens,
                 Int(avoid.Threshold) ?? 0,
                 Int(buyStructure.Threshold) ?? 0,
                 Int(buyFundamentals.Threshold) ?? 0,
                 Int(strongStructure.Threshold) ?? 0,
                 Int(strongFundamentals.Threshold) ?? 0,
-                Dec(strongValuation.Threshold) ?? 0m);
+                Dec(strongValuation.Threshold) ?? 0m,
+                Dec(strongGrowth.Threshold) ?? 0m);
         }
 
         private static VerdictCondition Condition(Verdict verdict, string ruleId, VerdictAxis axis) =>

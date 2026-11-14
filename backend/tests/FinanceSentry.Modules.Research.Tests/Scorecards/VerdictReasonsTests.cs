@@ -20,7 +20,7 @@ public sealed class VerdictReasonsTests
     {
         var explanation = Explain(78, 72, CrowdingClass.Normal, 8.5);
 
-        explanation.Reasons.Select(r => r.Axis).Should().Equal("Structure", "Fundamentals", "Crowding", "Valuation");
+        explanation.Reasons.Select(r => r.Axis).Should().Equal("Structure", "Fundamentals", "Crowding", "Valuation", "Growth");
         explanation.Reasons.Count.Should().BeInRange(3, 5);
     }
 
@@ -54,9 +54,10 @@ public sealed class VerdictReasonsTests
 
         explanation.Reasons[0].Status.Should().Be(VerdictReasonStatus.Fail);
         explanation.Reasons[0].Text.Should().Be("Structure 39 is below the BUY bar of 50.");
-        explanation.Reasons[0].Decisive.Should().BeTrue("the catch-all WAIT is decided by the BUY bar the name missed");
+        explanation.Reasons[0].Decisive.Should().BeTrue("the WAIT is decided by the BUY bar the name missed");
         explanation.Reasons[1].Status.Should().Be(VerdictReasonStatus.Pass);
-        explanation.Reasons[1].Decisive.Should().BeFalse();
+        explanation.Reasons[1].Decisive.Should().BeTrue("a strong business is what names the WAIT");
+        explanation.Reasons[2].Decisive.Should().BeFalse();
         explanation.Reasons[3].Status.Should().Be(VerdictReasonStatus.Missing);
         explanation.TurnsBuyWhen.Should().Be("structure reaches 50 (reads 39)");
     }
@@ -119,7 +120,7 @@ public sealed class VerdictReasonsTests
         var explanation = VerdictReasons.Explain(verdict);
 
         verdict.FiredRuleId.Should().Be(VerdictRules.NoAxisData);
-        explanation.Reasons.Should().HaveCount(4).And.OnlyContain(r => r.Status == VerdictReasonStatus.Missing);
+        explanation.Reasons.Should().HaveCount(5).And.OnlyContain(r => r.Status == VerdictReasonStatus.Missing);
         explanation.TurnsBuyWhen.Should().BeNull("a name that is not scored has no BUY to turn into");
     }
 
@@ -175,7 +176,33 @@ public sealed class VerdictReasonsTests
         explanation.Reasons.Should().OnlyContain(r => r.Text.Length > 0);
     }
 
+    [Fact]
+    public void Explain_PeerLens_NamesTheForwardPeAgainstPeersAsTheValuationRead()
+    {
+        var verdict = VerdictRules.Evaluate(
+            new VerdictInputs(78, 72, CrowdingClass.Normal, false, 6m, 15m, PriceLenses.Peers), Options);
+
+        var valuation = VerdictReasons.Explain(verdict).Reasons.Single(r => r.Axis == "Valuation");
+
+        valuation.Status.Should().Be(VerdictReasonStatus.Pass);
+        valuation.Text.Should().Be("Forward P/E premium to the peer median is +6%, within the STRONG BUY limit of 10%.");
+    }
+
+    [Fact]
+    public void Explain_Growth_ReadsPassFailAndMissingAgainstTheGate()
+    {
+        Reason(15m).Should().Match<VerdictReason>(r => r.Status == VerdictReasonStatus.Pass && r.Text.Contains("+15%") && r.Text.Contains("gate of 10%"));
+        Reason(4m).Should().Match<VerdictReason>(r => r.Status == VerdictReasonStatus.Fail && r.Text.Contains("at least 10%"));
+        Reason(null).Should().Match<VerdictReason>(r => r.Status == VerdictReasonStatus.Missing);
+
+        static VerdictReason Reason(decimal? growth) => VerdictReasons.Explain(VerdictRules.Evaluate(
+                new VerdictInputs(78, 72, CrowdingClass.Normal, false, 4m, growth, PriceLenses.OwnHistory), Options))
+            .Reasons.Single(r => r.Axis == "Growth");
+    }
+
     private static VerdictExplanation Explain(int? structure, int? fundamentals, CrowdingClass? crowding, double? premium) =>
         VerdictReasons.Explain(VerdictRules.Evaluate(
-            new VerdictInputs(structure, fundamentals, crowding, false, premium is null ? null : (decimal)premium.Value), Options));
+            new VerdictInputs(
+                structure, fundamentals, crowding, false, premium is null ? null : (decimal)premium.Value, 15m,
+                premium is null ? null : PriceLenses.OwnHistory), Options));
 }
