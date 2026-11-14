@@ -74,11 +74,12 @@ export class DossierVerdictUtils {
     if (!scorecard) {
       return null;
     }
-    const {word, turnsBuyWhen} = scorecard.verdict;
+    const {word, turnsBuyWhen, waitReasonLabel} = scorecard.verdict;
     const thesisState = DossierVerdictUtils.thesisStatus(thesis);
     return {
       status: {tone: VERDICT_WORD_VARIANT[word], label: VERDICT_HEADER_WORD_LABEL[word]},
       pills: [
+        ...(waitReasonLabel ? [{label: waitReasonLabel, tone: 'neutral' as const}] : []),
         {label: VERDICT_HEADER_NEW_MONEY_PILL, tone: 'neutral'},
         {label: thesisState.thesisLabel, tone: THESIS_STATE_VARIANT[thesisState.state]},
       ],

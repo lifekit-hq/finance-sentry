@@ -9,6 +9,11 @@
       <span class="text-cmn-sm font-medium text-text-primary" data-testid="verdict-for-new-money">
         {{ forNewMoney }}
       </span>
+      @if (v.waitReasonLabel; as waitReason) {
+        <span class="text-cmn-sm font-medium text-text-primary" data-testid="verdict-wait-reason">
+          {{ waitReason }}
+        </span>
+      }
       <span class="text-cmn-xs text-text-secondary">Rules v{{ v.rulesVersion }}</span>
     </div>
 

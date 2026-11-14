@@ -165,6 +165,18 @@ describe('ScorecardUtils.axes', () => {
     expect(fundamentals.notes).toEqual(['no fundamentals']);
   });
 
+  it('labels EPS growth read from fiscal years when the quarters could not resolve it', () => {
+    const fundamentals = axis(
+      ScorecardFixtures.scorecard({
+        fundamentals: {...card.fundamentals, epsYoy: 0.5, epsYoyBasis: 'annual_fallback'},
+      }),
+      'Fundamentals'
+    );
+
+    expect(facts(fundamentals)['EPS YoY (fiscal year)']).toBe('+50.0%');
+    expect(facts(fundamentals)['EPS YoY']).toBeUndefined();
+  });
+
   it('reads a null basis as no basis fact', () => {
     const fundamentals = axis(
       ScorecardFixtures.scorecard({fundamentals: {...card.fundamentals, basis: null}}),
@@ -218,6 +230,25 @@ describe('ScorecardUtils.axes', () => {
       'Implied upside: +15.0%',
     ]);
     expect(valuation.notes).toEqual([]);
+  });
+
+  it('reads the forward P/E against peers when the own history is missing', () => {
+    const valuation = axis(
+      ScorecardFixtures.scorecard({
+        valuation: {
+          ...card.valuation,
+          premiumPct: null,
+          peerForwardPeMedian: 32,
+          peerCount: 3,
+          peerPremiumPct: -17.5,
+          priceLens: 'peers',
+        },
+      }),
+      'Valuation'
+    );
+
+    expect(valuation.summary).toBe('Forward P/E -17.5% vs peers');
+    expect(facts(valuation)['Peer median forward P/E (3 peers)']).toBe('32.0');
   });
 
   it('reads an unknown premium as unknown, with the reason and the stale note first', () => {
@@ -284,6 +315,14 @@ describe('ScorecardUtils.rules', () => {
       {text: 'Crowding is Extended', actual: 'Extended', met: true},
       {text: 'P/E premium to its 5-year average > 0%', actual: '29.2%', met: true},
     ]);
+  });
+
+  it('words the valuation condition by the peer lens when the verdict read it', () => {
+    const peers = ScorecardUtils.rules({...card.verdict, priceLens: 'peers'});
+
+    expect(peers.find(r => r.id === 'extended_and_rich')?.conditions[1].text).toBe(
+      'Forward P/E premium to the peer median > 0%'
+    );
   });
 
   it('writes a token condition in words', () => {

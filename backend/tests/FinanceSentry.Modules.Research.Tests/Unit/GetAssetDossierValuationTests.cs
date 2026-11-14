@@ -87,6 +87,28 @@ public class GetAssetDossierValuationTests
         dossier.Analysts.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task EquityHolding_ScorecardGetsThePeerForwardPeFromTheValuationItAlreadyRead()
+    {
+        var analystHandler = new Mock<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>();
+        analystHandler
+            .Setup(h => h.Handle(It.IsAny<GetAnalystActionsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Analysts);
+        var withPeers = Valuation(notApplicable: false) with
+        {
+            Metrics = new ValuationMetricsDto(new MetricValue(20m), new MetricValue(18m), new MetricValue(null), new MetricValue(null)),
+            PeerSet = new ValuationPeerSet("default", [new("A", 20m, null), new("B", 24m, null), new("C", 30m, null)]),
+        };
+
+        var dossier = await HandleAsync(Held("Equities"), withPeers, analystHandler);
+
+        // No five-year history in this fixture, so the verdict reads the peer lens: 18 against a median of 24.
+        dossier.Scorecard!.Valuation.PeerForwardPeMedian.Should().Be(24m);
+        dossier.Scorecard.Valuation.PeerPremiumPct.Should().Be(-25.0m);
+        dossier.Scorecard.Valuation.PriceLens.Should().Be(PriceLenses.Peers);
+        dossier.Scorecard.Verdict.PriceLens.Should().Be(PriceLenses.Peers);
+    }
+
     [Theory]
     [InlineData("GBp", "GBP")]
     [InlineData("GBX", "GBP")]
@@ -159,6 +181,10 @@ public class GetAssetDossierValuationTests
             .Setup(h => h.Handle(It.IsAny<GetValuationSnapshotQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(valuation);
 
+        var noFacts = new Mock<IFundamentalsService>();
+        noFacts.Setup(f => f.GetFundamentalsAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string ticker, int _, CancellationToken _) => FakeFundamentalsService.ResultFor(ticker, []));
+
         var handler = new GetAssetDossierQueryHandler(
             book.Object,
             Mock.Of<IHoldingTaxLotsReader>(),
@@ -170,14 +196,14 @@ public class GetAssetDossierValuationTests
             Mock.Of<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>(),
             Mock.Of<IPositionCapSource>(),
             Mock.Of<IPriceHistoryService>(),
-            Mock.Of<IFundamentalsService>(),
+            noFacts.Object,
             Mock.Of<IAssetPriceTargetRepository>(),
             Mock.Of<IRecommendationRepository>(),
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new DisposalTaxContextReader(Mock.Of<IInstrumentTaxRegimeSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new ScorecardReader(
                 Mock.Of<IMarketStructureReader>(),
-                Mock.Of<IFundamentalsService>(),
+                noFacts.Object,
                 Mock.Of<IMarketRegimeSource>(),
                 Options.Create(new OpportunityOptions()),
                 Options.Create(new VerdictOptions())),

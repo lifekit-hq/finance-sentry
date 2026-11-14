@@ -334,6 +334,7 @@ public static class ResearchModule
         services.Configure<VerdictOptions>(config.GetSection(VerdictOptions.SectionName));
         services.Configure<NotableMoveOptions>(config.GetSection(NotableMoveOptions.SectionName));
         services.AddScoped<ScorecardReader>();
+        services.AddScoped<PeerForwardPeReader>();
         services.Configure<ResearchRetrievalOptions>(config.GetSection(ResearchRetrievalOptions.SectionName));
         services.Configure<AnalystSourcesOptions>(config.GetSection(AnalystSourcesOptions.SectionName));
 

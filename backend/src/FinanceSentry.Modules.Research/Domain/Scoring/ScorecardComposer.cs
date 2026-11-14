@@ -30,8 +30,8 @@ public static class ScorecardComposer
         OpportunityOptions options)
     {
         var (structureScore, structureReasons) = StructureScorer.Score(structure);
-        var (fundamentalsScore, revenueYoy, grossMarginLatest, grossMarginTrend, epsYoy, fundamentalsReasons, fundamentalsBasis) =
-            FundamentalsScorer.Evaluate(facts);
+        var fundamentals = FundamentalsScorer.Evaluate(facts);
+        var (fundamentalsScore, revenueYoy, grossMarginLatest, grossMarginTrend, epsYoy, fundamentalsReasons, fundamentalsBasis) = fundamentals;
         var crowding = CrowdingClassifier.Classify(structure?.ExtensionFromMa50, structure?.VolumeRatio, options);
 
         // 021: regime is CONTEXT only - haircut the presented/ranked structure score for speculative
@@ -54,7 +54,8 @@ public static class ScorecardComposer
             SectorRank: structure?.SectorRank,
             SectorRankDelta: structure?.SectorRankDelta,
             DistanceFrom63dHigh: structure?.DistanceFrom63dHigh,
-            FundamentalsBasis: fundamentalsBasis);
+            FundamentalsBasis: fundamentalsBasis,
+            EpsYoyBasis: fundamentals.EpsYoyBasis);
 
         return new ComposedScorecard(structureScore, fundamentalsScore, crowding, evidence, adjustment);
     }

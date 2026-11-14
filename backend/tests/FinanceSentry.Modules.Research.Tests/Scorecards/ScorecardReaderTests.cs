@@ -169,7 +169,7 @@ public sealed class ScorecardReaderTests
         var history = new Mock<IValuationHistoryService>();
         history.Setup(h => h.GetTrailingPeHistoryAsync("MSFT", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TrailingPeHistory(24m, 5));
-        var handler = new GetScorecardQueryHandler(valuation.Object, history.Object, Reader(new CountingFundamentalsService()));
+        var handler = new GetScorecardQueryHandler(valuation.Object, history.Object, new PeerForwardPeReader(valuation.Object), Reader(new CountingFundamentalsService()));
 
         var result = await handler.Handle(new GetScorecardQuery(" msft "), CancellationToken.None);
 
@@ -185,7 +185,7 @@ public sealed class ScorecardReaderTests
         valuation.Setup(v => v.GetCurrentMetricsAsync("NOPE", It.IsAny<CancellationToken>())).ReturnsAsync((ValuationCurrentMetrics?)null);
         valuation.Setup(v => v.GetCurrentMetricsAsync("BTC", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValuationCurrentMetrics("BTC", null, null, null, null, null, null, false, true, null, null));
-        var handler = new GetScorecardQueryHandler(valuation.Object, Mock.Of<IValuationHistoryService>(), Reader(new CountingFundamentalsService()));
+        var handler = new GetScorecardQueryHandler(valuation.Object, Mock.Of<IValuationHistoryService>(), new PeerForwardPeReader(valuation.Object), Reader(new CountingFundamentalsService()));
 
         foreach (var symbol in new[] { "NOPE", "BTC" })
         {
@@ -228,6 +228,141 @@ public sealed class ScorecardReaderTests
             .Should().Be(ScorecardValuationAxis.NotApplicableAxis);
     }
 
+    [Fact]
+    public void PeerLens_ComparesTheForwardPeWithThePeerMedian_WhenTheOwnHistoryIsMissing()
+    {
+        var axis = ScorecardValuationAxis.From(26m, null, null, 22m, 100m, 120m, "USD", false);
+
+        var lens = axis.WithPeerLens([20m, 25m, 30m, null, -4m], minPeers: 3);
+
+        lens.PeerForwardPeMedian.Should().Be(25m);
+        lens.PeerCount.Should().Be(3);
+        lens.PeerPremiumPct.Should().Be(-12.0m);
+        lens.PriceLens.Should().Be(PriceLenses.Peers);
+        lens.LensPremium().Should().Be(-12.0m);
+        lens.PremiumPct.Should().BeNull("the own-history premium stays what it is");
+    }
+
+    [Fact]
+    public void PeerLens_UsesTheMeanOfTheMiddlePair_ForAnEvenPeerCount()
+    {
+        var axis = ScorecardValuationAxis.From(null, null, null, 30m, 100m, null, "USD", false);
+
+        axis.WithPeerLens([10m, 20m, 40m, 50m], minPeers: 3).PeerForwardPeMedian.Should().Be(30m);
+    }
+
+    [Fact]
+    public void PeerLens_RidesBesideTheOwnHistoryAsFacts_AndIsNotWhatTheVerdictReads()
+    {
+        var withHistory = ScorecardValuationAxis.From(26m, 24m, 5, 22m, 100m, 120m, "USD", false);
+
+        var beside = withHistory.WithPeerLens([20m, 25m, 30m], 3);
+
+        beside.PeerPremiumPct.Should().Be(-12.0m);
+        beside.PremiumPct.Should().Be(8.3m);
+        beside.PriceLens.Should().Be(PriceLenses.OwnHistory);
+        beside.LensPremium().Should().Be(8.3m);
+    }
+
+    [Fact]
+    public void PeerLens_IsLeftAlone_WhenPeersAreFew_OrTheForwardPeIsMissing()
+    {
+        var withHistory = ScorecardValuationAxis.From(26m, 24m, 5, 22m, 100m, 120m, "USD", false);
+        var noForward = ScorecardValuationAxis.From(26m, null, null, null, 100m, 120m, "USD", false);
+        var negativeForward = ScorecardValuationAxis.From(26m, null, null, -3m, 100m, 120m, "USD", false);
+        var ok = ScorecardValuationAxis.From(26m, null, null, 22m, 100m, 120m, "USD", false);
+
+        withHistory.WithPeerLens([20m, 25m], 3).Should().Be(withHistory);
+        noForward.WithPeerLens([20m, 25m, 30m], 3).Should().Be(noForward);
+        negativeForward.WithPeerLens([20m, 25m, 30m], 3).Should().Be(negativeForward);
+        ok.WithPeerLens([20m, 25m], 3).Should().Be(ok);
+        ok.WithPeerLens([20m, null, -1m, 30m], 3).PriceLens.Should().BeNull("two positive peers are not enough");
+        ScorecardValuationAxis.NotApplicableAxis.WithPeerLens([20m, 25m, 30m], 3).Should().Be(ScorecardValuationAxis.NotApplicableAxis);
+        withHistory.PriceLens.Should().Be(PriceLenses.OwnHistory);
+    }
+
+    [Fact]
+    public void Build_ReadsTheRevenueGrowthGate_AndThePeerLens()
+    {
+        var composed = Composed(80, 80, 75, extension: 0.03m) with
+        {
+            Evidence = Composed(80, 80, 75, extension: 0.03m).Evidence with { RevenueYoy = 0.096m },
+        };
+        var peerLens = ScorecardValuationAxis.From(26m, null, null, 22m, 100m, 120m, "USD", false)
+            .WithPeerLens([30m, 32m, 34m], 3);
+
+        var slow = ScorecardReader.Build("MSFT", composed, peerLens, Opportunity, VerdictTable, Now);
+        var fast = ScorecardReader.Build(
+            "MSFT",
+            composed with { Evidence = composed.Evidence with { RevenueYoy = 0.12m } },
+            peerLens, Opportunity, VerdictTable, Now);
+
+        slow.Verdict.Word.Should().Be(nameof(VerdictWord.Buy));
+        fast.Verdict.Word.Should().Be(nameof(VerdictWord.StrongBuy));
+        fast.Verdict.PriceLens.Should().Be(PriceLenses.Peers);
+        fast.Verdict.RulesVersion.Should().Be(2);
+        fast.Verdict.Rules.Single(r => r.Id == VerdictRules.StrongBuy).Conditions
+            .Single(c => c.Axis == nameof(VerdictAxis.Valuation)).Actual.Should().Be("-31.2");
+        fast.Verdict.Rules.Single(r => r.Id == VerdictRules.StrongBuy).Conditions
+            .Single(c => c.Axis == nameof(VerdictAxis.Growth)).Actual.Should().Be("12.0");
+    }
+
+    [Fact]
+    public void Build_NamesTheReasonOfAWait_OnTheVerdict()
+    {
+        var result = ScorecardReader.Build("MSFT", Composed(45, 45, 85, extension: 0.03m), FairValuation, Opportunity, VerdictTable, Now);
+
+        result.Verdict.Word.Should().Be(nameof(VerdictWord.Wait));
+        result.Verdict.FiredRuleId.Should().Be(VerdictRules.StrongBusinessWeakTrend);
+        result.Verdict.WaitReason.Should().Be(WaitReasons.StrongBusinessWeakTrend);
+        result.Verdict.WaitReasonLabel.Should().Be("Strong business, weak trend");
+        ScorecardReader.Build("MSFT", Composed(80, 80, 75, extension: 0.03m), FairValuation, Opportunity, VerdictTable, Now)
+            .Verdict.WaitReasonLabel.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ScorecardQuery_FallsBackToThePeerForwardPe_OnlyWhenTheFiveYearHistoryIsMissing()
+    {
+        var valuation = new Mock<IValuationDataService>();
+        valuation.Setup(v => v.GetCurrentMetricsAsync("NEW", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Metrics("NEW", forwardPe: 20m));
+        valuation.Setup(v => v.GetPeerSymbolsAsync("NEW", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["P1", "P2", "P3", "NEW"]);
+        foreach (var (symbol, pe) in new[] { ("P1", 24m), ("P2", 25m), ("P3", 26m) })
+        {
+            valuation.Setup(v => v.GetCurrentMetricsAsync(symbol, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Metrics(symbol, forwardPe: pe));
+        }
+
+        var history = new Mock<IValuationHistoryService>();
+        history.Setup(h => h.GetTrailingPeHistoryAsync("NEW", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrailingPeHistory(null, null));
+        var handler = new GetScorecardQueryHandler(
+            valuation.Object, history.Object, new PeerForwardPeReader(valuation.Object), Reader(new CountingFundamentalsService()));
+
+        var result = await handler.Handle(new GetScorecardQuery("new"), CancellationToken.None);
+
+        result.Valuation.PremiumPct.Should().BeNull();
+        result.Valuation.PeerPremiumPct.Should().Be(-20.0m);
+        result.Valuation.PeerCount.Should().Be(3);
+        result.Valuation.PriceLens.Should().Be(PriceLenses.Peers);
+        result.Verdict.PriceLens.Should().Be(PriceLenses.Peers);
+        valuation.Verify(v => v.GetCurrentMetricsAsync("NEW", It.IsAny<CancellationToken>()), Times.Once);
+
+        // With a five-year history the peers are never asked for.
+        history.Setup(h => h.GetTrailingPeHistoryAsync("NEW", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrailingPeHistory(24m, 5));
+        valuation.Invocations.Clear();
+        var own = await handler.Handle(new GetScorecardQuery("NEW"), CancellationToken.None);
+
+        own.Valuation.PriceLens.Should().Be(PriceLenses.OwnHistory);
+        own.Valuation.PeerPremiumPct.Should().BeNull();
+        valuation.Verify(v => v.GetPeerSymbolsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static ValuationCurrentMetrics Metrics(string ticker, decimal forwardPe) =>
+        new(ticker, 100m, 26m, forwardPe, null, null, 120m, IsStale: false, NotApplicable: false, "Technology", "Software");
+
     private static ScorecardReader Reader(IFundamentalsService fundamentals) =>
         new(
             new FakeMarketStructureReader(),
@@ -239,7 +374,7 @@ public sealed class ScorecardReaderTests
     private static ComposedScorecard Composed(
         int? raw, int? adjusted, int? fundamentals, decimal? extension, IReadOnlyList<string>? rationale = null)
     {
-        var evidence = ScoreEvidence.Empty with { ExtensionFromMa50 = extension, VolumeRatio = extension is null ? null : 1.0m };
+        var evidence = ScoreEvidence.Empty with { ExtensionFromMa50 = extension, VolumeRatio = extension is null ? null : 1.0m, RevenueYoy = 0.15m };
         var crowding = CrowdingClassifier.Classify(extension, evidence.VolumeRatio, Opportunity);
         var regime = new RegimeAdjustment(
             raw, adjusted, (adjusted ?? 0) - (raw ?? 0), rationale ?? ["risk_on"], "Normal", "Normal", false, 15m, 1m, Now);

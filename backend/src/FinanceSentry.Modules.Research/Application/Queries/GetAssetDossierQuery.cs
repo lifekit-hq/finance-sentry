@@ -105,7 +105,9 @@ public sealed class GetAssetDossierQueryHandler(
             ? ScorecardValuationAxis.NotApplicableAxis
             : ScorecardValuationAxis.From(valuationResult);
         var scorecard = request.IncludeVerdicts
-            ? await Safe("scorecard", () => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct, valuationResult?.Sector, valuationResult?.Industry))
+            ? await Safe("scorecard", () => scorecards.ReadAsync(
+                symbol, scorecardValuation, facts, ct, valuationResult?.Sector, valuationResult?.Industry,
+                valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList()))
             : null;
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;

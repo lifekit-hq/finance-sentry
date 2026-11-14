@@ -54,7 +54,8 @@ public sealed record ScorecardFundamentalsAxis(
     decimal? GrossMarginTrend,
     decimal? EpsYoy,
     string? Basis,
-    IReadOnlyList<string> NotEvaluableReasons);
+    IReadOnlyList<string> NotEvaluableReasons,
+    string? EpsYoyBasis = null);
 
 /// <summary>
 /// Crowding: <c>Early</c>, <c>Normal</c> or <c>Extended</c>, with the thresholds that classify it.
@@ -73,7 +74,10 @@ public sealed record ScorecardCrowdingAxis(
 /// <summary>
 /// Valuation as raw facts, never a 0-100 score (spec 726 FR-004). <see cref="PremiumPct"/> is the
 /// trailing P/E's distance from its own five-year average in percent (31 vs 24 is 29.2); the verdict
-/// reads it. Prices are in major units of <see cref="Currency"/>.
+/// reads it. Prices are in major units of <see cref="Currency"/>. When that premium is missing (no five-year
+/// history) and the peers' forward P/Es are known, <see cref="PeerPremiumPct"/> is the forward P/E's distance
+/// from the peer median in percent and the verdict reads it instead (rules v2); <see cref="PriceLens"/> names
+/// the yardstick the verdict read (<see cref="PriceLenses"/>), null when neither exists.
 /// </summary>
 public sealed record ScorecardValuationAxis(
     bool NotApplicable,
@@ -89,6 +93,18 @@ public sealed record ScorecardValuationAxis(
     bool IsStale,
     string? NotEvaluableReason)
 {
+    /// <summary>Median of the peers' positive forward P/Es; null unless the peer lens was read.</summary>
+    public decimal? PeerForwardPeMedian { get; init; }
+
+    /// <summary>Peers that had a positive forward P/E; null unless the peer lens was read.</summary>
+    public int? PeerCount { get; init; }
+
+    /// <summary>Forward P/E over the peer median, in percent; null unless the peer lens was read.</summary>
+    public decimal? PeerPremiumPct { get; init; }
+
+    /// <summary>The yardstick the verdict reads (<see cref="PriceLenses"/>), or null when it has none.</summary>
+    public string? PriceLens { get; init; }
+
     public const string ReasonNotApplicable = "not_applicable";
     public const string ReasonUnavailable = "valuation_unavailable";
     public const string ReasonNoTrailingPe = "no_trailing_pe";
@@ -141,7 +157,44 @@ public sealed record ScorecardValuationAxis(
             : ReasonNoFiveYearAverage;
 
         return new ScorecardValuationAxis(
-            false, trailingPe, fiveYearAvg, windowYears, premium, forwardPe, price, consensusTarget, upside, currency, isStale, reason);
+            false, trailingPe, fiveYearAvg, windowYears, premium, forwardPe, price, consensusTarget, upside, currency, isStale, reason)
+        {
+            PriceLens = premium is null ? null : PriceLenses.OwnHistory,
+        };
+    }
+
+    /// <summary>The percentage the verdict's valuation conditions read: the own-history premium, else the peer premium.</summary>
+    public decimal? LensPremium() => PremiumPct ?? PeerPremiumPct;
+
+    /// <summary>
+    /// Adds the forward P/E against the median of <paramref name="peerForwardPes"/> as facts. It needs a positive
+    /// forward P/E and at least <paramref name="minPeers"/> peers with a positive forward P/E (a negative or absent
+    /// one is not a price), and leaves the axis unchanged otherwise. The verdict reads it (<see cref="PriceLens"/>
+    /// becomes <see cref="PriceLenses.Peers"/>) only when the own-history premium is missing; with that history the
+    /// peer figures ride beside it as facts and the lens stays the own history.
+    /// </summary>
+    public ScorecardValuationAxis WithPeerLens(IEnumerable<decimal?> peerForwardPes, int minPeers)
+    {
+        if (NotApplicable || ForwardPe is not > 0m)
+        {
+            return this;
+        }
+
+        var peers = peerForwardPes.OfType<decimal>().Where(pe => pe > 0m).OrderBy(pe => pe).ToList();
+        if (peers.Count < minPeers || peers.Count == 0)
+        {
+            return this;
+        }
+
+        var middle = peers.Count / 2;
+        var median = peers.Count % 2 == 1 ? peers[middle] : (peers[middle - 1] + peers[middle]) / 2m;
+        return this with
+        {
+            PeerForwardPeMedian = decimal.Round(median, Decimals),
+            PeerCount = peers.Count,
+            PeerPremiumPct = decimal.Round((ForwardPe.Value / median - 1m) * PercentScale, Decimals),
+            PriceLens = PremiumPct is null ? PriceLenses.Peers : PriceLens,
+        };
     }
 }
 
@@ -152,7 +205,10 @@ public sealed record ScorecardValuationAxis(
 /// <see cref="Reasons"/> and <see cref="TurnsBuyWhen"/> restate that table in words, derived from it
 /// deterministically by <see cref="VerdictReasons"/> (no model text); <see cref="TurnsBuyWhen"/> is null
 /// when the word is already BUY or better, or the name is not scored. They ride the verdict, so they
-/// reach only the callers the verdict reaches (<c>ai.use</c>).
+/// reach only the callers the verdict reaches (<c>ai.use</c>). <see cref="WaitReason"/> (a code) and
+/// <see cref="WaitReasonLabel"/> (its short label) name why a WAIT waits and are null for every other word;
+/// <see cref="PriceLens"/> says which yardstick the valuation conditions read (<c>own_history</c> or
+/// <c>peers</c>), null when there was none.
 /// </summary>
 public sealed record VerdictDto(
     string Word,
@@ -161,7 +217,10 @@ public sealed record VerdictDto(
     string StructureBasis,
     IReadOnlyList<VerdictRuleDto> Rules,
     IReadOnlyList<VerdictReasonDto> Reasons,
-    string? TurnsBuyWhen)
+    string? TurnsBuyWhen,
+    string? WaitReason = null,
+    string? WaitReasonLabel = null,
+    string? PriceLens = null)
 {
     public const string AdjustedBasis = "adjusted";
     public const string RawBasis = "raw";
@@ -183,7 +242,10 @@ public sealed record VerdictDto(
                 r.Conditions.Select(c => new VerdictConditionDto(
                     c.Axis.ToString(), c.Operator.ToString(), c.Threshold, c.Actual, c.Met)).ToList())).ToList(),
             explanation.Reasons.Select(r => new VerdictReasonDto(r.Axis, r.Status.ToString(), r.Text, r.Decisive)).ToList(),
-            explanation.TurnsBuyWhen);
+            explanation.TurnsBuyWhen,
+            verdict.WaitReason,
+            WaitReasons.Label(verdict.WaitReason),
+            verdict.PriceLens);
     }
 }
 
@@ -210,6 +272,7 @@ public sealed record VerdictConditionDto(
 /// <summary>
 /// One symbol's verdict word and the rule that fired, for a chip, plus the line saying what would turn it into BUY
 /// (the same <see cref="VerdictDto.TurnsBuyWhen"/> the full scorecard carries; null when there is no bar to name).
-/// Nothing else of the scorecard crosses.
+/// Nothing else of the scorecard crosses. <see cref="WaitReasonLabel"/> is the named reason of a WAIT.
 /// </summary>
-public sealed record ScorecardVerdictSummary(string Symbol, string Word, string FiredRuleId, string? TurnsBuyWhen);
+public sealed record ScorecardVerdictSummary(
+    string Symbol, string Word, string FiredRuleId, string? TurnsBuyWhen, string? WaitReasonLabel = null);

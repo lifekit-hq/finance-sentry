@@ -117,6 +117,22 @@ describe('DossierVerdictUtils.header', () => {
     });
   });
 
+  it('leads the pills with the named reason of a WAIT', () => {
+    const waiting = ScorecardFixtures.scorecard({
+      verdict: {
+        ...scorecard.verdict,
+        word: 'Wait',
+        waitReason: 'trend_without_business',
+        waitReasonLabel: 'Trend without the business',
+      },
+    });
+
+    expect(DossierVerdictUtils.header(waiting, false, null)?.pills[0]).toEqual({
+      label: 'Trend without the business',
+      tone: 'neutral',
+    });
+  });
+
   it('carries the fixed held line on a held name, whatever turns it BUY', () => {
     expect(DossierVerdictUtils.header(scorecard, true, null)?.caveat).toBe(
       'You hold this. Holding follows your thesis and its kill-switch, never the word.'

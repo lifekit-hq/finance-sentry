@@ -59,7 +59,7 @@ public sealed class GetScorecardVerdictsQueryTests
             new GetScorecardVerdictsQuery(["AAA"]), CancellationToken.None);
 
         typeof(ScorecardVerdictSummary).GetProperties().Select(p => p.Name)
-            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId", "TurnsBuyWhen");
+            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId", "TurnsBuyWhen", "WaitReasonLabel");
         result.Should().ContainSingle();
     }
 

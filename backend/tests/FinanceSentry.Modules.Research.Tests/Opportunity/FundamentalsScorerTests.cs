@@ -158,6 +158,81 @@ public sealed class FundamentalsScorerTests
     private static FundamentalFact Annual(string concept, decimal value, int fiscalYear)
         => new("ZIM", concept, concept, "USD", value, new DateOnly(fiscalYear, 12, 31), "FY", fiscalYear, "20-F");
 
+    // F4: a 20-F filer's quarters come from a provider (empty Form) and are too few for a year-on-year EPS pair.
+    private static FundamentalFact ProviderQuarter(string concept, decimal value, DateOnly periodEnd)
+        => new("GRAB", concept, concept, "USD", value, periodEnd, "3M", null, string.Empty);
+
+    [Fact]
+    public void Evaluate_ProviderQuarters_FallBackToAnnualEps_WhenQuarterlyEpsCannotResolve()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            ProviderQuarter("Revenue", 120m, new DateOnly(2026, 6, 30)),
+            ProviderQuarter("Revenue", 100m, new DateOnly(2025, 6, 30)),
+            ProviderQuarter("DilutedEPS", 0.02m, new DateOnly(2026, 6, 30)),
+            Annual("DilutedEPS", 0.30m, 2025),
+            Annual("DilutedEPS", 0.20m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.Basis.Should().Be(FundamentalsScorer.QuarterlyBasis);
+        result.RevenueYoy.Should().Be(0.2m);
+        result.EpsYoy.Should().Be(0.5m);
+        result.EpsYoyBasis.Should().Be(FundamentalsScorer.EpsAnnualFallback);
+        result.NotEvaluableReasons.Should().NotContain("eps_yoy_not_evaluable");
+    }
+
+    [Fact]
+    public void Evaluate_ProviderQuarters_KeepQuarterlyEps_WhenItResolves()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            ProviderQuarter("DilutedEPS", 0.03m, new DateOnly(2026, 6, 30)),
+            ProviderQuarter("DilutedEPS", 0.02m, new DateOnly(2025, 6, 30)),
+            Annual("DilutedEPS", 0.30m, 2025),
+            Annual("DilutedEPS", 0.20m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.EpsYoy.Should().Be(0.5m);
+        result.EpsYoyBasis.Should().BeNull();
+    }
+
+    [Fact]
+    public void Evaluate_FiledQuarters_NeverFallBackToAnnualEps()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("DilutedEPS", 0.02m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Annual("DilutedEPS", 0.30m, 2025),
+            Annual("DilutedEPS", 0.20m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.EpsYoy.Should().BeNull();
+        result.EpsYoyBasis.Should().BeNull();
+        result.NotEvaluableReasons.Should().Contain("eps_yoy_not_evaluable");
+    }
+
+    [Fact]
+    public void Evaluate_ProviderQuarters_StayNotEvaluable_WhenTheAnnualEpsCannotResolveEither()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            ProviderQuarter("DilutedEPS", 0.02m, new DateOnly(2026, 6, 30)),
+            Annual("DilutedEPS", 0.06m, 2025),
+            Annual("DilutedEPS", -0.03m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.EpsYoy.Should().BeNull();
+        result.EpsYoyBasis.Should().BeNull();
+    }
+
     [Fact]
     public void Evaluate_FallsBackToAnnualPeriods_WhenFilerHasNoQuarterlyFacts()
     {

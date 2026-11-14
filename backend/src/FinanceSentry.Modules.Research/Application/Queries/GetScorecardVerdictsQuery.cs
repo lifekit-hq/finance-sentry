@@ -38,7 +38,7 @@ public sealed class GetScorecardVerdictsQueryHandler(
             try
             {
                 var card = await scorecard.Handle(new GetScorecardQuery(symbol), ct);
-                result.Add(new ScorecardVerdictSummary(symbol, card.Verdict.Word, card.Verdict.FiredRuleId, card.Verdict.TurnsBuyWhen));
+                result.Add(new ScorecardVerdictSummary(symbol, card.Verdict.Word, card.Verdict.FiredRuleId, card.Verdict.TurnsBuyWhen, card.Verdict.WaitReasonLabel));
             }
             catch (OperationCanceledException)
             {

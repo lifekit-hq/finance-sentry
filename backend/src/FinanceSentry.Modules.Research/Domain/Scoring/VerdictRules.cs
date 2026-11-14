@@ -10,6 +10,9 @@ using FinanceSentry.Modules.Research.Domain.Opportunity;
 /// same <see cref="VerdictOptions"/> always give the same word (FR-005). Every rule is evaluated and
 /// returned so the drill-down shows the whole table, not only the winner (FR-006). There are no points
 /// and no weights: a word is never derived from a sum of axes (019 FR-007 as amended).
+/// Rules v2 keeps the five words and the table's shape: STRONG BUY also needs revenue growth, the price lens
+/// falls back to the forward P/E against peers when the own-history premium is missing, and every WAIT names its
+/// reason (<see cref="WaitReasons"/>).
 /// </summary>
 /// <remarks>
 /// Null axes are explicit (FR-008): <see cref="VerdictOperator.IsMissing"/> tests for them, and a
@@ -22,10 +25,13 @@ public static class VerdictRules
     public const string NoAxisData = "no_axis_data";
     public const string WeakStructure = "weak_structure";
     public const string ExtendedAndRich = "extended_and_rich";
-    public const string StructureMissing = "structure_missing";
+    public const string NotEnoughData = "not_enough_data";
     public const string StrongBuy = "strong_buy";
     public const string Buy = "buy";
     public const string BuyFundamentalsMissing = "buy_fundamentals_missing";
+    public const string StrongBusinessWeakTrend = "strong_business_weak_trend";
+    public const string TrendWithoutBusiness = "trend_without_business";
+    public const string WeakTrendBusinessUnread = "weak_trend_business_unread";
     public const string Otherwise = "otherwise";
 
     /// <summary>Threshold token of the outside-universe condition.</summary>
@@ -51,20 +57,25 @@ public static class VerdictRules
                 $"Adjusted structure below {options.AvoidStructureBelow}.",
                 Compare(VerdictAxis.Structure, VerdictOperator.LessThan, inputs.StructureScore, options.AvoidStructureBelow)),
             Rule(ExtendedAndRich, VerdictWord.Avoid,
-                "Crowding is Extended and the trailing P/E is above its own five-year average.",
+                "Crowding is Extended and the price lens reads above its yardstick: the trailing P/E above its own "
+                + "five-year average or, without that history, the forward P/E above the peer median.",
                 CrowdingIs(VerdictOperator.Is, inputs.Crowding),
                 Compare(VerdictAxis.Valuation, VerdictOperator.GreaterThan, inputs.ValuationPremiumPct, 0m)),
-            Rule(StructureMissing, VerdictWord.Wait,
+            Rule(NotEnoughData, VerdictWord.Wait,
                 "No structure score to read.",
+                WaitReasons.NotEnoughData,
                 Missing(VerdictAxis.Structure, inputs.StructureScore)),
             Rule(StrongBuy, VerdictWord.StrongBuy,
                 $"Adjusted structure at least {options.StrongBuyStructureAtLeast}, fundamentals at least "
-                + $"{options.StrongBuyFundamentalsAtLeast}, crowding not Extended, and the trailing P/E at most "
-                + $"{Format(options.StrongBuyMaxValuationPremiumPct)}% above its own five-year average.",
+                + $"{options.StrongBuyFundamentalsAtLeast}, crowding not Extended, the price lens at most "
+                + $"{Format(options.StrongBuyMaxValuationPremiumPct)}% above its yardstick (the trailing P/E over its own "
+                + "five-year average, else the forward P/E over the peer median), and revenue growing at least "
+                + $"{Format(options.StrongBuyMinRevenueYoyPct)}% year over year.",
                 Compare(VerdictAxis.Structure, VerdictOperator.AtLeast, inputs.StructureScore, options.StrongBuyStructureAtLeast),
                 Compare(VerdictAxis.Fundamentals, VerdictOperator.AtLeast, inputs.FundamentalsScore, options.StrongBuyFundamentalsAtLeast),
                 CrowdingIs(VerdictOperator.IsNot, inputs.Crowding),
-                Compare(VerdictAxis.Valuation, VerdictOperator.AtMost, inputs.ValuationPremiumPct, options.StrongBuyMaxValuationPremiumPct)),
+                Compare(VerdictAxis.Valuation, VerdictOperator.AtMost, inputs.ValuationPremiumPct, options.StrongBuyMaxValuationPremiumPct),
+                Compare(VerdictAxis.Growth, VerdictOperator.AtLeast, inputs.RevenueYoyPct, options.StrongBuyMinRevenueYoyPct)),
             Rule(Buy, VerdictWord.Buy,
                 $"Adjusted structure at least {options.BuyStructureAtLeast} and fundamentals at least {options.BuyFundamentalsAtLeast}.",
                 Compare(VerdictAxis.Structure, VerdictOperator.AtLeast, inputs.StructureScore, options.BuyStructureAtLeast),
@@ -73,11 +84,28 @@ public static class VerdictRules
                 $"Adjusted structure at least {options.BuyStructureAtLeast} with no fundamentals score: capped at BUY.",
                 Compare(VerdictAxis.Structure, VerdictOperator.AtLeast, inputs.StructureScore, options.BuyStructureAtLeast),
                 Missing(VerdictAxis.Fundamentals, inputs.FundamentalsScore)),
-            Rule(Otherwise, VerdictWord.Wait, OtherwiseDescription(inputs, options)),
+            Rule(StrongBusinessWeakTrend, VerdictWord.Wait,
+                $"Fundamentals at least {options.WaitStrongBusinessFundamentalsAtLeast} but adjusted structure below the BUY bar of "
+                + $"{options.BuyStructureAtLeast}: a strong business whose chart is not there yet.",
+                WaitReasons.StrongBusinessWeakTrend,
+                Compare(VerdictAxis.Fundamentals, VerdictOperator.AtLeast, inputs.FundamentalsScore, options.WaitStrongBusinessFundamentalsAtLeast),
+                Compare(VerdictAxis.Structure, VerdictOperator.LessThan, inputs.StructureScore, options.BuyStructureAtLeast)),
+            Rule(TrendWithoutBusiness, VerdictWord.Wait,
+                $"Adjusted structure at least {options.BuyStructureAtLeast} but fundamentals below the BUY bar of "
+                + $"{options.BuyFundamentalsAtLeast}: a chart without the business behind it.",
+                WaitReasons.TrendWithoutBusiness,
+                Compare(VerdictAxis.Structure, VerdictOperator.AtLeast, inputs.StructureScore, options.BuyStructureAtLeast),
+                Compare(VerdictAxis.Fundamentals, VerdictOperator.LessThan, inputs.FundamentalsScore, options.BuyFundamentalsAtLeast)),
+            Rule(WeakTrendBusinessUnread, VerdictWord.Wait,
+                $"Adjusted structure below the BUY bar of {options.BuyStructureAtLeast} and no fundamentals score to read.",
+                WaitReasons.NotEnoughData,
+                Compare(VerdictAxis.Structure, VerdictOperator.LessThan, inputs.StructureScore, options.BuyStructureAtLeast),
+                Missing(VerdictAxis.Fundamentals, inputs.FundamentalsScore)),
+            Rule(Otherwise, VerdictWord.Wait, OtherwiseDescription(inputs, options), WaitReasons.ShortOfBuyBar),
         };
 
         var fired = rules.First(r => r.Matched);
-        return new Verdict(fired.Word, options.RulesVersion, fired.Id, rules);
+        return new Verdict(fired.Word, options.RulesVersion, fired.Id, rules, fired.WaitReason, inputs.PriceLens);
     }
 
     /// <summary>
@@ -104,6 +132,10 @@ public static class VerdictRules
 
     private static VerdictRuleOutcome Rule(string id, VerdictWord word, string description, params VerdictCondition[] conditions) =>
         new(id, word, description, conditions, conditions.All(c => c.Met));
+
+    private static VerdictRuleOutcome Rule(
+        string id, VerdictWord word, string description, string waitReason, params VerdictCondition[] conditions) =>
+        new(id, word, description, conditions, conditions.All(c => c.Met), waitReason);
 
     private static VerdictCondition ValuationApplies(VerdictInputs inputs) =>
         new(VerdictAxis.Valuation, VerdictOperator.Is, NotApplicable,

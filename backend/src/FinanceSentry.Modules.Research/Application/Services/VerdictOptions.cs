@@ -11,7 +11,7 @@ public sealed class VerdictOptions
     public const string SectionName = "Verdict";
 
     /// <summary>Version of the rule table; carried on every verdict.</summary>
-    public int RulesVersion { get; set; } = 1;
+    public int RulesVersion { get; set; } = 2;
 
     /// <summary>Adjusted structure score below this is AVOID.</summary>
     public int AvoidStructureBelow { get; set; } = 30;
@@ -23,7 +23,8 @@ public sealed class VerdictOptions
     public int StrongBuyFundamentalsAtLeast { get; set; } = 70;
 
     /// <summary>
-    /// The most the trailing P/E may sit above its own five-year average (percent) for STRONG BUY.
+    /// The most the price lens may read above its yardstick (percent) for STRONG BUY: the trailing P/E over its own
+    /// five-year average, or, when that history is missing, the forward P/E over the peer median.
     /// </summary>
     public decimal StrongBuyMaxValuationPremiumPct { get; set; } = 10m;
 
@@ -32,4 +33,19 @@ public sealed class VerdictOptions
 
     /// <summary>Fundamentals score at or above this is needed for BUY.</summary>
     public int BuyFundamentalsAtLeast { get; set; } = 50;
+
+    /// <summary>Revenue growth year over year, in percent, needed for STRONG BUY (v2 growth gate).</summary>
+    public decimal StrongBuyMinRevenueYoyPct { get; set; } = 10m;
+
+    /// <summary>
+    /// Fundamentals score at or above this is a strong business: with a trend below the BUY bar the word is
+    /// the named WAIT "strong business, weak trend".
+    /// </summary>
+    public int WaitStrongBusinessFundamentalsAtLeast { get; set; } = 70;
+
+    /// <summary>
+    /// Peers with a positive forward P/E needed before the peer median counts as a price lens; fewer and the
+    /// lens is missing, never a median of one or two names.
+    /// </summary>
+    public int MinPeersForPriceLens { get; set; } = 3;
 }

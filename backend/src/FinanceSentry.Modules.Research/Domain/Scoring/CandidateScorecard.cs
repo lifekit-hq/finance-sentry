@@ -61,7 +61,8 @@ public sealed record ScoreEvidence(
     decimal? DistanceFrom63dHigh = null,
     string? FundamentalsBasis = null,
     CorrelationFact? Correlation = null,
-    AttentionFact? Attention = null)
+    AttentionFact? Attention = null,
+    string? EpsYoyBasis = null)
 {
     public static ScoreEvidence Empty { get; } = new(
         new Dictionary<int, decimal?>(),
