@@ -132,6 +132,28 @@ describe('UniverseScreenStore', () => {
     expect(getGap).toHaveBeenLastCalledWith('balanced');
   });
 
+  it('drops the previous archetype gap when the new archetype gap fails to load', () => {
+    const getGap = vi
+      .fn()
+      .mockReturnValueOnce(of(GapModeFixtures.gap()))
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({status: 500})));
+    const store = setup({
+      getUniverse: vi
+        .fn()
+        .mockReturnValueOnce(of(UniverseScreenFixtures.screen()))
+        .mockReturnValueOnce(of(UniverseScreenFixtures.screen({archetype: 'balanced'}))),
+      getGap,
+    });
+    expect(store.gap()).not.toBeNull();
+
+    store.setArchetype('balanced');
+    store.load();
+
+    expect(store.screen()?.archetype).toBe('balanced');
+    expect(store.gap()).toBeNull();
+    expect(store.gapErrorMessage()).toBe('Failed to load how your book compares.');
+  });
+
   it('keeps the screen when the gap cannot be loaded, and can retry it', () => {
     const getGap = vi
       .fn()

@@ -28,7 +28,10 @@ export function universeScreenEffects(store: EffectsStore) {
   /** Loads how the owner's book compares with the screen's target; a failure never blanks the screen. */
   const loadGap = rxMethod<void>(
     pipe(
-      tap(() => store.setGapLoading()),
+      tap(() => {
+        store.setGap(null);
+        store.setGapLoading();
+      }),
       switchMap(() =>
         service.getGap(store.screen()?.archetype ?? undefined).pipe(
           tap(gap => {
