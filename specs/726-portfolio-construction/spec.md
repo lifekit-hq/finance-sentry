@@ -47,7 +47,7 @@ new is stored and there is no migration.
 
 Not built here (follow-ups, each still under #726): US1 (ranked universe screen and universe scorecards,
 FR-001/FR-003), US3 (archetype constructor, a new module, FR-012..FR-018), US4 (gap mode, FR-019/FR-020), FR-022,
-suggested weights, the lifekit-common axis strip (FR-009/FR-010, SC-006 baselines), calibration of the v1
+suggested weights, the lifekit-common axis strip (FR-009/FR-010, SC-006 baselines), calibration of the verdict
 thresholds against stored `CandidateScore` rows (they carry no valuation premium, so the slice calibrates on a
 synthetic fixture), and the FR-023 flag. Nothing in the slice places a trade.
 
