@@ -153,4 +153,58 @@ public sealed class YahooValuationModulesContractTests
 
         YahooValuationDataService.Parse(empty, "ZZZZ").Should().BeNull();
     }
+
+    [Fact]
+    public void Parse_reads_comps_inputs_from_a_recorded_live_payload()
+    {
+        var json = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory, "Unit", "Fixtures", "Yahoo", "quotesummary-valuation-MCD-2026-11-14.json"));
+
+        var comps = YahooValuationDataService.Parse(json, "MCD")!.Comps;
+
+        comps.Should().NotBeNull();
+        comps!.EnterpriseValue.Should().Be(245302280192m);
+        comps.Ebitda.Should().Be(15075000320m);
+        comps.TotalRevenue.Should().Be(27782000640m);
+        comps.RevenueGrowth.Should().Be(0.011m);
+        comps.EbitdaMargin.Should().Be(0.54262m);
+        comps.TrailingEps.Should().Be(12.64m);
+        comps.BookValuePerShare.Should().Be(-0.486m);
+        comps.TotalDebt.Should().Be(54542999552m);
+        comps.TotalCash.Should().Be(1192999936m);
+        comps.SharesOutstanding.Should().Be(705784744m);
+        comps.FinancialCurrency.Should().Be("USD");
+        comps.PriceToBook.Should().BeNull("Yahoo returns an empty object for a negative book value, never a zero");
+    }
+
+    [Fact]
+    public void Parse_reads_price_to_book_and_leaves_missing_comps_inputs_null()
+    {
+        const string sparse = """
+        {
+          "quoteSummary": {
+            "result": [
+              {
+                "price": { "quoteType": "EQUITY" },
+                "defaultKeyStatistics": { "priceToBook": { "raw": 1.4 } }
+              }
+            ],
+            "error": null
+          }
+        }
+        """;
+
+        var comps = YahooValuationDataService.Parse(sparse, "BANK")!.Comps!;
+
+        comps.PriceToBook.Should().Be(1.4m);
+        comps.EnterpriseValue.Should().BeNull();
+        comps.Ebitda.Should().BeNull();
+        comps.TotalRevenue.Should().BeNull();
+        comps.RevenueGrowth.Should().BeNull();
+        comps.EbitdaMargin.Should().BeNull();
+        comps.TotalDebt.Should().BeNull("a missing debt figure is unknown, not zero");
+        comps.TotalCash.Should().BeNull();
+        comps.SharesOutstanding.Should().BeNull();
+        comps.FinancialCurrency.Should().BeNull();
+    }
 }

@@ -42,4 +42,27 @@ public sealed record ValuationCurrentMetrics(
     decimal? TargetHigh = null,
     int? AnalystCount = null,
     string? Currency = null,
-    decimal? MarketCap = null);
+    decimal? MarketCap = null,
+    ValuationCompsInputs? Comps = null);
+
+/// <summary>
+/// The raw trailing-twelve-month figures from the same Yahoo <c>quoteSummary</c> call that the comps
+/// tool compares across a peer set. Amounts (<see cref="EnterpriseValue"/>, <see cref="Ebitda"/>,
+/// <see cref="TotalRevenue"/>, <see cref="TotalDebt"/>, <see cref="TotalCash"/>) are in
+/// <see cref="FinancialCurrency"/> (the reporting currency); <see cref="TrailingEps"/> and
+/// <see cref="BookValuePerShare"/> are per share. Every field is nullable: a missing field is
+/// <c>null</c>, never zero.
+/// </summary>
+public sealed record ValuationCompsInputs(
+    decimal? EnterpriseValue,
+    decimal? Ebitda,
+    decimal? TotalRevenue,
+    decimal? RevenueGrowth,
+    decimal? EbitdaMargin,
+    decimal? PriceToBook,
+    decimal? TrailingEps,
+    decimal? BookValuePerShare,
+    decimal? TotalDebt,
+    decimal? TotalCash,
+    decimal? SharesOutstanding,
+    string? FinancialCurrency);

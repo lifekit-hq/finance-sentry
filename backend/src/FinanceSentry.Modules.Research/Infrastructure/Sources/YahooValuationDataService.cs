@@ -182,7 +182,20 @@ public sealed class YahooValuationDataService(
             TargetHigh: ReadRaw(financialData, "targetHighPrice"),
             AnalystCount: ReadRaw(financialData, "numberOfAnalystOpinions") is { } count ? (int)count : null,
             Currency: ReadString(price, "currency"),
-            MarketCap: ReadRaw(price, "marketCap") ?? ReadRaw(summaryDetail, "marketCap"));
+            MarketCap: ReadRaw(price, "marketCap") ?? ReadRaw(summaryDetail, "marketCap"),
+            Comps: new ValuationCompsInputs(
+                enterpriseValue,
+                ebitda,
+                ReadRaw(financialData, "totalRevenue"),
+                ReadRaw(financialData, "revenueGrowth"),
+                ReadRaw(financialData, "ebitdaMargins"),
+                ReadRaw(keyStats, "priceToBook"),
+                ReadRaw(keyStats, "trailingEps"),
+                ReadRaw(keyStats, "bookValue"),
+                ReadRaw(financialData, "totalDebt"),
+                ReadRaw(financialData, "totalCash"),
+                ReadRaw(keyStats, "sharesOutstanding"),
+                ReadString(financialData, "financialCurrency")));
     }
 
     private static IReadOnlyList<string> ParsePeers(string json, string self)
