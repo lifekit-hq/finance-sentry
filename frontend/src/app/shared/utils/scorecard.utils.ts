@@ -136,7 +136,7 @@ export class ScorecardUtils {
       return LOOK_THROUGH_UNAVAILABLE;
     }
     return (
-      `${ScorecardUtils.percentOfFund(basis.buyWeightSharePct)} of the top-10 weight reads BUY or better · ` +
+      `${ScorecardUtils.percentOfFund(basis.buyWeightSharePct)} of the top 10 weight reads BUY or better · ` +
       `BUY needs more than ${ScorecardUtils.percentOfFund(basis.buyWeightSharePctRequired)}`
     );
   }

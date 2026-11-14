@@ -181,7 +181,7 @@ export class ScorecardFixtures {
           {
             axis: 'LookThrough',
             status: 'Pass',
-            text: '60% of the top-10 weight reads BUY or better, above the 50% BUY needs.',
+            text: '60% of the top 10 weight reads BUY or better, above the 50% BUY needs.',
             decisive: true,
           },
         ],

@@ -458,7 +458,7 @@ describe('ScorecardUtils.lookThrough', () => {
     const view = ScorecardUtils.lookThrough(ScorecardFixtures.etf());
 
     expect(view?.headline).toBe(
-      '60% of the top-10 weight reads BUY or better · BUY needs more than 50%'
+      '60% of the top 10 weight reads BUY or better · BUY needs more than 50%'
     );
     expect(view?.sourceLine).toBe('Yahoo Finance · the top 10 cover 100% of the fund');
     expect(view?.degraded).toBe(false);

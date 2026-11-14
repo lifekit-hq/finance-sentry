@@ -22,7 +22,7 @@ describe('LookThroughComponent', () => {
     const host = render(ScorecardFixtures.etf());
 
     expect(text(host, 'look-through-headline')).toBe(
-      '60% of the top-10 weight reads BUY or better · BUY needs more than 50%'
+      '60% of the top 10 weight reads BUY or better · BUY needs more than 50%'
     );
     expect(text(host, 'look-through-source')).toContain('Yahoo Finance');
     expect(text(host, 'look-through-source')).toContain('read Nov 14, 2026');
