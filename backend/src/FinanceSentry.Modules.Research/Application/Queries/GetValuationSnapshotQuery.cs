@@ -22,7 +22,6 @@ public class GetValuationSnapshotQueryHandler(
     IValuationSnapshotRepository snapshots)
     : IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>
 {
-    private const int MaxPeers = 6;
     private const int PercentScale = 100;
 
     public async Task<ValuationSnapshotResult> Handle(GetValuationSnapshotQuery query, CancellationToken ct)
@@ -102,12 +101,7 @@ public class GetValuationSnapshotQueryHandler(
             ? requested!
             : await valuation.GetPeerSymbolsAsync(ticker, ct);
 
-        symbols = symbols
-            .Select(s => s.Trim().ToUpperInvariant())
-            .Where(s => s.Length > 0 && s != ticker)
-            .Distinct()
-            .Take(MaxPeers)
-            .ToList();
+        symbols = ValuationPeerSymbols.Normalize(symbols, ticker);
 
         if (symbols.Count == 0)
         {
@@ -121,10 +115,6 @@ public class GetValuationSnapshotQueryHandler(
             peers.Add(new ValuationPeer(symbol, metrics?.ForwardPe, metrics?.EvToEbitda));
         }
 
-        var name = isCustom
-            ? "custom"
-            : string.IsNullOrWhiteSpace(sector) ? "default" : $"sector:{sector} (default)";
-
-        return new ValuationPeerSet(name, peers);
+        return new ValuationPeerSet(ValuationPeerSymbols.SetName(isCustom, sector), peers);
     }
 }

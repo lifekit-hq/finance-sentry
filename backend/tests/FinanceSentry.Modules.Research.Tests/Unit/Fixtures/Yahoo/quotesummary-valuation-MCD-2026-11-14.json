@@ -1,0 +1,89 @@
+{
+  "quoteSummary": {
+    "result": [
+      {
+        "price": {
+          "quoteType": "EQUITY",
+          "currency": "USD",
+          "regularMarketPrice": {
+            "raw": 271.97,
+            "fmt": "271.97"
+          },
+          "marketCap": {
+            "raw": 191952289792,
+            "fmt": "191.95B",
+            "longFmt": "191,952,289,792.00"
+          },
+          "longName": "McDonald's Corporation"
+        },
+        "summaryDetail": {
+          "trailingPE": {
+            "raw": 21.516613,
+            "fmt": "21.52"
+          },
+          "forwardPE": {
+            "raw": 19.9192,
+            "fmt": "19.92"
+          }
+        },
+        "defaultKeyStatistics": {
+          "enterpriseValue": {
+            "raw": 245302280192,
+            "fmt": "245.3B",
+            "longFmt": "245,302,280,192"
+          },
+          "priceToBook": {},
+          "bookValue": {
+            "raw": -0.486,
+            "fmt": "-0.49"
+          },
+          "trailingEps": {
+            "raw": 12.64,
+            "fmt": "12.64"
+          },
+          "sharesOutstanding": {
+            "raw": 705784744,
+            "fmt": "705.78M",
+            "longFmt": "705,784,744"
+          }
+        },
+        "financialData": {
+          "ebitda": {
+            "raw": 15075000320,
+            "fmt": "15.08B",
+            "longFmt": "15,075,000,320"
+          },
+          "totalRevenue": {
+            "raw": 27782000640,
+            "fmt": "27.78B",
+            "longFmt": "27,782,000,640"
+          },
+          "revenueGrowth": {
+            "raw": 0.011,
+            "fmt": "1.10%"
+          },
+          "ebitdaMargins": {
+            "raw": 0.54262,
+            "fmt": "54.26%"
+          },
+          "totalDebt": {
+            "raw": 54542999552,
+            "fmt": "54.54B",
+            "longFmt": "54,542,999,552"
+          },
+          "totalCash": {
+            "raw": 1192999936,
+            "fmt": "1.19B",
+            "longFmt": "1,192,999,936"
+          },
+          "financialCurrency": "USD"
+        },
+        "assetProfile": {
+          "sector": "Consumer Cyclical",
+          "industry": "Restaurants"
+        }
+      }
+    ],
+    "error": null
+  }
+}
