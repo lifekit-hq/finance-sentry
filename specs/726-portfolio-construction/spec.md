@@ -171,7 +171,7 @@ top-10 weight. First match fires; there is no STRONG BUY rule, so an ETF word is
 Holdings come from Yahoo `topHoldings`, then the issuer's holdings CSV mapped per fund in `FundHoldings:IssuerFiles`
 (nothing mapped by default), cached for a day. The scorecard carries the basis (`lookThrough`: source, read time,
 covered weight, the share against its bar, each holding with its word). When holdings are missing the basis says
-so (`unavailable`, or `partial` when some holding could not be scored): the word cannot reach BUY, though AVOID on
+so (`unavailable`, or `partial` when some holding could not be scored or fewer than ten were listed): the word cannot reach BUY, though AVOID on
 the fund's own structure still applies. A symbol the source cannot type at all keeps `outside_universe`.
 
 ## Context
