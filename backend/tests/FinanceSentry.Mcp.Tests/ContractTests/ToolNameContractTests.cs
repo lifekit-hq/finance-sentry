@@ -41,6 +41,7 @@ public sealed class ToolNameContractTests
         "get_market_structure",
         "get_net_worth_history",
         "get_news_for_ticker",
+        "get_portfolio_gap",
         "get_portfolio_snapshot",
         "get_postmortem_packet",
         "get_quotes",

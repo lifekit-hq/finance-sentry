@@ -77,14 +77,32 @@ the brokerage holdings reader.
 | FR-007 / FR-008 | Covered: no composite number; a missing axis reads "no data" and fails its gate. | `UniverseScreenResult` shape test |
 | FR-017 | Not built: the constructor enforces the position cap and cash floor by construction, but the proposed book is not run through Risk's evaluator (`IProposedBookEvaluator`). | - |
 | FR-018 | Covered: nothing is created or placed. | - |
-| FR-021 | Partial: the screen has a REST read; no MCP tool yet. | `PortfolioConstructionController` |
+| FR-021 | Partial: the screen has a REST read; no MCP tool yet. Gap mode has both: `GET /api/v1/portfolio-construction/gap` and the `get_portfolio_gap` MCP tool. | `PortfolioConstructionController`, `GetPortfolioGapTool` |
 | FR-022 / OQ-7 | Not built: the archetype is a request parameter (default from configuration), not an IPS field; that needs a migration. | - |
 | FR-023 | Not applied: owner-only, as for the verdict slice. | - |
 
 Not built here (follow-ups under #726): universe scorecards persisted by a `UniverseScoringJob` (migration),
-scan-shortlist membership, `IProposedBookEvaluator` (FR-017), the archetype as an IPS field (FR-022), gap mode
-(US4), MCP `get_universe_screen` / `get_scorecard`, the lifekit-common axis strip, and adoption of the library page
+scan-shortlist membership, `IProposedBookEvaluator` (FR-017), the archetype as an IPS field (FR-022), MCP `get_universe_screen` / `get_scorecard`, the lifekit-common axis strip, and adoption of the library page
 template once the pinned `@lifekit-hq/ui` ships it.
+
+## Build status: gap mode (US4)
+
+Built on the universe-screen slice with no migration and no stored state. `GET /api/v1/portfolio-construction/gap`
+(`ai.use`, pinned in `RoleFeatureMatrixTests`) and the MCP `get_portfolio_gap` read `GetGapModeQuery`, which runs the
+universe screen's own handler for the target (so the coverage set, held and watchlist names, the stored sector data
+and the viewer's IPS and risk limits are the same ones the screen shows) and diffs it against `IBookFiguresService`,
+the canonical USD book. `GapModeCalculator` is pure and deterministic; there is no model call.
+
+| Requirement | Status in this slice | Where |
+|---|---|---|
+| FR-019 | Covered: per name and per sleeve, on the USD book figures (never native amounts summed across currencies); sector rows regroup the equities names by the stored sector (`Unclassified` when the source gave none). A theme has no stored per-symbol field, so sector is the only grouping. | `GapModeCalculator` |
+| FR-020 | Covered: gap lines are descriptive (status Missing / Underweight / OnTarget / Overweight, points and USD); a held name outside the target is flagged `heldOutsideTarget` and carries its verdict word, which is the call. Every response carries the informational `label`. No order is created. | `GapModeResult` |
+| SC-005 | Covered: sleeve current weights use the same arithmetic and rounding as `get_allocation_vs_target` (`Math.Round(value / total * 100, 2)`). | `GapModeTests` |
+| US4 scenario 3 | Covered as data: an empty book returns every target name as Missing, percentages only (`hasBook` false), with a note pointing at the universe screen. | `GapModeTests` |
+
+A gap is target minus current, from the two rounded percentages (and the two rounded dollar figures), so a shown row
+always subtracts exactly; a column may differ from its total by a rounding residual. A gap within 0.5 point is
+OnTarget. A refused policy (IPS targets over 100%) gives no gap.
 
 ### Verdict rule table v1
 
