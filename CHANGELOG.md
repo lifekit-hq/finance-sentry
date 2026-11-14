@@ -5,6 +5,45 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.20.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.19.0...v1.20.0) (2026-11-14)
+
+
+### Features
+
+* **agent:** format Ledger proactive messages with the shared typed schema ([#1377](https://github.com/lifekit-hq/finance-sentry/issues/1377)) ([5ba0d62](https://github.com/lifekit-hq/finance-sentry/commit/5ba0d626f9ab1ad70abedde5917c2441a885db29))
+* **frontend:** move the alerts screen onto the shared page layer ([#1371](https://github.com/lifekit-hq/finance-sentry/issues/1371)) ([6575c9d](https://github.com/lifekit-hq/finance-sentry/commit/6575c9d3088c65fd5e1efa21fefc8cfbb55fb15c))
+* **frontend:** open the holding detail on a verdict-first header ([#1366](https://github.com/lifekit-hq/finance-sentry/issues/1366)) ([14b0e8b](https://github.com/lifekit-hq/finance-sentry/commit/14b0e8b381fcb1180054a76d3005ccb73c16266d))
+* **frontend:** put budgets on cmn-page overview and enforce its screen gate ([#1370](https://github.com/lifekit-hq/finance-sentry/issues/1370)) ([dadf8bd](https://github.com/lifekit-hq/finance-sentry/commit/dadf8bd3e65774b1b4e92cb19a53c48b96612ff5))
+* **frontend:** put the decisions queue on cmn-page and cmn-prose ([#1369](https://github.com/lifekit-hq/finance-sentry/issues/1369)) ([ec97abf](https://github.com/lifekit-hq/finance-sentry/commit/ec97abf3a18eda3ecea1730aa2f7a10d422fe7bf))
+* **ledger:** persona runs the thesis loop itself, no owner confirm step ([#1385](https://github.com/lifekit-hq/finance-sentry/issues/1385)) ([320a49a](https://github.com/lifekit-hq/finance-sentry/commit/320a49a67e304ad18fbf0e5032468806d04e7b50))
+* **mcp:** let Ledger write theses, candidates and the watchlist directly, with an origin audit trail ([#1383](https://github.com/lifekit-hq/finance-sentry/issues/1383)) ([d23ed26](https://github.com/lifekit-hq/finance-sentry/commit/d23ed26065ea1e52fda514417327e4218a933a84))
+* **portfolio-construction:** gap mode - current book vs constructed target ([#1393](https://github.com/lifekit-hq/finance-sentry/issues/1393)) ([bf7ef51](https://github.com/lifekit-hq/finance-sentry/commit/bf7ef51c75720337089267d81080df7881a9b43e))
+* **research:** 63-day return correlation of a candidate to the top holdings and the book, with a D1 add-rule penalty input ([#558](https://github.com/lifekit-hq/finance-sentry/issues/558) stage 2) ([#1384](https://github.com/lifekit-hq/finance-sentry/issues/1384)) ([4b4d754](https://github.com/lifekit-hq/finance-sentry/commit/4b4d754425b46a426b255fc714d2f15a0048c113))
+* **research:** add coverage universe with deterministic add/remove rules and MCP read tools ([#1387](https://github.com/lifekit-hq/finance-sentry/issues/1387)) ([8b3f2ab](https://github.com/lifekit-hq/finance-sentry/commit/8b3f2abe8bcb16fc6ffbfd9e135539d17635b2b7))
+* **research:** add free cash flow, capex and ROE to get_fundamentals ([#1379](https://github.com/lifekit-hq/finance-sentry/issues/1379)) ([19f54bb](https://github.com/lifekit-hq/finance-sentry/commit/19f54bbbd6844aedf1459cb68c50d2c40cee22e4))
+* **research:** add fundamentals, relative-strength and dated-catalyst screens nominating into the candidate path ([#1390](https://github.com/lifekit-hq/finance-sentry/issues/1390)) ([530c62c](https://github.com/lifekit-hq/finance-sentry/commit/530c62cd593fc57875d58e404b7f51b50e279cf6))
+* **research:** carry scorecard and decision note into promoted thesis ([#1380](https://github.com/lifekit-hq/finance-sentry/issues/1380)) ([9ce93b5](https://github.com/lifekit-hq/finance-sentry/commit/9ce93b55326384f78bae0b3f7814495e770298b8))
+* **research:** daily 8-K catalyst scan and GDELT theme attention measure ([#1392](https://github.com/lifekit-hq/finance-sentry/issues/1392)) ([28d5fb5](https://github.com/lifekit-hq/finance-sentry/commit/28d5fb53070dfb462d3fb38c055cac0d4f2b452b))
+* **research:** grade the coverage list against the S&P 500 on the Ledger scoreboard ([#1388](https://github.com/lifekit-hq/finance-sentry/issues/1388)) ([85646a4](https://github.com/lifekit-hq/finance-sentry/commit/85646a414073a2c735a8415b8bba79cdb8211829))
+* **research:** make an EDGAR ticker→CIK map outage loud instead of silently blinding fundamentals and thesis monitoring ([#1378](https://github.com/lifekit-hq/finance-sentry/issues/1378)) ([82a3288](https://github.com/lifekit-hq/finance-sentry/commit/82a328823054b7aafcc7c199d717304e78f7972e))
+* **research:** narrative falsifiers on a thesis ([#1391](https://github.com/lifekit-hq/finance-sentry/issues/1391)) ([b505449](https://github.com/lifekit-hq/finance-sentry/commit/b505449d2fa5c82060270026df14635cdb42afe0))
+* **research:** raise ThesisReviewDue and CandidateReviewDue notices when a name deserves a fresh look ([#1381](https://github.com/lifekit-hq/finance-sentry/issues/1381)) ([650b617](https://github.com/lifekit-hq/finance-sentry/commit/650b617fdda7d81b1fe89a8e2d250fc68df1c805))
+* **research:** reference universe as data with weekly refresh and get_reference_universe MCP tool ([#1386](https://github.com/lifekit-hq/finance-sentry/issues/1386)) ([fe21253](https://github.com/lifekit-hq/finance-sentry/commit/fe21253748843493528b335a658f876d28652148))
+* **research:** review coverage-name events and add a disposition digest ([#1389](https://github.com/lifekit-hq/finance-sentry/issues/1389)) ([dca90c6](https://github.com/lifekit-hq/finance-sentry/commit/dca90c6e2a6b08a438aa039981b4c6207ed50db8))
+* **research:** simple or detailed verdict display and a turns-BUY line on position rows ([#1373](https://github.com/lifekit-hq/finance-sentry/issues/1373)) ([336c61e](https://github.com/lifekit-hq/finance-sentry/commit/336c61e6662b3ef4363a839982da0b4029537787))
+
+
+### Bug Fixes
+
+* **alerts:** notify a rebalance drift once per episode ([#1382](https://github.com/lifekit-hq/finance-sentry/issues/1382)) ([3a9645f](https://github.com/lifekit-hq/finance-sentry/commit/3a9645f80220c75352bc524aa6461d5180197042))
+* **frontend:** pin libxslt to the CVE-2026-87636/CVE-2026-9947 fix in the serve image ([#1374](https://github.com/lifekit-hq/finance-sentry/issues/1374)) ([4d3a327](https://github.com/lifekit-hq/finance-sentry/commit/4d3a32730c4e4bc9dad5489bfdea40ec6319de43))
+* **mcp:** unblock MCP connect page, stdio sign-in and sync health false errors ([#1396](https://github.com/lifekit-hq/finance-sentry/issues/1396)) ([5bd9d27](https://github.com/lifekit-hq/finance-sentry/commit/5bd9d2749a1e401b367fd655e63c4b6d6fb56b60))
+
+
+### Refactoring
+
+* **frontend:** move remaining routed pages onto cmn-page ([#1394](https://github.com/lifekit-hq/finance-sentry/issues/1394)) ([01a4f31](https://github.com/lifekit-hq/finance-sentry/commit/01a4f3168c5d4edd43026eb6bc001f17754193f5))
+
 ## [1.19.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.18.0...v1.19.0) (2026-11-09)
 
 
