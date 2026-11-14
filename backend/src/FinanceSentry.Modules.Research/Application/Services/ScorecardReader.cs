@@ -97,7 +97,7 @@ public sealed class ScorecardReader(
                 crowding,
                 valuation.NotApplicable,
                 valuation.LensPremium(),
-                evidence.RevenueYoy is { } growth ? decimal.Round(growth * PercentScale, 1) : null,
+                composed.Evidence.RevenueYoy is { } growth ? decimal.Round(growth * PercentScale, 1) : null,
                 valuation.PriceLens),
             verdictOptions);
         return Assemble(symbol, composed, valuation, opportunity, crowding, verdict, generatedAt, sector, industry, null);

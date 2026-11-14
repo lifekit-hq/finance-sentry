@@ -224,7 +224,7 @@ public sealed class EtfLookThroughTests
     {
         var harness = new Harness(Strong(Fund));
         harness.Holdings(Fund, Ten(strong: 7));
-        var handler = new GetScorecardQueryHandler(harness.Valuation.Object, harness.History.Object, harness.Reader);
+        var handler = new GetScorecardQueryHandler(harness.Valuation.Object, harness.History.Object, new PeerForwardPeReader(harness.Valuation.Object), harness.Reader);
 
         var card = await handler.Handle(new GetScorecardQuery(" etfx "), CancellationToken.None);
 
@@ -296,7 +296,7 @@ public sealed class EtfLookThroughTests
                 verdictOptions,
                 new EtfLookThroughReader(
                     source.Object,
-                    new ScorecardValuationReader(Valuation.Object, History.Object),
+                    new ScorecardValuationReader(Valuation.Object, History.Object, new PeerForwardPeReader(Valuation.Object)),
                     NullLogger<EtfLookThroughReader>.Instance));
         }
 
@@ -334,9 +334,11 @@ public sealed class EtfLookThroughTests
 
         public async Task<ScorecardResult> ReadAsync(string symbol, bool lookThrough = true)
         {
-            var (axis, sector, industry) = await new ScorecardValuationReader(Valuation.Object, History.Object)
+            var (axis, sector, industry, peerForwardPes) = await new ScorecardValuationReader(
+                    Valuation.Object, History.Object, new PeerForwardPeReader(Valuation.Object))
                 .ReadAsync(symbol, CancellationToken.None);
-            return await Reader.ReadAsync(symbol, axis, null, CancellationToken.None, sector, industry, lookThrough);
+            return await Reader.ReadAsync(
+                symbol, axis, null, CancellationToken.None, sector, industry, peerForwardPes, lookThrough);
         }
     }
 
