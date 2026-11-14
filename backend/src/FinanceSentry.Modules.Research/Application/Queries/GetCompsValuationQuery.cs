@@ -97,7 +97,7 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
         var growth = Measure(target, peers, c => Scaled(c.Inputs?.RevenueGrowth), null, flags, PercentDecimals);
         var margin = Measure(target, peers, c => Scaled(c.Inputs?.EbitdaMargin), null, flags, PercentDecimals);
 
-        if (evToEbitda.NotEvaluable && evToEbitda.NotEvaluableReason!.StartsWith(CompsReasons.TargetPrefix, StringComparison.Ordinal)
+        if (evToEbitda.NotEvaluable && evToEbitda.NotEvaluableReason == CompsReasons.TargetPrefix + CompsReasons.NegativeEbitda
             && !evToRevenue.NotEvaluable)
         {
             flags.Add(CompsFlags.EvRevenueFallback);

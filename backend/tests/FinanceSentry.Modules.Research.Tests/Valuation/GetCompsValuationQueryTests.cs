@@ -257,6 +257,20 @@ public sealed class GetCompsValuationQueryTests
     }
 
     [Fact]
+    public async Task Missing_target_ebitda_is_not_an_ev_revenue_fallback()
+    {
+        var data = Seed(
+            Company("TGT", ebitda: null),
+            PeerAt("P1", 8m), PeerAt("P2", 10m), PeerAt("P3", 14m), PeerAt("P4", 16m));
+
+        var result = await Run(data);
+
+        result.Multiples!.EvToEbitda.NotEvaluable.Should().BeTrue();
+        result.Multiples.EvToEbitda.NotEvaluableReason.Should().Be("TARGET_" + CompsReasons.MissingData);
+        result.Flags.Should().NotContain(CompsFlags.EvRevenueFallback);
+    }
+
+    [Fact]
     public async Task Missing_peer_data_is_null_never_zero()
     {
         var bare = new ValuationCurrentMetrics(
