@@ -11,7 +11,8 @@ public sealed class LookaheadUniverse(
     IBrokerageHoldingsReader brokerage,
     IWatchlistReader watchlist,
     IThesisRepository theses,
-    ICryptoHoldingsReader crypto)
+    ICryptoHoldingsReader crypto,
+    ICoverageRepository coverage)
 {
     private const string EquityInstrumentType = "STK";
 
@@ -74,6 +75,45 @@ public sealed class LookaheadUniverse(
         }
 
         return tickers;
+    }
+
+    /// <summary>
+    /// The coverage universe ("our own index", discovery funnel stage 1): the tickers the pipeline keeps in view. The
+    /// detectors read these names for events (filings, earnings, news) but raise no alert of their own for a name that
+    /// is not otherwise in their universe; a hit moves the member's <c>LastEventAt</c> and is reviewed by the coverage
+    /// rules. A coverage ticker naming a crypto asset the user holds is left out for the reason
+    /// <see cref="EarningsTickersAsync"/> gives. Held names stay ahead of the rest in
+    /// <see cref="CoverageTickersByPriorityAsync"/>.
+    /// </summary>
+    public async Task<IReadOnlySet<string>> CoverageTickersAsync(Guid userId, CancellationToken ct = default)
+        => (await CoverageTickersByPriorityAsync(userId, ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The coverage tickers with the held ones first, then the rest in ticker order: the order a per-run budget fills in
+    /// so the book is never starved by the wider list.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> CoverageTickersByPriorityAsync(Guid userId, CancellationToken ct = default)
+    {
+        var members = await coverage.ListMembersUnscopedAsync(userId, ct);
+        if (members.Count == 0)
+        {
+            return [];
+        }
+
+        var cryptoAssets = (await crypto.GetHoldingsAsync(userId, ct))
+            .Select(h => h.Asset)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var held = await EquityHoldingsAsync(userId, ct);
+
+        return
+        [
+            .. members
+                .Select(m => m.Ticker.Trim().ToUpperInvariant())
+                .Where(t => t.Length > 0 && !cryptoAssets.Contains(t))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(t => held.Contains(t) ? 0 : 1)
+                .ThenBy(t => t, StringComparer.Ordinal),
+        ];
     }
 
     private async Task<HashSet<string>> EquityHoldingsAsync(Guid userId, CancellationToken ct)

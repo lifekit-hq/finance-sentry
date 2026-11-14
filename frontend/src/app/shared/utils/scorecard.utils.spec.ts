@@ -314,6 +314,62 @@ describe('ScorecardUtils.rules', () => {
   });
 });
 
+describe('ScorecardUtils.trail', () => {
+  it('numbers the rules in the order they are tried, down to the one that fired', () => {
+    const trail = ScorecardUtils.trail(card.verdict);
+
+    expect(trail.map(s => [s.number, s.id, s.fired])).toEqual([
+      [1, 'outside_universe', false],
+      [2, 'weak_structure', false],
+      [3, 'extended_and_rich', true],
+    ]);
+  });
+
+  it('drops the rules after the fired one: the first match decides, so they were never consulted', () => {
+    expect(ScorecardUtils.trail(card.verdict).map(s => s.id)).not.toContain('buy');
+  });
+
+  it('reads each step like the rule table does, with the values the conditions read', () => {
+    const [, weak] = ScorecardUtils.trail(card.verdict);
+
+    expect(weak.conditions).toEqual([{text: 'Adjusted structure < 30', actual: '88', met: false}]);
+  });
+
+  it('returns the whole table when it names no fired rule', () => {
+    const trail = ScorecardUtils.trail({...card.verdict, firedRuleId: 'gone'});
+
+    expect(trail).toHaveLength(card.verdict.rules.length);
+    expect(trail.at(-1)?.number).toBe(card.verdict.rules.length);
+  });
+});
+
+describe('ScorecardUtils.turnsBuyLine', () => {
+  it('writes the bar as one sentence', () => {
+    expect(ScorecardUtils.turnsBuyLine('structure reaches 50 (reads 40)')).toBe(
+      'Turns BUY when structure reaches 50 (reads 40).'
+    );
+  });
+
+  it('is null where the API names no bar', () => {
+    expect(ScorecardUtils.turnsBuyLine(null)).toBeNull();
+    expect(ScorecardUtils.turnsBuyLine('')).toBeNull();
+  });
+});
+
+describe('ScorecardUtils.heldRowLine', () => {
+  it('states what would change the word without the add-prompt phrasing', () => {
+    const line = ScorecardUtils.heldRowLine('structure reaches 50 (reads 40)');
+
+    expect(line).toBe('The word reads BUY when structure reaches 50 (reads 40).');
+    expect(line).not.toContain('Turns BUY');
+  });
+
+  it('is null where the API names no bar', () => {
+    expect(ScorecardUtils.heldRowLine(null)).toBeNull();
+    expect(ScorecardUtils.heldRowLine('')).toBeNull();
+  });
+});
+
 describe('ScorecardUtils.firedRule', () => {
   it('returns the description of the rule that fired', () => {
     expect(ScorecardUtils.firedRule(card.verdict)).toBe('Rule extended_and_rich.');

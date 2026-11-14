@@ -335,6 +335,361 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("candidate_scores", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Catalyst.CatalystEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Accession")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("DetectedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Disposition")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("DocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateOnly>("FilingDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Form")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Items")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Tag")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DetectedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_catalyst_events_user_detected");
+
+                    b.HasIndex("UserId", "Ticker", "Accession")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalyst_events_identity");
+
+                    b.ToTable("catalyst_events", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Catalyst.ThemeAttentionDay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<long>("Articles")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("MeasuredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<long?>("TotalArticles")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Day")
+                        .HasDatabaseName("idx_theme_attention_days_day");
+
+                    b.HasIndex("Theme", "Phrase", "Day")
+                        .IsUnique()
+                        .HasDatabaseName("ux_theme_attention_days_identity");
+
+                    b.ToTable("theme_attention_days", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Disposition")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Rescored")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ReviewNotice")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rule")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Verdict")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "OccurredAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_coverage_events_user_occurred");
+
+                    b.HasIndex("UserId", "Ticker", "Source", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_coverage_events_identity");
+
+                    b.ToTable("coverage_events", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageJournalEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("At")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<decimal?>("CorrelationToBook")
+                        .HasPrecision(6, 4)
+                        .HasColumnType("numeric(6,4)");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("RankScore")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Rule")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Ticker", "At")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("idx_coverage_journal_user_ticker_at");
+
+                    b.ToTable("coverage_journal", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("AddedReason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("CorrelationToBook")
+                        .HasPrecision(6, 4)
+                        .HasColumnType("numeric(6,4)");
+
+                    b.Property<DateTimeOffset?>("LastEventAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LastScoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RemoveAfter")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Ticker")
+                        .IsUnique()
+                        .HasDatabaseName("ux_coverage_members_user_ticker");
+
+                    b.ToTable("coverage_members", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Coverage.CoverageVerdictObservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid?>("CandidateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FiredRuleId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateOnly>("ObservedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Verdict")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObservedOn")
+                        .HasDatabaseName("idx_coverage_observations_day");
+
+                    b.HasIndex("UserId", "Ticker", "ObservedOn")
+                        .IsUnique()
+                        .HasDatabaseName("ux_coverage_observations_user_ticker_day");
+
+                    b.ToTable("coverage_verdict_observations", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.InvestmentPolicyStatement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -487,6 +842,15 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<string>("InvalidationTriggers")
                         .IsRequired()
                         .HasColumnType("jsonb");
+
+                    b.Property<string>("MonitorSnapshot")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("NarrativeFalsifiers")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("ThesisText")
                         .IsRequired()
@@ -1189,6 +1553,89 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("recommendations", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ReferenceUniverse.ReferenceListMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source")
+                        .HasDatabaseName("idx_reference_members_source");
+
+                    b.HasIndex("Ticker")
+                        .HasDatabaseName("idx_reference_members_ticker");
+
+                    b.HasIndex("ListKey", "Ticker")
+                        .IsUnique()
+                        .HasDatabaseName("idx_reference_members_list_ticker");
+
+                    b.ToTable("reference_list_members", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ReferenceUniverse.ReferenceRefreshRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "FinishedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_reference_runs_source_finished");
+
+                    b.ToTable("reference_refresh_runs", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ResearchChunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1369,6 +1816,9 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<string>("Audit")
+                        .HasColumnType("jsonb");
+
                     b.Property<decimal?>("BenchmarkPrice")
                         .HasColumnType("numeric(18,6)");
 
@@ -1387,6 +1837,13 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("User");
 
                     b.Property<bool>("PricesPending")
                         .HasColumnType("boolean");

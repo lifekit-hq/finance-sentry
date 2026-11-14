@@ -10,7 +10,9 @@ import {
   VERDICT_AXIS_LABEL,
   VERDICT_CONDITION_SUBJECT,
   VERDICT_CONDITION_UNIT,
+  VERDICT_HELD_ROW_PREFIX,
   VERDICT_OPERATOR_LABEL,
+  VERDICT_TURNS_BUY_PREFIX,
 } from '../constants/scorecard/scorecard.constants';
 import {
   type ScorecardAxisView,
@@ -24,6 +26,7 @@ import {
   type VerdictConditionView,
   type VerdictDto,
   type VerdictRuleView,
+  type VerdictTrailStep,
 } from '../models/scorecard/scorecard.model';
 import {MoneyUtils} from './money.utils';
 
@@ -61,6 +64,28 @@ export class ScorecardUtils {
       fired: rule.fired,
       conditions: rule.conditions.map(ScorecardUtils.condition),
     }));
+  }
+
+  /**
+   * The audit trail behind the word: the rule table in the order the rules are tried, numbered, up to and
+   * including the rule that fired (the first match decides, so the rules after it were never consulted). A table
+   * that names no fired rule is returned whole.
+   */
+  public static trail(verdict: VerdictDto): VerdictTrailStep[] {
+    const rules = ScorecardUtils.rules(verdict);
+    const firedAt = rules.findIndex(r => r.id === verdict.firedRuleId);
+    const tried = firedAt === -1 ? rules : rules.slice(0, firedAt + 1);
+    return tried.map((rule, index) => ({...rule, number: index + 1}));
+  }
+
+  /** The line saying what would turn the verdict into BUY, as one sentence; null where the API names no bar. */
+  public static turnsBuyLine(turnsBuyWhen: Nullable<string>): Nullable<string> {
+    return turnsBuyWhen ? `${VERDICT_TURNS_BUY_PREFIX} ${turnsBuyWhen}.` : null;
+  }
+
+  /** The same bar worded for a held position's list row: what would change the word, not advice to add. */
+  public static heldRowLine(turnsBuyWhen: Nullable<string>): Nullable<string> {
+    return turnsBuyWhen ? `${VERDICT_HELD_ROW_PREFIX} ${turnsBuyWhen}.` : null;
   }
 
   /** The description of the rule that fired, or null when the table names none. */

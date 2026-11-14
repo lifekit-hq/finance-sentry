@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.EntityFrameworkCore;
 
 // Reads run under the Owner filter. Jobs, cross-module readers and the handlers they share run with no person in
@@ -56,6 +57,7 @@ public class ThesisRepository(ResearchDbContext db) : IThesisRepository
             existing.KeyDataPoints = thesis.KeyDataPoints;
             existing.Catalysts = thesis.Catalysts;
             existing.InvalidationTriggers = thesis.InvalidationTriggers;
+            existing.NarrativeFalsifiers = thesis.NarrativeFalsifiers;
             existing.EntryPrice = thesis.EntryPrice;
             existing.BrokenAt = thesis.BrokenAt;
             existing.BrokenReason = thesis.BrokenReason;
@@ -63,6 +65,13 @@ public class ThesisRepository(ResearchDbContext db) : IThesisRepository
 
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task SaveMonitorSnapshotAsync(
+        Guid userId, Guid thesisId, ThesisMonitorSnapshot snapshot, CancellationToken ct = default)
+        => await db.Theses
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(t => t.UserId == userId && t.Id == thesisId)
+            .ExecuteUpdateAsync(set => set.SetProperty(t => t.MonitorSnapshot, snapshot), ct);
 
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
     {

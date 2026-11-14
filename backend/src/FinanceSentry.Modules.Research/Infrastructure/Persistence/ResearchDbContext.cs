@@ -5,9 +5,13 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
+using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
+using FinanceSentry.Modules.Research.Domain.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Scoring;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -58,6 +62,22 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
 
     public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
     public DbSet<BenchmarkRelativeRecord> BenchmarkRelativeRecords { get; set; } = null!;
+
+    public DbSet<ReferenceListMember> ReferenceListMembers { get; set; } = null!;
+
+    public DbSet<ReferenceRefreshRun> ReferenceRefreshRuns { get; set; } = null!;
+
+    public DbSet<CoverageMember> CoverageMembers { get; set; } = null!;
+
+    public DbSet<CoverageJournalEntry> CoverageJournal { get; set; } = null!;
+
+    public DbSet<CoverageVerdictObservation> CoverageVerdictObservations { get; set; } = null!;
+
+    public DbSet<CoverageEvent> CoverageEvents { get; set; } = null!;
+
+    public DbSet<CatalystEvent> CatalystEvents { get; set; } = null!;
+
+    public DbSet<ThemeAttentionDay> ThemeAttentionDays { get; set; } = null!;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -115,6 +135,24 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasConversion(
                 v => JsonSerializer.Serialize(v, jsonOptions),
                 v => JsonSerializer.Deserialize<List<ThesisInvalidationTrigger>>(v, jsonOptions) ?? new());
+        // Free-text kill-switches (P7). Additive column: a row written before it reads back as [].
+        tb.Property(x => x.NarrativeFalsifiers)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
+            .HasDefaultValueSql("'[]'::jsonb")
+            .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                (a, b) => a!.SequenceEqual(b!),
+                v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
+                v => v.ToList()));
+        // The monitor's last-run coverage (#1375): a small JSON document, nullable for every thesis
+        // that has not been monitored since the column was added.
+        tb.Property(x => x.MonitorSnapshot)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, jsonOptions),
+                v => v == null ? null : JsonSerializer.Deserialize<ThesisMonitorSnapshot>(v, jsonOptions));
         tb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_thesis_user_ticker");
 
         var nb = modelBuilder.Entity<NewsArticle>();
@@ -255,6 +293,13 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         teb.Property(x => x.BenchmarkTicker).IsRequired().HasMaxLength(20).HasDefaultValue("SPY");
         teb.Property(x => x.PricesPending).IsRequired();
         teb.Property(x => x.DecisionNote).HasMaxLength(4000);
+        teb.Property(x => x.Origin).IsRequired().HasMaxLength(20).HasDefaultValue(ThesisEventOrigin.User)
+            .HasConversion<string>();
+        teb.Property(x => x.Audit)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, jsonOptions),
+                v => v == null ? null : JsonSerializer.Deserialize<ThesisAudit>(v, jsonOptions));
         teb.HasIndex(x => new { x.SubjectType, x.SubjectId, x.Timestamp })
             .HasDatabaseName("idx_thesis_events_subject");
         teb.HasIndex(x => new { x.UserId, x.PricesPending })
@@ -334,6 +379,115 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         aumb.Property(x => x.Active).IsRequired();
         aumb.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         aumb.HasIndex(x => x.Ticker).IsUnique().HasDatabaseName("idx_analyst_universe_ticker");
+
+        // Reference universe (shared market data, no UserId): one row per (list, ticker), plus the refresh log.
+        var rlm = modelBuilder.Entity<ReferenceListMember>();
+        rlm.ToTable("reference_list_members");
+        rlm.HasKey(x => x.Id);
+        rlm.Property(x => x.ListKey).IsRequired().HasMaxLength(120);
+        rlm.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        rlm.Property(x => x.Name).HasMaxLength(300);
+        rlm.Property(x => x.Source).IsRequired().HasMaxLength(30);
+        rlm.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        rlm.HasIndex(x => new { x.ListKey, x.Ticker }).IsUnique().HasDatabaseName("idx_reference_members_list_ticker");
+        rlm.HasIndex(x => x.Ticker).HasDatabaseName("idx_reference_members_ticker");
+        rlm.HasIndex(x => x.Source).HasDatabaseName("idx_reference_members_source");
+
+        var rrr = modelBuilder.Entity<ReferenceRefreshRun>();
+        rrr.ToTable("reference_refresh_runs");
+        rrr.HasKey(x => x.Id);
+        rrr.Property(x => x.Source).IsRequired().HasMaxLength(30);
+        rrr.Property(x => x.Error).HasMaxLength(2000);
+        rrr.HasIndex(x => new { x.Source, x.FinishedAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_reference_runs_source_finished");
+
+        var cvm = modelBuilder.Entity<CoverageMember>();
+        cvm.ToTable("coverage_members");
+        cvm.HasKey(x => x.Id);
+        cvm.Property(x => x.UserId).IsRequired();
+        cvm.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvm.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvm.Property(x => x.AddedReason).IsRequired().HasMaxLength(20);
+        cvm.Property(x => x.CorrelationToBook).HasPrecision(6, 4);
+        cvm.HasIndex(x => new { x.UserId, x.Ticker }).IsUnique().HasDatabaseName("ux_coverage_members_user_ticker");
+
+        var cvj = modelBuilder.Entity<CoverageJournalEntry>();
+        cvj.ToTable("coverage_journal");
+        cvj.HasKey(x => x.Id);
+        cvj.Property(x => x.UserId).IsRequired();
+        cvj.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvj.Property(x => x.Action).IsRequired().HasMaxLength(10);
+        cvj.Property(x => x.Rule).IsRequired().HasMaxLength(40);
+        cvj.Property(x => x.Reason).IsRequired().HasMaxLength(20);
+        cvj.Property(x => x.Detail).IsRequired().HasMaxLength(1000);
+        cvj.Property(x => x.At).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvj.Property(x => x.CorrelationToBook).HasPrecision(6, 4);
+        cvj.HasIndex(x => new { x.UserId, x.Ticker, x.At }).IsDescending(false, false, true)
+            .HasDatabaseName("idx_coverage_journal_user_ticker_at");
+
+        var cvo = modelBuilder.Entity<CoverageVerdictObservation>();
+        cvo.ToTable("coverage_verdict_observations");
+        cvo.HasKey(x => x.Id);
+        cvo.Property(x => x.UserId).IsRequired();
+        cvo.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cvo.Property(x => x.Verdict).IsRequired().HasMaxLength(20);
+        cvo.Property(x => x.FiredRuleId).IsRequired().HasMaxLength(40);
+        cvo.Property(x => x.ObservedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cvo.HasIndex(x => new { x.UserId, x.Ticker, x.ObservedOn }).IsUnique()
+            .HasDatabaseName("ux_coverage_observations_user_ticker_day");
+        cvo.HasIndex(x => x.ObservedOn).HasDatabaseName("idx_coverage_observations_day");
+
+        var cve = modelBuilder.Entity<CoverageEvent>();
+        cve.ToTable("coverage_events");
+        cve.HasKey(x => x.Id);
+        cve.Property(x => x.UserId).IsRequired();
+        cve.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cve.Property(x => x.Source).IsRequired().HasMaxLength(20);
+        cve.Property(x => x.Reference).IsRequired().HasMaxLength(200);
+        cve.Property(x => x.Summary).IsRequired().HasMaxLength(500);
+        cve.Property(x => x.OccurredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cve.Property(x => x.Disposition).IsRequired().HasMaxLength(10);
+        cve.Property(x => x.ReviewNotice).HasMaxLength(60);
+        cve.Property(x => x.Verdict).HasMaxLength(20);
+        cve.Property(x => x.Rule).HasMaxLength(40);
+        cve.Property(x => x.Detail).IsRequired().HasMaxLength(1000);
+        cve.HasIndex(x => new { x.UserId, x.Ticker, x.Source, x.Reference }).IsUnique()
+            .HasDatabaseName("ux_coverage_events_identity");
+        cve.HasIndex(x => new { x.UserId, x.OccurredAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_coverage_events_user_occurred");
+
+        // Catalyst detection (discovery funnel stage 7): one row per 8-K filing handled for a user, once ever.
+        var cat = modelBuilder.Entity<CatalystEvent>();
+        cat.ToTable("catalyst_events");
+        cat.HasKey(x => x.Id);
+        cat.Property(x => x.UserId).IsRequired();
+        cat.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cat.Property(x => x.Accession).IsRequired().HasMaxLength(30);
+        cat.Property(x => x.Form).IsRequired().HasMaxLength(10);
+        cat.Property(x => x.Items).IsRequired().HasMaxLength(60);
+        cat.Property(x => x.Summary).IsRequired().HasMaxLength(200);
+        cat.Property(x => x.DocumentUrl).IsRequired().HasMaxLength(500);
+        cat.Property(x => x.Source).IsRequired().HasMaxLength(12);
+        cat.Property(x => x.DetectedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cat.Property(x => x.Disposition).IsRequired().HasMaxLength(16);
+        cat.Property(x => x.Tag).HasMaxLength(100);
+        cat.Property(x => x.Detail).IsRequired().HasMaxLength(500);
+        cat.HasIndex(x => new { x.UserId, x.Ticker, x.Accession }).IsUnique()
+            .HasDatabaseName("ux_catalyst_events_identity");
+        cat.HasIndex(x => new { x.UserId, x.DetectedAt }).IsDescending(false, true)
+            .HasDatabaseName("idx_catalyst_events_user_detected");
+
+        // GDELT article volume per theme phrase (shared market data, no UserId): one row per (theme, phrase, day).
+        var tad = modelBuilder.Entity<ThemeAttentionDay>();
+        tad.ToTable("theme_attention_days");
+        tad.HasKey(x => x.Id);
+        tad.Property(x => x.Theme).IsRequired().HasMaxLength(60);
+        tad.Property(x => x.Phrase).IsRequired().HasMaxLength(120);
+        tad.Property(x => x.Source).IsRequired().HasMaxLength(12);
+        tad.Property(x => x.MeasuredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        tad.HasIndex(x => new { x.Theme, x.Phrase, x.Day }).IsUnique()
+            .HasDatabaseName("ux_theme_attention_days_identity");
+        tad.HasIndex(x => x.Day).HasDatabaseName("idx_theme_attention_days_day");
 
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");

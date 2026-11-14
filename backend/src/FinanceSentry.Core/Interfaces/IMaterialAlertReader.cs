@@ -20,6 +20,8 @@ public interface IMaterialAlertReader
 /// A lightweight projection of an alert for companion capture. <paramref name="AppPath"/> is where the alert opens in the
 /// app; <paramref name="HealthState"/> is the connection-health state that raised it
 /// (<c>ActionRequired</c>, <c>Dormant</c>) when the connection-health policy did, else null.
+/// <paramref name="Message"/> is the alert text; capture reads it only for the review-due kinds, whose subject id, source
+/// and evidence references ride it (<c>ReviewDueMessage</c>).
 /// </summary>
 public sealed record MaterialAlertRecord(
     Guid AlertId,
@@ -31,4 +33,5 @@ public sealed record MaterialAlertRecord(
     string? ReferenceLabel,
     DateTimeOffset CreatedAt,
     string? AppPath = null,
-    string? HealthState = null);
+    string? HealthState = null,
+    string? Message = null);

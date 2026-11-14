@@ -37,4 +37,10 @@ public class ThesisEvent : IUserOwned
     public bool PricesPending { get; set; }
 
     public string? DecisionNote { get; set; }
+
+    /// <summary>Who made the write; old rows read as <see cref="ThesisEventOrigin.User"/>.</summary>
+    public ThesisEventOrigin Origin { get; set; } = ThesisEventOrigin.User;
+
+    /// <summary>Before/after content, rationale and evidence of a thesis write; null on events that carry none.</summary>
+    public ThesisAudit? Audit { get; set; }
 }

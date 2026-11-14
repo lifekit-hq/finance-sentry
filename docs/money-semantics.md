@@ -1507,6 +1507,21 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 - **Sample size.** Below `MinimumClosedSampleSize` (30) scored rows a contestant reads "too few to tell
   skill from luck (n of 30)". Windows overlap, so n counts decisions, never days. The weekly brief carries
   only Ledger-as-proposed's gross mean, to one decimal.
+- **Coverage vs the S&P 500 ("our own index").** The `coverage` block grades the coverage universe from stored
+  daily adjusted closes (`CoverageGrader`; no model call, nothing fetched). Each membership (an add to its
+  removal or today; a re-added name counts again; a covered name with no journal add counts from its member
+  row) is one equal-weight observation. Entry is the first bar on or after the add date, exit the last bar on
+  or before the window end, each within 7 days; the S&P 500 is read on the same two dates. The window ends at
+  the horizon (30 and 90 days; 90 is the headline) or at the removal if that came first, so a removed member
+  keeps its graded history to the removal date (`throughRemoval`). List return and benchmark return are the
+  means over graded memberships, excess is their difference in points, and the beat share is the share whose
+  own excess > 0. A membership whose horizon (or closing bar) has not arrived is `awaiting`; one with no stored
+  bar at entry or exit is `notPriced`. A horizon with no graded membership reads "not enough history yet" and
+  carries no figures; below 30 graded memberships it reads "too few to tell skill from luck (n of 30)". Each
+  horizon also grades every source on its own: the add reason (Held, Watchlist, Screen, Ledger, User) and,
+  for a Screen add, the screen tag (the first screen-tag nomination reason of the newest candidate created by the add, else its first reason).
+  The grade needs bars for every member, so Radar's universe sync ingests coverage members that are not held,
+  watched or under a thesis (`UniverseKind.Coverage`).
 
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 

@@ -5,7 +5,7 @@ using FinanceSentry.Modules.Research.API.Responses;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// The verdict word of many symbols in one read, for the Accounts position chips (spec 726 US2): one request
+/// The verdict word (and what would turn it into BUY) of many symbols in one read, for the Accounts position rows (spec 726 US2): one request
 /// instead of one scorecard call per row. Each symbol goes through the same <see cref="GetScorecardQuery"/> as the
 /// single read, so a chip can never disagree with the dossier. A symbol whose scorecard cannot be read is left out
 /// (and logged), so one bad name never blanks the rest. Input is trimmed, upper-cased, de-duplicated and capped at
@@ -38,7 +38,7 @@ public sealed class GetScorecardVerdictsQueryHandler(
             try
             {
                 var card = await scorecard.Handle(new GetScorecardQuery(symbol), ct);
-                result.Add(new ScorecardVerdictSummary(symbol, card.Verdict.Word, card.Verdict.FiredRuleId));
+                result.Add(new ScorecardVerdictSummary(symbol, card.Verdict.Word, card.Verdict.FiredRuleId, card.Verdict.TurnsBuyWhen));
             }
             catch (OperationCanceledException)
             {

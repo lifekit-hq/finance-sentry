@@ -249,6 +249,39 @@ describe('AssetDossierComponent', () => {
     expect(verdict?.textContent).toContain('It places no trade.');
   });
 
+  it('offers the simple and detailed displays and hands the choice to the verdict block', () => {
+    mockStore.dossier.set({
+      ...DOSSIER,
+      scorecard: ScorecardFixtures.scorecard({symbol: DOSSIER.symbol}),
+    });
+    fixture.detectChanges();
+
+    const options = [...root().querySelectorAll('[data-testid="verdict-display"] [role="radio"]')];
+    expect(options.map(o => o.textContent?.trim())).toEqual(['Simple', 'Detailed']);
+    expect(byTestId('verdict-trail')).toBeNull();
+
+    mockStore.verdictDisplay.set('detailed');
+    fixture.detectChanges();
+
+    expect(byTestId('verdict-trail')).not.toBeNull();
+    expect(byTestId('verdict-reasons')).toBeNull();
+  });
+
+  it('saves the display the owner picks through the store', () => {
+    mockStore.dossier.set({
+      ...DOSSIER,
+      scorecard: ScorecardFixtures.scorecard({symbol: DOSSIER.symbol}),
+    });
+    fixture.detectChanges();
+
+    const detailed = [
+      ...root().querySelectorAll<HTMLElement>('[data-testid="verdict-display"] [role="radio"]'),
+    ].find(o => o.textContent?.trim() === 'Detailed');
+    detailed?.click();
+
+    expect(mockStore.setVerdictDisplay).toHaveBeenCalledWith('detailed');
+  });
+
   it('hands the held flag and the thesis to the verdict block', () => {
     const scorecard = ScorecardFixtures.scorecard({symbol: DOSSIER.symbol});
     mockStore.dossier.set({...DOSSIER, scorecard});

@@ -347,6 +347,7 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       dayChangeUsd: -15,
       hiddenReason: null,
       verdict: null,
+      verdictNote: null,
       weightPercent: 50,
       ...overrides,
     });
@@ -379,6 +380,22 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       expect(rowElement?.querySelector('[data-testid="verdict-chip"]')?.textContent?.trim()).toBe(
         'WAIT'
       );
+    });
+
+    it('says on the row what would turn its verdict BUY, when the API names a bar', () => {
+      const element = withFeed([
+        row({verdict: 'Wait', verdictNote: 'Turns BUY when structure reaches 50 (reads 39).'}),
+      ]);
+
+      expect(
+        element.querySelector('[data-testid="position-verdict-note"]')?.textContent?.trim()
+      ).toBe('Turns BUY when structure reaches 50 (reads 39).');
+    });
+
+    it('says nothing extra on a row with no bar to name', () => {
+      const element = withFeed([row({verdict: 'Buy'})]);
+
+      expect(element.querySelector('[data-testid="position-verdict-note"]')).toBeNull();
     });
 
     it('shows no chip on a row without a word', () => {

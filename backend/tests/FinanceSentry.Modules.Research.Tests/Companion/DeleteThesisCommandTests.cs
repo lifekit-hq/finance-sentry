@@ -119,6 +119,11 @@ public sealed class DeleteThesisCommandTests
 
         public Task UpsertAsync(InvestmentThesis thesis, CancellationToken ct = default) => Task.CompletedTask;
 
+        public Task SaveMonitorSnapshotAsync(
+            Guid userId, Guid thesisId, FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMonitorSnapshot snapshot,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
         {
             var removed = Theses.RemoveAll(t => t.UserId == userId && t.Id == id);

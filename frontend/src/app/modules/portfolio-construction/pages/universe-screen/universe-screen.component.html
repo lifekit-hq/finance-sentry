@@ -1,4 +1,4 @@
-<cmn-page-container spacing="none" fill>
+<cmn-page kind="list" fill>
   <div class="flex min-h-0 w-full max-w-[900px] flex-1 flex-col gap-cmn-3">
     <p class="text-cmn-sm text-text-secondary">{{ titleNote }}</p>
     <p class="text-cmn-xs text-text-secondary" data-testid="construction-not-advice">
@@ -102,6 +102,13 @@
               <p class="mt-cmn-2 text-cmn-xs text-text-secondary">{{ note }}</p>
             }
           </cmn-card>
+
+          <fns-gap-mode
+            [gap]="store.gap()"
+            [loading]="store.isGapLoading()"
+            [errorMessage]="store.gapErrorMessage()"
+            (retry)="store.loadGap()"
+          />
 
           @if (screen.truncated) {
             <cmn-alert variant="info">{{ truncatedNote }}</cmn-alert>
@@ -254,4 +261,4 @@
       </cmn-async-state>
     </cmn-page-scroll>
   </div>
-</cmn-page-container>
+</cmn-page>

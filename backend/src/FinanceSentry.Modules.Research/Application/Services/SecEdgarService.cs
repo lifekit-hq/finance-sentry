@@ -2,33 +2,34 @@ namespace FinanceSentry.Modules.Research.Application.Services;
 
 using System.Globalization;
 using System.Text.Json;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
 // Live SEC EDGAR access (data.sec.gov) — filings + XBRL fundamentals. Free and key-less, but SEC
 // policy requires a descriptive User-Agent (configured on the named client) and a 10 req/s ceiling,
 // which the concurrency cap + caches stay well under. Registered as a singleton so the ticker->CIK
-// map and per-ticker results are cached across requests. Nothing is persisted. Fundamentals reach
+// map and per-ticker results are cached across requests (the map itself lives in EdgarTickerMap: TTL
+// refresh with retry, stale-while-failing, health). Nothing is persisted. Fundamentals reach
 // readers through the provider chain (SecEdgarFundamentalsSource, one per taxonomy), never directly.
 public sealed class SecEdgarService(
     IHttpClientFactory httpFactory,
     TimeProvider clock,
-    ILogger<SecEdgarService> logger) : ISecEdgarService, IDisposable
+    ILogger<SecEdgarService> logger,
+    EdgarTickerMapOptions? tickerMapOptions = null) : ISecEdgarService, IDataSourceHealthReader, IDisposable
 {
     public const string HttpClientName = "sec-edgar";
-
-    private const string TickerMapUrl = "https://www.sec.gov/files/company_tickers.json";
 
     private static readonly string[] DefaultFormTypes = ["10-K", "10-Q", "8-K"];
 
     // Registered-fund filings: shareholder reports, portfolio holdings, prospectus updates, census.
     private static readonly string[] FundFormPrefixes = ["N-CSR", "N-PORT", "NPORT", "N-CEN", "485BPOS", "497", "N-1A", "N-2"];
 
-    private static readonly TimeSpan TickerMapTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan ResultTtl = TimeSpan.FromHours(12);
 
     // Shorter than the hourly filing-watch cadence, so each run sees a fresh submissions feed.
@@ -52,6 +53,10 @@ public sealed class SecEdgarService(
         ("NetIncome", ["NetIncomeLoss"]),
         ("DilutedEPS", ["EarningsPerShareDiluted"]),
         ("StockholdersEquity", ["StockholdersEquity"]),
+        // Cash-flow statement lines (#1376): year-to-date durations, turned into discrete quarters by
+        // CashFlowMath. Capex tags run broadest to narrowest (the later tag wins an overlapping period).
+        ("OperatingCashFlow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]),
+        ("Capex", ["PaymentsToAcquireProductiveAssets", "PaymentsToAcquirePropertyPlantAndEquipment"]),
     ];
 
     // The same friendly concepts in the ifrs-full taxonomy, read only when a filer reports none of
@@ -69,14 +74,13 @@ public sealed class SecEdgarService(
         ("NetIncome", ["ProfitLossAttributableToOwnersOfParent"]),
         ("DilutedEPS", ["DilutedEarningsLossPerShare"]),
         ("StockholdersEquity", ["EquityAttributableToOwnersOfParent"]),
+        ("OperatingCashFlow", ["CashFlowsFromUsedInOperatingActivities"]),
+        ("Capex", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"]),
     ];
 
-    private readonly SemaphoreSlim tickerMapLock = new(1, 1);
+    private readonly EdgarTickerMap tickerMap = new(httpFactory, clock, logger, tickerMapOptions ?? new EdgarTickerMapOptions());
     private readonly TtlCache<FilingsRead> filingsCache = new(clock, FilingsTtl, MaxCachedTickers);
     private readonly TtlCache<FundamentalsSourceResult> fundamentalsCache = new(clock, ResultTtl, MaxCachedTickers);
-
-    private IReadOnlyDictionary<string, string>? tickerToCik;
-    private DateTimeOffset tickerMapFetchedAt;
 
     public async Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
         string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
@@ -90,7 +94,7 @@ public sealed class SecEdgarService(
         var read = await GetAllFilingsAsync(upper, ct);
         if (surfaceProviderFailure && read.ProviderFailure is not null)
         {
-            throw new EdgarProviderException(read.ProviderFailure);
+            throw new EdgarProviderException(read.ProviderFailure, read.ProviderFailureCode ?? EdgarErrorCodes.SourceUnavailable);
         }
 
         return read.Filings
@@ -123,7 +127,7 @@ public sealed class SecEdgarService(
         if (cik is null)
         {
             return (mapFetchFailed
-                ? FundamentalsSourceResult.Failed("EDGAR ticker->CIK map unavailable")
+                ? FundamentalsSourceResult.Failed("EDGAR ticker->CIK map unavailable", errorCode: EdgarErrorCodes.MapUnavailable)
                 : FundamentalsSourceResult.NoData(
                     "not in the SEC ticker map", FundamentalsIssuerType.NotSecRegistrant), false);
         }
@@ -209,13 +213,15 @@ public sealed class SecEdgarService(
         {
             // mapFetchFailed distinguishes "EDGAR's map fetch never succeeded" (a provider
             // outage) from "the map is fine, this ticker just isn't a filer" (not a failure).
-            return (new FilingsRead(
-                [], mapFetchFailed ? $"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}." : null), false);
+            return (mapFetchFailed
+                ? new FilingsRead(
+                    [], $"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}.", EdgarErrorCodes.MapUnavailable)
+                : new FilingsRead([], null), false);
         }
 
         var filings = await FetchSubmissionsAsync(ticker, cik, ct);
         return filings is null
-            ? (new FilingsRead([], $"EDGAR submissions fetch failed for {ticker}."), false)
+            ? (new FilingsRead([], $"EDGAR submissions fetch failed for {ticker}.", EdgarErrorCodes.SourceUnavailable), false)
             : (new FilingsRead(filings, null), true);
     }
 
@@ -245,6 +251,9 @@ public sealed class SecEdgarService(
             var primaryDocs = recent.GetProperty("primaryDocument");
             var descriptions = recent.GetProperty("primaryDocDescription");
             var isXbrl = recent.GetProperty("isXBRL");
+            var items = recent.TryGetProperty("items", out var itemsColumn) && itemsColumn.ValueKind == JsonValueKind.Array
+                ? itemsColumn
+                : (JsonElement?)null;
             var cikNoPad = cik.TrimStart('0');
 
             var count = forms.GetArrayLength();
@@ -272,7 +281,8 @@ public sealed class SecEdgarService(
                     Blank(descriptions[i].GetString()),
                     accession,
                     documentUrl,
-                    isXbrl[i].ValueKind == JsonValueKind.Number && isXbrl[i].GetInt32() == 1));
+                    isXbrl[i].ValueKind == JsonValueKind.Number && isXbrl[i].GetInt32() == 1,
+                    ItemsAt(items, i)));
             }
 
             // EDGAR returns recent filings newest-first already, but sort defensively.
@@ -318,6 +328,12 @@ public sealed class SecEdgarService(
                 failures++;
                 logger.LogWarning(ex, "EDGAR concept {Tag} fetch failed for {Ticker}", tag, ticker);
             }
+        }
+
+        // Cash-flow facts are durations from the fiscal-year start: reduce them to discrete quarters + years.
+        if (CashFlowMath.IsCashFlowConcept(concept))
+        {
+            return new ConceptFetch(CashFlowMath.DiscretePeriods(merged), failures);
         }
 
         // Collapse restatements + cross-tag overlap: keep one row per (period, fiscal period), newest first.
@@ -374,6 +390,10 @@ public sealed class SecEdgarService(
                 ? conceptUrl
                 : $"https://www.sec.gov/Archives/edgar/data/{cikNoPad}/{accession.Replace("-", string.Empty)}/{accession}-index.htm";
 
+            var start = CashFlowMath.IsCashFlowConcept(concept)
+                ? ParseDate(point.TryGetProperty("start", out var st) ? st.GetString() : null)
+                : null;
+
             facts.Add(new FundamentalFact(
                 ticker,
                 concept,
@@ -385,7 +405,8 @@ public sealed class SecEdgarService(
                 point.TryGetProperty("fy", out var fy) && fy.ValueKind == JsonValueKind.Number ? fy.GetInt32() : null,
                 form,
                 taxonomy,
-                new SourceProvenance(provider, documentUrl, ingestedAt)));
+                new SourceProvenance(provider, documentUrl, ingestedAt),
+                start));
         }
 
         return facts;
@@ -401,71 +422,32 @@ public sealed class SecEdgarService(
             || form.StartsWith("20-F", StringComparison.OrdinalIgnoreCase)
             || form.StartsWith("40-F", StringComparison.OrdinalIgnoreCase);
 
-    // MapFetchFailed is true only when the ticker->CIK map was never fetched successfully (no
-    // cached copy to fall back on) — a provider outage, distinct from the ticker legitimately
+    // MapFetchFailed is true only when no usable ticker->CIK map could be had (never loaded, or stale past
+    // its ceiling after every refresh failed) - a provider outage, distinct from the ticker legitimately
     // not being an EDGAR filer once a real map is in hand.
     private async Task<(string? Cik, bool MapFetchFailed)> ResolveCikAsync(string ticker, CancellationToken ct)
     {
-        var map = await GetTickerMapAsync(ct);
-        if (map is null)
+        var read = await tickerMap.GetAsync(HttpClientName, ct);
+        if (read.Map is null)
         {
             return (null, true);
         }
 
-        return (map.TryGetValue(ticker, out var cik) ? cik : null, false);
+        return (read.Map.TryGetValue(ticker, out var cik) ? cik : null, false);
     }
 
-    private async Task<IReadOnlyDictionary<string, string>?> GetTickerMapAsync(CancellationToken ct)
+    public DataSourceHealth Read() => tickerMap.Read();
+
+    // The 8-K item codes of row i of the submissions "items" column ("2.02,9.01"); null when the column is absent or the row empty.
+    private static IReadOnlyList<string>? ItemsAt(JsonElement? column, int i)
     {
-        if (tickerToCik is not null && clock.GetUtcNow() - tickerMapFetchedAt < TickerMapTtl)
+        if (column is not { } items || i >= items.GetArrayLength() || items[i].ValueKind != JsonValueKind.String)
         {
-            return tickerToCik;
+            return null;
         }
 
-        await tickerMapLock.WaitAsync(ct);
-        try
-        {
-            if (tickerToCik is not null && clock.GetUtcNow() - tickerMapFetchedAt < TickerMapTtl)
-            {
-                return tickerToCik;
-            }
-
-            var client = httpFactory.CreateClient(HttpClientName);
-            using var response = await client.GetAsync(TickerMapUrl, ct);
-            response.EnsureSuccessStatusCode();
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-
-            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in doc.RootElement.EnumerateObject())
-            {
-                var row = entry.Value;
-                if (!row.TryGetProperty("ticker", out var t) || !row.TryGetProperty("cik_str", out var c))
-                {
-                    continue;
-                }
-
-                var symbol = t.GetString();
-                if (!string.IsNullOrEmpty(symbol) && c.ValueKind == JsonValueKind.Number)
-                {
-                    // EDGAR paths use the 10-digit zero-padded CIK.
-                    map[symbol] = c.GetInt64().ToString(CultureInfo.InvariantCulture).PadLeft(10, '0');
-                }
-            }
-
-            tickerToCik = map;
-            tickerMapFetchedAt = clock.GetUtcNow();
-            return tickerToCik;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "EDGAR ticker->CIK map fetch failed");
-            return tickerToCik; // fall back to a stale map if we have one
-        }
-        finally
-        {
-            tickerMapLock.Release();
-        }
+        var parsed = Domain.Catalyst.CatalystRules.ParseItems([items[i].GetString()]);
+        return parsed.Count == 0 ? null : parsed;
     }
 
     private static DateOnly? ParseDate(string? value)
@@ -477,10 +459,11 @@ public sealed class SecEdgarService(
     {
         filingsCache.Dispose();
         fundamentalsCache.Dispose();
-        tickerMapLock.Dispose();
+        tickerMap.Dispose();
     }
 
-    private sealed record FilingsRead(IReadOnlyList<EdgarFiling> Filings, string? ProviderFailure);
+    private sealed record FilingsRead(
+        IReadOnlyList<EdgarFiling> Filings, string? ProviderFailure, string? ProviderFailureCode = null);
 
     private readonly record struct ConceptFetch(IReadOnlyList<FundamentalFact> Facts, int Failures);
 

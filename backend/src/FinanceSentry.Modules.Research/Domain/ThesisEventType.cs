@@ -17,4 +17,10 @@ public enum ThesisEventType
     Snapshot,
     Confirmed,
     Superseded,
+
+    /// <summary>A saved thesis was revised (its <see cref="ThesisEvent.Audit"/> holds the prior and new version).</summary>
+    Revised,
+
+    /// <summary>A revision was reverted to the prior version it recorded.</summary>
+    Reverted,
 }

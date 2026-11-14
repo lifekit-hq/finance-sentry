@@ -149,6 +149,6 @@ evaluator, the IPS archetype field, MCP and gap mode remain. See the spec's
 - **Verdict is a trade call.** The owner chose `STRONG BUY / BUY / WAIT / AVOID` (spec OQ-3). Mitigated by the
   always-visible facts and fired rule, the versioned rule table, and the product never placing a trade (019 FR-014).
 - **Upstream cost.** Valuation snapshots fetch live per symbol. The universe is bounded by the shortlist cap
-  plus the curated list, and the job is rate-bounded like stage 1.
-- **Thin universe** for the cold-start user if the shortlist fails. A configured curated list keeps the
+  plus the coverage universe (capped by `Coverage:MaxMembers`), and the job is rate-bounded like stage 1.
+- **Thin universe** for the cold-start user if the shortlist fails. The coverage universe keeps the
   universe non-empty, and the empty state is explicit.

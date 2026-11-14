@@ -49,6 +49,44 @@ describe('AlertMessageUtils filing URL', () => {
   });
 });
 
+describe('AlertMessageUtils.stripReviewTail', () => {
+  const headline = 'NVDA filed a 10-Q: thesis review due.';
+  const tail =
+    '[review subject=thesis:3f2a9c1e-0000-4000-8000-000000000001 ticker=NVDA source=filing ref=0001045810-26-000123 evidence=filing:0001045810-26-000123|url:https://www.sec.gov/Archives/edgar/data/1045810/x.htm]';
+
+  it('removes the machine tail and its evidence url from a thesis review message', () => {
+    expect(AlertMessageUtils.stripReviewTail(`${headline} ${tail}`)).toBe(headline);
+  });
+
+  it('removes the machine tail from a candidate review message', () => {
+    expect(
+      AlertMessageUtils.stripReviewTail(
+        'Earnings passed. [review subject=candidate:3f2a9c1e-0000-4000-8000-000000000002 ticker=AMD source=earnings ref=2026-11-04]'
+      )
+    ).toBe('Earnings passed.');
+  });
+
+  it('leaves messages without the tail untouched', () => {
+    expect(AlertMessageUtils.stripReviewTail('Spent 12 of 100 [budget]')).toBe(
+      'Spent 12 of 100 [budget]'
+    );
+  });
+
+  it('returns an empty string for null and empty input', () => {
+    expect(AlertMessageUtils.stripReviewTail(null)).toBe('');
+    expect(AlertMessageUtils.stripReviewTail('')).toBe('');
+  });
+
+  it('works alongside the sec.gov strip and decimal rounding', () => {
+    const url = 'https://www.sec.gov/Archives/edgar/data/1045810/x.htm';
+    const message = `Drop of 12.34567% on NVDA. ${url} ${tail}`;
+    const result = AlertMessageUtils.roundNumbers(
+      AlertMessageUtils.stripFilingUrl(AlertMessageUtils.stripReviewTail(message))
+    );
+    expect(result).toBe('Drop of 12.35% on NVDA.');
+  });
+});
+
 describe('AlertMessageUtils.duplicateChargeMerchant', () => {
   it('reads the statement merchant out of a duplicate-charge message', () => {
     expect(

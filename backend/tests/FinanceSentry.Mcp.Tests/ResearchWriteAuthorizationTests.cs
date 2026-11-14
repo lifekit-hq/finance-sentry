@@ -11,10 +11,11 @@ using Xunit;
 namespace FinanceSentry.Mcp.Tests;
 
 /// <summary>
-/// A service token (the headless agent, Ledger) never creates, changes or deletes Research data: the Research write
-/// tools carry <see cref="AuthPolicies.RequireMcpPersonalToken"/>, so they are hidden from its tools/list and refused
-/// on call, and the watchlist tool refuses add/remove while list stays open. The owner's own session (a personal
-/// token) keeps every one of them. Proposal tools (propose_recommendation, score_candidate) stay open to the agent.
+/// The split between what Ledger's service token may write and what stays the owner's. Ledger forms, revises, promotes
+/// and rejects theses and keeps the watchlist itself (the owner decides only buy or not), every such change journaled
+/// with its origin so it is visible and reversible. Still owner-session only, hidden from a service token's tools/list
+/// and refused on call: deleting a thesis, registering a thesis source, and anything on the IPS or the risk
+/// measurement behind it. The owner's own session (a personal token) keeps every tool.
 /// </summary>
 public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : IClassFixture<McpHttpHostFixture>
 {
@@ -23,18 +24,27 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
     private static readonly string[] PersonalTokenOnlyTools =
     [
         "delete_thesis",
-        "promote_candidate",
         "record_risk_remeasurement",
         "register_thesis_source",
-        "reject_candidate",
         "save_ips",
+    ];
+
+    /// <summary>What Ledger's service token may now call: every Research tool it forms, revises and undoes theses with.</summary>
+    private static readonly string[] LedgerWritableTools =
+    [
+        "promote_candidate",
+        "reject_candidate",
+        "revert_thesis_revision",
         "save_thesis",
+        "watchlist",
     ];
 
     public static TheoryData<string> PersonalTokenOnlyToolNames() => [.. PersonalTokenOnlyTools];
 
+    public static TheoryData<string> LedgerWritableToolNames() => [.. LedgerWritableTools];
+
     [Fact]
-    public void PersonalTokenGate_CoversExactlyTheResearchWriteTools()
+    public void PersonalTokenGate_CoversExactlyTheOwnerOnlyTools()
     {
         var gated = McpToolReflection.GetToolTypes()
             .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public))
@@ -47,7 +57,7 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
     }
 
     [Fact]
-    public async Task ToolsList_ForServiceToken_HidesTheResearchWriteTools_AndKeepsReadsAndProposals()
+    public async Task ToolsList_ForServiceToken_HidesTheOwnerOnlyTools_AndListsWhatLedgerMayWrite()
     {
         var token = await ServiceTokenAsync();
 
@@ -55,24 +65,26 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
 
         foreach (var tool in PersonalTokenOnlyTools)
             body.Should().NotContain($"\"{tool}\"");
-        body.Should().Contain("\"list_theses\"").And.Contain("\"propose_recommendation\"")
-            .And.Contain("\"score_candidate\"").And.Contain("\"watchlist\"");
+        foreach (var tool in LedgerWritableTools)
+            body.Should().Contain($"\"{tool}\"");
+        body.Should().Contain("\"list_theses\"").And.Contain("\"list_thesis_events\"")
+            .And.Contain("\"propose_recommendation\"").And.Contain("\"score_candidate\"");
     }
 
     [Fact]
-    public async Task ToolsList_ForPersonalToken_ListsTheResearchWriteTools()
+    public async Task ToolsList_ForPersonalToken_ListsEveryResearchWriteTool()
     {
         var token = PersonalToken(await host.CreateUserAsync());
 
         var body = await ReadBodyAsync(await PostAsync(token, """{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"""));
 
-        foreach (var tool in PersonalTokenOnlyTools)
+        foreach (var tool in PersonalTokenOnlyTools.Concat(LedgerWritableTools))
             body.Should().Contain($"\"{tool}\"");
     }
 
     [Theory]
     [MemberData(nameof(PersonalTokenOnlyToolNames))]
-    public async Task CallingAResearchWriteTool_WithServiceToken_IsRefused(string tool)
+    public async Task CallingAnOwnerOnlyTool_WithServiceToken_IsRefused(string tool)
     {
         var token = await ServiceTokenAsync();
 
@@ -82,15 +94,26 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
     }
 
     [Theory]
-    [InlineData("""{"action":"add","ticker":"NVDA"}""")]
-    [InlineData("""{"action":"remove","itemId":"6f1c4f2e-8d0a-4a5b-9a51-2f7c3f6f8b11"}""")]
-    public async Task Watchlist_AddOrRemove_WithServiceToken_IsRefused(string arguments)
+    [MemberData(nameof(LedgerWritableToolNames))]
+    public async Task CallingALedgerWritableTool_WithServiceToken_PassesTheAuthorizationGate(string tool)
+    {
+        var token = await ServiceTokenAsync();
+
+        var body = await ReadBodyAsync(await CallToolAsync(token, tool, "{}"));
+
+        body.Should().NotContain("forbidden", "no policy stands between the service token and the tool");
+    }
+
+    [Theory]
+    [InlineData("""{"action":"add"}""", "action=add requires a ticker")]
+    [InlineData("""{"action":"remove"}""", "action=remove requires an itemId")]
+    public async Task Watchlist_AddOrRemove_WithServiceToken_ReachesTheTool(string arguments, string expected)
     {
         var token = await ServiceTokenAsync();
 
         var body = await ReadBodyAsync(await CallToolAsync(token, "watchlist", arguments));
 
-        body.Should().Contain("a service token can only list the watchlist");
+        body.Should().Contain(expected).And.NotContain("a service token can only list");
     }
 
     [Fact]
@@ -100,7 +123,7 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
 
         var body = await ReadBodyAsync(await CallToolAsync(token, "watchlist", """{"action":"add"}"""));
 
-        body.Should().Contain("action=add requires a ticker").And.NotContain("a service token can only list");
+        body.Should().Contain("action=add requires a ticker");
     }
 
     /// <summary>An Owner holds mcp.service, as Ledger's account does; the service token is what marks the agent.</summary>

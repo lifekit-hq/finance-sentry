@@ -112,6 +112,12 @@ public static class LedgerReadComposer
                 sb.AppendLine("Invalidation triggers: " +
                     string.Join("; ", t.InvalidationTriggers.Select(x => x.ToString())));
             }
+
+            if (t.NarrativeFalsifiers is { Count: > 0 } narrativeFalsifiers)
+            {
+                sb.AppendLine("Narrative falsifiers (model-checked, not monitored): " +
+                    string.Join("; ", narrativeFalsifiers));
+            }
         }
         else
         {

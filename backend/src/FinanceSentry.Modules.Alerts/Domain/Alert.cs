@@ -14,6 +14,11 @@ public class Alert : IHasUpdatedAt, IUserOwned
     public Guid? ReferenceId { get; set; }
     public string? ReferenceLabel { get; set; }
     /// <summary>
+    /// A machine dedupe key an emitter attaches when "the same alert again" is more than its type and reference (the
+    /// rebalance proposal's drift signature). Never rendered; null on alerts that need none.
+    /// </summary>
+    public string? DedupKey { get; set; }
+    /// <summary>
     /// Where in the app this alert opens (<c>AlertAppPath</c>), written by the emitter that knows what it is about. Null on
     /// alerts stored before it existed; <see cref="AlertAppPaths.For"/> resolves those from type, reference and label.
     /// </summary>

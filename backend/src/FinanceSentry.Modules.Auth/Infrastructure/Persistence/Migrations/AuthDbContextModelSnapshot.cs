@@ -176,6 +176,13 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("VerdictDisplay")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("simple");
+
                     b.Property<bool>("WatchlistAnalystAlerts")
                         .HasColumnType("boolean");
 

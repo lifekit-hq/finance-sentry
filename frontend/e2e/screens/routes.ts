@@ -94,8 +94,8 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
   {
     name: 'flow-breakdown',
     path: FLOW_BREAKDOWN_SCREEN.path,
-    kind: 'detail',
-    note: 'One month or window broken into its flows; reached from the dashboard.',
+    kind: 'overview',
+    note: 'One month or window broken into its flows; reached from the dashboard. Needs the full frame width: the stat cards wrap amounts in the detail column.',
     mode: 'report',
     fixture: fixtureOf(FLOW_BREAKDOWN_SCREEN),
   },
@@ -182,8 +182,8 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
   {
     name: 'asset-dossier',
     path: '/assets/AAPL',
-    kind: 'detail',
-    note: 'One holding: price, checks and the Ledger read.',
+    kind: 'overview',
+    note: 'One holding: price, checks and the Ledger read. Needs the full frame width: the chip and tab rows clip in the detail column.',
     mode: 'report',
     fixture: {
       mocks: mockDossier,

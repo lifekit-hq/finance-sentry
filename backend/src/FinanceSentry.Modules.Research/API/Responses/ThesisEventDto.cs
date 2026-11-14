@@ -13,4 +13,6 @@ public record ThesisEventDto(
     decimal? BenchmarkPrice,
     string BenchmarkTicker,
     bool PricesPending,
-    string? DecisionNote);
+    string? DecisionNote,
+    string Origin = "User",
+    ThesisAudit? Audit = null);

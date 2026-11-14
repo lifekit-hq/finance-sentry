@@ -22,6 +22,9 @@ public class ApplicationUser : IdentityUser
     /// <summary>How far the seed tints surfaces, 0-1; null means the tokens engine's default.</summary>
     public double? ThemeIntensity { get; set; }
 
+    /// <summary>How a research verdict is shown: <c>simple</c> (the word and its reasons) or <c>detailed</c> (the numbered rule trail).</summary>
+    public string VerdictDisplay { get; set; } = "simple";
+
     public bool EmailAlerts { get; set; } = true;
     public bool LowBalanceAlerts { get; set; } = true;
     public decimal LowBalanceThreshold { get; set; } = 500m;

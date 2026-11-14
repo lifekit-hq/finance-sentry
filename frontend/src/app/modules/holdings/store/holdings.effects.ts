@@ -4,7 +4,7 @@ import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
-import {type VerdictWord} from '../../../shared/models/scorecard/scorecard.model';
+import {type ScorecardVerdictSummary} from '../../../shared/models/scorecard/scorecard.model';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {type Position} from '../models/position/position.model';
@@ -20,7 +20,7 @@ interface StoreMethods {
   setPositions(positions: Position[]): void;
   setHeadline(headline: Nullable<Headline>): void;
   setDayChangePct(dayChangePctByTicker: Record<string, number>): void;
-  setVerdicts(verdictByTicker: Record<string, VerdictWord>): void;
+  setVerdicts(verdictByTicker: Record<string, ScorecardVerdictSummary>): void;
 }
 
 export function holdingsEffects(store: StoreMethods) {
@@ -54,7 +54,7 @@ export function holdingsEffects(store: StoreMethods) {
           : verdictsService.getVerdicts(tickers).pipe(
               tap(verdicts =>
                 store.setVerdicts(
-                  Object.fromEntries(verdicts.map(v => [v.symbol.toUpperCase(), v.word]))
+                  Object.fromEntries(verdicts.map(v => [v.symbol.toUpperCase(), v]))
                 )
               ),
               catchError(() => EMPTY)

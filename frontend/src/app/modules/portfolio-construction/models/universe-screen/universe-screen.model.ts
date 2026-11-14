@@ -3,7 +3,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {type VerdictWord} from '../../../../shared/models/scorecard/scorecard.model';
 
 /** Where a name in the universe came from (spec 726 OQ-1). */
-export type UniverseSource = 'held' | 'watchlist' | 'curated';
+export type UniverseSource = 'held' | 'watchlist' | 'coverage';
 
 /** An archetype the viewer can pick, with the gates it builds from. */
 export interface ArchetypeOption {

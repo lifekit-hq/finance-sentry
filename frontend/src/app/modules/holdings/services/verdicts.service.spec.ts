@@ -30,7 +30,9 @@ describe('VerdictsService', () => {
   });
 
   it('reads every symbol in one comma-joined call', () => {
-    const body: ScorecardVerdictSummary[] = [{symbol: 'AAA', word: 'Buy', firedRuleId: 'buy'}];
+    const body: ScorecardVerdictSummary[] = [
+      {symbol: 'AAA', word: 'Buy', firedRuleId: 'buy', turnsBuyWhen: null},
+    ];
     let result: ScorecardVerdictSummary[] = [];
 
     service.getVerdicts(['AAA', 'BBB']).subscribe(r => (result = r));

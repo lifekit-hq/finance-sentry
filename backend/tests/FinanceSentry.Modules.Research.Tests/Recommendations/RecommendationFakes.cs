@@ -78,6 +78,11 @@ internal sealed class JournalRecorder : IThesisEventRecorder
         Events.Add((subjectType, subjectId, eventType, decisionNote));
         return Task.CompletedTask;
     }
+
+    public Task RecordAuditedAsync(
+        Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker, ThesisEventType eventType,
+        ThesisEventOrigin origin, ThesisAudit? audit, string? decisionNote = null, CancellationToken ct = default)
+        => RecordAsync(userId, subjectType, subjectId, ticker, eventType, decisionNote, ct);
 }
 
 internal sealed class FixedBookFigures(BookFigures book) : IBookFiguresService

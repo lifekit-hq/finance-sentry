@@ -228,11 +228,23 @@ internal sealed class RecordingThesisEventRecorder : IThesisEventRecorder
 {
     public List<ThesisEventType> Events { get; } = [];
 
+    public List<(ThesisSubjectType SubjectType, ThesisEventType EventType, ThesisEventOrigin Origin, ThesisAudit? Audit)> Audited { get; } = [];
+
     public Task RecordAsync(
         Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
         ThesisEventType eventType, string? decisionNote = null, CancellationToken ct = default)
     {
         Events.Add(eventType);
+        return Task.CompletedTask;
+    }
+
+    public Task RecordAuditedAsync(
+        Guid userId, ThesisSubjectType subjectType, Guid subjectId, string ticker,
+        ThesisEventType eventType, ThesisEventOrigin origin, ThesisAudit? audit,
+        string? decisionNote = null, CancellationToken ct = default)
+    {
+        Events.Add(eventType);
+        Audited.Add((subjectType, eventType, origin, audit));
         return Task.CompletedTask;
     }
 }
@@ -269,6 +281,18 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task ResolveCoverageGapAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateThesisBreakAlertAsync(Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
+        => Task.CompletedTask;
+
     public Task ResolveThesisBreakAlertAsync(Guid userId, Guid thesisId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateMarketStructureAlertAsync(Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default, AlertDedup dedup = AlertDedup.ActiveThenSilence) => Task.CompletedTask;
     public Task GenerateMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, string reason, CancellationToken ct = default) => Task.CompletedTask;
@@ -281,7 +305,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateDuplicateChargeAlertAsync(Guid userId, Guid accountId, string merchantKey, string merchantName, decimal chargeAmount, string currency, int chargeCount, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCategorySpikeAlertAsync(Guid userId, string category, decimal currentMonthSpend, decimal baselineSpend, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFxSpreadAlertAsync(Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency, decimal impliedRate, decimal marketRate, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePolicyReviewAlertAsync(Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePolicyReviewMissedAlertAsync(Guid userId, DateTimeOffset dueAt, int daysOverdue, string cadence, CancellationToken ct = default) => Task.CompletedTask;
@@ -293,6 +317,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
         => Task.CompletedTask;
 
     public Task GenerateNewsClusterAlertAsync(Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetNearLimitAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetExceededAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetPaceAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
@@ -318,12 +343,29 @@ internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyG
 {
     public string? LastTicker { get; private set; }
     public bool? LastIsPaper { get; private set; }
+    public bool? LastOverrideRisk { get; private set; }
 
     public Task<RiskGateVerdict> CheckProposalAsync(
         Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default)
     {
         LastTicker = ticker;
         LastIsPaper = isPaper;
+        LastOverrideRisk = overrideFlag;
         return Task.FromResult(verdict);
+    }
+}
+
+/// <summary>Correlation reader double returning a fixed read (default: every reference not evaluable for lack of bars).</summary>
+internal sealed class FakeReturnCorrelationReader(Func<string, IReadOnlyCollection<CorrelationReference>, TickerCorrelation>? read = null)
+    : IReturnCorrelationReader
+{
+    public List<(string Ticker, IReadOnlyCollection<CorrelationReference> Book, int TopHoldings, decimal MinBookCoverage)> Calls { get; } = [];
+
+    public Task<TickerCorrelation> GetAsync(
+        string ticker, IReadOnlyCollection<CorrelationReference> book, int topHoldings, decimal minBookCoverage, CancellationToken ct = default)
+    {
+        Calls.Add((ticker, book, topHoldings, minBookCoverage));
+        return Task.FromResult(read?.Invoke(ticker, book) ?? new TickerCorrelation(
+            ticker, 63, [], new BookCorrelation(null, 0, 0m, CorrelationReasons.NoBars)));
     }
 }

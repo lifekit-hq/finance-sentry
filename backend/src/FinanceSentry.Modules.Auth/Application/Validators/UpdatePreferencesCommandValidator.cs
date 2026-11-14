@@ -5,8 +5,8 @@ using FluentValidation;
 namespace FinanceSentry.Modules.Auth.Application.Validators;
 
 /// <summary>
-/// The appearance bounds of the app-shell preferences resource: a known theme mode, a <c>#rrggbb</c> seed and an
-/// intensity in 0-1. Only the choices are stored, so anything else is refused rather than clamped.
+/// The bounds of the app-shell preferences resource: a known theme mode, a <c>#rrggbb</c> seed, an intensity in
+/// 0-1 and a known verdict display. Only the choices are stored, so anything else is refused rather than clamped.
 /// </summary>
 public sealed partial class UpdatePreferencesCommandValidator : AbstractValidator<UpdatePreferencesCommand>
 {
@@ -26,6 +26,11 @@ public sealed partial class UpdatePreferencesCommandValidator : AbstractValidato
                 .Must(intensity => intensity is null || intensity is >= 0d and <= 1d)
                 .WithMessage("Intensity must be between 0 and 1.");
         });
+
+        RuleFor(x => x.VerdictDisplay)
+            .Must(VerdictDisplayModes.IsKnown!)
+            .When(x => x.VerdictDisplay is not null)
+            .WithMessage("Verdict display must be simple or detailed.");
     }
 
     [GeneratedRegex("^#[0-9a-fA-F]{6}$")]

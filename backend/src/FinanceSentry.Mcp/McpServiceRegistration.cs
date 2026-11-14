@@ -41,6 +41,7 @@ public static class McpServiceRegistration
         typeof(FinanceSentry.Modules.Companion.CompanionModule).Assembly,
         typeof(FinanceSentry.Modules.Analytics.AnalyticsModule).Assembly,
         typeof(FinanceSentry.Modules.Events.EventsModule).Assembly,
+        typeof(FinanceSentry.Modules.PortfolioConstruction.PortfolioConstructionModule).Assembly,
     ];
 
     public static readonly Assembly McpAssembly = typeof(Tools.GetAccountSummaryTool).Assembly;

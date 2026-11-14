@@ -1,8 +1,10 @@
-import {computed, signal} from '@angular/core';
+import {computed, Injector, runInInjectionContext, signal} from '@angular/core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {vi} from 'vitest';
 
+import {type VerdictDisplay} from '../../../../shared/models/preferences/app-preferences.model';
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {AppPreferencesStore} from '../../../../shared/store/preferences/app-preferences.store';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -213,16 +215,22 @@ function createMockStore() {
   const chartErrorMessage = signal('');
   const targetDraft = signal('');
   const quote = signal<DossierQuoteDto | null>(null);
-  const derived = dossierComputed({
-    dossier,
-    ledgerRead: signal(null),
-    isThesisExpanded: signal(false),
-    quote,
-    chart,
-    chartStatus,
-    chartErrorMessage,
-    targetDraft,
+  // The real computeds read the account's preferences, so they are built where the store can be injected.
+  const injector = Injector.create({
+    providers: [{provide: AppPreferencesStore, useValue: {preferences: signal(null)}}],
   });
+  const derived = runInInjectionContext(injector, () =>
+    dossierComputed({
+      dossier,
+      ledgerRead: signal(null),
+      isThesisExpanded: signal(false),
+      quote,
+      chart,
+      chartStatus,
+      chartErrorMessage,
+      targetDraft,
+    })
+  );
   return {
     isDossierLoading: signal(false),
     dossierErrorMessage: signal(''),
@@ -248,6 +256,8 @@ function createMockStore() {
     quoteHeader: signal<DossierQuoteHeader | null>(null),
     quoteChange: derived.quoteChange,
     verdictHeader: derived.verdictHeader,
+    verdictDisplay: signal<VerdictDisplay>('simple'),
+    setVerdictDisplay: vi.fn(),
     isQuoteLoading: signal(false),
     chart,
     chartStatus,

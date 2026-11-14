@@ -2,10 +2,10 @@ import {type Nullable} from '@lifekit-hq/ui';
 
 import {
   VERDICT_HELD_LINE,
-  VERDICT_TURNS_BUY_PREFIX,
   VERDICT_WORD_VARIANT,
 } from '../../../shared/constants/scorecard/scorecard.constants';
 import {type ScorecardDto} from '../../../shared/models/scorecard/scorecard.model';
+import {ScorecardUtils} from '../../../shared/utils/scorecard.utils';
 import {
   KILL_SWITCH_NONE_LABEL,
   KILL_SWITCH_TRIPPED_LABEL,
@@ -83,11 +83,7 @@ export class DossierVerdictUtils {
         {label: thesisState.thesisLabel, tone: THESIS_STATE_VARIANT[thesisState.state]},
       ],
       // A held name carries the fixed line (the word never drives a sale or an add); otherwise what turns it BUY.
-      caveat: held
-        ? VERDICT_HELD_LINE
-        : turnsBuyWhen
-          ? `${VERDICT_TURNS_BUY_PREFIX} ${turnsBuyWhen}.`
-          : null,
+      caveat: held ? VERDICT_HELD_LINE : ScorecardUtils.turnsBuyLine(turnsBuyWhen),
     };
   }
 }

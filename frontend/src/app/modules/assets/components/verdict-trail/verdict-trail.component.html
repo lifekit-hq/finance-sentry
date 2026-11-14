@@ -1,0 +1,49 @@
+@let v = verdict();
+<section class="flex flex-col gap-cmn-2" data-testid="verdict-trail">
+  <p class="text-cmn-xs text-text-secondary" data-testid="verdict-trail-intro">
+    {{ intro }} {{ basisNote[v.structureBasis] }}
+  </p>
+  <ol class="flex flex-col gap-cmn-2">
+    @for (step of steps(); track step.id) {
+      <li
+        [attr.data-testid]="'verdict-trail-step-' + step.number"
+        [attr.data-fired]="step.fired"
+        [class]="step.fired ? 'border-accent-default' : 'border-border-default'"
+        class="rounded-cmn-md border px-cmn-3 py-cmn-2"
+      >
+        <div class="flex flex-wrap items-center gap-cmn-2">
+          <span class="text-cmn-sm font-semibold tabular-nums text-text-primary">
+            {{ step.number }}.
+          </span>
+          <cmn-tag [variant]="step.fired ? wordVariant[step.word] : 'neutral'">
+            {{ wordLabel[step.word] }}
+          </cmn-tag>
+          <span
+            [class]="step.fired ? 'text-text-primary font-semibold' : 'text-text-secondary'"
+            class="text-cmn-xs"
+          >
+            {{ step.fired ? firedLabel : missLabel }}
+          </span>
+        </div>
+        <p class="mt-cmn-1 text-cmn-sm text-text-primary">{{ step.description }}</p>
+        @if (step.conditions.length > 0) {
+          <ul class="mt-cmn-1 space-y-cmn-1 text-cmn-xs">
+            @for (condition of step.conditions; track $index) {
+              <li class="flex items-start gap-cmn-2">
+                <span
+                  [class]="condition.met ? metClass : unmetClass"
+                  class="mt-1 h-2 w-2 shrink-0 rounded-full"
+                ></span>
+                <span class="min-w-0 text-text-primary">
+                  {{ condition.text }}
+                  <span class="text-text-secondary">· read {{ condition.actual }}</span>
+                  <span class="sr-only">: {{ condition.met ? 'met' : 'not met' }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </li>
+    }
+  </ol>
+</section>

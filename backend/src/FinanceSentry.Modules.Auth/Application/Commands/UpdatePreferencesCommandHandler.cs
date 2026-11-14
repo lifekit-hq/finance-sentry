@@ -13,12 +13,21 @@ public class UpdatePreferencesCommandHandler(UserManager<ApplicationUser> userMa
         var user = await userManager.FindByIdAsync(command.UserId.ToString())
             ?? throw new UserNotFoundException();
 
-        if (command.Appearance is { } appearance)
+        if (command.Appearance is not null || command.VerdictDisplay is not null)
         {
-            // Written as a whole: an omitted seed or intensity clears the stored one.
-            user.Theme = appearance.Theme;
-            user.ThemeSeed = appearance.Seed?.ToLowerInvariant();
-            user.ThemeIntensity = appearance.Intensity;
+            if (command.Appearance is { } appearance)
+            {
+                // Written as a whole: an omitted seed or intensity clears the stored one.
+                user.Theme = appearance.Theme;
+                user.ThemeSeed = appearance.Seed?.ToLowerInvariant();
+                user.ThemeIntensity = appearance.Intensity;
+            }
+
+            if (command.VerdictDisplay is { } verdictDisplay)
+            {
+                user.VerdictDisplay = verdictDisplay;
+            }
+
             var result = await userManager.UpdateAsync(user);
             if (!result.Succeeded)
             {

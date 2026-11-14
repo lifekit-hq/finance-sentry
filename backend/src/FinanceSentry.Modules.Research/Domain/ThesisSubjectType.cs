@@ -9,4 +9,7 @@ public enum ThesisSubjectType
     Thesis,
     Candidate,
     Recommendation,
+
+    /// <summary>A watchlist entry (the add is its <c>Created</c> event, the removal its <c>Closed</c> event).</summary>
+    Watchlist,
 }

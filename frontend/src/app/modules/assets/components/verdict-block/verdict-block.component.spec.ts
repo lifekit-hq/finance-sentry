@@ -2,6 +2,7 @@ import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it} from 'vitest';
 
 import {NOT_ADVICE_NOTICE} from '../../../../shared/constants/legal/legal.constants';
+import {type VerdictDisplay} from '../../../../shared/models/preferences/app-preferences.model';
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {
   type ScorecardDto,
@@ -63,12 +64,13 @@ function card(word: VerdictWord, turnsBuyWhen: string | null = null): ScorecardD
 describe('VerdictBlockComponent', () => {
   const render = (
     scorecard: ScorecardDto,
-    inputs: {held?: boolean; thesis?: ThesisDto | null} = {}
+    inputs: {held?: boolean; thesis?: ThesisDto | null; display?: VerdictDisplay} = {}
   ): HTMLElement => {
     const fixture = TestBed.createComponent(VerdictBlockComponent);
     fixture.componentRef.setInput('scorecard', scorecard);
     fixture.componentRef.setInput('held', inputs.held ?? false);
     fixture.componentRef.setInput('thesis', inputs.thesis ?? null);
+    fixture.componentRef.setInput('display', inputs.display ?? 'simple');
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   };
@@ -128,6 +130,39 @@ describe('VerdictBlockComponent', () => {
     const empty: ScorecardDto = {...card('Wait'), verdict: {...card('Wait').verdict, reasons: []}};
 
     expect(has(render(empty), 'verdict-reasons')).toBe(false);
+  });
+
+  describe('the detailed display', () => {
+    it('swaps the reasons for the numbered trail of rules that produced the word', () => {
+      const host = render(card('Wait'), {display: 'detailed'});
+
+      expect(has(host, 'verdict-reasons')).toBe(false);
+      expect(has(host, 'verdict-trail')).toBe(true);
+      expect(host.querySelectorAll('[data-testid^="verdict-trail-step-"]').length).toBeGreaterThan(
+        0
+      );
+    });
+
+    it('keeps the word, the turns-BUY line and the thesis, and shows the rule table only once', () => {
+      const host = render(card('Wait', 'structure reaches 50 (reads 39)'), {
+        display: 'detailed',
+        thesis: THESIS,
+      });
+
+      expect(text(host, 'verdict-word')).toBe('WAIT');
+      expect(text(host, 'verdict-turns-buy')).toContain('structure reaches 50');
+      expect(has(host, 'verdict-thesis-state')).toBe(true);
+      expect(has(host, 'verdict-rule-weak_structure')).toBe(false);
+      expect(has(host, 'verdict-axis-Valuation')).toBe(true);
+    });
+
+    it('is not the default: the simple display keeps the reasons and the rule table', () => {
+      const host = render(card('Wait'));
+
+      expect(has(host, 'verdict-reasons')).toBe(true);
+      expect(has(host, 'verdict-trail')).toBe(false);
+      expect(has(host, 'verdict-rule-weak_structure')).toBe(true);
+    });
   });
 
   describe('a held position', () => {

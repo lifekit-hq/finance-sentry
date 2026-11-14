@@ -17,6 +17,12 @@ public enum AlertDedup
     /// resolved — suppresses a new one. No silence window applies.
     /// </summary>
     OncePerReference,
+
+    /// <summary>
+    /// One alert per drift episode: the alert's dedupe key names the drift, and it is recorded only when
+    /// the drift worsens on what the episode already announced (finance-sentry#1266).
+    /// </summary>
+    Episode,
 }
 
 public interface IAlertGeneratorService
@@ -233,6 +239,35 @@ public interface IAlertGeneratorService
         string detectorName,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Raises the run-level notice that the thesis monitor could not evaluate some triggers (#1375): one open alert per
+    /// user, carrying <paramref name="summary"/> (which theses and triggers are blind, and why). Error severity when
+    /// <paramref name="infraBlind"/> (an infrastructure failure, not missing data), Warning otherwise. A dismissal quiets
+    /// it for a day while the blind spot persists.
+    /// </summary>
+    Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId,
+        string summary,
+        bool infraBlind,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the monitoring-blind Alert once a run evaluates every trigger of every thesis.</summary>
+    Task ResolveThesisMonitoringBlindAlertAsync(
+        Guid userId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a coverage-degradation Alert for one thesis (#1375): a trigger that evaluated on the previous run could
+    /// not be evaluated on this one. Error severity; each degradation is recorded, replacing the still-open earlier
+    /// one on the same thesis.
+    /// </summary>
+    Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId,
+        Guid thesisId,
+        string ticker,
+        string reason,
+        CancellationToken ct = default);
+
     /// <summary>Resolves the market-structure freshness Alert once the Radar feed catches back up.</summary>
     Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId,
@@ -333,16 +368,27 @@ public interface IAlertGeneratorService
     /// <summary>
     /// Raises a Warning alert proposing a concrete rebalance order list when IPS bands are breached
     /// (432). <paramref name="orderCount"/> is the number of order lines; <paramref name="orderSummary"/>
-    /// is the human-readable formatted list. Silenced 24 hours so the daily job doesn't re-propose
-    /// while a prior one is still open or was recently dismissed.
+    /// is the human-readable formatted list. <paramref name="driftSignature"/> names the drift the proposal
+    /// answers (<c>Asset:Direction:BandsOut</c> per breaching sleeve, joined by <c>;</c>). One drift episode
+    /// notifies once: a later run records a proposal only when some sleeve and direction is new to the episode
+    /// or further out than any band multiple it already announced, superseding the open proposal; a shrinking or
+    /// flickering drift stays quiet. A proposal the operator accepted, dismissed or deferred keeps its drift quiet
+    /// for 7 days from that proposal's creation, whether or not the drift clears meanwhile; a worsening notifies at
+    /// any time (finance-sentry#1266).
     /// </summary>
     Task GenerateRebalanceProposalAlertAsync(
         Guid userId,
         int orderCount,
         string orderSummary,
+        string driftSignature,
         CancellationToken ct = default);
 
-    /// <summary>Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing.</summary>
+    /// <summary>
+    /// Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing. For a proposal nobody
+    /// acted on that ends the drift episode: a recurrence afterwards notifies at once. An accepted, dismissed or
+    /// deferred proposal is not treated as cleared, so its drift stays quiet for 7 days from the proposal's
+    /// creation even across a clear.
+    /// </summary>
     Task ResolveRebalanceProposalAlertAsync(
         Guid userId,
         CancellationToken ct = default);
@@ -493,6 +539,17 @@ public interface IAlertGeneratorService
         string reason,
         DateOnly day,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises the "look at this again" notice for a thesis (<c>ThesisReviewDue</c>) or an Active candidate
+    /// (<c>CandidateReviewDue</c>) when something deterministic happened to its name: a filing, an earnings or catalyst
+    /// date passed, a news cluster, a break or an unbreak. Raised once ever per (subject, source, reference) - the
+    /// reference identity is derived from all three, so a detector re-reading the same event is a no-op even after the
+    /// notice is dismissed. The alert opens the subject's ticker dossier; its message carries the subject id, source and
+    /// evidence references (<c>ReviewDueMessage</c>), which Companion relays to Ledger and uses to pick the lane:
+    /// realtime for filing, break and unbreak, the digest for the rest.
+    /// </summary>
+    Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default);
 
     /// <summary>
     /// Raises a Warning alert that a monthly budget's month-to-date spend has reached 90% of its

@@ -2,7 +2,11 @@ namespace FinanceSentry.Modules.Research;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Catalyst;
+using FinanceSentry.Modules.Research.Application.Services.Coverage;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
+using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
+using FinanceSentry.Modules.Research.Application.Services.Screens;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -10,6 +14,8 @@ using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Services;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
+using FinanceSentry.Modules.Research.Infrastructure.Sources.Catalyst;
+using FinanceSentry.Modules.Research.Infrastructure.Sources.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -81,6 +87,40 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Weekly());
 
+            // Weekly reference-universe refresh (S&P 500, Nasdaq-100, FinanceDatabase sectors/industries, themes),
+            // Sunday 04:00 UTC - after FinanceDatabase's own Sunday update. A failed dataset fails the job.
+            mgr.AddOrUpdate<ReferenceUniverseRefreshJob>(
+                ReferenceUniverseRefreshJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Weekly(DayOfWeek.Sunday, 4));
+
+            // Coverage universe evaluation (discovery funnel stage 1): after the 00:00 candidate expiry and scan it reads.
+            var coverageOptions = sp.GetRequiredService<IOptions<CoverageOptions>>().Value;
+            mgr.AddOrUpdate<CoverageEvaluationJob>(
+                CoverageEvaluationJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
+
+            // Discovery-funnel screens (stage 5): fundamentals, relative strength and dated catalyst over the reference
+            // universe nominate into the candidate path before the 00:00 scan; the 01:10 coverage evaluation reads them.
+            var screenOptions = sp.GetRequiredService<IOptions<ScreenOptions>>().Value;
+            mgr.AddOrUpdate<ScreenNominationJob>(
+                ScreenNominationJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(screenOptions.RunHourUtc, screenOptions.RunMinuteUtc));
+
+            // Catalyst detection (discovery funnel stage 7): GDELT attention first, then the 8-K scan whose nominations the
+            // 01:10 coverage evaluation reads. Both have an off-switch in the Catalyst section.
+            var catalystOptions = sp.GetRequiredService<IOptions<CatalystOptions>>().Value;
+            mgr.AddOrUpdate<ThemeAttentionRefreshJob>(
+                ThemeAttentionRefreshJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(catalystOptions.AttentionHourUtc, catalystOptions.AttentionMinuteUtc));
+            mgr.AddOrUpdate<CatalystDetectionJob>(
+                CatalystDetectionJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(catalystOptions.ScanHourUtc, catalystOptions.ScanMinuteUtc));
+
             mgr.AddOrUpdate<CandidateExpiryJob>(
                 "opportunity-candidate-expiry",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -146,6 +186,17 @@ public static class ResearchModule
                 EarningsAheadJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(6));
+
+            // Thesis-review triggers for dates that have passed: earnings (the counterpart of earnings-ahead) and
+            // thesis catalysts. Daily, after earnings-ahead has settled its own resolves.
+            mgr.AddOrUpdate<EarningsPassedJob>(
+                EarningsPassedJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                "30 6 * * *");
+            mgr.AddOrUpdate<CatalystPassedJob>(
+                CatalystPassedJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                "35 6 * * *");
 
             // Filing-landed detector (ledger-heartbeat T2), hourly.
             mgr.AddOrUpdate<FilingWatchJob>(
@@ -408,6 +459,8 @@ public static class ResearchModule
         services.AddScoped<IMarketNewsService, RssMarketNewsService>();
         services.AddScoped<IMacroCalendarService, MacroCalendarService>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
+        services.AddScoped<IResearchWriteScope, ResearchWriteScope>();
+        services.AddScoped<ThesisOriginReader>();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
         services.Configure<FrictionConfig>(config.GetSection(FrictionConfig.SectionName));
         services.Configure<RelativePerformanceConfig>(config.GetSection(RelativePerformanceConfig.SectionName));
@@ -417,8 +470,11 @@ public static class ResearchModule
         // Singleton: holds the cached Yahoo crumb + per-ticker event cache across requests.
         services.AddSingleton<IEarningsCalendarService, YahooEarningsCalendarService>();
 
-        // Singleton: caches the ticker->CIK map + per-ticker EDGAR results across requests.
-        services.AddSingleton<ISecEdgarService, SecEdgarService>();
+        // Singleton: caches the ticker->CIK map + per-ticker EDGAR results across requests. The same
+        // instance is also the source's health reader, so get_sync_health reports the map's state (#1375).
+        services.AddSingleton<SecEdgarService>();
+        services.AddSingleton<ISecEdgarService>(sp => sp.GetRequiredService<SecEdgarService>());
+        services.AddSingleton<IDataSourceHealthReader>(sp => sp.GetRequiredService<SecEdgarService>());
         services.AddFundamentalsChain(config);
 
         // Analyst-actions sources. MarketBeat is the sole per-action source since the Yahoo
@@ -434,7 +490,86 @@ public static class ResearchModule
         // Structured monthly consensus (feature 037). Always registered — the service no-ops via
         // IsConfigured when no key is present, keeping the DI graph stable across environments.
         services.AddSingleton<IRecommendationTrendsService, FinnhubRecommendationTrendsService>();
+        // Reference universe (stage A of the discovery funnel): lists as data, refreshed weekly. The S&P 500 port
+        // reads the table and falls back to the embedded seed (Sp500ConstituentSource).
+        services.Configure<ReferenceUniverseOptions>(config.GetSection(ReferenceUniverseOptions.SectionName));
+        var referenceTimeout = TimeSpan.FromSeconds(
+            config.GetSection(ReferenceUniverseOptions.SectionName).Get<ReferenceUniverseOptions>()?.RequestTimeoutSeconds
+            ?? new ReferenceUniverseOptions().RequestTimeoutSeconds);
+        services.AddHttpClient(ReferenceDatasetHttp.HttpClientName, client =>
+        {
+            client.Timeout = referenceTimeout;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0");
+        })
+            .AddProviderResilience(referenceTimeout, maxRetries: 2)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+        services.AddScoped<IReferenceListFeed, Sp500ConstituentsFeed>();
+        services.AddScoped<IReferenceListFeed, Nasdaq100Feed>();
+        services.AddScoped<IReferenceListFeed, FinanceDatabaseFeed>();
+        services.AddScoped<IReferenceListFeed, ThemeListFeed>();
+        services.AddScoped<IReferenceUniverseRepository, ReferenceUniverseRepository>();
+        services.AddScoped<ReferenceUniverseRefresher>();
+        services.AddScoped<ReferenceUniverseRefreshJob>();
+
+        // Coverage universe ("our own index", stage 1 of the discovery funnel): capped list of companies with
+        // deterministic add and remove rules, evaluated daily. The Core port feeds the construction screen.
+        services.Configure<CoverageOptions>(config.GetSection(CoverageOptions.SectionName));
+        services.AddScoped<ICoverageRepository, CoverageRepository>();
+        services.AddScoped<ICoverageVerdictSource, ScorecardCoverageVerdictSource>();
+        services.AddScoped<CoverageSnapshotReader>();
+        services.AddScoped<CoverageEvaluator>();
+        services.AddScoped<ICoverageEventReviewer, CoverageEventReviewer>();
+        services.AddScoped<CoverageExplainer>();
+        services.AddScoped<CoverageEvaluationJob>();
+        services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();
+        services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
+
+        // Screens (stage 5 of the discovery funnel): deterministic nominations into the candidate path, tagged with the
+        // screen that fired. The earnings window rides the Finnhub client and key registered above.
+        services.Configure<ScreenOptions>(config.GetSection(ScreenOptions.SectionName));
+        services.AddSingleton<IEarningsWindowSource, FinnhubEarningsWindowSource>();
+        services.AddScoped<ScreenUniverse>();
+        services.AddScoped<IScreen, FundamentalsScreen>();
+        services.AddScoped<IScreen, CatalystScreen>();
+        services.AddScoped<IScreen, RelativeStrengthScreen>();
+        services.AddScoped<ScreenNominator>();
+        services.AddScoped<ScreenNominationJob>();
         services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
+
+        // Catalyst detection (discovery funnel stage 7): the daily 8-K scan over the reference universe and the GDELT
+        // attention measure per theme. Provider rates are enforced by one keyed pacer each: the SEC's fair-access ceiling is
+        // 10 requests a second (this stays at Catalyst:SecRequestsPerSecond) and GDELT answers 429 above one request per 5 s.
+        services.Configure<CatalystOptions>(config.GetSection(CatalystOptions.SectionName));
+        services.AddKeyedSingleton(CatalystPacers.Sec, (sp, _) =>
+            RequestPacer.PerSecond(sp.GetRequiredService<IOptions<CatalystOptions>>().Value.SecRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
+        services.AddKeyedSingleton(CatalystPacers.Gdelt, (sp, _) =>
+            new RequestPacer(
+                TimeSpan.FromSeconds(Math.Max(1, sp.GetRequiredService<IOptions<CatalystOptions>>().Value.GdeltMinIntervalSeconds)),
+                sp.GetRequiredService<TimeProvider>()));
+        var gdeltTimeout = TimeSpan.FromSeconds(30);
+        services.AddHttpClient(GdeltTimelineClient.HttpClientName, client =>
+        {
+            client.Timeout = gdeltTimeout;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0");
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+        services.AddScoped<IEdgarFullTextSearch, EdgarFullTextSearch>();
+        services.AddScoped<IGdeltTimelineClient, GdeltTimelineClient>();
+        services.AddScoped<ICatalystRepository, CatalystRepository>();
+        services.AddScoped<IThemeAttentionRepository, ThemeAttentionRepository>();
+        services.AddScoped<CatalystFilingScanner>();
+        services.AddScoped<CatalystDetector>();
+        services.AddScoped<ThemeAttentionRefresher>();
+        services.AddScoped<IThemeAttentionReader, ThemeAttentionReader>();
+        services.AddScoped<CatalystDetectionJob>();
+        services.AddScoped<ThemeAttentionRefreshJob>();
+
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
 
         // Stage 1 of the #558 scan funnel. Scoped like its collaborators (quote reads and the analyst
@@ -504,6 +639,9 @@ public static class ResearchModule
         services.AddScoped<LookaheadUniverse>();
         services.AddSingleton<IRecurringJobAgeReader, HangfireRecurringJobAgeReader>();
         services.AddScoped<EarningsAheadJob>();
+        services.AddScoped<ReviewDueRaiser>();
+        services.AddScoped<EarningsPassedJob>();
+        services.AddScoped<CatalystPassedJob>();
         services.AddScoped<FilingWatchJob>();
         services.AddScoped<AnalystRatingChangeAlertJob>();
         services.AddScoped<LookaheadSilenceMonitorJob>();

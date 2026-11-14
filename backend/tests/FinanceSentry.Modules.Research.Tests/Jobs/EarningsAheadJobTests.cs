@@ -21,6 +21,7 @@ public sealed class EarningsAheadJobTests
     private readonly Mock<IWatchlistReader> _watchlist = new();
     private readonly Mock<IThesisRepository> _theses = new();
     private readonly Mock<ICryptoHoldingsReader> _crypto = new();
+    private readonly Mock<ICandidateRepository> _candidates = new();
     private readonly Mock<IEarningsCalendarService> _earningsCalendar = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
     private readonly EarningsAheadJob _job;
@@ -31,9 +32,10 @@ public sealed class EarningsAheadJobTests
     {
         _job = new EarningsAheadJob(
             _banking.Object,
-            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object, CoverageStubs.NoMembers()),
             _earningsCalendar.Object,
             _alerts.Object,
+            new ReviewDueRaiser(_theses.Object, _candidates.Object, _alerts.Object, CoverageStubs.NoReviewer()),
             NullLogger<EarningsAheadJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
@@ -41,6 +43,7 @@ public sealed class EarningsAheadJobTests
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
         _theses.Setup(t => t.ListUnscopedAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
         _crypto.Setup(c => c.GetHoldingsAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
+        _candidates.Setup(c => c.ListAllUnscopedAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
     }
 
     [Fact]

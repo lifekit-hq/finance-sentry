@@ -10,13 +10,18 @@ using FinanceSentry.Modules.Research.Domain.Repositories;
 /// Rejects an Active candidate (US3). The scorecard is kept for the track record / counterfactuals
 /// (SC-005/020) — nothing is deleted. Records a <see cref="ThesisEventType.Rejected"/> event.
 /// </summary>
-public record RejectCandidateCommand(Guid UserId, Guid CandidateId, string Reason) : ICommand<RejectCandidateResult>;
+public record RejectCandidateCommand(
+    Guid UserId,
+    Guid CandidateId,
+    string Reason,
+    ThesisEventOrigin Origin = ThesisEventOrigin.User) : ICommand<RejectCandidateResult>;
 
 public sealed record RejectCandidateResult(bool CandidateFound, CandidateStatus Status);
 
 public sealed class RejectCandidateCommandHandler(
     ICandidateRepository candidateRepo,
-    IThesisEventRecorder eventRecorder)
+    IThesisEventRecorder eventRecorder,
+    IResearchWriteScope writeScope)
     : ICommandHandler<RejectCandidateCommand, RejectCandidateResult>
 {
     public async Task<RejectCandidateResult> Handle(RejectCandidateCommand command, CancellationToken ct)
@@ -34,11 +39,16 @@ public sealed class RejectCandidateCommandHandler(
 
         candidate.Status = CandidateStatus.Rejected;
         candidate.RejectedReason = command.Reason;
-        await candidateRepo.UpdateAsync(candidate, ct);
-
-        await eventRecorder.RecordAsync(
-            command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
-            ThesisEventType.Rejected, command.Reason, ct);
+        await writeScope.RunAsync(command.Origin, async () =>
+        {
+            await candidateRepo.UpdateAsync(candidate, ct);
+            await eventRecorder.RecordAuditedAsync(
+                command.UserId, ThesisSubjectType.Candidate, candidate.Id, candidate.Ticker,
+                ThesisEventType.Rejected, command.Origin,
+                new ThesisAudit(Prior: null, New: null, command.Reason, Evidence: null),
+                command.Reason, ct);
+            return candidate;
+        }, ct);
 
         return new RejectCandidateResult(CandidateFound: true, CandidateStatus.Rejected);
     }

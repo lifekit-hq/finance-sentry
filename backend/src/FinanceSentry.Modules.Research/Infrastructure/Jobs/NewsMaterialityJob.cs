@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -23,14 +24,27 @@ using Microsoft.Extensions.Logging;
 /// (~0.3-1 fires/day); the retrievable-article and distinct-story gates above are #693's fix for that
 /// rate drifting several times over target, mostly overnight when wire syndication reposts the same
 /// story under multiple distributor names.
+/// <para>
+/// A cluster on a ticker that maps to a thesis (its own ticker or a trigger proxy) or to an Active candidate also raises the
+/// thesis-review notice (<see cref="ReviewDueRaiser"/>, source <c>news</c>, reference = ticker and day, evidence = the
+/// article ids). Active-candidate tickers outside the held and thesis names are scanned for that notice alone: a candidate
+/// is not a holding, so it earns no NewsCluster alert of its own.
+/// </para>
+/// <para>
+/// Coverage names (<see cref="LookaheadUniverse.CoverageTickersByPriorityAsync"/>) are scanned the same way, for the notice and
+/// the coverage event review alone (<see cref="ReviewDueRaiser.CompleteAsync"/>): a cluster on a name we only cover moves its
+/// <c>LastEventAt</c>, re-scores its candidate and runs the coverage remove rules, with no NewsCluster alert.
+/// </para>
 /// </summary>
 public sealed class NewsMaterialityJob(
     IBankingTotalsReader banking,
     IBrokerageHoldingsReader brokerage,
+    LookaheadUniverse universe,
     IThesisRepository theses,
     INewsRepository news,
     IMaterialityTermRepository materialityTerms,
     IAlertGeneratorService alerts,
+    ReviewDueRaiser reviewDue,
     ILogger<NewsMaterialityJob> logger,
     int minGoogleNewsThesisStories = NewsMaterialityJob.DefaultMinGoogleNewsThesisStories)
 {
@@ -45,6 +59,9 @@ public sealed class NewsMaterialityJob(
     private const string EquityInstrumentType = "STK";
     private const int MinClusterSources = 2;
     private const int ArticleLookbackLimit = 50;
+
+    /// <summary>How many article ids the review notice names; the newest first.</summary>
+    private const int MaxEvidenceArticles = 5;
 
     /// <summary>
     /// #693: a cluster backed by fewer than this many articles with a retrievable (non-blank,
@@ -108,11 +125,25 @@ public sealed class NewsMaterialityJob(
             }
         }
 
+        var subjects = await reviewDue.LoadSubjectsAsync(userId, ct);
+        subjects.TrackCoverage(await universe.CoverageTickersByPriorityAsync(userId, ct));
+        var reviewOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ticker in subjects.WatchedTickers)
+        {
+            if (tickerThesisIds.TryAdd(ticker, []))
+            {
+                reviewOnly.Add(ticker);
+            }
+        }
+
         var since = nowUtc - ClusterWindow;
         foreach (var (ticker, thesisIds) in tickerThesisIds)
         {
-            await ProcessTickerAsync(userId, ticker, thesisIds, since, day, terms, ct);
+            await ProcessTickerAsync(
+                userId, ticker, thesisIds, since, day, terms, subjects, raiseClusterAlert: !reviewOnly.Contains(ticker), ct);
         }
+
+        await reviewDue.CompleteAsync(userId, subjects, ct);
     }
 
     private static void AddThesisTicker(Dictionary<string, HashSet<Guid>> map, string ticker, Guid thesisId)
@@ -133,6 +164,8 @@ public sealed class NewsMaterialityJob(
         DateTimeOffset since,
         DateOnly day,
         IReadOnlyList<string> terms,
+        ReviewSubjects subjects,
+        bool raiseClusterAlert,
         CancellationToken ct)
     {
         var articles = (await news.GetForTickerAsync(ticker, since, ArticleLookbackLimit, ct)).ToList();
@@ -155,8 +188,7 @@ public sealed class NewsMaterialityJob(
         var distinctStories = retrievable.Select(a => NormalizeTitle(a.Title)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
         if (distinctSources >= MinClusterSources && distinctStories >= MinClusterSources)
         {
-            await alerts.GenerateNewsClusterAlertAsync(
-                userId, ticker, $"{distinctSources} sources within {ClusterWindow.TotalHours:0}h", day, ct);
+            await RaiseAsync($"{distinctSources} sources within {ClusterWindow.TotalHours:0}h");
             return;
         }
 
@@ -165,7 +197,7 @@ public sealed class NewsMaterialityJob(
             : retrievable.Where(a => a.ThesisIds.Any(thesisIds.Contains)).ToList();
         if (IsThesisHit(thesisArticles))
         {
-            await alerts.GenerateNewsClusterAlertAsync(userId, ticker, "thesis-attached source hit", day, ct);
+            await RaiseAsync("thesis-attached source hit");
             return;
         }
 
@@ -174,7 +206,24 @@ public sealed class NewsMaterialityJob(
             .FirstOrDefault();
         if (matchedKeyword is not null)
         {
-            await alerts.GenerateNewsClusterAlertAsync(userId, ticker, $"material keyword: {matchedKeyword}", day, ct);
+            await RaiseAsync($"material keyword: {matchedKeyword}");
+        }
+
+        async Task RaiseAsync(string reason)
+        {
+            if (raiseClusterAlert)
+            {
+                await alerts.GenerateNewsClusterAlertAsync(userId, ticker, reason, day, ct);
+            }
+
+            var evidence = retrievable
+                .OrderByDescending(a => a.PublishedAt)
+                .Take(MaxEvidenceArticles)
+                .Select(a => $"article:{a.Id}")
+                .ToList();
+            await reviewDue.RaiseAsync(
+                userId, subjects, ticker, ReviewDueSource.News, $"{ticker.ToUpperInvariant()}:{day:yyyy-MM-dd}", evidence,
+                $"news clustered on {day:yyyy-MM-dd} ({reason})", ct);
         }
     }
 

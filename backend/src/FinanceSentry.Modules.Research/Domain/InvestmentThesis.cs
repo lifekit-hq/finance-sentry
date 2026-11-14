@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Domain;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 
 public class InvestmentThesis : IHasUpdatedAt, IUserOwned
 {
@@ -14,10 +15,17 @@ public class InvestmentThesis : IHasUpdatedAt, IUserOwned
     public List<ThesisDataPoint> KeyDataPoints { get; set; } = [];
     public List<ThesisCatalyst> Catalysts { get; set; } = [];
     public List<ThesisInvalidationTrigger> InvalidationTriggers { get; set; } = [];
+    // Kill-switches no metric can express (a customer loss, a regulatory ruling). Free text, outside the closed
+    // trigger vocabulary: the monitor never evaluates them, Ledger checks them against the news on each review.
+    public List<string> NarrativeFalsifiers { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? BrokenAt { get; set; }
     public string? BrokenReason { get; set; }
+
+    // What the monitor could evaluate on its last run (#1375). Written by the monitor alone, through
+    // IThesisRepository.SaveMonitorSnapshotAsync, so a run never moves UpdatedAt.
+    public ThesisMonitorSnapshot? MonitorSnapshot { get; set; }
 }
 
 public record ThesisDataPoint(string Metric, string Direction, decimal Threshold, string Source);

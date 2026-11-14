@@ -57,4 +57,12 @@ public static class AlertType
     public const string MacroEventAhead = "MacroEventAhead";
     /// <summary>A high-importance macro release is out (#1091); raised once per release, ever.</summary>
     public const string MacroEventReleased = "MacroEventReleased";
+    /// <summary>
+    /// Something deterministic happened to a thesis's name (a filing, a passed earnings or catalyst date, a news cluster,
+    /// a break or an unbreak): Ledger should take a fresh look at the thesis. Raised once ever per (thesis, source,
+    /// reference); the message carries the subject id and evidence references (<c>ReviewDueMessage</c>).
+    /// </summary>
+    public const string ThesisReviewDue = "ThesisReviewDue";
+    /// <summary>The same notice for an Active candidate that has no thesis yet (a watchlist name); same once-ever identity.</summary>
+    public const string CandidateReviewDue = "CandidateReviewDue";
 }

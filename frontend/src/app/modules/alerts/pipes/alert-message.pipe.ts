@@ -6,6 +6,8 @@ import {AlertMessageUtils} from '../utils/alert-message.utils';
 @Pipe({name: 'alertMessage'})
 export class AlertMessagePipe implements PipeTransform {
   public transform(message: Nullable<string>): string {
-    return AlertMessageUtils.roundNumbers(AlertMessageUtils.stripFilingUrl(message));
+    return AlertMessageUtils.roundNumbers(
+      AlertMessageUtils.stripFilingUrl(AlertMessageUtils.stripReviewTail(message))
+    );
   }
 }

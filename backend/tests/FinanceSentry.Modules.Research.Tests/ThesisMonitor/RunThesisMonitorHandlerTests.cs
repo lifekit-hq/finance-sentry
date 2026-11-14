@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using FluentAssertions;
@@ -66,6 +67,111 @@ public class RunThesisMonitorHandlerTests
         alerts.GenerateCalls.Should().Be(0);
         alerts.ResolveCalls.Should().Be(0);
         thesis.BrokenAt.Should().Be(brokenAt);
+    }
+
+    [Fact]
+    public async Task Break_RaisesARealtimeBreakReviewNoticeForTheThesis_ReferencedByTheBreakTimestamp()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts);
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var review = alerts.ReviewDues.Should().ContainSingle().Subject;
+        review.Subject.Should().Be(ReviewSubjectKind.Thesis);
+        review.SubjectId.Should().Be(thesis.Id);
+        review.Ticker.Should().Be("MU");
+        review.Source.Should().Be(ReviewDueSource.Break);
+        ReviewDueSource.IsRealtime(review.Source).Should().BeTrue();
+        review.Reference.Should().Be(thesis.BrokenAt!.Value.UtcDateTime.ToString("yyyyMMddTHHmmssZ"));
+        review.Evidence.Should().Contain($"thesis:{thesis.Id}");
+        review.Headline.Should().Contain(thesis.BrokenReason!);
+    }
+
+    [Fact]
+    public async Task StillBroken_RaisesNoSecondBreakReviewNotice()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        thesis.BrokenAt = DateTimeOffset.UtcNow.AddDays(-3);
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q2]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.ReviewDues.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConditionCleared_RaisesARealtimeUnbreakReviewNotice_NamingTheBreakItClears()
+    {
+        var healthyFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var brokenAt = new DateTimeOffset(2026, 9, 1, 8, 30, 15, TimeSpan.Zero);
+        thesis.BrokenAt = brokenAt;
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q1]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(healthyFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var review = alerts.ReviewDues.Should().ContainSingle().Subject;
+        review.Source.Should().Be(ReviewDueSource.Unbreak);
+        ReviewDueSource.IsRealtime(review.Source).Should().BeTrue();
+        review.SubjectId.Should().Be(thesis.Id);
+        review.Reference.Should().Be("20260901T083015Z");
+    }
+
+    [Fact]
+    public async Task ZeroTriggers_BrokenThesis_RaisesTheUnbreakReviewNotice()
+    {
+        var thesis = Thesis([]);
+        thesis.BrokenAt = new DateTimeOffset(2026, 9, 1, 8, 30, 15, TimeSpan.Zero);
+        thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q1]";
+        var alerts = new FakeAlertGeneratorService();
+
+        await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService([]), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.ReviewDues.Should().ContainSingle(r => r.Source == ReviewDueSource.Unbreak && r.Reference == "20260901T083015Z");
+    }
+
+    [Fact]
+    public async Task ReviewNoticeFailure_NeverAbortsTheRun_AndTheBreakStillLands()
+    {
+        var breachingFacts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+        var thesis = Thesis([trigger]);
+        var alerts = new FakeAlertGeneratorService { ReviewDueThrows = true };
+
+        var summary = await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(breachingFacts), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.BreaksRaised.Should().Be(1);
+        summary.Errors.Should().Be(0);
+        thesis.BrokenAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -347,6 +453,255 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenReason.Should().Contain(ThesisMetric.RelativeReturn);
     }
 
+
+    // ── #1375: infra-blind marking, post-run meta-check, coverage-degradation diff ───────────────
+
+    private static readonly FundamentalsCoverage MapDownCoverage = new(
+        FundamentalsCoverageStatus.SourceUnavailable, null,
+        "sec-edgar-us-gaap unavailable: EDGAR ticker->CIK map unavailable", [], EdgarErrorCodes.MapUnavailable);
+
+    private static readonly ThesisInvalidationTrigger GrossMarginTrigger =
+        new(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+
+    private static List<FundamentalFact> HealthyGrossMarginFacts() =>
+    [
+        Fact("GrossProfit", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+    ];
+
+    [Fact]
+    public async Task SourceUnavailable_MarksTheTriggerInfraBlind_NotNoData()
+    {
+        var thesis = Thesis([GrossMarginTrigger]);
+        var handler = BuildHandler(
+            new FakeThesisRepository([thesis]), new StubFundamentalsService([], coverage: MapDownCoverage),
+            new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var trigger = summary.Unmonitorable.Single().Triggers.Single();
+        trigger.Cause.Should().Be(ThesisBlindCause.InfraBlind);
+        trigger.Coverage!.ErrorCode.Should().Be(EdgarErrorCodes.MapUnavailable);
+    }
+
+    [Fact]
+    public async Task NoSourceAvailable_StaysNoData_NotInfraBlind()
+    {
+        var coverage = new FundamentalsCoverage(
+            FundamentalsCoverageStatus.NoSourceAvailable, FundamentalsIssuerType.NotSecRegistrant, "no data", []);
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]), new StubFundamentalsService([], coverage: coverage),
+            new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Unmonitorable.Single().Triggers.Single().Cause.Should().Be(ThesisBlindCause.NoData);
+    }
+
+    [Fact]
+    public async Task PriceTriggerWithNoHistory_IsNoData_NotInfraBlind()
+    {
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "lessThan", -0.3m);
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([trigger])]), new StubFundamentalsService([]), new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Unmonitorable.Single().Triggers.Single().Cause.Should().Be(ThesisBlindCause.NoData);
+    }
+
+    [Fact]
+    public async Task BlindThesis_RaisesAnInfraBlindAlertAfterTheRun_NamingTheTriggerAndCause()
+    {
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]),
+            new StubFundamentalsService([], coverage: MapDownCoverage), alerts);
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var (summary, infraBlind) = alerts.BlindAlerts.Should().ContainSingle().Subject;
+        infraBlind.Should().BeTrue();
+        summary.Should().Contain("MU").And.Contain(ThesisMetric.GrossMargin).And.Contain("INFRA_BLIND")
+            .And.Contain("ticker->CIK map unavailable").And.Contain(ThesisMonitorability.Unmonitorable);
+        alerts.BlindResolveCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PartiallyMonitorableThesis_WithoutAnOutage_AlertsAsWarningNotInfra()
+    {
+        // Only the margin trigger has the periods it needs; revenue YoY has no prior-year pair.
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("GrossProfit", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var growth = new ThesisInvalidationTrigger(ThesisMetric.RevenueYoy, "lessThan", 0m, ConsecutivePeriods: 1);
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger, growth])]), new StubFundamentalsService(facts), alerts);
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var (summary, infraBlind) = alerts.BlindAlerts.Should().ContainSingle().Subject;
+        infraBlind.Should().BeFalse();
+        summary.Should().Contain(ThesisMetric.RevenueYoy).And.Contain(ThesisMonitorability.PartiallyMonitorable)
+            .And.NotContain(ThesisMetric.GrossMargin);
+    }
+
+    [Fact]
+    public async Task FullyMonitorableRun_RaisesNoBlindAlert_AndResolvesTheOpenOne()
+    {
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]), new StubFundamentalsService(HealthyGrossMarginFacts()), alerts);
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.BlindAlerts.Should().BeEmpty();
+        alerts.BlindResolveCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RunThatErrored_DoesNotResolveTheBlindAlert()
+    {
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]),
+            new StubFundamentalsService(HealthyGrossMarginFacts(), throwForTicker: "MU"), alerts);
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Errors.Should().Be(1);
+        alerts.BlindResolveCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AlertFailure_NeverAbortsTheRun()
+    {
+        var alerts = new FakeAlertGeneratorService { BlindAlertThrows = true };
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]),
+            new StubFundamentalsService([], coverage: MapDownCoverage), alerts);
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Unmonitorable.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task EveryRun_StoresTheEvaluableTriggerCount()
+    {
+        var thesis = Thesis([GrossMarginTrigger, new ThesisInvalidationTrigger(ThesisMetric.RevenueYoy, "lessThan", 0m)]);
+        var repo = new FakeThesisRepository([thesis]);
+        var handler = BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), new FakeAlertGeneratorService());
+
+        await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var snapshot = repo.Snapshots.Should().ContainSingle().Subject;
+        snapshot.TotalTriggers.Should().Be(2);
+        snapshot.EvaluableKeys.Should().ContainSingle().Which.Should().StartWith(ThesisMetric.GrossMargin + "|MU|");
+    }
+
+    [Fact]
+    public async Task FirstMonitoredRun_HasNothingToDiff_RaisesNoDegradationAlert()
+    {
+        var alerts = new FakeAlertGeneratorService();
+        var handler = BuildHandler(
+            new FakeThesisRepository([Thesis([GrossMarginTrigger])]),
+            new StubFundamentalsService([], coverage: MapDownCoverage), alerts);
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.DegradedAlerts.Should().BeEmpty();
+        summary.CoverageDegraded.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TriggerThatEvaluatedLastRunAndFailsNow_RaisesACoverageDegradationAlert_OnceUntilItRecovers()
+    {
+        var thesis = Thesis([GrossMarginTrigger]);
+        var repo = new FakeThesisRepository([thesis]);
+        var alerts = new FakeAlertGeneratorService();
+
+        // Run 1: the map is up and the trigger evaluates.
+        await BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+        alerts.DegradedAlerts.Should().BeEmpty();
+
+        // Run 2: the map is down - the trigger went blind since this run.
+        var down = BuildHandler(repo, new StubFundamentalsService([], coverage: MapDownCoverage), alerts);
+        var second = await down.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var (thesisId, ticker, reason) = alerts.DegradedAlerts.Should().ContainSingle().Subject;
+        thesisId.Should().Be(thesis.Id);
+        ticker.Should().Be("MU");
+        reason.Should().Contain("MU gross_margin went blind since").And.Contain("INFRA_BLIND");
+        second.CoverageDegraded.Should().ContainSingle().Which.Triggers.Should().ContainSingle()
+            .Which.Metric.Should().Be(ThesisMetric.GrossMargin);
+
+        // Run 3: still down - already blind last run, so not reported as a fresh degradation.
+        await down.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+        alerts.DegradedAlerts.Should().HaveCount(1);
+        alerts.BlindAlerts.Should().HaveCount(2); // the blind-spot notice repeats every run; the alert store dedups it
+
+        // Run 4: recovered; run 5: down again - a new regression, a new alert.
+        await BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+        await down.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+        alerts.DegradedAlerts.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task EditingATriggerThreshold_IsNotACoverageChange()
+    {
+        var thesis = Thesis([GrossMarginTrigger]);
+        var repo = new FakeThesisRepository([thesis]);
+        var alerts = new FakeAlertGeneratorService();
+        await BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        thesis.InvalidationTriggers = [GrossMarginTrigger with { Threshold = 0.20m }];
+        await BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        alerts.DegradedAlerts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task OnlyTheTriggerThatWentBlind_IsNamedInTheDegradation()
+    {
+        // Gross margin keeps evaluating; revenue YoY (which needs a prior-year pair) was evaluable and is not now.
+        var yoy = new ThesisInvalidationTrigger(ThesisMetric.RevenueYoy, "lessThan", 0m, ConsecutivePeriods: 1);
+        var thesis = Thesis([GrossMarginTrigger, yoy]);
+        var repo = new FakeThesisRepository([thesis]);
+        var alerts = new FakeAlertGeneratorService();
+
+        var withPriorYear = HealthyGrossMarginFacts();
+        withPriorYear.Add(Fact("Revenue", 90m, 2025, "Q2", new DateOnly(2025, 5, 31)));
+        await BuildHandler(repo, new StubFundamentalsService(withPriorYear), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var summary = await BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), alerts)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var degradation = summary.CoverageDegraded.Should().ContainSingle().Subject;
+        degradation.Triggers.Should().ContainSingle().Which.Metric.Should().Be(ThesisMetric.RevenueYoy);
+        alerts.DegradedAlerts.Single().Reason.Should().Contain("MU revenue_yoy").And.NotContain("gross_margin");
+    }
+
+    [Fact]
+    public async Task SnapshotWriteFailure_NeverAbortsTheRun()
+    {
+        var repo = new FakeThesisRepository([Thesis([GrossMarginTrigger])]) { SnapshotWritesFail = true };
+        var handler = BuildHandler(repo, new StubFundamentalsService(HealthyGrossMarginFacts()), new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Errors.Should().Be(0);
+        summary.ThesesEvaluated.Should().Be(1);
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeThesisRepository(IReadOnlyList<InvestmentThesis> theses) : IThesisRepository
@@ -367,6 +722,24 @@ public class RunThesisMonitorHandlerTests
             => Task.FromResult<IReadOnlyList<InvestmentThesis>>(theses.Where(t => t.Ticker == ticker).ToList());
 
         public Task UpsertAsync(InvestmentThesis thesis, CancellationToken ct = default) => Task.CompletedTask;
+
+        // Persistence stand-in: the next run reads the snapshot back off the same thesis instance.
+        public List<ThesisMonitorSnapshot> Snapshots { get; } = [];
+
+        public bool SnapshotWritesFail { get; set; }
+
+        public Task SaveMonitorSnapshotAsync(
+            Guid userId, Guid thesisId, ThesisMonitorSnapshot snapshot, CancellationToken ct = default)
+        {
+            if (SnapshotWritesFail)
+            {
+                throw new InvalidOperationException("snapshot write failed");
+            }
+
+            Snapshots.Add(snapshot);
+            theses.Single(t => t.Id == thesisId).MonitorSnapshot = snapshot;
+            return Task.CompletedTask;
+        }
 
         public Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default) => Task.FromResult(true);
     }
@@ -416,12 +789,67 @@ public class RunThesisMonitorHandlerTests
             string? decisionNote = null,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task RecordAuditedAsync(
+            Guid userId,
+            ThesisSubjectType subjectType,
+            Guid subjectId,
+            string ticker,
+            ThesisEventType eventType,
+            ThesisEventOrigin origin,
+            ThesisAudit? audit,
+            string? decisionNote = null,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     private sealed class FakeAlertGeneratorService : IAlertGeneratorService
     {
         public int GenerateCalls { get; private set; }
         public int ResolveCalls { get; private set; }
+
+        public List<(string Summary, bool InfraBlind)> BlindAlerts { get; } = [];
+        public int BlindResolveCalls { get; private set; }
+        public List<(Guid ThesisId, string Ticker, string Reason)> DegradedAlerts { get; } = [];
+        public bool BlindAlertThrows { get; set; }
+        public List<ReviewDue> ReviewDues { get; } = [];
+        public bool ReviewDueThrows { get; set; }
+
+        public Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default)
+        {
+            if (ReviewDueThrows)
+            {
+                throw new InvalidOperationException("alert store down");
+            }
+
+            ReviewDues.Add(review);
+            return Task.CompletedTask;
+        }
+
+        public Task GenerateThesisMonitoringBlindAlertAsync(
+            Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
+        {
+            if (BlindAlertThrows)
+            {
+                throw new InvalidOperationException("alert store down");
+            }
+
+            BlindAlerts.Add((summary, infraBlind));
+            return Task.CompletedTask;
+        }
+
+        public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
+        {
+            BlindResolveCalls++;
+            return Task.CompletedTask;
+        }
+
+        public Task GenerateThesisCoverageDegradedAlertAsync(
+            Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
+        {
+            DegradedAlerts.Add((thesisId, ticker, reason));
+            return Task.CompletedTask;
+        }
 
         public Task GenerateLowBalanceAlertAsync(
             Guid userId, Guid accountId, string accountName, decimal balance, decimal threshold, CancellationToken ct = default)
@@ -534,7 +962,7 @@ public class RunThesisMonitorHandlerTests
             decimal impliedRate, decimal marketRate, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, CancellationToken ct = default)
+        public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)

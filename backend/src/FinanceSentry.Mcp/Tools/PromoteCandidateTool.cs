@@ -1,10 +1,9 @@
 using System.ComponentModel;
-using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Domain;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
 
 namespace FinanceSentry.Mcp.Tools;
@@ -12,18 +11,19 @@ namespace FinanceSentry.Mcp.Tools;
 [McpServerToolType]
 public sealed class PromoteCandidateTool(
     ICommandHandler<PromoteCandidateCommand, PromoteCandidateResult> handler,
-    IIdentityResolver identity)
+    IIdentityResolver identity,
+    IHttpContextAccessor httpContextAccessor)
 {
-    [Authorize(Policy = AuthPolicies.RequireMcpPersonalToken)]
     [McpServerTool(Name = "promote_candidate")]
-    [Description("Promotes an active candidate into a monitored InvestmentThesis. Always runs the 022 risk gate (check_risk_rules) first: if the proposed position is Refused, no thesis is created and the verdict (named rule + max compliant size) is returned — unless overrideRisk is true, which records the override as a signal. Set paper=true for a tracking-only promotion that will never draw down real cash: the gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real (non-paper) promotions keep today's full rule set. Invalidation triggers default to the deterministic prefill from the candidate's fundamentals; pass triggers to override. Returns the thesis id (when created) and the gate verdict.")]
+    [Description("Promotes an active candidate into a monitored InvestmentThesis. Always runs the 022 risk gate (check_risk_rules) first: if the proposed position is Refused, no thesis is created and the verdict (named rule + max compliant size) is returned — unless overrideRisk is true, which records the override as a signal. Overriding the gate is the owner's decision alone: overrideRisk is ignored when Ledger calls, so a Refused verdict stays refused and the result's note says the override is owner-only. Set paper=true for a tracking-only promotion that will never draw down real cash: the gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real (non-paper) promotions keep today's full rule set. Invalidation triggers default to the deterministic prefill from the candidate's fundamentals; pass triggers to override. Evidence at entry: the candidate's latest scorecard summary and the decisionNote are carried into the thesis text and key data points (a candidate with no scorecard carries nothing and still promotes). The promotion and the thesis it creates are journaled with their origin (User or Ledger). Returns the thesis id (when created) and the gate verdict.")]
     public async Task<PromoteCandidateResult?> ExecuteAsync(
         [Description("Candidate id to promote.")] Guid id,
         [Description("Optional invalidation triggers to override the deterministic prefill.")] IReadOnlyList<ThesisInvalidationTrigger>? triggers = null,
-        [Description("Set true to promote despite a Refused risk verdict (records an explicit override signal).")] bool overrideRisk = false,
+        [Description("Owner only: set true to promote despite a Refused risk verdict (records an explicit override signal). Ignored when Ledger calls.")] bool overrideRisk = false,
         [Description("Proposed position size in USD for the risk gate's concentration/sizing check. Defaults to 0 (no sizing).")] decimal proposedUsd = 0m,
         [Description("Optional contemporaneous reasoning captured at promotion time.")] string? decisionNote = null,
         [Description("Set true for a paper/tracking-only promotion: the risk gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules. Defaults to false (real-book rule set unchanged).")] bool paper = false,
+        [Description("References the promotion rests on: newsArticleIds, filingAccessions, eventIds, fundamentalsAsOf. Kept in the audit trail.")] ThesisEvidenceRefs? evidence = null,
         CancellationToken cancellationToken = default)
     {
         var effective = identity.GetUserId();
@@ -33,7 +33,8 @@ public sealed class PromoteCandidateTool(
         }
 
         return await handler.Handle(
-            new PromoteCandidateCommand(effective.Value, id, triggers, overrideRisk, proposedUsd, decisionNote, paper),
+            new PromoteCandidateCommand(effective.Value, id, triggers, overrideRisk, proposedUsd, decisionNote, paper,
+                McpCallerOrigin.Of(httpContextAccessor), evidence),
             cancellationToken);
     }
 }

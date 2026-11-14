@@ -1,5 +1,8 @@
 namespace FinanceSentry.Modules.Research.Domain.Scoring;
 
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 
 /// <summary>
@@ -56,7 +59,9 @@ public sealed record ScoreEvidence(
     int? SectorRank = null,
     int? SectorRankDelta = null,
     decimal? DistanceFrom63dHigh = null,
-    string? FundamentalsBasis = null)
+    string? FundamentalsBasis = null,
+    CorrelationFact? Correlation = null,
+    AttentionFact? Attention = null)
 {
     public static ScoreEvidence Empty { get; } = new(
         new Dictionary<int, decimal?>(),
@@ -72,3 +77,37 @@ public sealed record ProposedTrigger(
     string? ProxyTicker,
     int ConsecutivePeriods,
     string Rationale);
+
+/// <summary>
+/// Rule D1 / #558 stage 2: how a candidate's 63-day daily returns move with the user's book. Holds the
+/// per-holding and book correlations (each null with a reason when not evaluable, never a fake number) and
+/// the documented add-rule inputs derived from them: <see cref="CorrelatedToBook"/> (null when the book
+/// figure is not evaluable) and <see cref="AddPenalty"/> (0 unless flagged). Facts only - no verdict reads it.
+/// </summary>
+public sealed record CorrelationFact(
+    int WindowDays,
+    IReadOnlyList<ReferenceCorrelation> TopHoldings,
+    decimal? BookCorrelation,
+    int BookObservations,
+    decimal BookCoverage,
+    string? BookNotEvaluableReason,
+    decimal FlagThreshold,
+    bool? CorrelatedToBook,
+    int AddPenalty)
+{
+    /// <summary>Derives the add-rule inputs from a raw correlation read and the configured threshold and penalty.</summary>
+    public static CorrelationFact From(TickerCorrelation read, OpportunityOptions options)
+    {
+        bool? flagged = read.Book.Correlation is { } book ? book >= options.CorrelationToBookFlagThreshold : null;
+        return new CorrelationFact(
+            read.WindowDays,
+            read.TopHoldings,
+            read.Book.Correlation,
+            read.Book.Observations,
+            read.Book.Coverage,
+            read.Book.NotEvaluableReason,
+            options.CorrelationToBookFlagThreshold,
+            flagged,
+            flagged == true ? options.CorrelationToBookPenalty : 0);
+    }
+}

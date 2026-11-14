@@ -2,9 +2,11 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
-import {describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vitest';
 
+import {type AppPreferences} from '../../../shared/models/preferences/app-preferences.model';
 import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -146,7 +148,37 @@ const SIGNAL: DossierSignalItem = {
   payload: {},
 };
 
+const preferences = signal<Partial<AppPreferences> | null>(null);
+
 describe('dossierComputed', () => {
+  beforeEach(() => {
+    preferences.set(null);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{provide: AppPreferencesStore, useValue: {preferences}}],
+    });
+  });
+
+  describe('verdictDisplay', () => {
+    it('is simple until the account has loaded', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(buildSignals()).verdictDisplay()).toBe('simple');
+      });
+    });
+
+    it('follows the account, so the choice is the same on every device', () => {
+      preferences.set({verdictDisplay: 'detailed'});
+
+      TestBed.runInInjectionContext(() => {
+        const computed = dossierComputed(buildSignals());
+        expect(computed.verdictDisplay()).toBe('detailed');
+
+        preferences.set({verdictDisplay: 'simple'});
+        expect(computed.verdictDisplay()).toBe('simple');
+      });
+    });
+  });
+
   it('hasDossierSections is false before a dossier has loaded', () => {
     const store = buildSignals();
     TestBed.runInInjectionContext(() => {

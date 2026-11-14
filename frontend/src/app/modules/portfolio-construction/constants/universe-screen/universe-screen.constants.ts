@@ -50,7 +50,7 @@ export const UNIVERSE_CROWDING_ORDER: Readonly<Record<string, number>> = {
 export const UNIVERSE_SOURCE_LABEL: Readonly<Record<UniverseSource, string>> = {
   held: 'Held',
   watchlist: 'Watchlist',
-  curated: 'Curated',
+  coverage: 'Coverage',
 };
 
 export const UNIVERSE_TITLE_NOTE =
@@ -62,7 +62,7 @@ export const UNIVERSE_WEIGHT_NOTE =
   'default and your risk rules. The rest is cash.';
 
 export const UNIVERSE_TRUNCATED_NOTE =
-  'The universe is capped, so some curated names are not scored.';
+  'The universe is capped, so some coverage names are not scored.';
 
 export const UNIVERSE_EMPTY_COPY = {
   message: 'No names to score yet',

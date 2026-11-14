@@ -6,7 +6,7 @@ export class UniverseScreenFixtures {
   public static row(overrides: Partial<UniverseRow> = {}): UniverseRow {
     return {
       symbol: 'AAA',
-      sources: ['curated'],
+      sources: ['coverage'],
       sector: 'Technology',
       industry: 'Software - Infrastructure',
       failureReason: null,

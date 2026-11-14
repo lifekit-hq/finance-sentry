@@ -15,10 +15,11 @@ public record AppearanceDto(
 /// <summary>
 /// Body of <c>GET</c> and <c>PATCH /me/preferences</c>, the account tier of the lifekit app-shell standard.
 /// </summary>
-public record PreferencesDto(AppearanceDto Appearance);
+public record PreferencesDto(AppearanceDto Appearance, string VerdictDisplay);
 
 /// <summary>
 /// Body of <c>PATCH /me/preferences</c>: a present top-level field replaces the stored one wholesale (an
 /// <c>appearance</c> object is written as a whole, so an omitted seed clears it), an omitted field is untouched.
+/// <c>verdictDisplay</c> is <c>simple</c> or <c>detailed</c>.
 /// </summary>
-public record UpdatePreferencesRequest(AppearanceDto? Appearance);
+public record UpdatePreferencesRequest(AppearanceDto? Appearance, string? VerdictDisplay = null);

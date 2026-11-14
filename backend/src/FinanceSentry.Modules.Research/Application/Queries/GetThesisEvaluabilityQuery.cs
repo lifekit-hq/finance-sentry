@@ -20,13 +20,23 @@ public record ThesisTriggerEvaluabilityView(
     bool IsEvaluable,
     string? Reason);
 
+/// <summary>Narrative falsifiers are read by Ledger against the news on each review; no job evaluates them.</summary>
+public static class NarrativeFalsifierStatus
+{
+    public const string ModelCheckedNotMonitored = "model-checked, not monitored";
+}
+
+public record NarrativeFalsifierView(string Text, string Status);
+
 public record ThesisEvaluabilityReport(
     Guid ThesisId,
     string Ticker,
     int TriggerCount,
     int EvaluableCount,
     bool FullyCovered,
-    IReadOnlyList<ThesisTriggerEvaluabilityView> Triggers);
+    IReadOnlyList<ThesisTriggerEvaluabilityView> Triggers,
+    // Reported beside the triggers, never counted in them: TriggerCount, EvaluableCount and FullyCovered are unchanged.
+    IReadOnlyList<NarrativeFalsifierView>? NarrativeFalsifiers = null);
 
 public class GetThesisEvaluabilityQueryHandler(IThesisRepository repo)
     : IQueryHandler<GetThesisEvaluabilityQuery, IReadOnlyList<ThesisEvaluabilityReport>>
@@ -57,6 +67,9 @@ public class GetThesisEvaluabilityQueryHandler(IThesisRepository repo)
             views.Count,
             evaluableCount,
             FullyCovered: views.Count > 0 && evaluableCount == views.Count,
-            views);
+            views,
+            thesis.NarrativeFalsifiers
+                .Select(f => new NarrativeFalsifierView(f, NarrativeFalsifierStatus.ModelCheckedNotMonitored))
+                .ToList());
     }
 }

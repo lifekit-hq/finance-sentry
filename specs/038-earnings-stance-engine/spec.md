@@ -33,6 +33,8 @@ Each day the system checks every name in the user's holdings and watchlist again
 
 ---
 
+> **Generalised (thesis-review trigger).** The mechanical trigger this story asks for now exists for every name that has a thesis or an Active candidate, and for more than earnings: `ThesisReviewDue` / `CandidateReviewDue` alerts and companion events are raised once per (subject, source, reference) for a filing, a passed earnings date, a news cluster, a passed `Catalysts` date, a thesis break and an unbreak (`specs/031-companion-notifications/contracts/mcp-tools.md`, "Review kinds"). The earnings source is the post-event half of this story (the date has passed); the "reports today" half is the existing `EarningsAhead` alert. The review bundle (US2), the expectations axis (US3) and scored stances (US4) are unchanged and still open.
+
 ### User Story 2 - Ledger reviews a name with a single call (Priority: P1)
 
 When Ledger goes to review a name, it can request one consolidated "earnings review" for that ticker and receive everything needed to judge the **state of the business**: the latest reported-quarter fundamentals, the most recent regulatory filing reference, recent analyst actions and the current recommendation trend, the latest valuation snapshot, and the user's existing thesis for that name (if any). Ledger makes one request instead of orchestrating five.

@@ -53,6 +53,8 @@ public class AlertAppPathTests
         { AlertType.FilingLanded, Guid.NewGuid(), "MSFT", "/assets/MSFT" },
         { AlertType.AnalystRatingChange, Guid.NewGuid(), "NVDA", "/assets/NVDA#analyst-coverage" },
         { AlertType.NewsCluster, Guid.NewGuid(), "TSLA", "/assets/TSLA" },
+        { AlertType.ThesisReviewDue, Guid.NewGuid(), "NVDA", "/assets/NVDA" },
+        { AlertType.CandidateReviewDue, Guid.NewGuid(), "CBRS", "/assets/CBRS" },
         { AlertType.MarketStructure, Guid.NewGuid(), "freshness", null },
         { AlertType.ThesisBroken, null, null, null },
 

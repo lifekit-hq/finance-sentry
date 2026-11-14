@@ -10,6 +10,7 @@ import {
   VERDICT_WORD_LABEL,
   VERDICT_WORD_VARIANT,
 } from '../../../../shared/constants/scorecard/scorecard.constants';
+import {type VerdictDisplay} from '../../../../shared/models/preferences/app-preferences.model';
 import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
 import {
   THESIS_MISSING_PROMPT,
@@ -19,16 +20,18 @@ import {
 } from '../../constants/dossier/dossier-verdict.constants';
 import {type ThesisDto} from '../../models/dossier/dossier.model';
 import {DossierVerdictUtils} from '../../utils/dossier-verdict.utils';
+import {VerdictTrailComponent} from '../verdict-trail/verdict-trail.component';
 
 /**
  * The per-share verdict (spec 726 US2): one block with the word labelled "for new money", the reasons behind
  * it, what would turn it into BUY, and the thesis with its kill-switch beside it. On a held position a fixed
  * line says holding follows the thesis and kill-switch, never the word. The reasons come from the backend's
- * rule table, so they cannot disagree with the word; nothing here places a trade.
+ * rule table, so they cannot disagree with the word; nothing here places a trade. In the detailed display the
+ * reasons give way to the numbered trail of rules that produced the word.
  */
 @Component({
   selector: 'fns-verdict-block',
-  imports: [ScorecardVerdictComponent, TagComponent],
+  imports: [ScorecardVerdictComponent, TagComponent, VerdictTrailComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block'},
   templateUrl: './verdict-block.component.html',
@@ -38,6 +41,8 @@ export class VerdictBlockComponent {
   /** True when the book holds this name. */
   public readonly held = input(false);
   public readonly thesis = input<ThesisDto | null>(null);
+  /** The owner's choice: the word with its reasons, or the numbered trail of rules behind it. */
+  public readonly display = input<VerdictDisplay>('simple');
 
   public readonly notAdvice = NOT_ADVICE_NOTICE;
   public readonly forNewMoney = VERDICT_FOR_NEW_MONEY;

@@ -14,6 +14,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>How long a dismissed detector-silent alert stays quiet while the silence persists.</summary>
     private static readonly TimeSpan DetectorSilentDismissQuiet = TimeSpan.FromDays(7);
 
+    /// <summary>How long a dismissed monitoring-blind alert stays quiet while the blind spot persists.</summary>
+    private static readonly TimeSpan ThesisMonitoringBlindDismissQuiet = TimeSpan.FromDays(1);
+
     /// <summary>
     /// The backstop silence window per alert type: how long after the last alert of that type on the
     /// same reference a fresh one stays quiet. Every generator reads its window from here, so adding
@@ -46,8 +49,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         [AlertType.CategorySpike] = TimeSpan.FromDays(7),
         // 7-day backstop; the daily detector doesn't spam while the routing pattern persists.
         [AlertType.FxSpread] = TimeSpan.FromDays(7),
-        // One proposal per user per day; mirrors LowBalance/ThesisBroken cadence.
-        [AlertType.RebalanceProposal] = TimeSpan.FromHours(24),
+        // The pulse checklist's cadence: how long a proposal the operator acted on (accepted, dismissed, deferred)
+        // keeps its drift quiet. An open proposal holds its drift for as long as it stays open (see DriftEpisode).
+        [AlertType.RebalanceProposal] = TimeSpan.FromDays(7),
         [AlertType.CashSweepProposal] = TimeSpan.FromHours(24),
         // Backstop only — the reference id already carries the event date, so a re-run within the
         // 3-day lookahead resolves to the same reference and is caught by the active-alert check
@@ -308,6 +312,51 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         Guid userId, string detectorName, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.JobFailure, DetectorSilentReferenceId(detectorName), ct);
 
+    public async Task GenerateThesisMonitoringBlindAlertAsync(
+        Guid userId, string summary, bool infraBlind, CancellationToken ct = default)
+    {
+        var referenceId = ThesisMonitoringBlindReferenceId(userId);
+        var draft = new AlertDraft(
+            AlertType.JobFailure, infraBlind ? AlertSeverity.Error : AlertSeverity.Warning,
+            referenceId, "thesis-monitoring",
+            infraBlind ? "Thesis monitoring is blind (data source down)" : "Thesis monitoring is blind",
+            $"The thesis monitor could not evaluate some triggers, so those theses are unwatched, not intact: {summary}")
+        {
+            // The open alert absorbs every re-run; after a dismissal, stay quiet for a day while it persists.
+            SilenceWindow = ThesisMonitoringBlindDismissQuiet,
+        };
+
+        // A standing missing-data Warning must not absorb a later infrastructure outage: escalate it to the Error.
+        if (infraBlind)
+        {
+            var open = await _alerts.FindActiveAsync(userId, AlertType.JobFailure, referenceId, ct);
+            if (open is not null && open.Severity != AlertSeverity.Error)
+            {
+                draft = draft with { Dedup = AlertDedup.Always, SupersedeOpen = true };
+            }
+        }
+
+        await EmitAsync(userId, draft, ct);
+    }
+
+    public Task ResolveThesisMonitoringBlindAlertAsync(Guid userId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.JobFailure, ThesisMonitoringBlindReferenceId(userId), ct);
+
+    public Task GenerateThesisCoverageDegradedAlertAsync(
+        Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.JobFailure, AlertSeverity.Error,
+            ThesisCoverageDegradedReferenceId(thesisId), ticker,
+            $"Monitoring coverage degraded: {ticker}",
+            $"Monitoring coverage degraded: {reason}")
+        {
+            // Each degradation is its own event (a trigger can recover and go blind again): record it, replacing the
+            // still-open earlier one on the same thesis.
+            Dedup = AlertDedup.Always,
+            SupersedeOpen = true,
+        },
+            ct);
+
     public Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId, Guid referenceId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.MarketStructure, referenceId, ct);
@@ -445,11 +494,15 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     }
 
     public Task GenerateRebalanceProposalAlertAsync(
-        Guid userId, int orderCount, string orderSummary, CancellationToken ct = default)
+        Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
             AlertType.RebalanceProposal, AlertSeverity.Warning,
             RebalancePortfolioReferenceId(userId), "portfolio",
-            $"Rebalance proposal: {orderCount} order(s)", orderSummary),
+            $"Rebalance proposal: {orderCount} order(s)", orderSummary)
+        {
+            Dedup = AlertDedup.Episode,
+            DedupKey = driftSignature.Trim(),
+        },
             ct);
 
     public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
@@ -601,6 +654,17 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             $"{ticker} news clustered on {day:yyyy-MM-dd}: {reason}"),
             ct);
 
+    public Task GenerateReviewDueAlertAsync(Guid userId, ReviewDue review, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            review.Subject == ReviewSubjectKind.Thesis ? AlertType.ThesisReviewDue : AlertType.CandidateReviewDue,
+            // A break is the one source that is bad news by itself; the rest only ask for a look.
+            review.Source == ReviewDueSource.Break ? AlertSeverity.Warning : AlertSeverity.Info,
+            ReviewDueReferenceId(review), review.Ticker,
+            $"{(review.Subject == ReviewSubjectKind.Thesis ? "Thesis" : "Candidate")} review due: {review.Ticker} ({review.Source})",
+            ReviewDueMessage.Compose(review))
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
     public Task GenerateBudgetNearLimitAlertAsync(
         Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
         int year, int month, CancellationToken ct = default)
@@ -696,6 +760,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             }
         }
 
+        var createdAt = DateTimeOffset.UtcNow;
+        if (draft.Dedup == AlertDedup.Episode)
+        {
+            var rows = await _alerts.GetByReferenceAsync(userId, draft.Type, draft.ReferenceId, ct);
+            var open = rows.FirstOrDefault(a => !a.IsResolved && !a.IsDismissed);
+            if (!DriftEpisode.Worsens(rows, draft.DedupKey, createdAt - SilenceWindows[draft.Type]))
+            {
+                if (open is not null) await _alerts.BumpOccurrenceAsync(open.Id, ct);
+                return;
+            }
+
+            // The open proposal is superseded, not cleared: it and its successor share the instant, which is how
+            // the episode tells a worsening from the drift ending. idx_alert_dedup allows one open row per reference.
+            if (open is not null) await _alerts.ResolveAtAsync(open.Id, createdAt, ct);
+        }
+
         if (draft.Dedup is AlertDedup.ActiveThenSilence or AlertDedup.SilenceOnly)
         {
             var window = draft.SilenceWindow ?? SilenceWindows[draft.Type];
@@ -715,12 +795,14 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         await _alerts.AddAsync(new Alert
         {
             UserId = userId,
+            CreatedAt = createdAt,
             Type = draft.Type,
             Severity = draft.Severity,
             Title = draft.Title,
             Message = draft.Message,
             ReferenceId = draft.ReferenceId,
             ReferenceLabel = draft.ReferenceLabel,
+            DedupKey = draft.DedupKey,
             AppPath = draft.AppPath ?? AlertAppPath.Resolve(draft.Type, draft.ReferenceId, draft.ReferenceLabel, DateTimeOffset.UtcNow),
             HealthState = draft.HealthState,
         }, ct);
@@ -758,6 +840,14 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-user synthetic GUID for cash-sweep dedup.</summary>
     private static Guid CashSweepReferenceId(Guid userId)
         => DerivedReferenceId($"cash:sweep:{userId}");
+
+    /// <summary>Stable per-user synthetic GUID - one open monitoring-blind alert per user.</summary>
+    private static Guid ThesisMonitoringBlindReferenceId(Guid userId)
+        => DerivedReferenceId($"thesis-monitoring-blind:{userId:N}");
+
+    /// <summary>Stable per-thesis synthetic GUID - one open coverage-degraded alert per thesis.</summary>
+    private static Guid ThesisCoverageDegradedReferenceId(Guid thesisId)
+        => DerivedReferenceId($"thesis-coverage-degraded:{thesisId:N}");
 
     /// <summary>Stable per-detector synthetic GUID — one open detector-silent alert per detector.</summary>
     private static Guid DetectorSilentReferenceId(string detectorName)
@@ -798,6 +888,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
                 ? $"{change.Firm} {verb} to {rating}"
                 : $"{change.Firm} {verb}";
     }
+
+    /// <summary>Stable per-(subject, source, reference) synthetic GUID - a review notice is raised once ever for the same event.</summary>
+    private static Guid ReviewDueReferenceId(ReviewDue review)
+        => DerivedReferenceId($"review-due:{ReviewDueMessage.SubjectKey(review.Subject)}:{review.SubjectId:N}:{review.Source}:{review.Reference}");
 
     /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
     private static Guid NewsClusterReferenceId(string ticker, DateOnly day)
@@ -844,6 +938,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Where the alert opens, for an emitter that knows more than type, reference and label say.</summary>
         public string? AppPath { get; init; }
+
+        /// <summary>The machine dedupe key stored on the alert (<see cref="Alert.DedupKey"/>).</summary>
+        public string? DedupKey { get; init; }
 
         /// <summary>The connection-health state that raised the alert (<see cref="Alert.HealthState"/>).</summary>
         public string? HealthState { get; init; }

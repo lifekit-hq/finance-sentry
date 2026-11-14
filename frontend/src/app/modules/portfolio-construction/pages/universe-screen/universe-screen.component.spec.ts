@@ -6,21 +6,24 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {NOT_ADVICE_NOTICE} from '../../../../shared/constants/legal/legal.constants';
+import {GapModeFixtures} from '../../models/gap-mode/gap-mode.fixtures';
 import {UniverseScreenFixtures} from '../../models/universe-screen/universe-screen.fixtures';
 import {PortfolioConstructionService} from '../../services/portfolio-construction.service';
 import {UniverseScreenComponent} from './universe-screen.component';
 
 describe('UniverseScreenComponent', () => {
   const getUniverse = vi.fn();
+  const getGap = vi.fn();
 
   let fixture: ComponentFixture<UniverseScreenComponent>;
 
   const render = async (screen = UniverseScreenFixtures.screen()): Promise<HTMLElement> => {
     getUniverse.mockReturnValue(of(screen));
+    getGap.mockReturnValue(of(GapModeFixtures.gap()));
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        {provide: PortfolioConstructionService, useValue: {getUniverse}},
+        {provide: PortfolioConstructionService, useValue: {getUniverse, getGap}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
     });
@@ -43,6 +46,7 @@ describe('UniverseScreenComponent', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     getUniverse.mockReset();
+    getGap.mockReset();
   });
 
   it('says the verdicts are informational, not advice', async () => {
@@ -169,5 +173,15 @@ describe('UniverseScreenComponent', () => {
     const host = await render(UniverseScreenFixtures.screen({truncated: true}));
 
     expect(host.textContent).toContain('The universe is capped');
+  });
+
+  it('shows the book against the target, labelled informational, on the same page', async () => {
+    const host = await render();
+
+    expect(text(host, 'gap-label')).toContain('not a recommendation to buy or sell');
+    expect(text(host, 'gap-headline')).toBe(
+      'Missing: BBB. Underweight: AAA. Overweight: CCC, ZZZ.'
+    );
+    expect(all(host, 'gap-name')).toHaveLength(4);
   });
 });

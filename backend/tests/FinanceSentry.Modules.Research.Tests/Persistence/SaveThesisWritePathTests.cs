@@ -2,7 +2,9 @@ namespace FinanceSentry.Modules.Research.Tests.Persistence;
 
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,7 +40,9 @@ public sealed class SaveThesisWritePathTests
 
     private static SaveThesisCommandHandler HandlerOver(
         ThesisSqliteFixture.ThesisOnlySqliteContext ctx, RecordingThesisEventRecorder recorder) =>
-        new(new ThesisRepository(ctx), recorder, NullLogger<SaveThesisCommandHandler>.Instance);
+        new(
+            new ThesisRepository(ctx), recorder, new ResearchWriteScope(ctx), new ThesisOriginReader(new InMemoryThesisEventRepository()),
+            NullLogger<SaveThesisCommandHandler>.Instance);
 
     private static async Task<IReadOnlyList<InvestmentThesis>> ReadBackAsync(ThesisSqliteFixture fixture)
     {
@@ -112,7 +116,10 @@ public sealed class SaveThesisWritePathTests
             .Which.Metric.Should().Be("price_return");
 
         recorder.Recorded.Should().ContainSingle(
+            e => e.EventType == ThesisEventType.Created,
             "FR-001/FR-002 allow exactly one Created event per thesis, never one per update");
+        recorder.Recorded.Should().ContainSingle(
+            e => e.EventType == ThesisEventType.Revised, "the update that changed the content is journaled as a revision");
     }
 
     [Fact]

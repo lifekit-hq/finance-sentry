@@ -4,7 +4,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
-using FinanceSentry.Modules.Research.Infrastructure.Sources;
+using FinanceSentry.Modules.Research.Tests.ReferenceUniverse;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -38,7 +38,7 @@ public sealed class AnalystUniverseServiceTests
         var repo = new FakeAnalystUniverseRepository();
         var service = new AnalystUniverseService(
             repo, db, new FakeBrokerageReader(holdings), new FakeBankingTotalsReader(User),
-            new Sp500ConstituentSource(), NullLogger<AnalystUniverseService>.Instance);
+            new EmbeddedSp500Seed(), NullLogger<AnalystUniverseService>.Instance);
 
         var active = await service.SyncAsync();
 
@@ -62,7 +62,7 @@ public sealed class AnalystUniverseServiceTests
 
         var service = new AnalystUniverseService(
             repo, db, new FakeBrokerageReader(), new FakeBankingTotalsReader(User),
-            new Sp500ConstituentSource(), NullLogger<AnalystUniverseService>.Instance);
+            new EmbeddedSp500Seed(), NullLogger<AnalystUniverseService>.Instance);
 
         await service.SyncAsync();
 
@@ -82,7 +82,7 @@ public sealed class AnalystUniverseServiceTests
 
         var service = new AnalystUniverseService(
             repo, db, new FakeBrokerageReader(), new FakeBankingTotalsReader(User),
-            new Sp500ConstituentSource(), NullLogger<AnalystUniverseService>.Instance);
+            new EmbeddedSp500Seed(), NullLogger<AnalystUniverseService>.Instance);
 
         await service.SyncAsync();
 
