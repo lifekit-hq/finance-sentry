@@ -3,7 +3,8 @@ import {type Nullable} from '@lifekit-hq/ui';
 export type VerdictWord = 'StrongBuy' | 'Buy' | 'Wait' | 'Avoid' | 'NotScored';
 
 /** The scorecard axis a verdict condition reads; `LookThrough` is the ETF table's share of top-10 weight reading BUY or better. */
-export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation' | 'Growth' | 'LookThrough';
+export type VerdictAxis =
+  'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation' | 'Growth' | 'LookThrough';
 
 /** The yardstick the valuation conditions read: the P/E against its own history, or the forward P/E against peers. */
 export type VerdictPriceLens = 'own_history' | 'peers';
