@@ -14,7 +14,6 @@ public static class CompsFlags
     public const string SharesFromMarketCap = "SHARES_FROM_MARKET_CAP";
     public const string FxConverted = "FX_CONVERTED";
     public const string FxUnknown = "FX_UNKNOWN";
-    public const string StalePrice = "STALE_PRICE";
 }
 
 /// <summary>Why a peer was dropped, a peer left out of one multiple, or a multiple could not be evaluated.</summary>

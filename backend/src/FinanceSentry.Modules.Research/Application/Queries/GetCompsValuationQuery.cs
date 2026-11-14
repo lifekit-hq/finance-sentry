@@ -103,11 +103,6 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
             flags.Add(CompsFlags.EvRevenueFallback);
         }
 
-        if (current.IsStale)
-        {
-            flags.Add(CompsFlags.StalePrice);
-        }
-
         var multiples = new CompsMultiples(evToEbitda, evToRevenue, trailingPe, forwardPe, priceToBook);
         var summary = BuildSummary(multiples, growth, margin, current.Price);
 
