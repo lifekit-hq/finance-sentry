@@ -95,6 +95,14 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         return evt;
     }
 
+    // The default NewEvent kind (NewsCluster) rides the ledger-pulse and does not count toward the Digest wake.
+    private static CompanionEvent HeldAnalystEvent(Guid userId)
+    {
+        var evt = NewEvent(userId, EventDisposition.HeldForDigest);
+        evt.Kind = CompanionEventKind.AnalystAction;
+        return evt;
+    }
+
     private async Task SeedAsync(params object[] entities)
     {
         // Inserts are not filtered, so a no-person context writes any user's rows.
@@ -495,8 +503,8 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
     {
         await SeedAsync(
             NewSetting(_userA, NotificationMode.Digest),
-            NewEvent(_userA, EventDisposition.HeldForDigest),
-            NewEvent(_userA, EventDisposition.HeldForDigest));
+            HeldAnalystEvent(_userA),
+            HeldAnalystEvent(_userA));
         var dispatcher = new Mock<IAgentWakeDispatcher>();
         dispatcher.Setup(d => d.WakeDigestAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(WakeResult.Sent);
