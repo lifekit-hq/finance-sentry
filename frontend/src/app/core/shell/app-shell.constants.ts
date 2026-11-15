@@ -25,7 +25,7 @@ export const PERMISSION_BY_ENTRY: Readonly<Record<string, Permission>> = {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {label: 'Home', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
-  {label: 'Accounts', icon: 'Building2', route: AppRoute.Accounts},
+  {label: 'Accounts', icon: 'Building2', route: AppRoute.AccountsList},
   {label: 'Transactions', icon: 'ArrowLeftRight', route: AppRoute.Transactions},
   {label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets},
   {label: 'Subscriptions', icon: 'RefreshCw', route: AppRoute.Subscriptions},
@@ -39,7 +39,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 /** Nav routes shown as bottom tabs below the md breakpoint; every other nav item is on the More page. */
 export const PHONE_TAB_ROUTES: readonly string[] = [
   AppRoute.Dashboard,
-  AppRoute.Accounts,
+  AppRoute.AccountsList,
   AppRoute.Transactions,
   AppRoute.Alerts,
 ];
