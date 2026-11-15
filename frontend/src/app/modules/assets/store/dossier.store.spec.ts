@@ -410,20 +410,12 @@ describe('DossierStore', () => {
     expect(store.ledgerRead()).toEqual(READ);
   });
 
-  it('loads the one-year chart with the dossier and reloads on a new range only', () => {
+  it('loads the whole price history once with the dossier', () => {
     const store = inject();
 
-    expect(service.getChart).toHaveBeenCalledWith('AAPL', '1Y');
+    expect(service.getChart).toHaveBeenCalledOnce();
+    expect(service.getChart).toHaveBeenCalledWith('AAPL', 'MAX');
     expect(store.chartStatus()).toBe('success');
-    expect(store.chart()?.range).toBe('1Y');
-
-    store.selectChartRange('1Y');
-    expect(service.getChart).toHaveBeenCalledTimes(1);
-
-    store.selectChartRange('5Y');
-    expect(service.getChart).toHaveBeenLastCalledWith('AAPL', '5Y');
-    expect(store.chartRange()).toBe('5Y');
-    expect(store.chart()?.range).toBe('5Y');
   });
 
   it('keeps the page when the chart fails and resolves its message', () => {
@@ -434,16 +426,6 @@ describe('DossierStore', () => {
     expect(store.dossierStatus()).toBe('success');
     expect(store.chartStatus()).toBe('error');
     expect(store.chartAsyncStatus()).toBe('error');
-  });
-
-  it('ignores a range change before the dossier has loaded', () => {
-    service.getDossier.mockReturnValue(NEVER);
-    const store = inject();
-
-    store.selectChartRange('5Y');
-
-    expect(service.getChart).not.toHaveBeenCalled();
-    expect(store.chartRange()).toBe('1Y');
   });
 
   it('saves a valid draft in the asset currency and writes it into the dossier', () => {

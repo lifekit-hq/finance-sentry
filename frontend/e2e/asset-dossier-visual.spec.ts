@@ -21,8 +21,8 @@ const PHONE = {width: 375, height: 2400};
 const PHONE_FULL = {width: 375, height: 4800};
 // The hero's logo comes from a third party: a flat square keeps the baselines off the network.
 const LOGO_HOSTS = ['https://financialmodelingprep.com/**', 'https://assets.coincap.io/**'];
-// The "How has it moved?" chart, on every dossier that holds a position.
-const MOVED_CHART_CANVAS = 'cmn-area-chart canvas';
+// The price block's chart, on every dossier that holds a position.
+const MOVED_CHART_CANVAS = 'cmn-price-block canvas';
 const SCREENSHOT_OPTIONS = {
   animations: 'disabled',
   // Glyph anti-aliasing differs a little between the machines that render these baselines.

@@ -112,7 +112,7 @@ describe('dossierMethods', () => {
     expect(state.quote()).toBeNull();
   });
 
-  it('setChart and setChartRange store the chart and its range', () => {
+  it('setChart stores the chart', () => {
     const state = signalState(initialDossierState);
     const methods = dossierMethods(state);
     const chart = {
@@ -130,10 +130,17 @@ describe('dossierMethods', () => {
     };
 
     methods.setChart(chart);
-    methods.setChartRange('6M');
 
     expect(state.chart()).toEqual(chart);
-    expect(state.chartRange()).toBe('6M');
+  });
+
+  it('setChartPeriod stores the selected period', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+
+    methods.setChartPeriod('MAX');
+
+    expect(state.chartPeriod()).toBe('MAX');
   });
 
   it('openTargetEditor starts from the saved target, or blank without one', () => {

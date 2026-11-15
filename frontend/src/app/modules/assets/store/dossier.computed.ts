@@ -1,4 +1,5 @@
 import {computed, inject, type Signal} from '@angular/core';
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type AsyncStateStatus, type Nullable} from '@lifekit-hq/ui';
 
@@ -26,6 +27,7 @@ interface StateSignals {
   isThesisExpanded: Signal<boolean>;
   quote: Signal<Nullable<DossierQuoteDto>>;
   chart: Signal<Nullable<AssetChartDto>>;
+  chartPeriod: Signal<PricePeriod>;
   chartStatus: Signal<AsyncStatus>;
   chartErrorMessage: Signal<string>;
   targetDraft: Signal<string>;
@@ -143,7 +145,7 @@ export function dossierComputed(store: StateSignals) {
       return result;
     }),
 
-    chartView: computed(() => DossierChartUtils.view(store.chart())),
+    chartView: computed(() => DossierChartUtils.view(store.chart(), store.chartPeriod())),
     chartAsyncStatus: computed((): AsyncStateStatus => {
       if (store.chartErrorMessage() !== '' && store.chartStatus() === 'error') {
         return 'error';

@@ -629,118 +629,71 @@
           }
 
           <div class="space-y-cmn-5 lg:col-span-2">
-            <!-- How has it moved? 1Y by default, the S&P 500 rebased onto its first close, the user's fills and average cost. -->
+            <!-- How has it moved? The library price block over the whole history: period tabs (1Y first), the S&P 500 overlaid so it reads as percent change, a dotted line at the period's start. -->
             @if (dossier.performance) {
-              <cmn-card
+              <section
                 [id]="sectionId.chart"
-                class="block scroll-mt-cmn-16"
+                class="block scroll-mt-cmn-16 space-y-cmn-2"
                 data-testid="price-chart"
               >
-                <div class="flex flex-wrap items-start justify-between gap-cmn-3">
-                  <div>
-                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
-                      How has it moved?
-                    </h2>
-                    @if (store.chart(); as chart) {
-                      @if (chart.changePct !== null) {
-                        <p
-                          class="mt-cmn-1 text-cmn-xs text-text-secondary"
-                          data-testid="chart-change"
-                        >
-                          {{ chart.range === 'MAX' ? 'All history' : chart.range }}
-                          <span
-                            [class]="chart.changePct >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                            class="font-medium tabular-nums"
-                            >{{ chart.changePct > 0 ? '+' : ''
-                            }}{{ chart.changePct | number: '1.1-1' }}%</span
-                          >
-                          @if (chart.benchmarkChangePct !== null) {
-                            · S&amp;P 500
-                            <span class="tabular-nums"
-                              >{{ chart.benchmarkChangePct > 0 ? '+' : ''
-                              }}{{ chart.benchmarkChangePct | number: '1.1-1' }}%</span
-                            >
-                          }
-                        </p>
-                      }
-                    }
-                  </div>
-                  @if (store.sectionChecks()['chart']; as axis) {
+                @if (store.sectionChecks()['chart']; as axis) {
+                  <div class="flex justify-end">
                     <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
-                  }
-                </div>
+                  </div>
+                }
 
-                <lk-chip-row
-                  [options]="chartRanges"
-                  [selected]="[store.chartRange()]"
-                  (lk-chip-row-change)="onChartRangeChange($event)"
-                  class="mt-cmn-3 block"
-                  data-testid="chart-ranges"
-                  label="Chart range"
-                />
-
-                <!-- Fixed height in every state, so switching range never moves the page: the
-                     skeleton matches the chart card, the floor also holds the key row under it. -->
+                <!-- The skeleton holds the block's height in every state, so a load never moves the page. -->
                 <cmn-async-state
                   [status]="store.chartAsyncStatus()"
                   [errorMessage]="store.chartErrorMessage()"
                   [isEmpty]="store.chartView() === null"
-                  [emptyMessage]="'No price history for ' + dossier.symbol + ' in this range.'"
+                  [emptyMessage]="'No price history for ' + dossier.symbol + '.'"
                   [skeletonHeight]="chartSkeletonHeight"
                   [skeletonRows]="1"
-                  (retry)="store.loadChart({symbol: dossier.symbol, range: store.chartRange()})"
-                  emptySubMessage="Pick a longer range to see more of its price history."
-                  class="mt-cmn-3 block min-h-[23rem]"
+                  [keepContent]="false"
+                  [crossfade]="false"
+                  (retry)="store.loadChart(dossier.symbol)"
+                  emptySubMessage="Check back after the next price update."
+                  class="block"
                   retryable
                 >
                   @if (store.chartView(); as view) {
-                    <cmn-area-chart
+                    <cmn-price-block
                       [series]="view.series"
-                      [stacked]="false"
+                      [caption]="view.caption"
                       [currency]="store.chart()?.currency ?? 'USD'"
-                      [label]="dossier.symbol + ' price'"
-                      class="block"
+                      [label]="'How has ' + dossier.symbol + ' moved?'"
+                      [emptyMessage]="'No price history for ' + dossier.symbol + ' in this period.'"
+                      [period]="store.chartPeriod()"
+                      (periodChange)="store.setChartPeriod($event)"
+                      data-testid="price-block"
                     />
-                    @if (view.ticks.length > 0) {
-                      <!-- Fills sit under the close they moved: green buys, red sells. -->
-                      <div
-                        aria-label="Your trades in this range"
-                        class="relative mx-cmn-4 mt-cmn-2 h-3"
-                        data-testid="chart-trades"
-                        role="list"
-                      >
-                        @for (tick of view.ticks; track $index) {
-                          <span
-                            [class]="tick.side === 'buy' ? 'bg-gain' : 'bg-loss'"
-                            [style.left.%]="tick.leftPct"
-                            [attr.title]="tick.title"
-                            [attr.aria-label]="tick.title"
-                            class="absolute top-0 h-3 w-1 -translate-x-1/2 rounded-full"
-                            data-testid="chart-trade"
-                            role="listitem"
-                          ></span>
-                        }
-                      </div>
-                    }
-                    @if (view.averageCostLabel || view.ticks.length > 0) {
-                      <p
-                        class="mt-cmn-2 flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
-                        data-testid="chart-key"
-                      >
-                        @if (view.averageCostLabel) {
-                          <span>{{ view.averageCostLabel }}</span>
-                        }
-                        @if (view.ticks.length > 0) {
-                          <span class="flex items-center gap-cmn-1">
-                            <span class="h-2 w-1 rounded-full bg-gain"></span> Buy
-                            <span class="ml-cmn-1 h-2 w-1 rounded-full bg-loss"></span> Sell
-                          </span>
-                        }
+                    @if (view.averageCostLabel) {
+                      <p class="text-cmn-xs text-text-secondary" data-testid="chart-key">
+                        {{ view.averageCostLabel }}
                       </p>
+                    }
+                    @if (view.trades.length > 0) {
+                      <details class="text-cmn-xs text-text-secondary" data-testid="chart-trades">
+                        <summary class="cursor-pointer">
+                          Your trades ({{ view.trades.length }})
+                        </summary>
+                        <ul class="mt-cmn-1 space-y-cmn-1">
+                          @for (trade of view.trades; track $index) {
+                            <li class="flex items-center gap-cmn-2" data-testid="chart-trade">
+                              <span
+                                [class]="trade.side === 'buy' ? 'bg-gain' : 'bg-loss'"
+                                class="h-2 w-1 rounded-full"
+                              ></span>
+                              {{ trade.title }}
+                            </li>
+                          }
+                        </ul>
+                      </details>
                     }
                   }
                 </cmn-async-state>
-              </cmn-card>
+              </section>
 
               <!-- The same history as candles, line or area, with averages, volume and a measure tool. -->
               <fns-price-chart />

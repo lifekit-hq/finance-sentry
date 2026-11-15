@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 
-import {type AssetChartDto, type AssetChartTradeDto} from '../models/dossier/dossier.model';
+import {type AssetChartDto} from '../models/dossier/dossier.model';
 import {type DossierChartView} from '../models/dossier/dossier-view.model';
 import {DossierChartUtils} from './dossier-chart.utils';
 
@@ -25,120 +25,156 @@ function chart(overrides: Partial<AssetChartDto> = {}): AssetChartDto {
   };
 }
 
-const BUY: AssetChartTradeDto = {
-  date: '2025-10-14',
-  side: 'buy',
-  quantity: 5,
-  price: 110,
-  currency: 'USD',
-};
-
 describe('DossierChartUtils.view', () => {
   it('is null without a chart', () => {
-    expect(DossierChartUtils.view(null)).toBeNull();
+    expect(DossierChartUtils.view(null, '1Y')).toBeNull();
   });
 
   it('is null when the range has no closes', () => {
-    expect(DossierChartUtils.view(chart({points: []}))).toBeNull();
+    expect(DossierChartUtils.view(chart({points: []}), '1Y')).toBeNull();
   });
 
   it('draws the price and the benchmark as index-aligned lines', () => {
-    const view = DossierChartUtils.view(chart()) as DossierChartView;
+    const view = DossierChartUtils.view(chart(), '1Y') as DossierChartView;
 
-    expect(view.series.map(s => s.label)).toEqual(['Price', 'S&P 500']);
+    expect(view.series.map(s => s.label)).toEqual(['AAPL', 'S&P 500']);
     expect(view.series[0].points.map(p => p.value)).toEqual([100, 110, 120]);
+    expect(view.series[0].points[0].time).toBe(Date.parse('2025-10-13'));
     expect(view.series[1].points.map(p => p.value)).toEqual([100, 105, 110]);
     expect(view.averageCostLabel).toBeNull();
-    expect(view.ticks).toEqual([]);
+    expect(view.caption).toContain('S&P 500');
   });
 
-  it('carries the previous benchmark close over a gap and back-fills a leading one', () => {
+  it('keeps the benchmark to the days the index closed, whatever the API reports for the whole history', () => {
     const view = DossierChartUtils.view(
       chart({
         points: [
-          {date: '2025-10-13', close: 100, benchmark: null},
-          {date: '2025-10-14', close: 110, benchmark: 104},
-          {date: '2025-10-15', close: 120, benchmark: null},
-        ],
-      })
-    ) as DossierChartView;
-
-    expect(view.series[1].points.map(p => p.value)).toEqual([104, 104, 104]);
-  });
-
-  it('leaves the benchmark out when the API reports it does not cover the window', () => {
-    const view = DossierChartUtils.view(
-      chart({
-        points: [
-          {date: '2025-10-13', close: 100, benchmark: null},
-          {date: '2025-10-20', close: 110, benchmark: 110},
-          {date: '2025-10-21', close: 120, benchmark: 115},
+          {date: '1990-01-02', close: 1, benchmark: null},
+          {date: '1993-02-01', close: 2, benchmark: 2},
+          {date: '2025-10-15', close: 120, benchmark: 110},
         ],
         benchmarkChangePct: null,
-      })
+      }),
+      '1Y'
     ) as DossierChartView;
 
-    expect(view.series.map(s => s.label)).toEqual(['Price']);
+    expect(view.series.map(s => s.label)).toEqual(['AAPL', 'S&P 500']);
+    expect(view.series[1].points).toEqual([
+      {time: Date.parse('1993-02-01'), value: 2},
+      {time: Date.parse('2025-10-15'), value: 110},
+    ]);
   });
 
   it('leaves the benchmark out when the index has no close in the window', () => {
     const view = DossierChartUtils.view(
-      chart({points: [{date: '2025-10-13', close: 100, benchmark: null}]})
+      chart({points: [{date: '2025-10-13', close: 100, benchmark: null}]}),
+      '1Y'
     ) as DossierChartView;
 
-    expect(view.series.map(s => s.label)).toEqual(['Price']);
+    expect(view.series.map(s => s.label)).toEqual(['AAPL']);
   });
 
-  it('holds the average cost flat across the window and states it', () => {
-    const view = DossierChartUtils.view(chart({averageCost: 95})) as DossierChartView;
+  it('states the average cost the block cannot draw', () => {
+    const view = DossierChartUtils.view(chart({averageCost: 95}), '1Y') as DossierChartView;
 
-    expect(view.series[2].points.map(p => p.value)).toEqual([95, 95, 95]);
+    expect(view.series).toHaveLength(2);
     expect(view.averageCostLabel).toBe('Your average cost $95.00');
   });
 
-  it('draws no average-cost line for a zero cost', () => {
+  it('states no average cost for a zero cost', () => {
     expect(
-      (DossierChartUtils.view(chart({averageCost: 0})) as DossierChartView).series
-    ).toHaveLength(2);
+      (DossierChartUtils.view(chart({averageCost: 0}), '1Y') as DossierChartView).averageCostLabel
+    ).toBeNull();
   });
 });
 
-describe('DossierChartUtils.ticks', () => {
-  it('is empty without closes', () => {
-    expect(DossierChartUtils.ticks(chart({points: [], trades: [BUY]}))).toEqual([]);
+describe('DossierChartUtils.view trades', () => {
+  it('lists the user fills with their side and a plain-language title', () => {
+    const view = DossierChartUtils.view(
+      chart({
+        trades: [
+          {date: '2025-10-14', side: 'buy', quantity: 5, price: 110, currency: 'USD'},
+          {date: '2025-10-15', side: 'sell', quantity: 2, price: 120, currency: 'USD'},
+        ],
+      }),
+      '1Y'
+    ) as DossierChartView;
+
+    expect(view.trades.map(t => t.side)).toEqual(['buy', 'sell']);
+    expect(view.trades[0].title).toMatch(/^Bought 5 at \$110\.00 · /);
+    expect(view.trades[1].title).toMatch(/^Sold 2 at \$120\.00 · /);
   });
 
-  it('places a fill under the first close on or after its day', () => {
-    const [tick] = DossierChartUtils.ticks(chart({trades: [BUY]}));
-
-    expect(tick.leftPct).toBe(50);
-    expect(tick.side).toBe('buy');
-  });
-
-  it('pins a fill after the last close to the end', () => {
-    const [tick] = DossierChartUtils.ticks(
-      chart({trades: [{...BUY, date: '2025-12-01', side: 'sell'}]})
-    );
-
-    expect(tick.leftPct).toBe(100);
-    expect(tick.side).toBe('sell');
-  });
-
-  it('centres the fill on a single-close chart', () => {
-    const [tick] = DossierChartUtils.ticks(
-      chart({points: [{date: '2025-10-14', close: 110, benchmark: null}], trades: [BUY]})
-    );
-
-    expect(tick.leftPct).toBe(50);
+  it('has no trades when the user never traded it', () => {
+    expect((DossierChartUtils.view(chart(), '1Y') as DossierChartView).trades).toEqual([]);
   });
 });
 
-describe('DossierChartUtils.tradeTitle', () => {
-  it('describes a buy', () => {
-    expect(DossierChartUtils.tradeTitle(BUY)).toMatch(/^Bought 5 at \$110\.00 · .*2025$/);
+describe('DossierChartUtils.view benchmark coverage of the period', () => {
+  const longHistory = (): AssetChartDto =>
+    chart({
+      points: [
+        {date: '1990-01-02', close: 1, benchmark: null},
+        {date: '1992-06-01', close: 2, benchmark: null},
+        {date: '1993-02-01', close: 3, benchmark: 3},
+        {date: '2025-09-01', close: 100, benchmark: 90},
+        {date: '2025-10-15', close: 120, benchmark: 110},
+      ],
+      benchmarkChangePct: null,
+    });
+
+  it('leaves the index out on a period that opens before the index existed', () => {
+    const view = DossierChartUtils.view(longHistory(), 'MAX') as DossierChartView;
+
+    expect(view.series.map(s => s.label)).toEqual(['AAPL']);
+    expect(view.caption).not.toContain('S&P 500');
   });
 
-  it('describes a sell', () => {
-    expect(DossierChartUtils.tradeTitle({...BUY, side: 'sell'})).toMatch(/^Sold 5 at/);
+  it('overlays the index on a period it fully covers, whatever the whole history lacks', () => {
+    const view = DossierChartUtils.view(longHistory(), '1Y') as DossierChartView;
+
+    expect(view.series.map(s => s.label)).toEqual(['AAPL', 'S&P 500']);
+  });
+
+  it('overlays the index when it starts within the tolerance of the first close', () => {
+    const view = DossierChartUtils.view(
+      chart({
+        points: [
+          {date: '2025-10-13', close: 100, benchmark: null},
+          {date: '2025-10-15', close: 110, benchmark: 105},
+          {date: '2025-10-16', close: 120, benchmark: 110},
+        ],
+      }),
+      '1Y'
+    ) as DossierChartView;
+
+    expect(view.series.map(s => s.label)).toEqual(['AAPL', 'S&P 500']);
+  });
+
+  it('leaves the index out when it starts later than the tolerance after the first close', () => {
+    const view = DossierChartUtils.view(
+      chart({
+        points: [
+          {date: '2025-10-01', close: 100, benchmark: null},
+          {date: '2025-10-08', close: 110, benchmark: 105},
+          {date: '2025-10-15', close: 120, benchmark: 110},
+        ],
+      }),
+      '1Y'
+    ) as DossierChartView;
+
+    expect(view.series.map(s => s.label)).toEqual(['AAPL']);
+  });
+});
+
+describe('DossierChartUtils.caption', () => {
+  it('names the index and the dotted line when it overlays', () => {
+    expect(DossierChartUtils.caption('AAPL', 'S&P 500')).toContain('against S&P 500');
+  });
+
+  it('names the price and the dotted line alone', () => {
+    expect(DossierChartUtils.caption('AAPL', false)).toBe(
+      'AAPL price (solid line); the dotted line marks the price at the start of the period.'
+    );
   });
 });

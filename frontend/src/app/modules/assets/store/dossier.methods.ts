@@ -1,5 +1,6 @@
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type Nullable} from '@lifekit-hq/ui';
-import {getState, patchState, type WritableStateSource} from '@ngrx/signals';
+import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {
@@ -10,7 +11,6 @@ import {
   type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
-  type ChartRangeId,
   type DossierQuoteDto,
   type DossierUserTargetDto,
 } from '../models/dossier/dossier.model';
@@ -19,9 +19,9 @@ import {type DossierState, initialDossierState} from './dossier.state';
 export function dossierMethods(store: WritableStateSource<DossierState>) {
   return {
     // Drops everything read for the previous symbol so a symbol change in place never shows old
-    // content under the new header. The chart range is the reader's choice, not the symbol's.
+    // content under the new header.
     resetForSymbol(): void {
-      patchState(store, {...initialDossierState, chartRange: getState(store).chartRange});
+      patchState(store, initialDossierState);
     },
     setDossier(dossier: AssetDossierDto): void {
       patchState(store, {dossier});
@@ -42,8 +42,8 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
     setChart(chart: AssetChartDto): void {
       patchState(store, {chart});
     },
-    setChartRange(chartRange: ChartRangeId): void {
-      patchState(store, {chartRange});
+    setChartPeriod(chartPeriod: PricePeriod): void {
+      patchState(store, {chartPeriod});
     },
     setTargetDraft(targetDraft: string): void {
       patchState(store, {targetDraft});

@@ -827,23 +827,13 @@ describe('AssetDossierComponent', () => {
       expect(labels).toContain('value: 0 of 2 checks pass');
     });
 
-    it('draws the chart with its change, the trade markers and the key', () => {
+    it('draws the price block over the history, with the average cost and fills under it', () => {
       fixture.detectChanges();
 
-      expect(byTestId('chart-change')?.textContent).toContain('+22.9%');
-      expect(root().querySelectorAll('[data-testid="chart-trade"]')).toHaveLength(1);
+      expect(root().querySelector('cmn-price-block')).not.toBeNull();
       expect(byTestId('chart-key')?.textContent).toContain('average cost');
-      expect(byTestId('chart-key')?.textContent).toContain('Buy');
-    });
-
-    it('asks the store for a new range when a chip is pressed', () => {
-      fixture.detectChanges();
-
-      byTestId('chart-ranges')?.dispatchEvent(
-        new CustomEvent('lk-chip-row-change', {detail: {selected: ['5Y'], value: '5Y'}})
-      );
-
-      expect(mockStore.selectChartRange).toHaveBeenCalledWith('5Y');
+      expect(root().querySelectorAll('[data-testid="chart-trade"]')).toHaveLength(1);
+      expect(byTestId('chart-trades')?.textContent).toContain('Bought 10 at $40.00');
     });
 
     it('breaks the return down into its legs', () => {

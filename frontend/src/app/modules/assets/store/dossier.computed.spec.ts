@@ -1,5 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it} from 'vitest';
@@ -31,6 +32,7 @@ function buildSignals(overrides: Partial<DossierState> = {}) {
     quote: signal<Nullable<DossierQuoteDto>>(overrides.quote ?? null),
     chart: signal<Nullable<AssetChartDto>>(overrides.chart ?? null),
     chartStatus: signal<AsyncStatus>('idle'),
+    chartPeriod: signal<PricePeriod>(overrides.chartPeriod ?? '1Y'),
     chartErrorMessage: signal<string>(''),
     targetDraft: signal<string>(overrides.targetDraft ?? ''),
   };

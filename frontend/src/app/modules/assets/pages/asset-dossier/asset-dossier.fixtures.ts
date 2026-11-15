@@ -1,4 +1,5 @@
 import {computed, Injector, runInInjectionContext, signal} from '@angular/core';
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {vi} from 'vitest';
 
@@ -10,7 +11,6 @@ import {AppPreferencesStore} from '../../../../shared/store/preferences/app-pref
 import {
   type AssetChartDto,
   type AssetDossierDto,
-  type ChartRangeId,
   type DossierAnalystsSection,
   type DossierPositionSection,
   type DossierQuoteDto,
@@ -212,6 +212,7 @@ export function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Re
 function createMockStore() {
   const dossier = signal<AssetDossierDto | null>(DOSSIER);
   const chart = signal<AssetChartDto | null>(null);
+  const chartPeriod = signal<PricePeriod>('1Y');
   const chartStatus = signal<AsyncStatus>('success');
   const chartErrorMessage = signal('');
   const targetDraft = signal('');
@@ -227,6 +228,7 @@ function createMockStore() {
       isThesisExpanded: signal(false),
       quote,
       chart,
+      chartPeriod,
       chartStatus,
       chartErrorMessage,
       targetDraft,
@@ -261,9 +263,10 @@ function createMockStore() {
     setVerdictDisplay: vi.fn(),
     isQuoteLoading: signal(false),
     chart,
+    chartPeriod,
+    setChartPeriod: (period: PricePeriod) => chartPeriod.set(period),
     chartStatus,
     chartErrorMessage,
-    chartRange: signal<ChartRangeId>('1Y'),
     targetDraft,
     isEditingTarget: signal(false),
     isTargetLoading: signal(false),
@@ -292,7 +295,6 @@ function createMockStore() {
     toggleThesisExpanded: vi.fn(),
     generateLedgerRead: vi.fn(),
     loadChart: vi.fn(),
-    selectChartRange: vi.fn(),
     openTargetEditor: vi.fn(),
     closeTargetEditor: vi.fn(),
     setTargetDraft: vi.fn(),

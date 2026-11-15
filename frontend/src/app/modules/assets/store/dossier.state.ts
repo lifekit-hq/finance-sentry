@@ -1,13 +1,12 @@
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {type ThesisRevisionDto} from '../../../shared/models/thesis-revision/thesis-revision.model';
-import {DEFAULT_CHART_RANGE} from '../constants/dossier/dossier-chart.constants';
 import {
   type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
-  type ChartRangeId,
   type DossierQuoteDto,
 } from '../models/dossier/dossier.model';
 
@@ -17,7 +16,8 @@ export interface DossierState {
   isThesisExpanded: boolean;
   quote: Nullable<DossierQuoteDto>;
   chart: Nullable<AssetChartDto>;
-  chartRange: ChartRangeId;
+  /** The price block's selected period; the S&P 500 overlay depends on it. */
+  chartPeriod: PricePeriod;
   /** The target editor's text; parsed and validated in the computeds. */
   targetDraft: string;
   isEditingTarget: boolean;
@@ -35,7 +35,7 @@ export const initialDossierState: DossierState = {
   isThesisExpanded: false,
   quote: null,
   chart: null,
-  chartRange: DEFAULT_CHART_RANGE,
+  chartPeriod: '1Y',
   targetDraft: '',
   isEditingTarget: false,
   decidedRecommendation: null,

@@ -279,16 +279,21 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await expect(value).toContainText('median of 2 peers');
   });
 
-  test('chart draws the year with the S&P 500, trades and a range switch', async ({page}) => {
+  test('price block reads the whole history: S&P 500 overlay, period tabs and the average cost', async ({
+    page,
+  }) => {
+    const request = page.waitForRequest(req => req.url().includes('/chart?range=MAX'));
     await page.goto('/assets/AAPL');
+    await request;
     const chart = page.getByTestId('price-chart');
     await expect(chart.locator('canvas')).toBeVisible();
     await expect(chart.getByTestId('chart-trade')).toHaveCount(3);
+    await expect(chart.getByRole('tab', {name: '1Y'})).toHaveAttribute('aria-selected', 'true');
     await expect(chart.getByTestId('chart-key')).toContainText('Your average cost $150.00');
 
-    const request = page.waitForRequest(req => req.url().includes('/chart?range=5Y'));
-    await chart.getByTestId('chart-ranges').getByText('5Y', {exact: true}).click();
-    await request;
+    // A period is the block's own cut of the history already loaded: no second request.
+    await chart.getByRole('tab', {name: '5Y'}).click();
+    await expect(chart.getByRole('tab', {name: '5Y'})).toHaveAttribute('aria-selected', 'true');
   });
 
   test('return decomposition splits unrealized, realized, dividends and currency', async ({
