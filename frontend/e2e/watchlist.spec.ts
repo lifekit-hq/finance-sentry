@@ -115,7 +115,22 @@ test.describe('Watchlist', () => {
     await mockWatchlist(page, [PLTR]);
     await page.goto('/watchlist');
     await expect(page.getByTestId('watchlist-count')).toHaveText(/watching\s*·\s*1/i);
-    await expect(page.getByRole('button', {name: 'Remove PLTR'})).toBeVisible();
+    await expect(
+      page.getByTestId('watchlist-remove').getByRole('button', {name: 'Remove PLTR'})
+    ).toBeVisible();
+  });
+
+  test('the swipe tray offers Remove as a button that asks first', async ({page}) => {
+    const server = await mockWatchlist(page, [PLTR]);
+    await page.goto('/watchlist');
+
+    const tray = page.getByRole('button', {name: 'Remove PLTR'}).first();
+    await tray.focus();
+    await tray.press('Enter');
+    await page.getByRole('dialog').getByRole('button', {name: 'Remove'}).click();
+
+    await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
+    expect(server.removed).toHaveLength(1);
   });
 
   test('lists the full note and links the ticker to its dossier', async ({page}) => {

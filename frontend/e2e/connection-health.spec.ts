@@ -236,7 +236,7 @@ test.describe('connection-health alerts', () => {
   test('opens the reconnect from the alert of a confirmed credential loss', async ({page}) => {
     await openAlerts(page);
 
-    await page.getByRole('button', {name: 'Sync failed for AIB'}).click();
+    await page.getByRole('button', {name: 'Sync failed for AIB', exact: true}).click();
 
     await expect(page.getByRole('dialog').last()).toContainText('Reconnect bank');
   });
