@@ -9,6 +9,7 @@ public static class DcfFlags
     public const string CostOfDebtDefaulted = "COST_OF_DEBT_DEFAULTED";
     public const string NwcAssumedZero = "NWC_ASSUMED_ZERO";
     public const string TerminalGrowthCapped = "TERMINAL_GROWTH_CAPPED";
+    public const string WaccFloored = "WACC_FLOORED";
     public const string BaseYearTtm = "BASE_YEAR_TTM";
     public const string ImpliedGrowthOutOfRange = "IMPLIED_GROWTH_OUT_OF_RANGE";
     public const string ExitMultipleUnavailable = "EXIT_MULTIPLE_UNAVAILABLE";

@@ -167,6 +167,11 @@ public class GetDcfValuationQueryHandler(
             }
 
             wacc = BuildWacc(riskFree.Value, current.Beta.Value, derived.Drivers.TaxRate, netDebt, shares * price / toQuoted, history, current, flags);
+            if (wacc < MinWaccOverride)
+            {
+                wacc = MinWaccOverride;
+                flags.Add(DcfFlags.WaccFloored);
+            }
         }
 
         var terminalGrowth = query.TerminalGrowth ?? CappedTerminalGrowth(riskFree, wacc.Value, flags);

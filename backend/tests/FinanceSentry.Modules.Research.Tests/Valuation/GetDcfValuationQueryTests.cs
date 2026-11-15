@@ -435,6 +435,26 @@ public sealed class GetDcfValuationQueryTests
         r.Assumptions.NwcPctOfRevenueChange.Should().Be(0m);
     }
 
+    [Fact]
+    public async Task A_computed_wacc_below_one_percent_is_raised_to_the_floor_with_the_flag()
+    {
+        var netCash = Metrics(beta: -0.7m, debt: 100m, cash: 300m);
+
+        var r = await Run(target: netCash, yield: 4.3m);
+
+        r.Assumptions!.Wacc.Should().Be(0.01m, "4.3% + -0.7 x 5% is a 0.8% cost of equity, below the 1% floor");
+        r.Flags.Should().Contain(DcfFlags.WaccFloored);
+    }
+
+    [Fact]
+    public async Task A_normal_computed_wacc_is_not_floored()
+    {
+        var r = await Run();
+
+        r.Assumptions!.Wacc.Should().BeGreaterThan(0.01m);
+        r.Flags.Should().NotContain(DcfFlags.WaccFloored);
+    }
+
     private static List<DcfAnnualPeriod> HistoryWithWorkingCapital(decimal change) =>
     [
         Year(2025, 1200m, workingCapital: change),
