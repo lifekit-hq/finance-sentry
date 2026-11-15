@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.Revisions;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +20,8 @@ using Microsoft.Extensions.Options;
 /// deterministic <see cref="TriggerPrefill"/> derived from the candidate's latest scorecard.
 /// Evidence at entry: the latest scorecard summary and the <see cref="DecisionNote"/> are carried into
 /// the thesis text and key data points. No scorecard degrades to an empty carry (the default text, no
-/// data points) and never fails the promotion.
+/// data points) and never fails the promotion. <see cref="Content"/> (a confirmed thesis-revision proposal) replaces
+/// those defaults field by field: whatever it leaves null keeps the scorecard-built text, data points and trigger prefill.
 /// <see cref="Paper"/> (finance-sentry#704) marks the promotion as tracking-only: it never draws
 /// down real cash, so the gate skips the real-book cash-funding rule (MinCashBuffer) for it while
 /// still enforcing concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real
@@ -34,7 +36,8 @@ public record PromoteCandidateCommand(
     string? DecisionNote = null,
     bool Paper = false,
     ThesisEventOrigin Origin = ThesisEventOrigin.User,
-    ThesisEvidenceRefs? Evidence = null) : ICommand<PromoteCandidateResult>;
+    ThesisEvidenceRefs? Evidence = null,
+    ThesisRevisionContent? Content = null) : ICommand<PromoteCandidateResult>;
 
 public sealed record PromoteCandidateResult(
     Guid? ThesisId,
@@ -98,7 +101,7 @@ public sealed class PromoteCandidateCommandHandler(
         }
 
         var latest = await scoreRepo.LatestForCandidateAsync(candidate.Id, ct);
-        var triggers = command.Triggers ?? BuildPrefilledTriggers(latest);
+        var triggers = command.Triggers ?? command.Content?.InvalidationTriggers ?? BuildPrefilledTriggers(latest);
 
         var thesis = await writeScope.RunAsync(command.Origin, async () =>
         {
@@ -107,15 +110,16 @@ public sealed class PromoteCandidateCommandHandler(
                     command.UserId,
                     Id: null,
                     candidate.Ticker,
-                    BuildThesisText(latest, command.DecisionNote),
-                    BuildKeyDataPoints(latest),
-                    [],
+                    command.Content?.ThesisText ?? BuildThesisText(latest, command.DecisionNote),
+                    command.Content?.KeyDataPoints ?? BuildKeyDataPoints(latest),
+                    command.Content?.Catalysts ?? [],
                     InvalidationTriggers: triggers,
-                    EntryPrice: null,
+                    EntryPrice: command.Content?.EntryPrice,
                     DecisionNote: command.DecisionNote,
                     Origin: command.Origin,
                     Rationale: command.DecisionNote,
-                    Evidence: command.Evidence),
+                    Evidence: command.Evidence,
+                    NarrativeFalsifiers: command.Content?.NarrativeFalsifiers),
                 ct);
 
             candidate.PromotedThesisId = saved.Id;

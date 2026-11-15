@@ -19,9 +19,9 @@ public static class AuthPolicies
     public const string RequireMcpAccess = "RequireMcpAccess";
 
     /// <summary>
-    /// The gate on the MCP tools that stay the owner's own (IPS, risk measurement, thesis deletion and sources), registered by the MCP host only and not
+    /// The gate on the MCP tools that stay the owner's own (IPS, risk measurement, every thesis write and promotion, the confirm of a thesis revision), registered by the MCP host only and not
     /// one-to-one with a permission: a personal token (the owner's own session) passes, a service token (a headless
-    /// agent such as Ledger) never does. Ledger's thesis, candidate and watchlist writes are not behind it.
+    /// agent such as Ledger) never does. Ledger's candidate and watchlist writes are not behind it; it proposes thesis changes instead.
     /// </summary>
     public const string RequireMcpPersonalToken = "RequireMcpPersonalToken";
 

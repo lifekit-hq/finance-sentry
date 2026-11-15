@@ -177,6 +177,12 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(5, 15));
 
+            // Thesis revisions proposed by Ledger and left undecided past their expiry; the rows stay.
+            mgr.AddOrUpdate<ThesisRevisionExpiryJob>(
+                "thesis-revision-expiry",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(5, 20));
+
             mgr.AddOrUpdate<RecommendationOutcomeJob>(
                 "recommendation-outcomes",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -360,6 +366,7 @@ public static class ResearchModule
         services.AddScoped<IBenchmarkRelativeRecordRepository, BenchmarkRelativeRecordRepository>();
         services.AddScoped<ICandidateRepository, CandidateRepository>();
         services.AddScoped<IRecommendationRepository, RecommendationRepository>();
+        services.AddScoped<IThesisRevisionRepository, ThesisRevisionRepository>();
         services.AddScoped<RecommendationPositionReader>();
         services.AddScoped<RecommendationWriter>();
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();
@@ -681,6 +688,7 @@ public static class ResearchModule
         services.AddScoped<CandidateExpiryJob>();
         services.AddScoped<RecommendationTriggerJob>();
         services.AddScoped<RecommendationExpiryJob>();
+        services.AddScoped<ThesisRevisionExpiryJob>();
         services.AddScoped<RecommendationOutcomeJob>();
         services.AddScoped<OpportunityScanJob>();
         services.AddScoped<ResearchIndexingJob>();

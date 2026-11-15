@@ -4,7 +4,9 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Coverage;
+using FinanceSentry.Modules.Research.Domain.Exceptions;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
+using FinanceSentry.Modules.Research.Domain.Revisions;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
@@ -85,7 +87,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(17);
+        perUser.Should().HaveCount(18);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -117,6 +119,158 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         (await asNoOne.Theses.AnyAsync()).Should().BeFalse("no person in scope matches no row");
         (await asNoOne.PolicyStatements.AnyAsync()).Should().BeFalse();
         (await asNoOne.WatchlistItems.AnyAsync()).Should().BeFalse();
+    }
+
+    private static ThesisRevision NewRevision(Guid userId, Guid subjectId, DateTimeOffset? expiresAt = null) => new()
+    {
+        UserId = userId,
+        Kind = ThesisRevisionKind.NarrativeUpdate,
+        ProposedBy = ThesisEventOrigin.Ledger,
+        SubjectType = ThesisSubjectType.Thesis,
+        SubjectId = subjectId,
+        Ticker = "CBRS",
+        Proposed = new ThesisRevisionContent(
+            ThesisText: "Narrowed.", InvalidationTriggers: [new ThesisInvalidationTrigger("price_drawdown", "greaterThan", 0.4m)]),
+        Rationale = "Filing.",
+        Evidence = new ThesisEvidenceRefs(FilingAccessions: ["0001-26-1"]),
+        ExpiresAt = expiresAt ?? DateTimeOffset.UtcNow.AddDays(14),
+    };
+
+    [DockerRequiredFact]
+    public async Task Thesis_revisions_are_private_round_trip_their_content_and_allow_one_pending_per_subject()
+    {
+        var subject = Guid.NewGuid();
+        var mine = NewRevision(_userA, subject);
+        var theirs = NewRevision(_userB, subject);
+
+        await using (var asA = CreateContext(_userA))
+            await new ThesisRevisionRepository(asA).AddPendingAsync(mine);
+        await using (var asB = CreateContext(_userB))
+            await new ThesisRevisionRepository(asB).AddPendingAsync(theirs);
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var read = await repo.GetAsync(_userA, mine.Id);
+            read!.Proposed.ThesisText.Should().Be("Narrowed.");
+            read.Proposed.InvalidationTriggers!.Single().Threshold.Should().Be(0.4m);
+            read.Evidence!.FilingAccessions.Should().Equal("0001-26-1");
+            read.Kind.Should().Be(ThesisRevisionKind.NarrativeUpdate);
+            (await repo.GetAsync(_userA, theirs.Id)).Should().BeNull("the filter holds even when a read names another person's row");
+            (await repo.ListPendingAsync(_userA)).Select(r => r.Id).Should().Equal(mine.Id);
+
+            var duplicate = () => repo.AddPendingAsync(NewRevision(_userA, subject));
+            await duplicate.Should().ThrowAsync<ThesisRevisionConflictException>("one proposal stays open per subject");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.ThesisRevisions.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task The_revision_expiry_sweep_finds_every_users_overdue_proposals_with_no_person_in_scope()
+    {
+        var overdueA = NewRevision(_userA, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-1));
+        var overdueB = NewRevision(_userB, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-2));
+        var live = NewRevision(_userA, Guid.NewGuid());
+        await SeedAsync(overdueA, overdueB, live);
+
+        await using var job = CreateContext();
+        var expired = await new ThesisRevisionRepository(job).ListExpiredUnscopedAsync(DateTimeOffset.UtcNow);
+
+        expired.Select(r => r.Id).Should().BeEquivalentTo([overdueA.Id, overdueB.Id]);
+    }
+
+    [DockerRequiredFact]
+    public async Task A_revision_is_claimed_by_one_decision_only_and_a_claim_can_be_released()
+    {
+        var live = NewRevision(_userA, Guid.NewGuid());
+        var overdue = NewRevision(_userA, Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(-1));
+        await SeedAsync(live, overdue);
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", now)).Should().BeTrue();
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Rejected, "no", now)).Should().BeFalse(
+                "the second of two overlapping decisions loses");
+            (await repo.TryClaimAsync(_userA, overdue.Id, ThesisRevisionStatus.Confirmed, null, now)).Should().BeFalse(
+                "an expired proposal cannot be decided");
+        }
+
+        await using (var asB = CreateContext(_userB))
+            (await new ThesisRevisionRepository(asB).TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Rejected, "no", now))
+                .Should().BeFalse("another person's proposal is out of scope");
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var claimed = await repo.GetAsync(_userA, live.Id);
+            claimed!.Status.Should().Be(ThesisRevisionStatus.Confirmed);
+            claimed.DecisionNote.Should().Be("ok");
+            claimed.DecidedAt.Should().NotBeNull();
+
+            await repo.ReleaseClaimAsync(_userA, live.Id);
+        }
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var released = await new ThesisRevisionRepository(asA).GetAsync(_userA, live.Id);
+            released!.Status.Should().Be(ThesisRevisionStatus.Pending);
+            released.DecidedAt.Should().BeNull();
+            released.DecisionNote.Should().BeNull();
+        }
+    }
+
+    [DockerRequiredFact]
+    public async Task A_proposal_cannot_supersede_a_revision_a_decision_has_claimed()
+    {
+        var subject = Guid.NewGuid();
+        var live = NewRevision(_userA, subject);
+        await SeedAsync(live);
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var loaded = await repo.FindPendingAsync(_userA, subject);
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", now)).Should().BeTrue();
+
+            var next = NewRevision(_userA, subject);
+            loaded!.Status = ThesisRevisionStatus.Superseded;
+            loaded.SupersededById = next.Id;
+            var supersede = () => repo.AddPendingAsync(next, loaded);
+            await supersede.Should().ThrowAsync<ThesisRevisionConflictException>("the claimed row is no longer pending");
+        }
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var after = await new ThesisRevisionRepository(asA).GetAsync(_userA, live.Id);
+            after!.Status.Should().Be(ThesisRevisionStatus.Confirmed, "a blind update must not overwrite the claim");
+            (await asA.ThesisRevisions.CountAsync(r => r.SubjectId == subject)).Should().Be(1);
+        }
+    }
+
+    [DockerRequiredFact]
+    public async Task Releasing_a_claim_after_a_newer_proposal_took_the_subject_supersedes_it()
+    {
+        var subject = Guid.NewGuid();
+        var live = NewRevision(_userA, subject);
+        await SeedAsync(live);
+
+        await using var asA = CreateContext(_userA);
+        var repo = new ThesisRevisionRepository(asA);
+        (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", DateTimeOffset.UtcNow)).Should().BeTrue();
+        var newer = NewRevision(_userA, subject);
+        await repo.AddPendingAsync(newer);
+
+        (await repo.ReleaseClaimAsync(_userA, live.Id)).Should().Be(ThesisRevisionStatus.Superseded);
+
+        await using var check = CreateContext(_userA);
+        var old = await new ThesisRevisionRepository(check).GetAsync(_userA, live.Id);
+        old!.Status.Should().Be(ThesisRevisionStatus.Superseded);
+        old.SupersededById.Should().Be(newer.Id);
     }
 
     [DockerRequiredFact]

@@ -97,6 +97,14 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   RECOMMENDATION_CONFLICT:
     'Another proposal on this ticker arrived at the same time. Reload and try again.',
   RECOMMENDATION_NOT_FOUND: 'That proposal no longer exists.',
+  INVALID_THESIS_REVISION:
+    'That thesis revision could not be applied. A rejection needs a reason, and notes are capped at 2,000 characters.',
+  THESIS_REVISION_NOT_PENDING:
+    'This thesis revision was already decided, expired or replaced. Reload to see it.',
+  THESIS_REVISION_CONFLICT:
+    'Another revision of this thesis arrived at the same time. Reload and try again.',
+  THESIS_REVISION_NOT_FOUND: 'That thesis revision no longer exists.',
+  THESIS_REVISION_OWNER_ONLY: 'Only you can confirm or reject a thesis revision.',
   INVALID_CHART_RANGE: 'That chart range is not available. Pick 1M, 6M, YTD, 1Y, 5Y or Max.',
   INVALID_PRICE_BAR_REQUEST: 'That period or candle size is not available for this chart.',
   INVALID_DATE_RANGE: 'That date range is not allowed. Check the from/to dates and try again.',
