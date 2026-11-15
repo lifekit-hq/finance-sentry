@@ -248,6 +248,76 @@ public sealed class IntradayMoveSentinelJobTests
             _userId, It.IsAny<Guid>(), "TSLA", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
+    [Fact]
+    public async Task Execute_HoldingMovesTwiceItsBar_RaisesTheSevereTierOnly()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        SetQuotes(Quote("AAPL", price: 111m, previousClose: 100m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateSevereMarketMoveAlertAsync(
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_HoldingMovesJustUnderTwiceItsBar_StaysRoutine()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        SetQuotes(Quote("AAPL", price: 109m, previousClose: 100m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateSevereMarketMoveAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(115, false)]
+    [InlineData(116, true)]
+    public async Task Execute_WatchlistSevereBarIsSixteenPercent(int price, bool severe)
+    {
+        _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync(["TSLA"]);
+        SetQuotes(Quote("TSLA", price: price, previousClose: 100m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateSevereMarketMoveAlertAsync(
+            _userId, It.IsAny<Guid>(), "TSLA", It.IsAny<string>(), default), severe ? Times.Once : Times.Never);
+    }
+
+    /// <summary>A routine alert earlier the same day is under its own reference, so the severe tier is not swallowed.</summary>
+    [Fact]
+    public async Task Execute_SevereTierUsesItsOwnReferenceId()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        Guid routineRef = default, severeRef = default;
+        _alerts.Setup(a => a.GenerateMarketStructureAlertAsync(
+                _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly))
+            .Callback<Guid, Guid, string, string, CancellationToken, AlertDedup>((_, refId, _, _, _, _) => routineRef = refId)
+            .Returns(Task.CompletedTask);
+        _alerts.Setup(a => a.GenerateSevereMarketMoveAlertAsync(
+                _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default))
+            .Callback<Guid, Guid, string, string, CancellationToken>((_, refId, _, _, _) => severeRef = refId)
+            .Returns(Task.CompletedTask);
+
+        SetQuotes(Quote("AAPL", price: 106m, previousClose: 100m));
+        await _job.ExecuteAsync();
+        SetQuotes(Quote("AAPL", price: 111m, previousClose: 100m));
+        await _job.ExecuteAsync();
+
+        Assert.NotEqual(Guid.Empty, routineRef);
+        Assert.NotEqual(Guid.Empty, severeRef);
+        Assert.NotEqual(routineRef, severeRef);
+    }
+
     /// <summary>Above the holding bar but below the watchlist's own, stricter bar — proves the two thresholds are distinct.</summary>
     [Fact]
     public async Task Execute_WatchlistTickerMovesBetweenFiveAndEightPercent_NoAlert()

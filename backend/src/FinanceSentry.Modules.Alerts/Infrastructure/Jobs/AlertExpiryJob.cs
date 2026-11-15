@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Alerts.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -21,13 +22,6 @@ public sealed class AlertExpiryJob(
     TimeProvider clock,
     ILogger<AlertExpiryJob> logger)
 {
-    /// <summary>
-    /// ReferenceLabel the freshness flavour of <see cref="AlertType.MarketStructure"/> is generated
-    /// with (<c>AlertGeneratorService.GenerateMarketStructureFreshnessAlertAsync</c>) — the way that
-    /// producer already distinguishes itself from a ticker-move alert of the same type.
-    /// </summary>
-    private const string MarketStructureFreshnessLabel = "freshness";
-
     /// <summary>
     /// Defer means "not now", not "never" (§3.3, #419 S5): a deferred alert resolves 7 days after
     /// the user's decision regardless of type, ahead of any per-type TTL below.
@@ -101,7 +95,7 @@ public sealed class AlertExpiryJob(
 
         if (alert.Type == AlertType.MarketStructure)
         {
-            return alert.ReferenceLabel == MarketStructureFreshnessLabel
+            return alert.ReferenceLabel == MarketStructureAlertLabel.Freshness
                 ? null
                 : alert.CreatedAt + Ttls[AlertType.MarketStructure];
         }

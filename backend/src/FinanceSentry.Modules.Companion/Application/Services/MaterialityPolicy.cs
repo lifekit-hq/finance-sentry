@@ -28,7 +28,8 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         CompanionEventKind.FamilyStatement,
         CompanionEventKind.FireBrief,
         // Batched into the three-times-a-day ledger-pulse instead of one fresh agent session per signal
-        // (issue #1274, owner decision 2026-11-04). Revert: delete these two entries.
+        // (issue #1274, owner decision 2026-11-04). Revert: delete these two entries. A severe intraday move is the
+        // one MarketStructure exception (see DispositionFor).
         CompanionEventKind.MarketStructure,
         CompanionEventKind.NewsCluster,
     };
@@ -83,7 +84,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
 
     public EventDisposition DispositionFor(
         NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null,
-        string? reviewSource = null)
+        string? reviewSource = null, string? severity = null, string? referenceLabel = null)
     {
         // A review notice is realtime when a filing, a break or an unbreak raised it (the mode rule, quiet hours and the
         // hourly cap apply downstream unchanged) and digest material otherwise. A notice whose source cannot be read is
@@ -100,6 +101,12 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         // a confirmed credential loss goes out proactively, and Quiet still surfaces it).
         if (kind == CompanionEventKind.SyncFailure && healthState == nameof(ConnectionHealthState.ActionRequired))
             return EventDisposition.Pending;
+
+        // A severe intraday move (the sentinel raises it at Error) takes the mode rule like any realtime kind; the Error
+        // freshness notice of the same kind stays batched.
+        if (kind == CompanionEventKind.MarketStructure && severity == "Error"
+            && referenceLabel != MarketStructureAlertLabel.Freshness)
+            return DispositionForMode(mode);
 
         // A Dormant connection is told once, in the digest; Quiet keeps it silent like any other digest line.
         // A retired account is told once, in the digest, the same way.

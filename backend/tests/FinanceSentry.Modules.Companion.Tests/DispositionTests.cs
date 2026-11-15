@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FluentAssertions;
@@ -60,6 +61,32 @@ public sealed class DispositionTests
         foreach (var mode in new[] { NotificationMode.Digest, NotificationMode.Scan, NotificationMode.Realtime })
             _policy.DispositionFor(mode, kind).Should().Be(EventDisposition.HeldForDigest);
     }
+
+    [Theory]
+    [InlineData(NotificationMode.Realtime, EventDisposition.Pending)]
+    [InlineData(NotificationMode.Scan, EventDisposition.Pending)]
+    [InlineData(NotificationMode.Digest, EventDisposition.HeldForDigest)]
+    [InlineData(NotificationMode.Quiet, EventDisposition.SuppressedByMode)]
+    public void A_severe_market_move_takes_the_mode_rule(NotificationMode mode, EventDisposition expected)
+        => _policy.DispositionFor(mode, CompanionEventKind.MarketStructure, severity: "Error", referenceLabel: "NVDA")
+            .Should().Be(expected);
+
+    [Fact]
+    public void A_routine_market_move_at_warning_stays_held()
+        => _policy.DispositionFor(NotificationMode.Realtime, CompanionEventKind.MarketStructure, severity: "Warning", referenceLabel: "NVDA")
+            .Should().Be(EventDisposition.HeldForDigest);
+
+    [Fact]
+    public void The_Error_freshness_notice_stays_held_for_the_digest()
+        => _policy.DispositionFor(
+                NotificationMode.Realtime, CompanionEventKind.MarketStructure, severity: "Error",
+                referenceLabel: MarketStructureAlertLabel.Freshness)
+            .Should().Be(EventDisposition.HeldForDigest);
+
+    [Fact]
+    public void Error_severity_does_not_lift_a_news_cluster_out_of_the_batch()
+        => _policy.DispositionFor(NotificationMode.Realtime, CompanionEventKind.NewsCluster, severity: "Error", referenceLabel: "NVDA")
+            .Should().Be(EventDisposition.HeldForDigest);
 
     [Theory]
     [InlineData(CompanionEventKind.AnalystAction)]

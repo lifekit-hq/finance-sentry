@@ -230,10 +230,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         },
             ct);
 
+    public Task GenerateSevereMarketMoveAlertAsync(
+        Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.MarketStructure, AlertSeverity.Error, referenceId, ticker,
+            $"Large move: {ticker}",
+            $"Market structure flagged {ticker}: {reason}")
+        {
+            Dedup = AlertDedup.SilenceOnly,
+            SupersedeOpen = true,
+        },
+            ct);
+
     public Task GenerateMarketStructureFreshnessAlertAsync(
         Guid userId, Guid referenceId, string reason, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
-            AlertType.MarketStructure, AlertSeverity.Error, referenceId, "freshness",
+            AlertType.MarketStructure, AlertSeverity.Error, referenceId, MarketStructureAlertLabel.Freshness,
             "Radar data is stale",
             $"Market-structure data may be unreliable: {reason}")
         {

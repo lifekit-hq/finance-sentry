@@ -89,6 +89,53 @@ public sealed class CompanionDigestJobTests
         dispatcher.LastHeldCount.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(CompanionEventKind.MarketStructure)]
+    [InlineData(CompanionEventKind.NewsCluster)]
+    public async Task Pulse_batched_kinds_alone_do_not_wake_the_digest(CompanionEventKind kind)
+    {
+        var events = NewEventRepository();
+        var batched = HeldEvent();
+        batched.Kind = kind;
+        await events.InsertIfNewAsync(batched);
+
+        var dispatcher = RunDigestNow(events, out var job);
+        await job.ExecuteAsync();
+
+        dispatcher.DigestWakes.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Pulse_batched_kinds_are_not_counted_when_other_held_events_wake_the_digest()
+    {
+        var events = NewEventRepository();
+        var batched = HeldEvent();
+        batched.Kind = CompanionEventKind.NewsCluster;
+        await events.InsertIfNewAsync(batched);
+        await events.InsertIfNewAsync(HeldEvent());
+
+        var dispatcher = RunDigestNow(events, out var job);
+        await job.ExecuteAsync();
+
+        dispatcher.DigestWakes.Should().Be(1);
+        dispatcher.LastHeldCount.Should().Be(1);
+    }
+
+    private static RecordingDispatcher RunDigestNow(InMemoryCompanionStore events, out CompanionDigestJob job)
+    {
+        var setting = new CompanionNotificationSetting
+        {
+            UserId = User,
+            Mode = NotificationMode.Realtime,
+            TimeZoneId = "UTC",
+            DigestHourLocal = DateTimeOffset.UtcNow.UtcDateTime.Hour,
+        };
+        var dispatcher = new RecordingDispatcher();
+        job = new CompanionDigestJob(
+            new FixedSettings(setting), events, PassThroughReconciler.Instance, dispatcher, NullLogger<CompanionDigestJob>.Instance);
+        return dispatcher;
+    }
+
     [Fact]
     public async Task No_wake_outside_the_configured_local_hour()
     {
