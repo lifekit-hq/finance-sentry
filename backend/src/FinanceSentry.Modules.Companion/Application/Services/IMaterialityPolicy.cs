@@ -34,9 +34,13 @@ public interface IMaterialityPolicy
     /// <see cref="CompanionEventKind.CandidateReviewDue"/> notice: filing, break and unbreak keep the mode rule
     /// (realtime), news, earnings and catalyst are held for the digest, and an unreadable source is held too.
     /// </param>
+    /// <param name="severity">The source alert's severity. A <see cref="CompanionEventKind.MarketStructure"/> event at
+    /// <c>Error</c> is a severe intraday move and keeps the mode rule (delivered immediately; quiet hours still defer it).</param>
+    /// <param name="referenceLabel">The source alert's reference label; the <c>freshness</c> flavour of
+    /// <see cref="CompanionEventKind.MarketStructure"/> is also <c>Error</c> but stays digest-only.</param>
     EventDisposition DispositionFor(
         NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null, string? healthState = null,
-        string? reviewSource = null);
+        string? reviewSource = null, string? severity = null, string? referenceLabel = null);
 
     /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest:
     /// at capture the source's time since its last successful sync, at delivery (<c>ISyncFailureReconciler</c>) how long

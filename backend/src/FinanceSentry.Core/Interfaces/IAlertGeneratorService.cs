@@ -1,5 +1,12 @@
 namespace FinanceSentry.Core.Interfaces;
 
+/// <summary>Reference labels the market-structure alert flavours are raised with.</summary>
+public static class MarketStructureAlertLabel
+{
+    /// <summary>The Radar data-staleness flavour (an operational notice, <c>Error</c> but never a market event).</summary>
+    public const string Freshness = "freshness";
+}
+
 /// <summary>How much of the dedup discipline applies to one alert emission.</summary>
 public enum AlertDedup
 {
@@ -153,6 +160,19 @@ public interface IAlertGeneratorService
         string reason,
         CancellationToken ct = default,
         AlertDedup dedup = AlertDedup.ActiveThenSilence);
+
+    /// <summary>
+    /// Raises the severe tier of the intraday-move alert: the same market-structure alert at <c>Error</c> severity, with
+    /// the SilenceOnly dedup discipline. The caller passes its own severe-tier <paramref name="referenceId"/> so a routine
+    /// alert raised earlier on the ticker never swallows it. Companion capture delivers it immediately (see
+    /// <c>MaterialityPolicy</c>) instead of batching it into the ledger-pulse.
+    /// </summary>
+    Task GenerateSevereMarketMoveAlertAsync(
+        Guid userId,
+        Guid referenceId,
+        string ticker,
+        string reason,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Raises a market-structure freshness Alert when the Radar data is stale or an ingestion run failed.

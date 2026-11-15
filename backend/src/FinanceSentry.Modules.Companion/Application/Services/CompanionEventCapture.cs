@@ -85,7 +85,7 @@ public sealed class CompanionEventCapture(
                 ReferenceId = review?.SubjectId ?? a.ReferenceId ?? a.AlertId,
                 AppPath = a.AppPath,
                 SourceModule = "alerts",
-                Disposition = policy.DispositionFor(mode, kind.Value, staleness, a.HealthState, review?.Source),
+                Disposition = policy.DispositionFor(mode, kind.Value, staleness, a.HealthState, review?.Source, a.Severity, a.ReferenceLabel),
                 OccurredAt = a.CreatedAt,
             };
 

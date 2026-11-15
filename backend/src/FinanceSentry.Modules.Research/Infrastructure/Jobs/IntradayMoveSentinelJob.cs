@@ -52,6 +52,9 @@ public sealed class IntradayMoveSentinelJob(
     private const decimal WatchlistMoveThreshold = 0.08m;
     private const decimal ZScoreThreshold = 3.0m;
 
+    // A move this many times its alert bar (10% holding, 16% watchlist) is severe: size only, not position-weighted.
+    private const decimal SevereMoveMultiple = 2m;
+
     // 20 daily returns need 21 closes; the extra calendar-day buffer absorbs weekends/holidays.
     private const int VolatilityWindow = 20;
     private const int HistoryLookbackDays = 45;
@@ -165,10 +168,14 @@ public sealed class IntradayMoveSentinelJob(
         if (Math.Abs(movePct) >= tracker.MoveThreshold)
         {
             var thresholdKind = tracker.MoveThreshold == HoldingMoveThreshold ? "holding" : "watchlist";
-            await RaiseAsync(
-                userId, ticker,
-                $"moved {movePct:P1} intraday, above the {thresholdKind} {tracker.MoveThreshold:P0} bar",
-                ct);
+            var reason = $"moved {movePct:P1} intraday, above the {thresholdKind} {tracker.MoveThreshold:P0} bar";
+            if (Math.Abs(movePct) >= tracker.MoveThreshold * SevereMoveMultiple)
+            {
+                await alerts.GenerateSevereMarketMoveAlertAsync(userId, SevereReferenceId(ticker), ticker, reason, ct);
+                return;
+            }
+
+            await RaiseAsync(userId, ticker, reason, ct);
             return;
         }
 
@@ -268,6 +275,11 @@ public sealed class IntradayMoveSentinelJob(
     // reference — this detector's 24h silence window tracks its own trigger history per ticker.
     private static Guid ReferenceId(string ticker)
         => new(MD5.HashData(Encoding.UTF8.GetBytes($"intraday-move:{ticker.ToUpperInvariant()}")));
+
+    // The severe tier has its own reference (and so its own 24h silence window): a routine 5.5% alert earlier the same
+    // day must not swallow the 11% one that has to reach the owner at once.
+    private static Guid SevereReferenceId(string ticker)
+        => new(MD5.HashData(Encoding.UTF8.GetBytes($"intraday-move-severe:{ticker.ToUpperInvariant()}")));
 
     private sealed record TrackedTicker(string Ticker, bool IsEquity, decimal MoveThreshold);
 }

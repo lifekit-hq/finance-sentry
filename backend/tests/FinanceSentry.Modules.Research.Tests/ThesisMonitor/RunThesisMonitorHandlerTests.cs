@@ -914,6 +914,10 @@ public class RunThesisMonitorHandlerTests
             AlertDedup dedup = AlertDedup.ActiveThenSilence)
             => Task.CompletedTask;
 
+        public Task GenerateSevereMarketMoveAlertAsync(
+            Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task GenerateMarketStructureFreshnessAlertAsync(
             Guid userId, Guid referenceId, string reason, CancellationToken ct = default)
             => Task.CompletedTask;

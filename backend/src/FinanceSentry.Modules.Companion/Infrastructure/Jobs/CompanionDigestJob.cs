@@ -13,7 +13,8 @@ using Microsoft.Extensions.Logging;
 /// the user's proactivity mode — <see cref="Application.Services.MaterialityPolicy"/> holds some kinds
 /// (e.g. sync failures) for the digest regardless of mode, so a mode-only gate stranded them
 /// (issue #686). The agent pulls the held events, delivers, and acks (so they don't repeat). No held
-/// events ⇒ no wake (no forced empty message).
+/// events ⇒ no wake (no forced empty message). MarketStructure and NewsCluster events do not count: the
+/// ledger-pulse drains them, so a pool holding only those does not earn a Digest session.
 /// </summary>
 [DisableConcurrentExecution(timeoutInSeconds: 120)]
 public sealed class CompanionDigestJob(
@@ -39,7 +40,7 @@ public sealed class CompanionDigestJob(
 
             // Resolved failures expire here and long-open ones escalate out of the digest, so only live held events count.
             var held = (await reconciler.ReconcileAsync(await events.ListHeldForDigestUnscopedAsync(userId, ct), ct))
-                .Where(e => e.Disposition == EventDisposition.HeldForDigest)
+                .Where(e => e.Disposition == EventDisposition.HeldForDigest && !IsPulseBatched(e.Kind))
                 .ToList();
             if (held.Count == 0)
             {
@@ -50,4 +51,8 @@ public sealed class CompanionDigestJob(
             logger.LogInformation("Companion digest wake for {User}: {Count} held events", userId, held.Count);
         }
     }
+
+    // The ledger-pulse drains these two kinds three times a day, so they alone never justify a daily Digest session.
+    private static bool IsPulseBatched(CompanionEventKind kind)
+        => kind is CompanionEventKind.MarketStructure or CompanionEventKind.NewsCluster;
 }

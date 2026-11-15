@@ -1372,6 +1372,23 @@ public class AlertGeneratorServiceTests
             a.Message.Contains("5% bar")), default), Times.Once);
     }
 
+    [Fact]
+    public async Task GenerateSevereMarketMove_AddsErrorAlertUnderItsOwnReference()
+    {
+        var referenceId = Guid.NewGuid();
+        AllowAlert(AlertType.MarketStructure);
+
+        await _service.GenerateSevereMarketMoveAlertAsync(
+            _userId, referenceId, "AAPL", "moved 11.0% intraday, above the holding 5% bar");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.MarketStructure &&
+            a.Severity == AlertSeverity.Error &&
+            a.ReferenceId == referenceId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title == "Large move: AAPL"), default), Times.Once);
+    }
+
     /// <summary>
     /// P1 (ledger-heartbeat design): the intraday-move-sentinel job re-checks every held/watchlisted
     /// ticker every 15 minutes with the same per-ticker reference id, so the 24h silence window is what
