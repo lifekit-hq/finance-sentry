@@ -4,7 +4,7 @@ import {type Signal, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {ASYNC_STATE_SHOW_DELAY_MS, CmnDrawerService} from '@lifekit-hq/ui';
+import {ASYNC_STATE_SHOW_DELAY_MS, CmnDrawerService, CmnPullRefreshService} from '@lifekit-hq/ui';
 import {Subject} from 'rxjs';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
@@ -549,5 +549,19 @@ describe('TransactionLedgerComponent filtered empty state', () => {
       queryParams: {account: null, q: null, from: null, to: null, type: null, category: null},
       queryParamsHandling: 'merge',
     });
+  });
+});
+
+describe('TransactionLedgerComponent pull to refresh', () => {
+  it('reloads the ledger through the store', async () => {
+    const {store, fixture} = setup(null);
+    const pullRefresh = TestBed.inject(CmnPullRefreshService);
+    fixture.detectChanges();
+    store.load.mockClear();
+
+    expect(pullRefresh.available()).toBe(true);
+    await pullRefresh.refresh();
+
+    expect(store.load).toHaveBeenCalledTimes(1);
   });
 });

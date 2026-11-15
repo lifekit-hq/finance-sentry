@@ -100,6 +100,7 @@ frontend/.angular/
 frontend/out-tsc/
 frontend/**/*.tsbuildinfo
 frontend/.vitest-attachments/
+frontend/.vitest/
 frontend/**/__screenshots__/
 docs/superpowers
 
