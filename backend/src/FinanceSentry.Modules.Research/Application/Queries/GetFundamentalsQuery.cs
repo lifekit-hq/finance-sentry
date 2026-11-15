@@ -27,6 +27,7 @@ public class GetFundamentalsQueryHandler(IFundamentalsService fundamentals)
 
         var fcf = DerivedFundamentalsMath.FreeCashFlow(result.Facts, Math.Max(requested, MinQuarters), requested);
         var roe = DerivedFundamentalsMath.ReturnOnEquity(result.Facts, requested);
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(result.Facts, requested);
         var shown = result.Facts
             .GroupBy(f => f.Concept)
             .SelectMany(g => g.OrderByDescending(f => f.PeriodEnd).Take(requested))
@@ -45,7 +46,9 @@ public class GetFundamentalsQueryHandler(IFundamentalsService fundamentals)
             fcf,
             fcf.Count > 0 ? null : MissingReason(result, "cash flow (operating cash flow and capex)"),
             roe,
-            roe.Count > 0 ? null : MissingReason(result, "net income and stockholders' equity"));
+            roe.Count > 0 ? null : MissingReason(result, "net income and stockholders' equity"),
+            roic,
+            roic.Count > 0 ? null : MissingReason(result, "operating income, tax, debt, cash and equity"));
     }
 
     private static string MissingReason(FundamentalsResult result, string what)

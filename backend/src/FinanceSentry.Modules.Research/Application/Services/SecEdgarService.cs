@@ -57,6 +57,22 @@ public sealed class SecEdgarService(
         // CashFlowMath. Capex tags run broadest to narrowest (the later tag wins an overlapping period).
         ("OperatingCashFlow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]),
         ("Capex", ["PaymentsToAcquireProductiveAssets", "PaymentsToAcquirePropertyPlantAndEquipment"]),
+        // Return on invested capital inputs (#1376): annual income-statement and year-end balance-sheet lines.
+        // Current borrowings are kept as separate concepts so they can be summed without double counting:
+        // CurrentDebt (DebtCurrent) is the filer's own total of current borrowings and, when reported, is used
+        // alone; otherwise CurrentLongTermDebt (current portion of long-term debt) plus ShortTermDebt
+        // (ShortTermBorrowings, the short-term total) are added. CommercialPaper and NotesPayableCurrent are read
+        // apart because they may be components of ShortTermBorrowings: they stand in for it only when it is absent,
+        // and when both are reported without that total the short-term debt is not determinable (never summed).
+        ("IncomeTaxExpense", ["IncomeTaxExpenseBenefit"]),
+        ("PretaxIncome", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"]),
+        ("LongTermDebt", ["LongTermDebtNoncurrent"]),
+        ("CurrentDebt", ["DebtCurrent"]),
+        ("CurrentLongTermDebt", ["LongTermDebtCurrent"]),
+        ("ShortTermDebt", ["ShortTermBorrowings"]),
+        ("CommercialPaper", ["CommercialPaper"]),
+        ("NotesPayableCurrent", ["NotesPayableCurrent"]),
+        ("CashAndEquivalents", ["CashAndCashEquivalentsAtCarryingValue"]),
     ];
 
     // The same friendly concepts in the ifrs-full taxonomy, read only when a filer reports none of
@@ -76,6 +92,11 @@ public sealed class SecEdgarService(
         ("StockholdersEquity", ["EquityAttributableToOwnersOfParent"]),
         ("OperatingCashFlow", ["CashFlowsFromUsedInOperatingActivities"]),
         ("Capex", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"]),
+        // IFRS filers tag total Borrowings (current + non-current), so it is one TotalDebt line.
+        ("IncomeTaxExpense", ["IncomeTaxExpenseContinuingOperations"]),
+        ("PretaxIncome", ["ProfitLossBeforeTax"]),
+        ("TotalDebt", ["Borrowings"]),
+        ("CashAndEquivalents", ["CashAndCashEquivalents"]),
     ];
 
     private readonly EdgarTickerMap tickerMap = new(httpFactory, clock, logger, tickerMapOptions ?? new EdgarTickerMapOptions());
