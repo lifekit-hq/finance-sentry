@@ -163,7 +163,7 @@ public sealed class TaxProfilePersistenceTests : IAsyncLifetime
         using var document = JsonDocument.Parse(text);
         var rows = document.RootElement.GetProperty("tax_profiles");
         rows.GetArrayLength().Should().Be(1);
-        rows[0].GetProperty("jurisdiction_notes").GetString().Should().Be(SecretNotes);
+        rows[0].GetProperty("jurisdictionNotes").GetString().Should().Be(SecretNotes);
         rows[0].GetProperty("caveat").GetString().Should().Be(SecretCaveat);
         text.Should().NotContain("v1.", "no ciphertext leaks into the export");
         text.Should().NotContain(_personB.ToString());
