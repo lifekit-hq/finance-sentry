@@ -18,6 +18,7 @@ import {DossierChecksUtils} from '../utils/dossier-checks.utils';
 import {DossierFactsUtils} from '../utils/dossier-facts.utils';
 import {DossierPositionUtils} from '../utils/dossier-position.utils';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
+import {DossierTilesUtils} from '../utils/dossier-tiles.utils';
 import {DossierVerdictUtils} from '../utils/dossier-verdict.utils';
 import {DossierViewUtils} from '../utils/dossier-view.utils';
 
@@ -58,6 +59,14 @@ export function dossierComputed(store: StateSignals) {
     const dossier = store.dossier();
     return DossierViewUtils.isCrypto(dossier) ? null : (dossier?.valuation ?? null);
   });
+
+  const recommendationSummary = computed(() =>
+    DossierViewUtils.recommendationSummary(store.dossier()?.analysts?.trends ?? [])
+  );
+
+  const targetBand = computed(() =>
+    DossierPositionUtils.targetBand(usableValuation(), store.dossier()?.userTarget, currentPrice())
+  );
 
   return {
     // How the owner reads a verdict, from the account (the same on every device); simple until it has loaded.
@@ -112,9 +121,20 @@ export function dossierComputed(store: StateSignals) {
     }),
     sectionChips: computed(() => DossierViewUtils.sectionChips(store.dossier())),
     // The latest month of the street's ratings as one bar and one verdict ("21 of 26 Buy").
-    recommendationSummary: computed(() =>
-      DossierViewUtils.recommendationSummary(store.dossier()?.analysts?.trends ?? [])
-    ),
+    recommendationSummary,
+    // The fact sections as one grid of one-line tiles, then the notable moves, one tile each.
+    factTiles: computed(() => {
+      const dossier = store.dossier();
+      return dossier
+        ? DossierTilesUtils.tiles({
+            dossier,
+            valuation: usableValuation(),
+            targetBand: targetBand(),
+            recommendation: recommendationSummary(),
+          })
+        : [];
+    }),
+    moveViews: computed(() => DossierTilesUtils.moves(store.dossier())),
     ledgerReadNarrative: computed(() => store.ledgerRead()?.narrative ?? ''),
     // The backend reports a missing cache as stale; only an actual narrative can be out of date.
     isLedgerReadStale: computed(() => {
@@ -159,14 +179,7 @@ export function dossierComputed(store: StateSignals) {
     positionUnitPrices: computed(() =>
       DossierPositionUtils.unitPrices(store.dossier()?.position ?? null)
     ),
-    targetBand: computed(() => {
-      const dossier = store.dossier();
-      return DossierPositionUtils.targetBand(
-        usableValuation(),
-        dossier?.userTarget,
-        currentPrice()
-      );
-    }),
+    targetBand,
     parsedTargetDraft: computed(() => DossierPositionUtils.parseTarget(store.targetDraft())),
     fundamentals: computed(() =>
       DossierFactsUtils.fundamentals(usableValuation(), store.dossier()?.performance)

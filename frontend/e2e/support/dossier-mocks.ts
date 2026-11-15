@@ -439,6 +439,39 @@ export const DOSSIER_AAPL = {
       payload: {volume: 2500000},
     },
   ],
+  // Two days that moved 5% or more: one with the news and a signal around it, one with nothing found.
+  notableMoves: {
+    thresholdPct: 5,
+    windowDays: 1,
+    visibleDays: 30,
+    moves: [
+      {
+        date: '2026-08-15',
+        returnPct: 6.4,
+        links: [
+          {
+            kind: 'news',
+            timestamp: '2026-08-15T12:00:00Z',
+            title: 'Apple reports record services revenue in Q3',
+            source: 'Reuters',
+            url: 'https://reuters.com/apple-q3',
+            severity: null,
+            relevance: 3,
+          },
+          {
+            kind: 'signal',
+            timestamp: '2026-08-15T09:00:00Z',
+            title: 'RSI_OVERSOLD',
+            source: 'momentum',
+            url: null,
+            severity: 'info',
+            relevance: 2,
+          },
+        ],
+      },
+      {date: '2026-08-06', returnPct: -5.3, links: []},
+    ],
+  },
   // The owner reads a scorecard, so the page opens on its verdict (Avoid, for new money, on a held name).
   scorecard: ScorecardFixtures.scorecard({symbol: 'AAPL'}),
   generatedAt: '2026-09-01T10:30:00Z',

@@ -64,60 +64,89 @@ describe('AssetDossierComponent: Why is it moving?', () => {
     ],
   };
 
-  it('lists each move with its linked news and signal, and says so plainly when none', () => {
+  // The grid draws a tile's panel only while that tile is open.
+  const openTile = async (id: string): Promise<void> => {
+    fixture.detectChanges();
+    fixture.componentInstance.openTile.set(id);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
+  const SIGNAL = {
+    timestamp: '2026-10-21T09:00:00Z',
+    scanner: 'volume',
+    signalType: 'volume_spike',
+    severity: 'notable',
+    payload: {},
+  };
+
+  it('makes each move a tile: the day, the size of the move and what stands around it', () => {
     mockStore.dossier.set({...DOSSIER, notableMoves: MOVES});
     fixture.detectChanges();
 
-    const card = byTestId('notable-moves');
-    expect(card).not.toBeNull();
-    const text = card?.textContent ?? '';
-    expect(text).toContain('+8.2%');
-    expect(text).toContain('-6.1%');
-    expect(card?.querySelector('a[href="https://example.com/a"]')).not.toBeNull();
-    expect(card?.querySelector('a[href^="#"]')).toBeNull();
-    expect(text).toContain('no linked news or signal found');
+    const moves = mockStore.factTiles().filter(tile => tile.id.startsWith('move-'));
+    expect(moves).toEqual([
+      {id: 'move-2026-10-20', label: 'Moved 20 Oct', headline: '+8.2% · news, signal'},
+      {id: 'move-2026-10-14', label: 'Moved 14 Oct', headline: '-6.1% · no cause found'},
+    ]);
+    const tiles = byTestId('dossier-facts')?.textContent ?? '';
+    expect(tiles).toContain('Moved 20 Oct');
+    expect(tiles).toContain('-6.1% · no cause found');
   });
 
-  it('shows a linked signal as plain text when the Radar signals card is not rendered', () => {
+  it('opens a move to its magnitude and cause chips, then the linked items', async () => {
+    mockStore.dossier.set({...DOSSIER, notableMoves: MOVES});
+    await openTile('move-2026-10-20');
+
+    const panel = byTestId('notable-move');
+    expect(panel).not.toBeNull();
+    expect(byTestId('move-summary')?.textContent).toContain('+8.2%');
+    expect(byTestId('move-cause-news')?.textContent).toContain('1 news');
+    expect(byTestId('move-cause-signal')?.textContent).toContain('1 signal');
+    expect(byTestId('move-summary')?.querySelectorAll('cmn-icon')).toHaveLength(3);
+    expect(panel?.querySelector('a[href="https://example.com/a"]')).not.toBeNull();
+    expect(panel?.querySelector('a[href^="#"]')).toBeNull();
+  });
+
+  it('says so plainly when nothing was found around a move', async () => {
+    mockStore.dossier.set({...DOSSIER, notableMoves: MOVES});
+    await openTile('move-2026-10-14');
+
+    expect(byTestId('move-summary')?.textContent).toContain('-6.1%');
+    expect(byTestId('move-cause-news')).toBeNull();
+    expect(byTestId('move-cause-signal')).toBeNull();
+    expect(byTestId('notable-move')?.textContent).toContain('no linked news or signal found');
+  });
+
+  it('shows a linked signal as plain text when the Radar signals tile is not there', async () => {
     mockStore.dossier.set({...DOSSIER, notableMoves: MOVES, radarSignals: []});
-    fixture.detectChanges();
+    await openTile('move-2026-10-20');
 
     expect(byTestId('move-signal-link')).toBeNull();
     expect(byTestId('move-signal-text')?.textContent).toContain('Volume Spike');
-    expect(byTestId('notable-moves')?.textContent).toContain('example-scanner');
+    expect(byTestId('notable-move')?.textContent).toContain('example-scanner');
   });
 
-  it('scrolls to the Radar signals card, without navigating, when a signal is clicked', () => {
-    mockStore.dossier.set({
-      ...DOSSIER,
-      notableMoves: MOVES,
-      radarSignals: [
-        {
-          timestamp: '2026-10-21T09:00:00Z',
-          scanner: 'volume',
-          signalType: 'volume_spike',
-          severity: 'notable',
-          payload: {},
-        },
-      ],
-    });
-    fixture.detectChanges();
+  it('opens the Radar signals tile, without navigating, when a signal is clicked', async () => {
+    mockStore.dossier.set({...DOSSIER, notableMoves: MOVES, radarSignals: [SIGNAL]});
+    await openTile('move-2026-10-20');
 
-    const target = root().ownerDocument.getElementById('radar-signals');
-    expect(target).not.toBeNull();
+    const grid = byTestId('dossier-facts');
     const scrollSpy = vi.fn();
-    if (target) {
-      target.scrollIntoView = scrollSpy;
+    if (grid) {
+      grid.scrollIntoView = scrollSpy;
     }
     byTestId('move-signal-link')?.querySelector('button')?.click();
 
+    expect(fixture.componentInstance.openTile()).toBe('radar-signals');
     expect(scrollSpy).toHaveBeenCalled();
   });
 
-  it('shows nothing when no day reached the threshold', () => {
+  it('adds no move tile when no day reached the threshold', () => {
     mockStore.dossier.set({...DOSSIER, notableMoves: {...MOVES, moves: []}});
     fixture.detectChanges();
 
-    expect(byTestId('notable-moves')).toBeNull();
+    expect(mockStore.factTiles().some(tile => tile.id.startsWith('move-'))).toBe(false);
   });
 });

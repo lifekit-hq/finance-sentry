@@ -289,6 +289,8 @@ function createMockStore() {
     chartView: derived.chartView,
     chartAsyncStatus: derived.chartAsyncStatus,
     targetBand: derived.targetBand,
+    factTiles: derived.factTiles,
+    moveViews: derived.moveViews,
     parsedTargetDraft: derived.parsedTargetDraft,
     fundamentals: derived.fundamentals,
     dataStatus: derived.dataStatus,

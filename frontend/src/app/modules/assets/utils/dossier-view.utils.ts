@@ -9,6 +9,7 @@ import {
 import {
   CRYPTO_PRICE_CARD_TITLE,
   DOSSIER_SECTION_CHIPS,
+  MOVE_TILE_ID_PREFIX,
   VALUATION_CARD_TITLE,
 } from '../constants/dossier/dossier-sections.constants';
 import {
@@ -24,6 +25,7 @@ const PERCENT_SCALE = 100;
 const YIELD_FRACTION_DIGITS = 2;
 const DETAIL_SEPARATOR = ' · ';
 const CRYPTO_ASSET_CLASS = 'crypto';
+const ISO_DATE_LENGTH = 10;
 
 export class DossierViewUtils {
   /**
@@ -126,6 +128,11 @@ export class DossierViewUtils {
     return `${(fraction * PERCENT_SCALE).toFixed(YIELD_FRACTION_DIGITS)}%`;
   }
 
+  /** The tile id of a notable move: the day it happened, so a reload keeps the same tile. */
+  public static moveTileId(date: string): string {
+    return `${MOVE_TILE_ID_PREFIX}${date.slice(0, ISO_DATE_LENGTH)}`;
+  }
+
   /** The sections that exist for this symbol, in page order: an absent section gets no chip. */
   public static sectionChips(dossier: Nullable<AssetDossierDto>): DossierSectionChip[] {
     if (!dossier) {
@@ -159,8 +166,13 @@ export class DossierViewUtils {
     if (dossier.nextEarnings) {
       chips.push(DOSSIER_SECTION_CHIPS.earnings);
     }
-    if ((dossier.notableMoves?.moves.length ?? 0) > 0) {
-      chips.push(DOSSIER_SECTION_CHIPS.moves);
+    // Each move is a tile; the chip opens the newest.
+    const newestMove = dossier.notableMoves?.moves[0];
+    if (newestMove) {
+      chips.push({
+        ...DOSSIER_SECTION_CHIPS.moves,
+        id: DossierViewUtils.moveTileId(newestMove.date),
+      });
     }
     if (dossier.recentNews.length > 0) {
       chips.push(DOSSIER_SECTION_CHIPS.news);

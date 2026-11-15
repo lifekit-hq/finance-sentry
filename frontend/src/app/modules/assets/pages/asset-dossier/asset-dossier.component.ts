@@ -5,6 +5,7 @@ import {
   computed,
   CUSTOM_ELEMENTS_SCHEMA,
   inject,
+  signal,
 } from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
@@ -19,6 +20,7 @@ import {
   ChipComponent,
   EmptyStateComponent,
   FormFieldComponent,
+  IconComponent,
   InputComponent,
   InstitutionAvatarComponent,
   LineChartComponent,
@@ -29,6 +31,8 @@ import {
   SkeletonComponent,
   TagComponent,
   type TagVariant,
+  TileGridComponent,
+  TilePanelDirective,
   VerdictHeaderComponent,
 } from '@lifekit-hq/ui';
 
@@ -63,9 +67,11 @@ import {VerdictBlockComponent} from '../../components/verdict-block/verdict-bloc
 import {CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
 import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
 import {
+  DOSSIER_FACTS_ID,
   DOSSIER_SECTION_ID,
   NO_LINKED_MOVE_ITEMS_MESSAGE,
 } from '../../constants/dossier/dossier-sections.constants';
+import {MOVE_ICON} from '../../constants/dossier/dossier-tiles.constants';
 import {
   type DossierDeltaDirection,
   type DossierSignalItem,
@@ -128,11 +134,14 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     EmptyStateComponent,
     FormFieldComponent,
     FormsModule,
+    IconComponent,
     InputComponent,
     InputHintsDirective,
     LineChartComponent,
     NgTemplateOutlet,
     TagComponent,
+    TileGridComponent,
+    TilePanelDirective,
     TriggerSentencePipe,
     VerdictHeaderComponent,
   ],
@@ -170,6 +179,10 @@ export class AssetDossierComponent {
   };
 
   public readonly sectionId = DOSSIER_SECTION_ID;
+  public readonly factsId = DOSSIER_FACTS_ID;
+  public readonly moveIcon = MOVE_ICON;
+  // The one open tile of the facts grid; a chip, a fragment or a move's signal link moves it.
+  public readonly openTile = signal<string | null>(null);
   public readonly noLinkedItemsMessage = NO_LINKED_MOVE_ITEMS_MESSAGE;
   public readonly chartSkeletonHeight = CHART_SKELETON_HEIGHT;
   public readonly ownershipNote = OWNERSHIP_NOTE;
@@ -218,7 +231,14 @@ export class AssetDossierComponent {
   });
 
   public scrollToSection(id: string): void {
-    this.document.getElementById(id)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    // A section that is a tile has no element of its own: open it and land on the grid.
+    const isTile = this.store.factTiles().some(tile => tile.id === id);
+    if (isTile) {
+      this.openTile.set(id);
+    }
+    this.document
+      .getElementById(isTile ? this.factsId : id)
+      ?.scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 
   // The tick-strip template's context is untyped; this keeps the lookup typed.

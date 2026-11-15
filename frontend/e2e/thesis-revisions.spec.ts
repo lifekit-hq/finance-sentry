@@ -229,6 +229,8 @@ test.describe('Thesis change on the asset dossier', () => {
       'Thesis change confirmed'
     );
     await expect(card).toBeHidden();
+    // The thesis text lives in the Plan tile's panel, which draws only while the tile is open.
+    await page.getByTestId('dossier-facts').getByRole('button', {name: /^Plan/}).click();
     await expect(page.getByTestId('thesis-text')).toContainText('28% of revenue');
     expect(written(writes)).toEqual(['POST /api/v1/research/thesis-revisions/rev-aapl/confirm']);
     expect(writes[0]?.postDataJSON()).toEqual({note: null, overrideRisk: false});

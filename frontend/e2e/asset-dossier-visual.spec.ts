@@ -73,7 +73,6 @@ test.describe('Asset dossier visual baseline', () => {
     await page.setViewportSize(DESKTOP);
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop.png', SCREENSHOT_OPTIONS);
   });
@@ -83,7 +82,6 @@ test.describe('Asset dossier visual baseline', () => {
     await page.setViewportSize(DESKTOP);
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop-dark.png', SCREENSHOT_OPTIONS);
   });
@@ -91,10 +89,31 @@ test.describe('Asset dossier visual baseline', () => {
   test('full dossier on a phone', async ({page}) => {
     await page.setViewportSize(PHONE_FULL);
     await openDossier(page, 'AAPL');
-    await expect(page.getByTestId('trend-list')).toBeVisible();
-    await expectTrendDrawn(page);
+    await expect(page.getByTestId('dossier-facts')).toBeVisible();
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-phone.png', SCREENSHOT_OPTIONS);
+  });
+
+  test('dossier with the signals tile open on desktop', async ({page}) => {
+    await page.setViewportSize(DESKTOP);
+    await openDossier(page, 'AAPL');
+    await page
+      .getByTestId('dossier-facts')
+      .getByRole('button', {name: /^Signals/})
+      .click();
+    await expectTrendDrawn(page);
+    await expect(page).toHaveScreenshot('dossier-signals-open.png', SCREENSHOT_OPTIONS);
+  });
+
+  test('dossier with a move tile open on a phone', async ({page}) => {
+    await page.setViewportSize(PHONE_FULL);
+    await openDossier(page, 'AAPL');
+    await page
+      .getByTestId('dossier-facts')
+      .getByRole('button', {name: /^Moved 15 Aug/})
+      .click();
+    await expect(page.getByTestId('notable-move')).toBeVisible();
+    await expect(page).toHaveScreenshot('dossier-move-open-phone.png', SCREENSHOT_OPTIONS);
   });
 
   test('crypto dossier on a phone', async ({page}) => {
@@ -122,7 +141,6 @@ test.describe('Asset dossier visual baseline', () => {
       )
     );
     await expect(page.getByTestId('ledger-read-narrative')).toContainText(LEDGER_READ_NARRATIVE);
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-ledger-read.png', SCREENSHOT_OPTIONS);
   });
