@@ -152,6 +152,8 @@ public sealed class DecideThesisRevisionCommandTests
 
         result.Outcome.Should().Be(ThesisRevisionOutcome.RiskGateRefused);
         result.Gate!.RuleKey.Should().Be("MaxPositionWeight");
+        result.Revision.Status.Should().Be(ThesisRevisionStatus.Pending.ToString());
+        result.Revision.DecidedAt.Should().BeNull();
         revision.Status.Should().Be(ThesisRevisionStatus.Pending);
         _promote.Verify(h => h.Handle(It.Is<PromoteCandidateCommand>(c => !c.OverrideRisk), It.IsAny<CancellationToken>()), Times.Once);
 

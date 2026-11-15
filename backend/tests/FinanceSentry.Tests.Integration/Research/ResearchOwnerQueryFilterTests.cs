@@ -182,6 +182,48 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task A_revision_is_claimed_by_one_decision_only_and_a_claim_can_be_released()
+    {
+        var live = NewRevision(_userA, Guid.NewGuid());
+        var overdue = NewRevision(_userA, Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(-1));
+        await SeedAsync(live, overdue);
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", now)).Should().BeTrue();
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Rejected, "no", now)).Should().BeFalse(
+                "the second of two overlapping decisions loses");
+            (await repo.TryClaimAsync(_userA, overdue.Id, ThesisRevisionStatus.Confirmed, null, now)).Should().BeFalse(
+                "an expired proposal cannot be decided");
+        }
+
+        await using (var asB = CreateContext(_userB))
+            (await new ThesisRevisionRepository(asB).TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Rejected, "no", now))
+                .Should().BeFalse("another person's proposal is out of scope");
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var claimed = await repo.GetAsync(_userA, live.Id);
+            claimed!.Status.Should().Be(ThesisRevisionStatus.Confirmed);
+            claimed.DecisionNote.Should().Be("ok");
+            claimed.DecidedAt.Should().NotBeNull();
+
+            await repo.ReleaseClaimAsync(_userA, live.Id);
+        }
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var released = await new ThesisRevisionRepository(asA).GetAsync(_userA, live.Id);
+            released!.Status.Should().Be(ThesisRevisionStatus.Pending);
+            released.DecidedAt.Should().BeNull();
+            released.DecisionNote.Should().BeNull();
+        }
+    }
+
+    [DockerRequiredFact]
     public async Task Price_targets_are_readable_and_removable_only_by_their_owner()
     {
         await SeedAsync(

@@ -115,12 +115,13 @@ public sealed class DecideThesisRevisionCommandHandler(
                 ThesisRevisionKind.Close => await ConfirmCloseAsync(command, revision, ct),
                 _ => await ConfirmReviseAsync(command, revision, ct),
             };
-            if (result.Outcome != ThesisRevisionOutcome.Confirmed)
+            if (result.Outcome == ThesisRevisionOutcome.Confirmed)
             {
-                await ReleaseClaimAsync(revision);
+                return result;
             }
 
-            return result;
+            await ReleaseClaimAsync(revision);
+            return result with { Revision = ThesisRevisionDto.From(revision) };
         }
         catch when (revision.ResultThesisId is null)
         {
