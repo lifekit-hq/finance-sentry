@@ -3,6 +3,12 @@ import {type Nullable} from '@lifekit-hq/ui';
 
 import {type DossierCheckAxisDto, type DossierCheckAxisKey} from './dossier.model';
 
+/** One of the user's fills, as a line under the price block. */
+export interface ChartTradeEntry {
+  side: 'buy' | 'sell';
+  title: string;
+}
+
 /**
  * The price chart as the price block takes it: the asset's history, then the S&P 500 when it covers the
  * window. `caption` names the lines; `averageCostLabel` adds the cost the block cannot draw.
@@ -11,6 +17,7 @@ export interface DossierChartView {
   series: PriceSeries[];
   caption: string;
   averageCostLabel: Nullable<string>;
+  trades: ChartTradeEntry[];
 }
 
 /** One leg of the return decomposition; `value` null = the ledger cannot state it. */

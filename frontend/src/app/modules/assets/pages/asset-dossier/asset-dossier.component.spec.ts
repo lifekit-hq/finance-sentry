@@ -827,11 +827,13 @@ describe('AssetDossierComponent', () => {
       expect(labels).toContain('value: 0 of 2 checks pass');
     });
 
-    it('draws the price block over the history, with the average cost under it', () => {
+    it('draws the price block over the history, with the average cost and fills under it', () => {
       fixture.detectChanges();
 
       expect(root().querySelector('cmn-price-block')).not.toBeNull();
       expect(byTestId('chart-key')?.textContent).toContain('average cost');
+      expect(root().querySelectorAll('[data-testid="chart-trade"]')).toHaveLength(1);
+      expect(byTestId('chart-trades')?.textContent).toContain('Bought 10 at $40.00');
     });
 
     it('breaks the return down into its legs', () => {

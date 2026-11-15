@@ -45,33 +45,23 @@ describe('DossierChartUtils.view', () => {
     expect(view.caption).toContain('S&P 500');
   });
 
-  it('carries the previous benchmark close over a gap and back-fills a leading one', () => {
+  it('keeps the benchmark to the days the index closed, whatever the API reports for the whole history', () => {
     const view = DossierChartUtils.view(
       chart({
         points: [
-          {date: '2025-10-13', close: 100, benchmark: null},
-          {date: '2025-10-14', close: 110, benchmark: 104},
-          {date: '2025-10-15', close: 120, benchmark: null},
-        ],
-      })
-    ) as DossierChartView;
-
-    expect(view.series[1].points.map(p => p.value)).toEqual([104, 104, 104]);
-  });
-
-  it('leaves the benchmark out when the API reports it does not cover the window', () => {
-    const view = DossierChartUtils.view(
-      chart({
-        points: [
-          {date: '2025-10-13', close: 100, benchmark: null},
-          {date: '2025-10-20', close: 110, benchmark: 110},
-          {date: '2025-10-21', close: 120, benchmark: 115},
+          {date: '1990-01-02', close: 1, benchmark: null},
+          {date: '1993-02-01', close: 2, benchmark: 2},
+          {date: '2025-10-15', close: 120, benchmark: 110},
         ],
         benchmarkChangePct: null,
       })
     ) as DossierChartView;
 
-    expect(view.series.map(s => s.label)).toEqual(['AAPL']);
+    expect(view.series.map(s => s.label)).toEqual(['AAPL', 'S&P 500']);
+    expect(view.series[1].points).toEqual([
+      {time: Date.parse('1993-02-01'), value: 2},
+      {time: Date.parse('2025-10-15'), value: 110},
+    ]);
   });
 
   it('leaves the benchmark out when the index has no close in the window', () => {
@@ -93,6 +83,27 @@ describe('DossierChartUtils.view', () => {
     expect(
       (DossierChartUtils.view(chart({averageCost: 0})) as DossierChartView).averageCostLabel
     ).toBeNull();
+  });
+});
+
+describe('DossierChartUtils.view trades', () => {
+  it('lists the user fills with their side and a plain-language title', () => {
+    const view = DossierChartUtils.view(
+      chart({
+        trades: [
+          {date: '2025-10-14', side: 'buy', quantity: 5, price: 110, currency: 'USD'},
+          {date: '2025-10-15', side: 'sell', quantity: 2, price: 120, currency: 'USD'},
+        ],
+      })
+    ) as DossierChartView;
+
+    expect(view.trades.map(t => t.side)).toEqual(['buy', 'sell']);
+    expect(view.trades[0].title).toMatch(/^Bought 5 at \$110\.00 · /);
+    expect(view.trades[1].title).toMatch(/^Sold 2 at \$120\.00 · /);
+  });
+
+  it('has no trades when the user never traded it', () => {
+    expect((DossierChartUtils.view(chart()) as DossierChartView).trades).toEqual([]);
   });
 });
 

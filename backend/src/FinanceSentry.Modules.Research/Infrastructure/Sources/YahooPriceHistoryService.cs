@@ -44,7 +44,7 @@ public sealed class YahooPriceHistoryService(
             ChartRange.SixMonths => ("6mo", "1d"),
             ChartRange.YearToDate => ("ytd", "1d"),
             ChartRange.FiveYears => ("5y", "1wk"),
-            ChartRange.Max => ("max", "1mo"),
+            ChartRange.Max => ("max", "1d"),
             _ => ("1y", "1d"),
         };
 

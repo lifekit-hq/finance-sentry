@@ -287,6 +287,7 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await request;
     const chart = page.getByTestId('price-chart');
     await expect(chart.locator('canvas')).toBeVisible();
+    await expect(chart.getByTestId('chart-trade')).toHaveCount(3);
     await expect(chart.getByRole('tab', {name: '1Y'})).toHaveAttribute('aria-selected', 'true');
     await expect(chart.getByTestId('chart-key')).toContainText('Your average cost $150.00');
 

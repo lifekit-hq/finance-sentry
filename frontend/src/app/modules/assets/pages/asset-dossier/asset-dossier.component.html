@@ -672,6 +672,24 @@
                         {{ view.averageCostLabel }}
                       </p>
                     }
+                    @if (view.trades.length > 0) {
+                      <details class="text-cmn-xs text-text-secondary" data-testid="chart-trades">
+                        <summary class="cursor-pointer">
+                          Your trades ({{ view.trades.length }})
+                        </summary>
+                        <ul class="mt-cmn-1 space-y-cmn-1">
+                          @for (trade of view.trades; track $index) {
+                            <li class="flex items-center gap-cmn-2" data-testid="chart-trade">
+                              <span
+                                [class]="trade.side === 'buy' ? 'bg-gain' : 'bg-loss'"
+                                class="h-2 w-1 rounded-full"
+                              ></span>
+                              {{ trade.title }}
+                            </li>
+                          }
+                        </ul>
+                      </details>
+                    }
                   }
                 </cmn-async-state>
               </section>
