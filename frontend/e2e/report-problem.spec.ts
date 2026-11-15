@@ -88,7 +88,7 @@ test.describe('report a problem (desktop)', () => {
     await expect(footer.locator('.cmn-badge-indicator')).toBeVisible();
 
     await footer.click();
-    await expect(page.getByTestId('whats-new-list')).toContainText('only money in');
+    await expect(page.locator('[data-whats-new-list]')).toContainText('only money in');
     await page.keyboard.press('Escape');
     await expect(footer.locator('.cmn-badge-indicator')).toHaveCount(0);
   });

@@ -13,21 +13,21 @@ import {
   AppLayoutComponent,
   CmnPullRefreshService,
   CmnShellService,
+  CmnWhatsNewService,
   CommandPaletteItem,
   type MenuItem,
   type NavItem,
+  WHATS_NEW_LABEL,
+  WHATS_NEW_MENU_ID,
 } from '@lifekit-hq/ui';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AuthStore} from '../../modules/auth/store/auth.store';
-import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {
   REPORT_PROBLEM_ACTION_ID,
   REPORT_PROBLEM_LABEL,
 } from '../report-problem/constants/report-problem.constants';
-import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../whats-new/constants/whats-new.constants';
-import {WhatsNewStore} from '../whats-new/store/whats-new.store';
 import {
   CONNECT_ACTION_ID,
   PHONE_TAB_ROUTES,
@@ -51,7 +51,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
   {id: AppRoute.SettingsPeople, label: 'People', icon: 'Users', group: 'Pages'},
   {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
-  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone', group: 'Actions'},
+  {id: WHATS_NEW_MENU_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone', group: 'Actions'},
   {
     id: REPORT_PROBLEM_ACTION_ID,
     label: REPORT_PROBLEM_LABEL,
@@ -111,12 +111,13 @@ export class AppShellComponent {
   private readonly chrome = inject(ShellChromeService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
   private readonly pullRefresh = inject(CmnPullRefreshService);
+  private readonly whatsNew = inject(CmnWhatsNewService);
 
   public readonly appUpdate = inject(AppUpdateService);
 
   public readonly canUseAi = inject(AuthStore).canUseAi;
-  public readonly versionLabel = `v${APP_VERSION} · ${WHATS_NEW_LABEL}`;
-  public readonly hasUnreadNotes = inject(WhatsNewStore).hasUnread;
+  public readonly versionLabel = this.whatsNew.versionLabel;
+  public readonly hasUnreadNotes = this.whatsNew.hasUnread;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
   public readonly moreRoute = AppRoute.More;
   public readonly navItems = this.chrome.navItems;
@@ -138,7 +139,7 @@ export class AppShellComponent {
   }
 
   public openWhatsNew(): void {
-    this.chrome.openWhatsNew();
+    this.whatsNew.open();
   }
 
   /** The layout navigates to Settings itself; the app handles Sign out and its own extras. */

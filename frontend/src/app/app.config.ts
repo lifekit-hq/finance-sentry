@@ -14,6 +14,7 @@ import {provideAppLocale} from './core/providers/locale.provider';
 import {provideAppPreferences} from './core/providers/preferences.provider';
 import {provideAppServiceWorker} from './core/providers/service-worker.provider';
 import {provideTitleStrategy} from './core/providers/title-strategy.provider';
+import {provideAppWhatsNew} from './core/providers/whats-new.provider';
 import {authInterceptor} from './modules/auth/interceptors/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -36,5 +37,6 @@ export const appConfig: ApplicationConfig = {
     provideDecimalPipe(),
     provideAppServiceWorker(),
     provideTitleStrategy(),
+    provideAppWhatsNew(),
   ],
 };

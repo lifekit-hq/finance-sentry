@@ -1,7 +1,10 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {type MenuItem, MorePageComponent as MorePageKitComponent} from '@lifekit-hq/ui';
+import {
+  CmnWhatsNewService,
+  type MenuItem,
+  MorePageComponent as MorePageKitComponent,
+} from '@lifekit-hq/ui';
 
-import {APP_VERSION} from '../../../shared/constants/version/version.constants';
 import {PHONE_TAB_ROUTES} from '../app-shell.constants';
 import {ShellChromeService} from '../services/shell-chrome.service';
 
@@ -30,7 +33,7 @@ export class MorePageComponent {
   public readonly navItems = this.chrome.navItems;
   public readonly account = this.chrome.account;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
-  public readonly versionLabel = `v${APP_VERSION}`;
+  public readonly versionLabel = `v${inject(CmnWhatsNewService).version}`;
 
   /** A route item (Settings) is a link the kit follows; Sign out and the extras are the app's. */
   public select(item: MenuItem): void {
