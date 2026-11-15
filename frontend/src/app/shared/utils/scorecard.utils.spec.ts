@@ -409,6 +409,18 @@ describe('ScorecardUtils.heldRowLine', () => {
   });
 });
 
+describe('ScorecardUtils.unreadable', () => {
+  it('keeps the symbol with no word and the unreadable reason', () => {
+    expect(ScorecardUtils.unreadable('NVDA')).toEqual({
+      symbol: 'NVDA',
+      word: null,
+      firedRuleId: null,
+      turnsBuyWhen: null,
+      gapReason: 'unreadable',
+    });
+  });
+});
+
 describe('ScorecardUtils.firedRule', () => {
   it('returns the description of the rule that fired', () => {
     expect(ScorecardUtils.firedRule(card.verdict)).toBe('Rule extended_and_rich.');

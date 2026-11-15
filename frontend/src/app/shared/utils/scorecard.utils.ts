@@ -30,6 +30,7 @@ import {
   type ScorecardLookThroughDto,
   type ScorecardStructureAxis,
   type ScorecardValuationAxis,
+  type ScorecardVerdictSummary,
   type VerdictConditionDto,
   type VerdictConditionView,
   type VerdictDto,
@@ -114,6 +115,11 @@ export class ScorecardUtils {
   /** The same bar worded for a held position's list row: what would change the word, not advice to add. */
   public static heldRowLine(turnsBuyWhen: Nullable<string>): Nullable<string> {
     return turnsBuyWhen ? `${VERDICT_HELD_ROW_PREFIX} ${turnsBuyWhen}.` : null;
+  }
+
+  /** A symbol whose verdict could not be read (a failed batch): no word, and the reason a chip's dash states. */
+  public static unreadable(symbol: string): ScorecardVerdictSummary {
+    return {symbol, word: null, firedRuleId: null, turnsBuyWhen: null, gapReason: 'unreadable'};
   }
 
   /** The description of the rule that fired, or null when the table names none. */

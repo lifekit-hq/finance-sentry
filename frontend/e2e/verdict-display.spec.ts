@@ -1,11 +1,16 @@
-import {expect, test} from '@playwright/test';
+import {expect, type Page, test} from '@playwright/test';
 
 import {INSTITUTION_ROW} from './support/accounts-mocks';
-import {API, mockApis} from './support/dossier-mocks';
+import {API, DOSSIER_AAPL, mockApis} from './support/dossier-mocks';
 import {mockPreferences} from './support/preferences-mocks';
 
 const PHONE = {width: 375, height: 812};
 const DESKTOP = {width: 1280, height: 900};
+const GAP_LINES = {
+  no_role: 'No verdict for your role.',
+  outside_universe: 'Outside the scoring universe (crypto / fund type).',
+  unreadable: 'The verdict could not be read, retry.',
+} as const;
 const TURNS_BUY = 'structure reaches 50 (reads 39)';
 
 test.describe('Verdict display', () => {
@@ -94,5 +99,72 @@ test.describe('Verdict display', () => {
     await expect(row.getByTestId('position-verdict-note')).toHaveText(
       `The word reads BUY when ${TURNS_BUY}.`
     );
+  });
+
+  const mockDossierWithGap = async (page: Page, scorecardGap: keyof typeof GAP_LINES) =>
+    page.route(`${API}/research/assets/AAPL/dossier`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({...DOSSIER_AAPL, scorecard: null, scorecardGap}),
+      })
+    );
+
+  for (const reason of ['no_role', 'outside_universe'] as const) {
+    test(`a dossier with no verdict says why (${reason}), with no retry`, async ({page}) => {
+      await mockDossierWithGap(page, reason);
+      await page.goto('/assets/AAPL');
+
+      const card = page.getByTestId('dossier-verdict-gap');
+      await expect(card).toContainText(GAP_LINES[reason]);
+      await expect(card.getByRole('button', {name: /retry/i})).toHaveCount(0);
+    });
+  }
+
+  test('an unreadable verdict offers a retry that reads it again', async ({page}) => {
+    await mockDossierWithGap(page, 'unreadable');
+    await page.route(`${API}/research/scorecards/AAPL`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(DOSSIER_AAPL.scorecard),
+      })
+    );
+    await page.goto('/assets/AAPL');
+
+    const card = page.getByTestId('dossier-verdict-gap');
+    await expect(card).toContainText(GAP_LINES.unreadable);
+    await card.getByRole('button', {name: /retry/i}).click();
+
+    await expect(page.getByTestId('dossier-verdict')).toBeVisible();
+    await expect(page.getByTestId('dossier-verdict-gap')).toHaveCount(0);
+  });
+
+  test('an Accounts row shows a dash with the reason on hover where no verdict is read', async ({
+    page,
+  }) => {
+    await page.route(`${API}/research/scorecards/verdicts**`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            symbol: 'AAPL',
+            word: null,
+            firedRuleId: null,
+            turnsBuyWhen: null,
+            gapReason: 'unreadable',
+          },
+        ]),
+      })
+    );
+    await page.goto('/accounts/list');
+    const broker = page.locator(INSTITUTION_ROW, {hasText: 'Interactive Brokers'});
+    await broker.locator('button[aria-controls]').first().click();
+
+    const row = broker.getByTestId('position-row').filter({hasText: 'AAPL'});
+    const chip = row.getByTestId('verdict-chip-gap');
+    await expect(chip).toHaveText('—');
+    await expect(chip).toHaveAttribute('title', new RegExp(GAP_LINES.unreadable));
   });
 });

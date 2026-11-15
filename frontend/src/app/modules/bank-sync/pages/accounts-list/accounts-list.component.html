@@ -424,8 +424,12 @@
                 <span class="min-w-0">
                   <span class="flex items-center gap-cmn-2">
                     <span class="truncate" data-testid="position-ticker">{{ row.symbol }}</span>
-                    @if (row.verdict; as word) {
-                      <fns-verdict-chip [word]="word" data-testid="position-verdict" />
+                    @if (row.verdict || row.verdictGap) {
+                      <fns-verdict-chip
+                        [word]="row.verdict"
+                        [gap]="row.verdictGap"
+                        data-testid="position-verdict"
+                      />
                     }
                   </span>
                   <span

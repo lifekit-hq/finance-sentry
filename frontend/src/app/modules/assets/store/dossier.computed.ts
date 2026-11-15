@@ -4,6 +4,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {type AsyncStateStatus, type Nullable} from '@lifekit-hq/ui';
 
 import {DEFAULT_VERDICT_DISPLAY} from '../../../shared/constants/preferences/app-preferences.constants';
+import {SCORECARD_GAP_COPY} from '../../../shared/constants/scorecard/scorecard.constants';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {SECTION_AXIS} from '../constants/dossier/dossier-checks.constants';
 import {
@@ -30,6 +31,7 @@ interface StateSignals {
   chartPeriod: Signal<PricePeriod>;
   chartStatus: Signal<AsyncStatus>;
   chartErrorMessage: Signal<string>;
+  verdictStatus: Signal<AsyncStatus>;
   targetDraft: Signal<string>;
 }
 
@@ -152,6 +154,26 @@ export function dossierComputed(store: StateSignals) {
       }
       return store.chartStatus() === 'loading' || store.chartStatus() === 'idle'
         ? 'loading'
+        : 'success';
+    }),
+
+    // Why the Verdict card is not there (issue #1414): null while a scorecard is on the page, and on a payload that
+    // names no reason, where the page keeps showing nothing rather than guessing one.
+    verdictGap: computed(() => {
+      const dossier = store.dossier();
+      return dossier && !dossier.scorecard ? (dossier.scorecardGap ?? null) : null;
+    }),
+    // A failed read ("unreadable") is an error with a retry; the other reasons are settled states, so empty.
+    verdictAsyncStatus: computed((): AsyncStateStatus => {
+      if (store.verdictStatus() === 'loading') {
+        return 'loading';
+      }
+      if (store.verdictStatus() === 'error') {
+        return 'error';
+      }
+      const gap = store.dossier()?.scorecardGap;
+      return gap !== undefined && gap !== null && SCORECARD_GAP_COPY[gap].retryable
+        ? 'error'
         : 'success';
     }),
 

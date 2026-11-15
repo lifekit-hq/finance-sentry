@@ -1,8 +1,23 @@
-<cmn-tag
-  [variant]="wordVariant[word()]"
-  [attr.aria-label]="'Verdict for new money: ' + wordLabel[word()] + '. ' + notAdvice"
-  [attr.title]="notAdvice"
-  data-testid="verdict-chip"
->
-  {{ wordLabel[word()] }}
-</cmn-tag>
+@let shown = word();
+@if (shown) {
+  <cmn-tag
+    [variant]="wordVariant[shown]"
+    [attr.aria-label]="'Verdict for new money: ' + wordLabel[shown] + '. ' + notAdvice"
+    [attr.title]="notAdvice"
+    data-testid="verdict-chip"
+  >
+    {{ wordLabel[shown] }}
+  </cmn-tag>
+} @else if (gapText(); as text) {
+  <cmn-tag
+    [cmnTooltip]="text"
+    [attr.aria-label]="'No verdict. ' + text"
+    [attr.title]="text"
+    (click)="explain($event)"
+    (keydown.enter)="explain($event)"
+    variant="neutral"
+    tabindex="0"
+    data-testid="verdict-chip-gap"
+    >{{ dash }}</cmn-tag
+  >
+}

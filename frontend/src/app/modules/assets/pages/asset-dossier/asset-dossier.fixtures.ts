@@ -231,6 +231,7 @@ function createMockStore() {
       chartPeriod,
       chartStatus,
       chartErrorMessage,
+      verdictStatus: signal<AsyncStatus>('idle'),
       targetDraft,
     })
   );
@@ -259,6 +260,9 @@ function createMockStore() {
     quoteHeader: signal<DossierQuoteHeader | null>(null),
     quoteChange: derived.quoteChange,
     verdictHeader: derived.verdictHeader,
+    verdictGap: derived.verdictGap,
+    verdictAsyncStatus: derived.verdictAsyncStatus,
+    retryVerdict: vi.fn(),
     verdictDisplay: signal<VerdictDisplay>('simple'),
     setVerdictDisplay: vi.fn(),
     isQuoteLoading: signal(false),

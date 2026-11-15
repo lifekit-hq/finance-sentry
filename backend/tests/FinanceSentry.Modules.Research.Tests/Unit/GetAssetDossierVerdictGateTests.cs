@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -83,6 +84,74 @@ public class GetAssetDossierVerdictGateTests
     }
 
     [Fact]
+    public async Task WithoutVerdicts_SaysTheVerdictIsNotForThisRole()
+    {
+        var dossier = await HandleAsync(new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: false), PendingRecommendationFor(Symbol));
+
+        dossier.ScorecardGap.Should().Be(ScorecardGapReason.NoRole);
+    }
+
+    [Fact]
+    public async Task WithAScorecard_CarriesNoGapReason()
+    {
+        var dossier = await HandleAsync(new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), PendingRecommendationFor(Symbol));
+
+        dossier.Scorecard.Should().NotBeNull();
+        dossier.ScorecardGap.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WhenTheScorecardReadThrows_SaysItCouldNotBeRead_SoThePageCanOfferARetry()
+    {
+        var structure = new Mock<IMarketStructureReader>();
+        structure.Setup(s => s.GetStructureAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("bars source down"));
+
+        var dossier = await HandleAsync(
+            new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), PendingRecommendationFor(Symbol), structureReader: structure.Object);
+
+        dossier.Scorecard.Should().BeNull();
+        dossier.ScorecardGap.Should().Be(ScorecardGapReason.Unreadable);
+    }
+
+    [Fact]
+    public async Task WhenTheScorecardReadThrowsOnANameTheVerdictDoesNotScore_StillSaysItCouldNotBeRead_NotOutsideTheUniverse()
+    {
+        var valuation = new Mock<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>();
+        valuation
+            .Setup(v => v.Handle(It.IsAny<GetValuationSnapshotQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValuationSnapshotResult(
+                Symbol,
+                NotApplicable: true,
+                Price: 0m,
+                IsStale: false,
+                new ValuationMetricsDto(new MetricValue(null), new MetricValue(null), new MetricValue(null), new MetricValue(null)),
+                ConsensusTarget: null,
+                ImpliedUpsidePct: null,
+                PeerSet: null,
+                Sources: [],
+                RetrievedAt: DateTimeOffset.UtcNow));
+        var structure = new Mock<IMarketStructureReader>();
+        structure.Setup(s => s.GetStructureAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("no bars for this symbol"));
+
+        var dossier = await HandleAsync(
+            new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), PendingRecommendationFor(Symbol), valuation.Object, structure.Object);
+
+        dossier.Scorecard.Should().BeNull();
+        dossier.ScorecardGap.Should().Be(ScorecardGapReason.Unreadable);
+    }
+
+    [Theory]
+    [InlineData(false, false, ScorecardGapReason.NoRole)]
+    [InlineData(false, true, ScorecardGapReason.NoRole)]
+    [InlineData(true, true, null)]
+    [InlineData(true, false, ScorecardGapReason.Unreadable)]
+    public void ScorecardGapFor_NamesTheReasonOnlyWhenThereIsNoScorecard(
+        bool includeVerdicts, bool hasScorecard, string? expected)
+        => GetAssetDossierQueryHandler.ScorecardGapFor(includeVerdicts, hasScorecard).Should().Be(expected);
+
+    [Fact]
     public void ByDefault_TheQueryIncludesVerdicts_SoTheAiGatedLedgerReadKeepsItsInputs()
         => new GetAssetDossierQuery(User, Symbol).IncludeVerdicts.Should().BeTrue();
 
@@ -104,7 +173,8 @@ public class GetAssetDossierVerdictGateTests
     private static Task<AssetDossierResult> HandleAsync(
         GetAssetDossierQuery query,
         Mock<IRecommendationRepository> recommendations,
-        IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>? valuation = null)
+        IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>? valuation = null,
+        IMarketStructureReader? structureReader = null)
     {
         var fundamentals = new Mock<IFundamentalsService>();
         fundamentals
@@ -128,7 +198,7 @@ public class GetAssetDossierVerdictGateTests
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new DisposalTaxContextReader(Mock.Of<IInstrumentTaxRegimeSource>(), Mock.Of<IHistoricalExchangeRateService>()),
             new ScorecardReader(
-                Mock.Of<IMarketStructureReader>(),
+                structureReader ?? Mock.Of<IMarketStructureReader>(),
                 fundamentals.Object,
                 Mock.Of<IMarketRegimeSource>(),
                 Options.Create(new OpportunityOptions()),

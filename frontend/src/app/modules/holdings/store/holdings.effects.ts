@@ -5,6 +5,7 @@ import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {type ScorecardVerdictSummary} from '../../../shared/models/scorecard/scorecard.model';
+import {ScorecardUtils} from '../../../shared/utils/scorecard.utils';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {type Position} from '../models/position/position.model';
@@ -44,8 +45,9 @@ export function holdingsEffects(store: StoreMethods) {
     )
   );
 
-  // The verdict chips (spec 726 US2): one batch read for the held listed stocks, owner only. A failed read
-  // leaves the chips as they were; a row without a word simply shows no chip.
+  // The verdict chips (spec 726 US2): one batch read for the held listed stocks, owner only. A symbol the
+  // API could not read, or a batch that failed outright, shows a dash with the reason (issue #1414)
+  // instead of no chip at all.
   const loadVerdicts = rxMethod<string[]>(
     pipe(
       switchMap(tickers =>
@@ -57,7 +59,14 @@ export function holdingsEffects(store: StoreMethods) {
                   Object.fromEntries(verdicts.map(v => [v.symbol.toUpperCase(), v]))
                 )
               ),
-              catchError(() => EMPTY)
+              catchError(() => {
+                store.setVerdicts(
+                  Object.fromEntries(
+                    tickers.map(ticker => [ticker.toUpperCase(), ScorecardUtils.unreadable(ticker)])
+                  )
+                );
+                return EMPTY;
+              })
             )
       )
     )

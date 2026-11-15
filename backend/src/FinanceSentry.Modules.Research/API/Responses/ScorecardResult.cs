@@ -275,10 +275,12 @@ public sealed record VerdictConditionDto(
 /// <summary>
 /// One symbol's verdict word and the rule that fired, for a chip, plus the line saying what would turn it into BUY
 /// (the same <see cref="VerdictDto.TurnsBuyWhen"/> the full scorecard carries; null when there is no bar to name).
-/// Nothing else of the scorecard crosses. <see cref="WaitReasonLabel"/> is the named reason of a WAIT.
+/// Nothing else of the scorecard crosses. <see cref="WaitReasonLabel"/> is the named reason of a WAIT. A symbol whose
+/// verdict could not be read keeps its row with <see cref="Word"/>, <see cref="FiredRuleId"/> and <see cref="TurnsBuyWhen"/>
+/// null and <see cref="GapReason"/> set (a <see cref="ScorecardGapReason"/> code, issue #1414), so a chip says why instead of vanishing.
 /// </summary>
 public sealed record ScorecardVerdictSummary(
-    string Symbol, string Word, string FiredRuleId, string? TurnsBuyWhen, string? WaitReasonLabel = null);
+    string Symbol, string? Word, string? FiredRuleId, string? TurnsBuyWhen, string? WaitReasonLabel = null, string? GapReason = null);
 
 /// <summary>
 /// The basis of an ETF verdict (issue #1324): the fund's top holdings, each scored by the single-name rules, and the

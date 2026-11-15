@@ -3,6 +3,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
+import {type ScorecardDto} from '../../../shared/models/scorecard/scorecard.model';
 import {
   type DecideThesisRevisionResult,
   type ThesisRevisionDto,
@@ -25,6 +26,12 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
     },
     setDossier(dossier: AssetDossierDto): void {
       patchState(store, {dossier});
+    },
+    // A verdict re-read after "could not be read": the card takes the scorecard's place and the gap clears.
+    setScorecard(scorecard: ScorecardDto): void {
+      patchState(store, state => ({
+        dossier: state.dossier ? {...state.dossier, scorecard, scorecardGap: null} : null,
+      }));
     },
     setLedgerRead(ledgerRead: AssetLedgerReadDto): void {
       patchState(store, {ledgerRead});

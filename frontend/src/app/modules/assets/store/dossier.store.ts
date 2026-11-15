@@ -12,6 +12,7 @@ export const DossierStore = signalStore(
   withNamedAsyncStatus('ledgerRead', {defaultErrorMessage: "Failed to load Ledger's read."}),
   withNamedAsyncStatus('quote'),
   withNamedAsyncStatus('chart', {defaultErrorMessage: 'Failed to load the price chart.'}),
+  withNamedAsyncStatus('verdict', {defaultErrorMessage: 'The verdict could not be read.'}),
   withNamedAsyncStatus('target', {defaultErrorMessage: 'Failed to save your target.'}),
   withMethods(dossierMethods),
   withComputed(dossierComputed),

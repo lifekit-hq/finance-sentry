@@ -380,6 +380,39 @@ describe('holdingsComputed hidden positions', () => {
     expect(bySymbol('BTC')?.verdict).toBeNull();
   });
 
+  it('carries the reason where a held stock has a dash instead of a word (issue #1414)', () => {
+    const stock = {provider: 'ibkr', instrumentType: 'STK', assetClass: 'equity' as const};
+    const computed = build(
+      [
+        position({...stock, symbol: 'AAPL', currentValue: 110}),
+        position({...stock, symbol: 'MSFT', currentValue: 50}),
+        position({...stock, symbol: 'NVDA', currentValue: 40}),
+      ],
+      {},
+      'idle',
+      null,
+      {
+        AAPL: summary('AAPL', 'Wait'),
+        MSFT: {
+          symbol: 'MSFT',
+          word: null,
+          firedRuleId: null,
+          turnsBuyWhen: null,
+          gapReason: 'unreadable',
+        },
+      }
+    );
+
+    const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
+    const row = (s: string) => rows.find(r => r.symbol === s);
+
+    expect(row('MSFT')?.verdict).toBeNull();
+    expect(row('MSFT')?.verdictGap).toBe('unreadable');
+    expect(row('MSFT')?.verdictNote).toBeNull();
+    expect(row('AAPL')?.verdictGap).toBeNull();
+    expect(row('NVDA')?.verdictGap).toBeNull();
+  });
+
   it('says what would turn the verdict BUY only where the API names a bar', () => {
     const stock = {provider: 'ibkr', instrumentType: 'STK', assetClass: 'equity' as const};
     const computed = build(

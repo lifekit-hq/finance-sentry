@@ -34,6 +34,7 @@ function buildSignals(overrides: Partial<DossierState> = {}) {
     chartStatus: signal<AsyncStatus>('idle'),
     chartPeriod: signal<PricePeriod>(overrides.chartPeriod ?? '1Y'),
     chartErrorMessage: signal<string>(''),
+    verdictStatus: signal<AsyncStatus>('idle'),
     targetDraft: signal<string>(overrides.targetDraft ?? ''),
   };
 }
@@ -158,6 +159,66 @@ describe('dossierComputed', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [{provide: AppPreferencesStore, useValue: {preferences}}],
+    });
+  });
+
+  describe('the verdict gap (issue #1414)', () => {
+    const gapState = (
+      scorecardGap: AssetDossierDto['scorecardGap'],
+      withScorecard = false,
+      verdictStatus: AsyncStatus = 'idle'
+    ) => ({
+      ...buildSignals({
+        dossier: emptyDossier({
+          scorecardGap,
+          scorecard: withScorecard ? ScorecardFixtures.scorecard({symbol: 'ZZZZ'}) : null,
+        }),
+      }),
+      verdictStatus: signal<AsyncStatus>(verdictStatus),
+    });
+
+    it.each(['no_role', 'outside_universe', 'unreadable'] as const)(
+      'names %s while the dossier has no scorecard',
+      reason => {
+        TestBed.runInInjectionContext(() => {
+          expect(dossierComputed(gapState(reason)).verdictGap()).toBe(reason);
+        });
+      }
+    );
+
+    it('names nothing once a scorecard is on the page', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(gapState(null, true)).verdictGap()).toBeNull();
+      });
+    });
+
+    it('names nothing on a payload that carries no reason', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(gapState(undefined)).verdictGap()).toBeNull();
+      });
+    });
+
+    it('reads an unreadable verdict as an error, so the region offers its retry', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(gapState('unreadable')).verdictAsyncStatus()).toBe('error');
+      });
+    });
+
+    it.each(['no_role', 'outside_universe'] as const)('reads %s as a settled state', reason => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(gapState(reason)).verdictAsyncStatus()).toBe('success');
+      });
+    });
+
+    it('shows loading while the retry runs and an error when it fails', () => {
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(gapState('unreadable', false, 'loading')).verdictAsyncStatus()).toBe(
+          'loading'
+        );
+        expect(dossierComputed(gapState('unreadable', false, 'error')).verdictAsyncStatus()).toBe(
+          'error'
+        );
+      });
     });
   });
 

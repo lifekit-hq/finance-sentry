@@ -23,6 +23,7 @@ import {
   type RecommendationDto,
   type RecommendationVerdict,
 } from '../../../shared/models/recommendation/recommendation.model';
+import {type ScorecardDto} from '../../../shared/models/scorecard/scorecard.model';
 import {
   type DecideThesisRevisionResult,
   type ThesisRevisionDto,
@@ -32,6 +33,7 @@ import {AppPreferencesStore} from '../../../shared/store/preferences/app-prefere
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
+import {ScorecardService} from '../../decisions/services/scorecard.service';
 import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
 import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
 import {CHART_HISTORY_RANGE} from '../constants/dossier/dossier-chart.constants';
@@ -67,6 +69,11 @@ interface StoreMethods {
   setChart(chart: AssetChartDto): void;
   setChartError(errorCode: Nullable<string>): void;
   setChartIdle(): void;
+  setVerdictLoading(): void;
+  setVerdictSuccess(): void;
+  setScorecard(scorecard: ScorecardDto): void;
+  setVerdictError(errorCode: Nullable<string>): void;
+  setVerdictIdle(): void;
   setTargetLoading(): void;
   setTargetSuccess(): void;
   setTargetError(errorCode: Nullable<string>): void;
@@ -87,6 +94,7 @@ export function dossierEffects(store: StoreMethods) {
   const decisionSheet = inject(DecisionSheetService);
   const revisions = inject(ThesisRevisionService);
   const revisionSheet = inject(ThesisRevisionSheetService);
+  const scorecards = inject(ScorecardService);
   const authStore = inject(AuthStore);
   const preferences = inject(AppPreferencesStore);
 
@@ -139,6 +147,26 @@ export function dossierEffects(store: StoreMethods) {
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setChartError(code),
+          }),
+          takeUntil(symbolChanged$)
+        )
+      )
+    )
+  );
+
+  // The Verdict card's own retry after "could not be read": one scorecard read, so the page does not reload
+  // (and flash to its skeleton) for a card. Owner only; the same endpoint the Decisions pages use.
+  const retryVerdict = rxMethod<string>(
+    pipe(
+      tap(() => store.setVerdictLoading()),
+      switchMap(symbol =>
+        scorecards.read(symbol).pipe(
+          tap(scorecard => {
+            store.setScorecard(scorecard);
+            store.setVerdictSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setVerdictError(code),
           }),
           takeUntil(symbolChanged$)
         )
@@ -311,6 +339,7 @@ export function dossierEffects(store: StoreMethods) {
     store.setQuoteIdle();
     store.setChartIdle();
     store.setTargetIdle();
+    store.setVerdictIdle();
     loadDossier(symbol);
     if (authStore.canUseAi()) {
       loadLedgerRead(symbol);
@@ -336,6 +365,7 @@ export function dossierEffects(store: StoreMethods) {
     loadLedgerRead,
     generateLedgerRead,
     loadChart,
+    retryVerdict,
     saveTarget,
     clearTarget,
   };
