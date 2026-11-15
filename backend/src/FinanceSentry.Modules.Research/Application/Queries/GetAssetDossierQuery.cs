@@ -107,7 +107,8 @@ public sealed class GetAssetDossierQueryHandler(
         var scorecard = request.IncludeVerdicts
             ? await Safe("scorecard", () => scorecards.ReadAsync(
                 symbol, scorecardValuation, facts, ct, valuationResult?.Sector, valuationResult?.Industry,
-                valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList()))
+                valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList(),
+                lookThrough: !DossierTickers.IsCrypto(bookPosition?.AssetClass)))
             : null;
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;

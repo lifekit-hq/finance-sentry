@@ -362,7 +362,7 @@ export interface AssetDossierDto {
   pendingRecommendation?: Nullable<RecommendationDto>;
   /**
    * The four-axis scorecard and its verdict word (spec 726 US2); null when it could not be read or the caller lacks ai.use,
-   * absent from older API builds. A non-equity reads NotScored.
+   * absent from older API builds. An ETF carries its look-through basis; any other non-equity reads NotScored.
    */
   scorecard?: Nullable<ScorecardDto>;
 }

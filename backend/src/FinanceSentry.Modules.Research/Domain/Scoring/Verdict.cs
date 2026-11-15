@@ -4,7 +4,7 @@ using FinanceSentry.Modules.Research.Domain.Opportunity;
 
 /// <summary>
 /// The verdict vocabulary (spec 726 OQ-3). <see cref="NotScored"/> is the non-verdict: the scorecard
-/// has nothing to read, or the name sits outside the v1 single-equity universe.
+/// has nothing to read, or the name sits outside the v1 universe (a single equity, or an ETF read by look-through).
 /// </summary>
 public enum VerdictWord
 {
@@ -15,7 +15,10 @@ public enum VerdictWord
     NotScored,
 }
 
-/// <summary>The scorecard axis a verdict condition reads.</summary>
+/// <summary>
+/// The scorecard axis a verdict condition reads. <see cref="LookThrough"/> is the share of an ETF's top-10 weight
+/// reading BUY or better; only the ETF rule table (<see cref="EtfVerdictRules"/>) reads it.
+/// </summary>
 public enum VerdictAxis
 {
     Structure,
@@ -25,6 +28,7 @@ public enum VerdictAxis
 
     /// <summary>Revenue growth year over year (rules v2 growth gate on STRONG BUY).</summary>
     Growth,
+    LookThrough,
 }
 
 /// <summary>

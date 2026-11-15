@@ -1,6 +1,16 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {type ScorecardDto, type VerdictConditionDto, type VerdictRuleDto} from './scorecard.model';
+import {
+  type LookThroughHoldingDto,
+  type ScorecardDto,
+  type ScorecardLookThroughDto,
+  type VerdictConditionDto,
+  type VerdictRuleDto,
+} from './scorecard.model';
+
+const HOLDING_COUNT = 10;
+const HOLDING_WEIGHT_PCT = 10;
+const BUY_HOLDING_COUNT = 6;
 
 /** Spec fixtures for the scorecard drill-down (spec 726 US2); never imported by app code. */
 export class ScorecardFixtures {
@@ -120,6 +130,89 @@ export class ScorecardFixtures {
         turnsBuyWhen:
           'crowding is no longer Extended or the P/E premium falls to 0% or below (reads +29.2%)',
       },
+      ...overrides,
+    };
+  }
+
+  /** An ETF read by look-through: BUY on a sound fund chart and 60% of the top-10 weight reading BUY or better. */
+  public static etf(overrides: Partial<ScorecardDto> = {}): ScorecardDto {
+    const base = ScorecardFixtures.scorecard();
+    return {
+      ...base,
+      symbol: 'SPY',
+      fundamentals: {...base.fundamentals, score: null, revenueYoy: null, grossMarginLatest: null},
+      valuation: {...base.valuation, notApplicable: true, trailingPe: null, premiumPct: null},
+      verdict: {
+        word: 'Buy',
+        rulesVersion: 1,
+        firedRuleId: 'etf_buy',
+        structureBasis: 'adjusted',
+        rules: [
+          ScorecardFixtures.rule('etf_no_data', 'NotScored', false, [
+            ScorecardFixtures.condition('Structure', 'IsMissing', null, '88', false),
+            ScorecardFixtures.condition('LookThrough', 'IsMissing', null, '60', false),
+          ]),
+          ScorecardFixtures.rule('etf_weak_structure', 'Avoid', false, [
+            ScorecardFixtures.condition('Structure', 'LessThan', '30', '88', false),
+          ]),
+          ScorecardFixtures.rule('etf_structure_missing', 'Wait', false, [
+            ScorecardFixtures.condition('Structure', 'IsMissing', null, '88', false),
+          ]),
+          ScorecardFixtures.rule(
+            'etf_buy',
+            'Buy',
+            true,
+            [
+              ScorecardFixtures.condition('Structure', 'AtLeast', '50', '88', true),
+              ScorecardFixtures.condition('Crowding', 'IsNot', 'Extended', 'Normal', true),
+              ScorecardFixtures.condition('LookThrough', 'GreaterThan', '50', '60', true),
+            ],
+            true
+          ),
+          ScorecardFixtures.rule('etf_otherwise', 'Wait', true, []),
+        ],
+        reasons: [
+          {
+            axis: 'Structure',
+            status: 'Pass',
+            text: 'Fund structure 88 clears the BUY bar of 50.',
+            decisive: true,
+          },
+          {
+            axis: 'LookThrough',
+            status: 'Pass',
+            text: '60% of the top 10 weight reads BUY or better, above the 50% BUY needs.',
+            decisive: true,
+          },
+        ],
+        turnsBuyWhen: null,
+      },
+      lookThrough: ScorecardFixtures.lookThrough(),
+      ...overrides,
+    };
+  }
+
+  /** A complete look-through: ten holdings of 10% each, the first six reading BUY. */
+  public static lookThrough(
+    overrides: Partial<ScorecardLookThroughDto> = {}
+  ): ScorecardLookThroughDto {
+    const holdings: LookThroughHoldingDto[] = Array.from({length: HOLDING_COUNT}, (_, index) => ({
+      symbol: `H${index + 1}`,
+      name: `Holding ${index + 1}`,
+      weightPct: HOLDING_WEIGHT_PCT,
+      word: index < BUY_HOLDING_COUNT ? 'Buy' : 'Wait',
+      firedRuleId: index < BUY_HOLDING_COUNT ? 'buy_fundamentals_missing' : 'otherwise',
+    }));
+    return {
+      status: 'complete',
+      source: 'yahoo',
+      asOf: '2026-11-14T08:00:00Z',
+      coveredWeightPct: 100,
+      buyWeightPct: 60,
+      buyWeightSharePct: 60,
+      buyWeightSharePctRequired: 50,
+      holdings,
+      note: null,
       ...overrides,
     };
   }

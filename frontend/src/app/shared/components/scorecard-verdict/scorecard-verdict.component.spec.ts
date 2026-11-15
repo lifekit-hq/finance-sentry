@@ -150,4 +150,21 @@ describe('ScorecardVerdictComponent', () => {
 
     expect(host.textContent?.toLowerCase()).not.toMatch(/composite|overall score|total score/);
   });
+
+  it('shows the look-through basis of an ETF verdict above the drill-down', () => {
+    const host = render(ScorecardFixtures.etf());
+
+    expect(text(host, 'verdict-word')).toBe('BUY');
+    expect(host.querySelector('[data-testid="look-through"]')).not.toBeNull();
+    expect(host.querySelectorAll('[data-testid="look-through-holding"]')).toHaveLength(10);
+    expect(text(host, 'verdict-rule-etf_buy')).toContain(
+      'Top-10 weight reading BUY or better > 50%'
+    );
+  });
+
+  it('shows no look-through for a name that is not an ETF', () => {
+    const host = render(ScorecardFixtures.scorecard());
+
+    expect(host.querySelector('[data-testid="look-through"]')).toBeNull();
+  });
 });

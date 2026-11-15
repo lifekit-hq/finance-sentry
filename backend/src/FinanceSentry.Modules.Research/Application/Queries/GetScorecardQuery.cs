@@ -3,7 +3,6 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Services;
-using FinanceSentry.Modules.Research.Domain;
 
 /// <summary>
 /// One symbol's scorecard with its verdict word, the facts behind each axis and the rule that fired
@@ -21,45 +20,12 @@ public sealed class GetScorecardQueryHandler(
     ScorecardReader reader)
     : IQueryHandler<GetScorecardQuery, ScorecardResult>
 {
+    private readonly ScorecardValuationReader valuationReader = new(valuation, history, peers);
+
     public async Task<ScorecardResult> Handle(GetScorecardQuery query, CancellationToken ct)
     {
         var symbol = query.Symbol.Trim().ToUpperInvariant();
-        var (axis, sector, industry, peerForwardPes) = await ReadValuationAsync(symbol, ct);
+        var (axis, sector, industry, peerForwardPes) = await valuationReader.ReadAsync(symbol, ct);
         return await reader.ReadAsync(symbol, axis, null, ct, sector, industry, peerForwardPes);
-    }
-
-    /// <summary>
-    /// The valuation axis and, from the same Yahoo read, the company's sector and industry (null when unknown); plus
-    /// the peers' forward P/Es, read only when the own-history premium is missing and the name has a forward P/E.
-    /// </summary>
-    private async Task<(ScorecardValuationAxis Axis, string? Sector, string? Industry, IReadOnlyList<decimal?>? PeerForwardPes)> ReadValuationAsync(
-        string symbol, CancellationToken ct)
-    {
-        var current = await valuation.GetCurrentMetricsAsync(symbol, ct);
-        if (current is null)
-        {
-            return (ScorecardValuationAxis.Unavailable, null, null, null);
-        }
-
-        if (current.NotApplicable)
-        {
-            return (ScorecardValuationAxis.NotApplicableAxis, null, null, null);
-        }
-
-        var trailing = await history.GetTrailingPeHistoryAsync(symbol, ct);
-        var (currency, divisor) = MinorUnitCurrency.Normalize(current.Currency);
-        var axis = ScorecardValuationAxis.From(
-            current.TrailingPe,
-            trailing.FiveYearAvg,
-            trailing.WindowYears,
-            current.ForwardPe,
-            current.Price / divisor,
-            current.ConsensusTarget / divisor,
-            currency,
-            current.IsStale);
-        var peerForwardPes = axis.PremiumPct is null && current.ForwardPe is > 0m
-            ? await peers.ReadAsync(symbol, ct)
-            : null;
-        return (axis, current.Sector, current.Industry, peerForwardPes);
     }
 }

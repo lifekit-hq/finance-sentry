@@ -4,6 +4,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Catalyst;
 using FinanceSentry.Modules.Research.Application.Services.Coverage;
+using FinanceSentry.Modules.Research.Application.Services.Etf;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Application.Services.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Application.Services.Screens;
@@ -242,6 +243,36 @@ public static class ResearchModule
     }
 
     /// <summary>
+    /// ETF top holdings for the look-through verdict (issue #1324): Yahoo <c>topHoldings</c> on the valuation client, the
+    /// issuer's holdings CSV from <c>FundHoldings:IssuerFiles</c> as the fallback, cached for a day. The Yahoo provider
+    /// keeps its crumb, so it is a singleton.
+    /// </summary>
+    private static void AddFundHoldings(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<FundHoldingsOptions>(config.GetSection(FundHoldingsOptions.SectionName));
+        var issuerTimeout = TimeSpan.FromSeconds(15);
+        services.AddHttpClient(IssuerFundHoldingsProvider.HttpClientName, client =>
+        {
+            client.Timeout = issuerTimeout;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        })
+            .AddProviderResilience(issuerTimeout)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<YahooFundHoldingsProvider>();
+        services.AddSingleton<IssuerFundHoldingsProvider>();
+        services.AddSingleton<IFundHoldingsSource>(sp => new FundHoldingsSource(
+            sp.GetRequiredService<YahooFundHoldingsProvider>(),
+            sp.GetRequiredService<IssuerFundHoldingsProvider>(),
+            sp.GetRequiredService<TimeProvider>()));
+    }
+
+    /// <summary>
     /// The fundamentals provider chain (#837): every <see cref="IFundamentalsSource"/> plus the
     /// <see cref="IFundamentalsService"/> readers use, ordered by <c>Fundamentals:SourceOrder</c>.
     /// Needs <see cref="ISecEdgarService"/> and a <see cref="TimeProvider"/> registered. A new source is
@@ -335,6 +366,9 @@ public static class ResearchModule
         services.Configure<NotableMoveOptions>(config.GetSection(NotableMoveOptions.SectionName));
         services.AddScoped<ScorecardReader>();
         services.AddScoped<PeerForwardPeReader>();
+        services.AddScoped<ScorecardValuationReader>();
+        services.AddScoped<EtfLookThroughReader>();
+        AddFundHoldings(services, config);
         services.Configure<ResearchRetrievalOptions>(config.GetSection(ResearchRetrievalOptions.SectionName));
         services.Configure<AnalystSourcesOptions>(config.GetSection(AnalystSourcesOptions.SectionName));
 

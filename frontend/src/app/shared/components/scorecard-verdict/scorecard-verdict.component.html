@@ -13,6 +13,10 @@
     }
   }
 
+  @if (scorecard().lookThrough) {
+    <fns-look-through [scorecard]="scorecard()" class="mt-cmn-1" />
+  }
+
   <details class="group" data-testid="verdict-why">
     <summary
       class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"

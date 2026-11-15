@@ -130,7 +130,7 @@ public static class VerdictRules
             : $"No earlier rule matched: {string.Join(" and ", missed)}.";
     }
 
-    private static VerdictRuleOutcome Rule(string id, VerdictWord word, string description, params VerdictCondition[] conditions) =>
+    internal static VerdictRuleOutcome Rule(string id, VerdictWord word, string description, params VerdictCondition[] conditions) =>
         new(id, word, description, conditions, conditions.All(c => c.Met));
 
     private static VerdictRuleOutcome Rule(
@@ -142,18 +142,18 @@ public static class VerdictRules
             inputs.ValuationNotApplicable ? NotApplicable : Applicable,
             inputs.ValuationNotApplicable);
 
-    private static VerdictCondition Missing<T>(VerdictAxis axis, T? value)
+    internal static VerdictCondition Missing<T>(VerdictAxis axis, T? value)
         where T : struct =>
         new(axis, VerdictOperator.IsMissing, null, Format(value), value is null);
 
-    private static VerdictCondition CrowdingIs(VerdictOperator op, CrowdingClass? crowding)
+    internal static VerdictCondition CrowdingIs(VerdictOperator op, CrowdingClass? crowding)
     {
         var met = crowding is { } actual
             && (op == VerdictOperator.Is ? actual == CrowdingClass.Extended : actual != CrowdingClass.Extended);
         return new VerdictCondition(VerdictAxis.Crowding, op, nameof(CrowdingClass.Extended), crowding?.ToString(), met);
     }
 
-    private static VerdictCondition Compare(VerdictAxis axis, VerdictOperator op, decimal? actual, decimal threshold)
+    internal static VerdictCondition Compare(VerdictAxis axis, VerdictOperator op, decimal? actual, decimal threshold)
     {
         var met = actual is { } value && op switch
         {
@@ -166,9 +166,9 @@ public static class VerdictRules
         return new VerdictCondition(axis, op, Format(threshold), Format(actual), met);
     }
 
-    private static string? Format<T>(T? value)
+    internal static string? Format<T>(T? value)
         where T : struct =>
         value is IFormattable formattable ? formattable.ToString(null, CultureInfo.InvariantCulture) : value?.ToString();
 
-    private static string Format(decimal value) => value.ToString(CultureInfo.InvariantCulture);
+    internal static string Format(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 }

@@ -1,0 +1,42 @@
+@if (view(); as lookThrough) {
+  <section class="flex flex-col gap-cmn-2" data-testid="look-through">
+    <h4 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+      {{ title }}
+    </h4>
+    <p class="text-cmn-sm text-text-primary" data-testid="look-through-headline">
+      {{ lookThrough.headline }}
+    </p>
+    @if (lookThrough.sourceLine; as sourceLine) {
+      <p class="text-cmn-xs text-text-secondary" data-testid="look-through-source">
+        {{ sourceLine }}
+        @if (asOf(); as read) {
+          · read {{ read | date: 'mediumDate' }}
+        }
+      </p>
+    }
+    @if (lookThrough.degraded && lookThrough.note; as note) {
+      <cmn-alert variant="warning" data-testid="look-through-degraded">{{ note }}</cmn-alert>
+    }
+    @if (lookThrough.holdings.length > 0) {
+      <ul class="divide-y divide-border-default" data-testid="look-through-holdings">
+        @for (holding of lookThrough.holdings; track $index) {
+          <li
+            class="flex items-center justify-between gap-cmn-3 py-cmn-1"
+            data-testid="look-through-holding"
+          >
+            <span class="min-w-0 text-cmn-sm text-text-primary">
+              <span class="font-medium">{{ holding.label }}</span>
+              @if (holding.name; as name) {
+                <span class="text-text-secondary"> {{ name }}</span>
+              }
+            </span>
+            <span class="flex shrink-0 items-center gap-cmn-2">
+              <span class="text-cmn-xs tabular-nums text-text-secondary">{{ holding.weight }}</span>
+              <cmn-tag [variant]="wordVariant[holding.word]">{{ wordLabel[holding.word] }}</cmn-tag>
+            </span>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}

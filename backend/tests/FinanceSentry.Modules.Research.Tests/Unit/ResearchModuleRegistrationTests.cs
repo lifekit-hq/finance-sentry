@@ -2,10 +2,12 @@ namespace FinanceSentry.Modules.Research.Tests.Unit;
 
 using FinanceSentry.Modules.Research;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Etf;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 /// <summary>
@@ -45,6 +47,31 @@ public sealed class ResearchModuleRegistrationTests
             d.ServiceType == typeof(IRecommendationTrendsService) &&
             d.ImplementationType == typeof(FinnhubRecommendationTrendsService),
             "the trends service no-ops via IsConfigured, so the DI graph stays stable without a key");
+    }
+
+    [Fact]
+    public void Fund_holdings_source_resolves_with_the_issuer_files_bound_from_configuration()
+    {
+        var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["FundHoldings:IssuerFiles:VWCE"] = "https://issuer.example/vwce.csv",
+        });
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredService<IFundHoldingsSource>().Should().BeOfType<FundHoldingsSource>();
+        provider.GetRequiredService<IOptions<FundHoldingsOptions>>().Value.IssuerFiles["vwce"]
+            .Should().Be("https://issuer.example/vwce.csv");
+    }
+
+    [Fact]
+    public void The_scorecard_reader_is_given_the_etf_look_through()
+    {
+        var services = BuildServices([]);
+
+        services.Should().Contain(d => d.ServiceType == typeof(EtfLookThroughReader));
+        services.Should().Contain(d => d.ServiceType == typeof(ScorecardValuationReader));
+        services.Should().Contain(d => d.ServiceType == typeof(ScorecardReader));
     }
 
     [Fact]

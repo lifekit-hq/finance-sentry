@@ -2,6 +2,7 @@
 import {type TagVariant} from '@lifekit-hq/ui';
 
 import {
+  type LookThroughSource,
   type VerdictAxis,
   type VerdictOperator,
   type VerdictStructureBasis,
@@ -30,6 +31,7 @@ export const VERDICT_AXIS_LABEL: Readonly<Record<VerdictAxis, string>> = {
   Crowding: 'Crowding',
   Valuation: 'Valuation',
   Growth: 'Growth',
+  LookThrough: 'Look-through',
 };
 
 /** What a condition on each axis reads, as the rule table names it. */
@@ -39,6 +41,7 @@ export const VERDICT_CONDITION_SUBJECT: Readonly<Record<VerdictAxis, string>> = 
   Crowding: 'Crowding',
   Valuation: 'P/E premium to its 5-year average',
   Growth: 'Revenue growth year over year',
+  LookThrough: 'Top-10 weight reading BUY or better',
 };
 
 /** The valuation condition's subject when the verdict read the peer lens instead of the own history. */
@@ -51,6 +54,7 @@ export const VERDICT_CONDITION_UNIT: Readonly<Record<VerdictAxis, string>> = {
   Crowding: '',
   Valuation: '%',
   Growth: '%',
+  LookThrough: '%',
 };
 
 export const VERDICT_OPERATOR_LABEL: Readonly<Record<VerdictOperator, string>> = {
@@ -88,3 +92,13 @@ export const VERDICT_HELD_LINE =
 export const VERDICT_TURNS_BUY_PREFIX = 'Turns BUY when';
 /** The row line on a held position: a statement about the word, never an invitation to add. */
 export const VERDICT_HELD_ROW_PREFIX = 'The word reads BUY when';
+
+export const LOOK_THROUGH_TITLE = 'Look-through of the top 10 holdings';
+export const LOOK_THROUGH_SOURCE_LABEL: Readonly<Record<LookThroughSource, string>> = {
+  yahoo: 'Yahoo Finance',
+  issuer: 'Issuer holdings file',
+};
+/** Shown for a holding the single-name rules could not score (no symbol, or its scorecard could not be read). */
+export const LOOK_THROUGH_UNSCORED = 'Not scored';
+export const LOOK_THROUGH_UNLISTED = 'Unlisted line';
+export const LOOK_THROUGH_UNAVAILABLE = 'No holdings found: the look-through was not applied.';

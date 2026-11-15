@@ -9,7 +9,9 @@ using FinanceSentry.Modules.Research.Domain.Scoring;
 /// (019 FR-007, spec 726 FR-007, SC-003). Enums cross as their names. <see cref="Sector"/> and
 /// <see cref="Industry"/> are the company profile Yahoo returns with the valuation metrics already read for
 /// this scorecard (spec 726 FR-015): a fact about the name, not an axis, so neither feeds the verdict. Null
-/// when the source gave none (or the name is not an equity); never guessed.
+/// when the source gave none (or the name is not an equity); never guessed. <see cref="LookThrough"/> is set only for
+/// an ETF (issue #1324): the top holdings the fund's word was read through, each with its own single-name word; null
+/// for every other name.
 /// </summary>
 public sealed record ScorecardResult(
     string Symbol,
@@ -21,7 +23,8 @@ public sealed record ScorecardResult(
     ScorecardValuationAxis Valuation,
     VerdictDto Verdict,
     string? Sector = null,
-    string? Industry = null);
+    string? Industry = null,
+    ScorecardLookThrough? LookThrough = null);
 
 /// <summary>
 /// Structure: the raw 0-100 score and, beside it, the regime-adjusted one the verdict reads (spec 726
@@ -276,3 +279,37 @@ public sealed record VerdictConditionDto(
 /// </summary>
 public sealed record ScorecardVerdictSummary(
     string Symbol, string Word, string FiredRuleId, string? TurnsBuyWhen, string? WaitReasonLabel = null);
+
+/// <summary>
+/// The basis of an ETF verdict (issue #1324): the fund's top holdings, each scored by the single-name rules, and the
+/// share of their weight reading BUY or better. <see cref="Status"/> is <c>complete</c> (every listed holding scored),
+/// <c>partial</c> (some holding could not be scored, or fewer than ten were listed; those count against the fund) or
+/// <c>unavailable</c> (no holdings were found, so the look-through was not applied and the word cannot reach BUY).
+/// <see cref="Note"/> says so in words when the status is not <c>complete</c>. Weights are percent of the fund.
+/// </summary>
+public sealed record ScorecardLookThrough(
+    string Status,
+    string? Source,
+    DateTimeOffset? AsOf,
+    decimal CoveredWeightPct,
+    decimal BuyWeightPct,
+    decimal? BuyWeightSharePct,
+    decimal BuyWeightSharePctRequired,
+    IReadOnlyList<LookThroughHolding> Holdings,
+    string? Note)
+{
+    public const string Complete = "complete";
+    public const string Partial = "partial";
+    public const string Unavailable = "unavailable";
+}
+
+/// <summary>
+/// One top holding of an ETF with the word the single-name rules gave it; <see cref="Word"/> and
+/// <see cref="FiredRuleId"/> are null when the holding had no symbol or its scorecard could not be read.
+/// </summary>
+public sealed record LookThroughHolding(
+    string? Symbol,
+    string? Name,
+    decimal WeightPct,
+    string? Word,
+    string? FiredRuleId);
