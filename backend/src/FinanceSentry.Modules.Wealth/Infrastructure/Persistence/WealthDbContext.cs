@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 
 /// <summary>
 /// The encryption service is the process's credential service, which only the worker host (the API) holds. A host
-/// without it (the MCP host, issue #613) passes none, and the encrypted columns of <see cref="IncomeSource"/> are bound
+/// without it (the MCP host, issue #613) passes none, and the encrypted columns of <see cref="IncomeSource"/>, <see cref="CareerEvent"/> and <see cref="TaxProfile"/> are bound
 /// to <see cref="KeylessFieldEncryption"/>: the model is the same, reading or writing one of them throws, and a query that
 /// projects the plain columns works.
 /// </summary>
@@ -44,6 +44,8 @@ public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
     public DbSet<IncomeSource> IncomeSources { get; set; } = null!;
 
     public DbSet<CareerEvent> CareerEvents { get; set; } = null!;
+
+    public DbSet<TaxProfile> TaxProfiles { get; set; } = null!;
 
     public ICredentialEncryptionService Encryption => _encryption ?? KeylessFieldEncryption.Instance;
 
@@ -175,5 +177,18 @@ public class WealthDbContext : OwnerScopedDbContext, IFieldEncryptedContext
         career.Property(x => x.CreatedAt).HasColumnName("created_at");
         career.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         career.HasIndex(x => x.UserId).HasDatabaseName("idx_career_events_user");
+
+        // The stated tax profile (#454): one row per person. The two free-text fields are field-encrypted into one text column
+        // each; the jurisdiction code stays readable so a host without the key can still say which one is on file.
+        var tax = modelBuilder.Entity<TaxProfile>();
+        tax.ToTable("tax_profiles");
+        tax.HasKey(x => x.Id);
+        tax.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+        tax.Property(x => x.Jurisdiction).HasColumnName("jurisdiction").HasMaxLength(TaxProfileLimits.JurisdictionLength);
+        tax.Property(x => x.JurisdictionNotes).HasColumnName("jurisdiction_notes").IsEncryptedOptional(Encryption);
+        tax.Property(x => x.Caveat).HasColumnName("caveat").IsEncryptedOptional(Encryption);
+        tax.Property(x => x.CreatedAt).HasColumnName("created_at");
+        tax.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        tax.HasIndex(x => x.UserId).IsUnique().HasDatabaseName("idx_tax_profiles_user");
     }
 }

@@ -2018,14 +2018,15 @@ Computed on read from the readers behind §15, §16, §17, §18 and §19; nothin
 person's own planning, never a trading signal: nothing here produces a buy, sell or hold call.
 
 - **Sections and data quality.** `cashflow` (§15), `goals` (§16), `income` (§18), `career` (§19), `disposalTax` (§17 across the held
-  positions) and `risk` (the current IPS's risk fields), each `{dataQuality, reasons, data}` with `asOf` on the whole.
+  positions), `taxProfile` (§21) and `risk` (the current IPS's risk fields), each `{dataQuality, reasons, data}` with `asOf` on the whole.
   `Complete`: everything the section is meant to say is present. `Partial`: some is, and `reasons` names what is not. `Missing`:
   nothing usable (`missingSections` lists them), so the reader states what it does not know instead of guessing. A section whose
   read throws is `Missing` with `SECTION_UNAVAILABLE`; the rest still returns. Rules: cashflow is `Missing` under three
   complete months, `Partial` with no runway or stale sources; goals `Missing` with no goals, `Partial` when a goal lacks a target
   or date or has no history; income `Missing` with nothing declared, `Partial` when the declared figure is unreadable, not
   comparable or has no observed income to meet; career `Missing` with no events, `Partial` when unreadable; disposal tax `Missing`
-  with no positions or all withheld, `Partial` when some are withheld; risk `Missing` with no IPS, `Partial` with capacity or
+  with no positions or all withheld, `Partial` when some are withheld; tax profile `Missing` with nothing stated
+  (`NO_TAX_PROFILE`), `Partial` with no jurisdiction (`TAX_JURISDICTION_NOT_SET`) or notes or a caveat unreadable on this host (`TAX_PROFILE_UNREADABLE`); risk `Missing` with no IPS, `Partial` with capacity or
   drawdown unset or a re-measurement due. **Missing is not zero**: a person with no declared income has not told us their income.
 - **Summaries, not copies.** The income and career sections carry counts and the declared and observed monthly figures, never a
   source's or event's label, amount or note; the goals section carries each goal's standing without the return ranges (§16 has
@@ -2056,3 +2057,27 @@ person's own planning, never a trading signal: nothing here produces a buy, sell
   constants on `CapacityIndicator` and are judgement, not a standard. **It never writes the IPS**: the owner says the number and
   records it with `record_risk_remeasurement`, which stores exactly what was passed; the suggestion is read before that write and
   is shown beside it.
+
+## 21. Stated tax profile (#454)
+
+What the person says about their own tax situation, kept as context for the agent to surface and refer. **Nothing is computed from
+it**: the disposal-tax estimate (§17) comes from `FrictionConfig` and does not read it, and no figure anywhere applies a rate,
+band or exemption because the profile says so. It is never tax advice: a response that carries it carries the disclosure
+(`TaxProfileText.Disclosure`), and the agent refers the person to a qualified tax adviser for anything definitive.
+
+- **Shape.** One row per person (`tax_profiles`, `TaxProfile`): `jurisdiction` (a two-letter country code, upper-cased; `IE` for
+  Ireland), `jurisdictionNotes` and `caveat` (free text, at most 2,000 characters each). Every value is optional and a blank one is
+  stored as **null, never as an empty string or zero**; a person who has set nothing has no row, and a read returns the empty
+  profile (`updatedAt` null). Not stored: tax identifiers (PPSN), returns, correspondence.
+- **Encrypted and audited.** `jurisdictionNotes` and `caveat` are field-encrypted (AES-256-GCM, the credential encryption service)
+  and rotated with the other Wealth columns; the code stays readable so a host without the key can say which jurisdiction is on
+  file. Every save is put on the audit trail by field name, never value (`tax_profile`); a read through MCP or the in-app agent is
+  audited by the `get_financial_profile` mark (`Jurisdiction`, `JurisdictionNotes`, `Caveat`). The data download carries the
+  decrypted profile and account closure erases it.
+- **REST.** `GET /api/v1/wealth/tax-profile` (empty until set), `PUT` (restates the whole profile; an omitted field is cleared;
+  at least one value is required) and `DELETE` (idempotent). All require sign-in; the Owner filter scopes them to the caller.
+- **In the profile (§20).** The `taxProfile` section: `Missing` (`NO_TAX_PROFILE`) with nothing stated; `Partial` with no
+  jurisdiction (`TAX_JURISDICTION_NOT_SET`) or with notes or a caveat that exist but are unreadable on this host
+  (`TAX_PROFILE_UNREADABLE`; a keyless host with only a jurisdiction stated hides no text and stays `Complete`); otherwise
+  `Complete`. On the MCP host, which holds no encryption key, the notes and caveat are null while `hasJurisdictionNotes` and
+  `hasCaveat` still say whether they exist - the same rule as §18 and §19. **Unreadable is not "no profile".**

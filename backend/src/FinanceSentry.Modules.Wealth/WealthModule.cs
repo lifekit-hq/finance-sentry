@@ -39,7 +39,7 @@ public static class WealthModule
         {
             services.AddHostedService<NetWorthSnapshotCatchUpHostedService>();
 
-            // Declared income and the career timeline are field-encrypted, so key rotation runs where the key is held (the API host).
+            // Declared income, the career timeline and the tax profile are field-encrypted, so key rotation runs where the key is held (the API host).
             services.AddEncryptedFieldRotation<WealthDbContext>("wealth.income_sources");
         }
     }
@@ -79,6 +79,7 @@ public static class WealthModule
         services.AddScoped<IManualHoldingRepository, ManualHoldingRepository>();
         services.AddScoped<IIncomeSourceRepository, IncomeSourceRepository>();
         services.AddScoped<ICareerEventRepository, CareerEventRepository>();
+        services.AddScoped<ITaxProfileRepository, TaxProfileRepository>();
         services.AddScoped<ScenarioReader>();
         // Values entered by hand join the book after the three sleeves (AddBookFigures is idempotent), so they read last.
         services.AddBookFigures();
