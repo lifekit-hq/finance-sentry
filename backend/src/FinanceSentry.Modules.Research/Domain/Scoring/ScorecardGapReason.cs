@@ -9,7 +9,7 @@ public static class ScorecardGapReason
     /// <summary>The caller lacks <c>ai.use</c>: verdicts are the owner's, by design.</summary>
     public const string NoRole = "no_role";
 
-    /// <summary>The name is outside what the verdict scores (crypto, a fund type the rules do not read); reading again cannot help.</summary>
+    /// <summary>The name is outside what the verdict scores (crypto, a fund type the rules do not read); reading again cannot help. Never inferred from a failed read.</summary>
     public const string OutsideUniverse = "outside_universe";
 
     /// <summary>The scorecard read threw (a source failed, the reader broke): a retry may succeed.</summary>

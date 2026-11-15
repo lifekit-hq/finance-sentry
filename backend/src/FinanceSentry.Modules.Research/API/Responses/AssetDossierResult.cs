@@ -15,7 +15,7 @@ using FinanceSentry.Modules.Research.Domain.Tax;
 /// PendingRecommendation: Ledger's pending proposal on the name (#1069), null = none.
 /// NotableMoves: days whose return reached the threshold, each with the news and signals near it (#1218); null = no price history.
 /// Scorecard: the four-axis scorecard and its verdict word (spec 726 US2), null = no verdict, and <c>ScorecardGap</c> says why
-/// (<c>no_role</c>, <c>outside_universe</c> or <c>unreadable</c>, see <c>ScorecardGapReason</c>; issue #1414); null whenever a scorecard is present.
+/// (<c>no_role</c> or <c>unreadable</c>, see <c>ScorecardGapReason</c>; issue #1414; a name the verdict does not score still carries a NotScored scorecard); null whenever a scorecard is present.
 /// </summary>
 public sealed record AssetDossierResult(
     string Symbol,

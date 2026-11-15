@@ -110,7 +110,7 @@ public sealed class GetAssetDossierQueryHandler(
                 valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList(),
                 lookThrough: !DossierTickers.IsCrypto(bookPosition?.AssetClass)))
             : null;
-        var scorecardGap = ScorecardGapFor(request.IncludeVerdicts, scorecard is not null, scorecardValuation.NotApplicable);
+        var scorecardGap = ScorecardGapFor(request.IncludeVerdicts, scorecard is not null);
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 
@@ -163,10 +163,11 @@ public sealed class GetAssetDossierQueryHandler(
     }
 
     /// <summary>
-    /// Why the dossier carries no scorecard (issue #1414), null when it does: the caller is not the owner, the name is
-    /// outside what the verdict scores (so reading it again cannot help), or the read threw and may succeed on retry.
+    /// Why the dossier carries no scorecard (issue #1414), null when it does: the caller is not the owner, or the read
+    /// threw and may succeed on retry. A name the verdict does not score still returns a NotScored scorecard, so a
+    /// missing scorecard is never an outside-universe signal.
     /// </summary>
-    public static string? ScorecardGapFor(bool includeVerdicts, bool hasScorecard, bool outsideUniverse)
+    public static string? ScorecardGapFor(bool includeVerdicts, bool hasScorecard)
     {
         if (!includeVerdicts)
         {
@@ -178,7 +179,7 @@ public sealed class GetAssetDossierQueryHandler(
             return null;
         }
 
-        return outsideUniverse ? ScorecardGapReason.OutsideUniverse : ScorecardGapReason.Unreadable;
+        return ScorecardGapReason.Unreadable;
     }
 
     /// <summary>

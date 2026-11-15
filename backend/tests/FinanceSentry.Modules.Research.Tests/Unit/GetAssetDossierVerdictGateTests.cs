@@ -115,7 +115,7 @@ public class GetAssetDossierVerdictGateTests
     }
 
     [Fact]
-    public async Task WhenTheScorecardReadThrowsOnANameTheVerdictDoesNotScore_SaysItIsOutsideTheUniverse_NotARetry()
+    public async Task WhenTheScorecardReadThrowsOnANameTheVerdictDoesNotScore_StillSaysItCouldNotBeRead_NotOutsideTheUniverse()
     {
         var valuation = new Mock<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>();
         valuation
@@ -139,19 +139,17 @@ public class GetAssetDossierVerdictGateTests
             new GetAssetDossierQuery(User, Symbol, IncludeVerdicts: true), PendingRecommendationFor(Symbol), valuation.Object, structure.Object);
 
         dossier.Scorecard.Should().BeNull();
-        dossier.ScorecardGap.Should().Be(ScorecardGapReason.OutsideUniverse);
+        dossier.ScorecardGap.Should().Be(ScorecardGapReason.Unreadable);
     }
 
     [Theory]
-    [InlineData(false, false, false, ScorecardGapReason.NoRole)]
-    [InlineData(false, true, true, ScorecardGapReason.NoRole)]
-    [InlineData(true, true, false, null)]
-    [InlineData(true, true, true, null)]
-    [InlineData(true, false, false, ScorecardGapReason.Unreadable)]
-    [InlineData(true, false, true, ScorecardGapReason.OutsideUniverse)]
+    [InlineData(false, false, ScorecardGapReason.NoRole)]
+    [InlineData(false, true, ScorecardGapReason.NoRole)]
+    [InlineData(true, true, null)]
+    [InlineData(true, false, ScorecardGapReason.Unreadable)]
     public void ScorecardGapFor_NamesTheReasonOnlyWhenThereIsNoScorecard(
-        bool includeVerdicts, bool hasScorecard, bool outsideUniverse, string? expected)
-        => GetAssetDossierQueryHandler.ScorecardGapFor(includeVerdicts, hasScorecard, outsideUniverse).Should().Be(expected);
+        bool includeVerdicts, bool hasScorecard, string? expected)
+        => GetAssetDossierQueryHandler.ScorecardGapFor(includeVerdicts, hasScorecard).Should().Be(expected);
 
     [Fact]
     public void ByDefault_TheQueryIncludesVerdicts_SoTheAiGatedLedgerReadKeepsItsInputs()
