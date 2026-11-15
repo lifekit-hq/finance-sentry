@@ -41,7 +41,7 @@ function isCurrentRange(store: EffectsStore, range: HistoryRange): boolean {
 export function dashboardEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  return {
+  const effects = {
     // The selected range scopes the month-bucketed widgets too (income vs spending,
     // savings rate, top categories) — one range, one story across the whole dashboard.
     load: rxMethod<HistoryRange>(
@@ -99,6 +99,16 @@ export function dashboardEffects(store: EffectsStore) {
         )
       )
     ),
+  };
+
+  return {
+    ...effects,
+    /** Fetches the range on screen again (pull to refresh): the statistics and the history chart. */
+    reload: (): void => {
+      const range = untracked(store.historyRange);
+      effects.loadNetWorthHistory(range);
+      effects.load(range);
+    },
   };
 }
 

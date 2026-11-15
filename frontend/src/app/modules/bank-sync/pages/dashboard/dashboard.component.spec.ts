@@ -6,7 +6,7 @@ import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
 import {type ChartPointClick, type ChartScrubPoint} from '@lifekit-hq/charts-core';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {AreaChartComponent} from '@lifekit-hq/ui';
+import {AreaChartComponent, CmnPullRefreshService} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -615,5 +615,32 @@ describe('DashboardComponent range-scoped widgets', () => {
 
     expect(text).toContain('€3,100');
     expect(text).toContain('€4,000');
+  });
+});
+
+describe('DashboardComponent pull to refresh', () => {
+  it('reloads through the store and holds the indicator until the history has landed too', async () => {
+    const isLoading = signal(false);
+    const isHistoryLoading = signal(true);
+    const reload = vi.fn();
+    const {fixture} = render('3m', undefined, {reload, isLoading, isHistoryLoading});
+    const pullRefresh = TestBed.inject(CmnPullRefreshService);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+
+    expect(pullRefresh.available()).toBe(true);
+
+    const settled = vi.fn();
+    void pullRefresh.refresh().then(settled);
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(pullRefresh.refreshing()).toBe(true);
+    expect(settled).not.toHaveBeenCalled();
+
+    isHistoryLoading.set(false);
+    await vi.waitFor(() => expect(settled).toHaveBeenCalled());
+    expect(pullRefresh.refreshing()).toBe(false);
   });
 });
