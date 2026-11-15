@@ -106,6 +106,13 @@ public sealed class CoverageEvaluator(
         Guid userId, DateTimeOffset asOf, IReadOnlySet<string>? only, CancellationToken ct)
     {
         var snapshot = await snapshots.ReadAsync(userId, asOf, ct);
+        if (only is null && snapshot.Held.Count > _options.HeldSoftCap)
+        {
+            logger.LogWarning(
+                "Coverage: {Held} held names pass the soft cap of {Cap} for user {UserId}; nothing is blocked, list_coverage reports it",
+                snapshot.Held.Count, _options.HeldSoftCap, userId);
+        }
+
         var observations = await RecordVerdictsAsync(userId, snapshot, only, ct);
         var reviews = new Dictionary<string, CoverageTickerReview>(StringComparer.OrdinalIgnoreCase);
 

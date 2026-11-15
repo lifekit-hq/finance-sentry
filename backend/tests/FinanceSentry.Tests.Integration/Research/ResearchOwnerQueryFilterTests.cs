@@ -85,7 +85,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(16);
+        perUser.Should().HaveCount(17);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -300,6 +300,42 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         {
             UserId = _userA, Ticker = "NVDA", ObservedOn = today, Verdict = "Avoid", FiredRuleId = "weak_structure",
         })).Should().BeFalse("a filtered existence check would find nothing and insert a duplicate for the day");
+    }
+
+    [DockerRequiredFact]
+    public async Task Coverage_memos_follow_the_acting_person_and_the_memo_job_reads_across_people_by_unscoped_reads()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var entryA = new CoverageJournalEntry { UserId = _userA, Ticker = "MU", Action = CoverageAction.Added, Rule = CoverageRuleIds.BuyTwice, Reason = CoverageReason.Screen, Detail = "x", At = at };
+        var entryB = new CoverageJournalEntry { UserId = _userB, Ticker = "MU", Action = CoverageAction.Added, Rule = CoverageRuleIds.BuyTwice, Reason = CoverageReason.Screen, Detail = "x", At = at };
+        await SeedAsync(
+            new CoverageMember { UserId = _userA, Ticker = "MU", AddedReason = CoverageReason.Screen },
+            new CoverageMember { UserId = _userB, Ticker = "MU", AddedReason = CoverageReason.Screen },
+            entryA, entryB,
+            new CoverageMemo { UserId = _userA, Ticker = "MU", JournalEntryId = entryA.Id, ModelId = "m", CostUsd = 0.05m, Body = "a", CreatedAt = at });
+
+        await using (var asA = CreateContext(_userA))
+        {
+            (await asA.CoverageMemos.Select(m => m.UserId).ToListAsync()).Should().Equal(_userA);
+        }
+
+        await using (var asB = CreateContext(_userB))
+        {
+            (await asB.CoverageMemos.AnyAsync()).Should().BeFalse("B has no memo and must not see A's");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.CoverageMemos.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+
+        var noPerson = new CoverageMemoRepository(asNoOne);
+        (await noPerson.ListEntrantsWithoutMemoUnscopedAsync(_userA, at.AddDays(-1))).Should().BeEmpty("A's entry already has its memo");
+        (await noPerson.ListEntrantsWithoutMemoUnscopedAsync(_userB, at.AddDays(-1))).Should().ContainSingle(e => e.Id == entryB.Id);
+        (await noPerson.TotalsSinceUnscopedAsync(at.AddDays(-1))).Should().Be((1, 0.05m));
+        (await noPerson.GetLatestUnscopedAsync(_userA, "MU"))!.Body.Should().Be("a");
+        (await noPerson.GetLatestUnscopedAsync(_userB, "MU")).Should().BeNull();
+        (await noPerson.LatestTimesUnscopedAsync(_userA)).Should().ContainKey("MU");
+        (await noPerson.AddUnscopedAsync(new CoverageMemo { UserId = _userA, Ticker = "MU", JournalEntryId = entryA.Id, ModelId = "m", Body = "dup" }))
+            .Should().BeFalse("one memo per coverage add");
     }
 
     [DockerRequiredFact]

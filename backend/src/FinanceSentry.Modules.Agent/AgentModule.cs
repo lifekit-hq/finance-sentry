@@ -45,6 +45,7 @@ public static class AgentModule
 
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<ILlmClient, AnthropicLlmClient>();
+        services.AddScoped<IMemoLanguageModel, AnthropicMemoLanguageModel>();
         services.AddSingleton<McpToolBridge>();
         services.AddSingleton<PersonaComposer>();
 

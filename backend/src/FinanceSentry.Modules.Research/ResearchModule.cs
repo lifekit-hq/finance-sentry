@@ -102,6 +102,13 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
 
+            // Stage 6 research memos on coverage entrants: after the evaluation whose adds it writes up. Off by
+            // default (Coverage:MemoMode), so registering the job spends nothing.
+            mgr.AddOrUpdate<CoverageMemoJob>(
+                CoverageMemoJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(coverageOptions.MemoHourUtc, coverageOptions.MemoMinuteUtc));
+
             // Discovery-funnel screens (stage 5): fundamentals, relative strength and dated catalyst over the reference
             // universe nominate into the candidate path before the 00:00 scan; the 01:10 coverage evaluation reads them.
             var screenOptions = sp.GetRequiredService<IOptions<ScreenOptions>>().Value;
@@ -564,6 +571,9 @@ public static class ResearchModule
         services.AddScoped<ICoverageEventReviewer, CoverageEventReviewer>();
         services.AddScoped<CoverageExplainer>();
         services.AddScoped<CoverageEvaluationJob>();
+        services.AddScoped<ICoverageMemoRepository, CoverageMemoRepository>();
+        services.AddScoped<CoverageMemoWriter>();
+        services.AddScoped<CoverageMemoJob>();
         services.AddScoped<ICoverageUniverseReader, CoverageUniverseReader>();
         services.AddScoped<IReferenceUniverseReader, ReferenceUniverseReader>();
 

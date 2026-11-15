@@ -29,6 +29,9 @@ public class UserDataExportConventionTests(AssetDossierApiFactory factory) : ICl
         "ResearchChunk.ContentHash",
         // How many model tokens a chunk of text costs: a count, not a credential.
         "ResearchChunk.TokenEstimate",
+        // How many model tokens a research memo call used: counts the memo was priced by, not credentials.
+        "CoverageMemo.InputTokens",
+        "CoverageMemo.OutputTokens",
         // The digest of a transaction's own fields, used only to skip re-imports: derived from the row, opens nothing.
         "Transaction.UniqueHash",
         // The id of the stored connection an account syncs through (the connection's key material is byte[], dropped).

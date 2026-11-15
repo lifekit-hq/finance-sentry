@@ -68,6 +68,10 @@ public interface ICoverageRepository
     Task<(IReadOnlyList<CoverageEvent> Events, int Total, int Removed, int Rescored)> ListEventsUnscopedAsync(
         Guid userId, DateTimeOffset since, int take, CancellationToken ct = default);
 
+    /// <summary>The user's newest coverage events for one ticker, newest first, at most <paramref name="take"/>. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CoverageEvent>> ListEventsForTickerUnscopedAsync(
+        Guid userId, string ticker, int take, CancellationToken ct = default);
+
     /// <summary>Deletes coverage events older than <paramref name="before"/> for every user. Opts out of the Owner query filter.</summary>
     Task<int> PruneEventsUnscopedAsync(DateTimeOffset before, CancellationToken ct = default);
 }
