@@ -267,6 +267,43 @@ public sealed class DecideThesisRevisionCommandTests
         NothingWasWritten();
     }
 
+    [Theory]
+    [InlineData(ThesisRevisionVerdict.Confirm)]
+    [InlineData(ThesisRevisionVerdict.Reject)]
+    public async Task ADecisionThatLosesTheClaimToAnOverlappingOne_WritesNothing(ThesisRevisionVerdict verdict)
+    {
+        var revision = Pending(ThesisRevisionKind.Promote);
+        var repo = new Mock<IThesisRevisionRepository>();
+        repo.Setup(r => r.GetAsync(User, revision.Id, It.IsAny<CancellationToken>())).ReturnsAsync(revision);
+        repo.Setup(r => r.TryClaimAsync(
+                User, revision.Id, It.IsAny<ThesisRevisionStatus>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var audit = new Mock<IAuditActor>();
+        audit.SetupGet(a => a.Kind).Returns(AuditActorKind.OwnerSession);
+        var handler = new DecideThesisRevisionCommandHandler(
+            repo.Object, _theses.Object, _promote.Object, _save.Object, _delete.Object, _recorder.Object, audit.Object);
+
+        var act = () => handler.Handle(new DecideThesisRevisionCommand(User, revision.Id, verdict, "ok"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ThesisRevisionNotPendingException>();
+        revision.Status.Should().Be(ThesisRevisionStatus.Pending);
+        NothingWasWritten();
+    }
+
+    [Fact]
+    public async Task AConfirmThatFails_ReleasesTheClaim_SoTheOwnerCanRetry()
+    {
+        var revision = Pending(ThesisRevisionKind.Promote);
+        _promote.Setup(h => h.Handle(It.IsAny<PromoteCandidateCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        var act = () => Handler().Handle(Confirm(revision), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        revision.Status.Should().Be(ThesisRevisionStatus.Pending);
+        revision.DecidedAt.Should().BeNull();
+    }
+
     [Fact]
     public async Task AnUnknownProposal_Is404()
     {

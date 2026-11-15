@@ -95,6 +95,23 @@ public sealed class ProposeThesisRevisionCommandTests
     }
 
     [Fact]
+    public async Task APendingProposalPastItsExpiry_IsSettledAsExpired_AndDoesNotBlockANewOne()
+    {
+        var thesis = Thesis();
+        var stale = await Handler().Handle(
+            Propose(ThesisRevisionKind.NarrativeUpdate, thesis.Id, new ThesisRevisionContent(ThesisText: "First.")), CancellationToken.None);
+        _revisions.Rows.Single(r => r.Id == stale.Id).ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+        var fresh = await Handler().Handle(
+            Propose(ThesisRevisionKind.NarrativeUpdate, thesis.Id, new ThesisRevisionContent(ThesisText: "Second.")), CancellationToken.None);
+
+        var rows = _revisions.Rows.ToDictionary(r => r.Id);
+        rows[stale.Id].Status.Should().Be(ThesisRevisionStatus.Expired);
+        rows[stale.Id].SupersededById.Should().BeNull();
+        rows[fresh.Id].Status.Should().Be(ThesisRevisionStatus.Pending);
+    }
+
+    [Fact]
     public async Task ARationale_IsRequired()
     {
         var thesis = Thesis();

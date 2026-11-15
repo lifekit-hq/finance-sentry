@@ -6,7 +6,10 @@ public interface IThesisRevisionRepository
 {
     Task<ThesisRevision?> GetAsync(Guid userId, Guid id, CancellationToken ct = default);
 
-    /// <summary>The live (not yet expired) pending proposal on the subject, tracked so a supersede can save it.</summary>
+    /// <summary>
+    /// The pending proposal on the subject, tracked so a supersede can save it. It may be past its expiry but not yet
+    /// swept: the unique index still counts it, so the caller settles it rather than ignoring it.
+    /// </summary>
     Task<ThesisRevision?> FindPendingAsync(Guid userId, Guid subjectId, CancellationToken ct = default);
 
     /// <summary>Live (not yet expired) pending proposals, oldest first.</summary>
@@ -24,6 +27,16 @@ public interface IThesisRevisionRepository
     /// tracked row, is saved in the same transaction so a failed insert leaves it as it was.
     /// </summary>
     Task AddPendingAsync(ThesisRevision revision, ThesisRevision? supersedes = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically moves a proposal that is still pending and unexpired to <paramref name="status"/>, stamping the decision.
+    /// False when another decision (or the expiry) got there first.
+    /// </summary>
+    Task<bool> TryClaimAsync(
+        Guid userId, Guid id, ThesisRevisionStatus status, string? note, DateTimeOffset decidedAt, CancellationToken ct = default);
+
+    /// <summary>Puts a claimed (Confirmed) proposal back to Pending when the confirm wrote nothing.</summary>
+    Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default);
 
     /// <summary>Saves a changed row. The expiry job writes with no person in scope; SaveChanges is not filtered.</summary>
     Task UpdateAsync(ThesisRevision revision, CancellationToken ct = default);

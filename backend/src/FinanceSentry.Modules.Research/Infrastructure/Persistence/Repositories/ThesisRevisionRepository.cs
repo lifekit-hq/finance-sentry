@@ -14,15 +14,11 @@ public sealed class ThesisRevisionRepository(ResearchDbContext db) : IThesisRevi
     public Task<ThesisRevision?> GetAsync(Guid userId, Guid id, CancellationToken ct = default)
         => db.ThesisRevisions.FirstOrDefaultAsync(r => r.UserId == userId && r.Id == id, ct);
 
-    // The request-path reads leave out a pending row past its expiry; the daily expiry job settles it.
     public Task<ThesisRevision?> FindPendingAsync(Guid userId, Guid subjectId, CancellationToken ct = default)
-    {
-        var now = DateTimeOffset.UtcNow;
-        return db.ThesisRevisions.FirstOrDefaultAsync(
-            r => r.UserId == userId && r.SubjectId == subjectId && r.Status == ThesisRevisionStatus.Pending && r.ExpiresAt > now,
-            ct);
-    }
+        => db.ThesisRevisions.FirstOrDefaultAsync(
+            r => r.UserId == userId && r.SubjectId == subjectId && r.Status == ThesisRevisionStatus.Pending, ct);
 
+    // The lists leave out a pending row past its expiry; the daily expiry job settles it.
     public async Task<IReadOnlyList<ThesisRevision>> ListPendingAsync(Guid userId, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
@@ -74,6 +70,27 @@ public sealed class ThesisRevisionRepository(ResearchDbContext db) : IThesisRevi
 
         await transaction.CommitAsync(ct);
     }
+
+    public async Task<bool> TryClaimAsync(
+        Guid userId, Guid id, ThesisRevisionStatus status, string? note, DateTimeOffset decidedAt, CancellationToken ct = default)
+        => await db.ThesisRevisions
+            .Where(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Pending && r.ExpiresAt > decidedAt)
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(r => r.Status, status)
+                    .SetProperty(r => r.DecidedAt, decidedAt)
+                    .SetProperty(r => r.DecisionNote, note),
+                ct) == 1;
+
+    public async Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
+        => await db.ThesisRevisions
+            .Where(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed)
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(r => r.Status, ThesisRevisionStatus.Pending)
+                    .SetProperty(r => r.DecidedAt, (DateTimeOffset?)null)
+                    .SetProperty(r => r.DecisionNote, (string?)null),
+                ct);
 
     public async Task UpdateAsync(ThesisRevision revision, CancellationToken ct = default)
     {

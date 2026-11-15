@@ -79,9 +79,16 @@ public sealed class ProposeThesisRevisionCommandHandler(
         var open = await revisions.FindPendingAsync(command.UserId, command.SubjectId, ct);
         if (open is not null)
         {
-            open.Status = ThesisRevisionStatus.Superseded;
-            open.DecidedAt = now;
-            open.SupersededById = revision.Id;
+            if (open.ExpiresAt <= now)
+            {
+                open.Status = ThesisRevisionStatus.Expired;
+            }
+            else
+            {
+                open.Status = ThesisRevisionStatus.Superseded;
+                open.DecidedAt = now;
+                open.SupersededById = revision.Id;
+            }
         }
 
         await revisions.AddPendingAsync(revision, open, ct);

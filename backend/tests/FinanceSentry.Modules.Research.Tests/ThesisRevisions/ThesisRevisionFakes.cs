@@ -14,7 +14,7 @@ internal sealed class InMemoryThesisRevisionRepository : IThesisRevisionReposito
 
     public Task<ThesisRevision?> FindPendingAsync(Guid userId, Guid subjectId, CancellationToken ct = default)
         => Task.FromResult(Rows.FirstOrDefault(r => r.UserId == userId && r.SubjectId == subjectId
-            && r.Status == ThesisRevisionStatus.Pending && r.ExpiresAt > DateTimeOffset.UtcNow));
+            && r.Status == ThesisRevisionStatus.Pending));
 
     public Task<IReadOnlyList<ThesisRevision>> ListPendingAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<ThesisRevision>>(Rows
@@ -39,6 +39,34 @@ internal sealed class InMemoryThesisRevisionRepository : IThesisRevisionReposito
         }
 
         Rows.Add(revision);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> TryClaimAsync(
+        Guid userId, Guid id, ThesisRevisionStatus status, string? note, DateTimeOffset decidedAt, CancellationToken ct = default)
+    {
+        var row = Rows.FirstOrDefault(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Pending && r.ExpiresAt > decidedAt);
+        if (row is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        row.Status = status;
+        row.DecidedAt = decidedAt;
+        row.DecisionNote = note;
+        return Task.FromResult(true);
+    }
+
+    public Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
+    {
+        var row = Rows.FirstOrDefault(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed);
+        if (row is not null)
+        {
+            row.Status = ThesisRevisionStatus.Pending;
+            row.DecidedAt = null;
+            row.DecisionNote = null;
+        }
+
         return Task.CompletedTask;
     }
 

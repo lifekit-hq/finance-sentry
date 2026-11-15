@@ -30,7 +30,8 @@ public enum ThesisRevisionOutcome
 /// <see cref="PromoteCandidateCommand"/> (so the risk gate runs first and an override is the owner's alone), a narrative or
 /// trigger change through <see cref="SaveThesisCommand"/>, a close through <see cref="DeleteThesisCommand"/>, each stamped as
 /// the owner's own write with the proposal's rationale and evidence in the audit. Reject needs the real reason, kept as
-/// the counterfactual. Only the owner's own session decides: the handler refuses every other actor (a service token,
+/// the counterfactual. A decision claims the proposal first with one conditional Pending-to-decided write, so two
+/// overlapping decisions cannot both act; a confirm that writes nothing (risk gate refusal, a failure) releases the claim. Only the owner's own session decides: the handler refuses every other actor (a service token,
 /// the in-app agent, a job), so the boundary does not rest on a transport attribute alone.
 /// </summary>
 public sealed record DecideThesisRevisionCommand(
@@ -91,22 +92,45 @@ public sealed class DecideThesisRevisionCommandHandler(
             throw new ThesisRevisionNotPendingException(revision.Status.ToString());
         }
 
-        if (command.Verdict == ThesisRevisionVerdict.Reject)
+        var verdict = command.Verdict == ThesisRevisionVerdict.Reject ? ThesisRevisionStatus.Rejected : ThesisRevisionStatus.Confirmed;
+        var decidedAt = DateTimeOffset.UtcNow;
+        if (!await revisions.TryClaimAsync(command.UserId, revision.Id, verdict, note, decidedAt, ct))
         {
-            await Close(revision, ThesisRevisionStatus.Rejected, note, resultThesisId: null, ct);
+            throw new ThesisRevisionNotPendingException("decided");
+        }
+
+        revision.Status = verdict;
+        revision.DecidedAt = decidedAt;
+        revision.DecisionNote = note;
+        if (verdict == ThesisRevisionStatus.Rejected)
+        {
             return new DecideThesisRevisionResult(ThesisRevisionOutcome.Rejected, ThesisRevisionDto.From(revision));
         }
 
-        return revision.Kind switch
+        try
         {
-            ThesisRevisionKind.Promote => await ConfirmPromoteAsync(command, revision, note, ct),
-            ThesisRevisionKind.Close => await ConfirmCloseAsync(command, revision, note, ct),
-            _ => await ConfirmReviseAsync(command, revision, note, ct),
-        };
+            var result = revision.Kind switch
+            {
+                ThesisRevisionKind.Promote => await ConfirmPromoteAsync(command, revision, ct),
+                ThesisRevisionKind.Close => await ConfirmCloseAsync(command, revision, ct),
+                _ => await ConfirmReviseAsync(command, revision, ct),
+            };
+            if (result.Outcome != ThesisRevisionOutcome.Confirmed)
+            {
+                await ReleaseClaimAsync(revision);
+            }
+
+            return result;
+        }
+        catch when (revision.ResultThesisId is null)
+        {
+            await ReleaseClaimAsync(revision);
+            throw;
+        }
     }
 
     private async Task<DecideThesisRevisionResult> ConfirmPromoteAsync(
-        DecideThesisRevisionCommand command, ThesisRevision revision, string? note, CancellationToken ct)
+        DecideThesisRevisionCommand command, ThesisRevision revision, CancellationToken ct)
     {
         var result = await promote.Handle(
             new PromoteCandidateCommand(
@@ -133,7 +157,7 @@ public sealed class DecideThesisRevisionCommandHandler(
             throw new InvalidThesisRevisionException("the candidate is no longer active; reject this proposal.");
         }
 
-        await Close(revision, ThesisRevisionStatus.Confirmed, note, thesisId, ct);
+        await Finish(revision, thesisId, ct);
         var thesis = await theses.FindAsync(command.UserId, thesisId, ct);
         return new DecideThesisRevisionResult(
             ThesisRevisionOutcome.Confirmed, ThesisRevisionDto.From(revision), thesis is null ? null : ToDto(thesis),
@@ -141,7 +165,7 @@ public sealed class DecideThesisRevisionCommandHandler(
     }
 
     private async Task<DecideThesisRevisionResult> ConfirmReviseAsync(
-        DecideThesisRevisionCommand command, ThesisRevision revision, string? note, CancellationToken ct)
+        DecideThesisRevisionCommand command, ThesisRevision revision, CancellationToken ct)
     {
         var thesis = await theses.FindAsync(command.UserId, revision.SubjectId, ct)
             ?? throw new InvalidThesisRevisionException("the thesis no longer exists; reject this proposal.");
@@ -164,12 +188,12 @@ public sealed class DecideThesisRevisionCommandHandler(
                 NarrativeFalsifiers: merged.NarrativeFalsifiers),
             ct);
 
-        await Close(revision, ThesisRevisionStatus.Confirmed, note, saved.Id, ct);
+        await Finish(revision, saved.Id, ct);
         return new DecideThesisRevisionResult(ThesisRevisionOutcome.Confirmed, ThesisRevisionDto.From(revision), saved);
     }
 
     private async Task<DecideThesisRevisionResult> ConfirmCloseAsync(
-        DecideThesisRevisionCommand command, ThesisRevision revision, string? note, CancellationToken ct)
+        DecideThesisRevisionCommand command, ThesisRevision revision, CancellationToken ct)
     {
         var thesis = await theses.FindAsync(command.UserId, revision.SubjectId, ct)
             ?? throw new InvalidThesisRevisionException("the thesis no longer exists; reject this proposal.");
@@ -185,18 +209,22 @@ public sealed class DecideThesisRevisionCommandHandler(
             ThesisEventOrigin.User, new ThesisAudit(prior, null, ConfirmedRationale(revision), revision.Evidence),
             ConfirmedRationale(revision), ct);
 
-        await Close(revision, ThesisRevisionStatus.Confirmed, note, thesis.Id, ct);
+        await Finish(revision, thesis.Id, ct);
         return new DecideThesisRevisionResult(ThesisRevisionOutcome.Confirmed, ThesisRevisionDto.From(revision));
     }
 
-    private async Task Close(
-        ThesisRevision revision, ThesisRevisionStatus status, string? note, Guid? resultThesisId, CancellationToken ct)
+    private async Task Finish(ThesisRevision revision, Guid resultThesisId, CancellationToken ct)
     {
-        revision.Status = status;
-        revision.DecidedAt = DateTimeOffset.UtcNow;
-        revision.DecisionNote = note;
         revision.ResultThesisId = resultThesisId;
         await revisions.UpdateAsync(revision, ct);
+    }
+
+    private async Task ReleaseClaimAsync(ThesisRevision revision)
+    {
+        await revisions.ReleaseClaimAsync(revision.UserId, revision.Id, CancellationToken.None);
+        revision.Status = ThesisRevisionStatus.Pending;
+        revision.DecidedAt = null;
+        revision.DecisionNote = null;
     }
 
     private static string ConfirmedRationale(ThesisRevision revision)
