@@ -1,0 +1,84 @@
+<section class="flex flex-col gap-cmn-3" aria-labelledby="thesis-revisions-heading">
+  <h2 id="thesis-revisions-heading" class="text-cmn-xs font-semibold text-text-secondary">
+    Thesis changes ({{ store.pending().length }})
+  </h2>
+  <cmn-async-state
+    [status]="store.view().status"
+    [errorMessage]="store.view().errorMessage"
+    [isEmpty]="!store.hasData()"
+    [emptyMessage]="emptyCopy.message"
+    [emptySubMessage]="emptyCopy.subMessage"
+    [keepContent]="false"
+    [crossfade]="false"
+    (retry)="store.load()"
+    class="block"
+    errorPlacement="above"
+    retryable
+  >
+    <!-- Compact on purpose: the queue above already carries the page's full empty state -->
+    <p empty class="text-cmn-sm text-text-secondary" data-testid="thesis-revisions-empty">
+      {{ emptyCopy.message }}. {{ emptyCopy.subMessage }}
+    </p>
+
+    <div skeleton class="flex flex-col gap-cmn-4" data-testid="thesis-revisions-skeleton">
+      @for (_ of skeletonCards; track $index) {
+        <cmn-card>
+          <cmn-skeleton [count]="3" shape="row" />
+        </cmn-card>
+      }
+    </div>
+
+    <div class="flex flex-col gap-cmn-4">
+      @if (store.pending().length > 0) {
+        <div class="flex flex-col gap-cmn-4" data-testid="thesis-revisions-pending">
+          @for (revision of store.pending(); track revision.id) {
+            <fns-thesis-revision-card
+              [revision]="revision"
+              [thesis]="store.thesesById().get(revision.subjectId) ?? null"
+              [linkTicker]="true"
+              (decide)="store.decide({revision, verdict: $event})"
+            />
+          }
+        </div>
+      } @else {
+        <p class="text-cmn-sm text-text-secondary" data-testid="thesis-revisions-pending-empty">
+          No thesis change is waiting on you.
+        </p>
+      }
+
+      @if (store.decided().length > 0) {
+        <ul
+          class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+          data-testid="thesis-revisions-decided"
+        >
+          @for (revision of store.decided(); track revision.id) {
+            <li class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
+              <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+                <div class="flex min-w-0 items-center gap-cmn-2">
+                  <cmn-tag [variant]="statusVariant[revision.status]">
+                    {{ statusLabel[revision.status] }}
+                  </cmn-tag>
+                  <a
+                    [routerLink]="[dossierRoute, revision.ticker]"
+                    class="font-semibold text-text-primary underline-offset-2 hover:underline"
+                  >
+                    {{ revision.ticker }}
+                  </a>
+                  <span class="text-cmn-xs text-text-secondary">{{
+                    kindLabel[revision.kind]
+                  }}</span>
+                </div>
+                <span class="text-cmn-xs text-text-secondary">
+                  {{ revision.decidedAt ?? revision.expiresAt | date: 'mediumDate' }}
+                </span>
+              </div>
+              @if (revision.decisionNote; as note) {
+                <p class="break-words text-cmn-sm text-text-secondary">{{ note }}</p>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </cmn-async-state>
+</section>

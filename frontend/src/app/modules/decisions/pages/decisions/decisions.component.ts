@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {ThesisRevisionsSectionComponent} from '../../components/thesis-revisions-section/thesis-revisions-section.component';
 import {
   DECISION_SKELETON_DECIDED_ROWS,
   DECISION_SKELETON_OUTCOME_LINES,
@@ -56,6 +57,7 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
     RouterLink,
     SkeletonComponent,
     TagComponent,
+    ThesisRevisionsSectionComponent,
   ],
   providers: [DecisionsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,

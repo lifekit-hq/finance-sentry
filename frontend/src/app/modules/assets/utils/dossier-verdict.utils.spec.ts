@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 
 import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
-import {type ThesisDto} from '../models/dossier/dossier.model';
+import {type ThesisDto} from '../../../shared/models/thesis/thesis.model';
 import {DossierVerdictUtils} from './dossier-verdict.utils';
 
 function thesis(overrides: Partial<ThesisDto> = {}): ThesisDto {

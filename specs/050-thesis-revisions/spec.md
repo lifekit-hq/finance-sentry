@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-15
 
-**Status**: Implemented (backend + MCP; the SPA confirm card is a follow-up slice)
+**Status**: Implemented (backend + MCP + the SPA confirm surface)
 
 **Origin**: Finance flow scout (firstmate `data/fs-finance-flow-scout/report.md` §0 Q1 option b, §5 P1/P2/P6), chosen by the
 owner on 2026-11-15. It **narrows** PR #1383 (2026-11-13, "Ledger writes theses directly"): promotion and every thesis
@@ -46,10 +46,21 @@ gains a server-side pending artifact for the rest. #1383's `origin` stamp and au
 - **FR-005** One migration: additive table `research.thesis_revisions` (M030); no existing row is read, rewritten or backfilled.
 - **FR-006** `thesis-revision-expiry` (daily 05:20 UTC) expires pending proposals past their date.
 
+## SPA confirm surface (P6)
+
+- **FR-007** The Decisions queue (`/ledger/decisions`) lists each pending revision as a card: before and after text, the
+  trigger diff (added, removed, kept), the evidence links, and Confirm / Reject (reject needs a reason). The last 30 days'
+  outcomes follow, with the reason a change was turned down.
+- **FR-008** The asset dossier shows the ticker's pending revision under the hero, as it does a recommendation, and says what
+  was recorded once decided; a confirm writes the resulting thesis onto the page.
+- **FR-009** A promotion the risk gate refuses (409) leaves the proposal pending, shows the refusal and offers the owner's
+  explicit override; every other failure resolves through the error-code registry.
+- **FR-010** `GET research/thesis-revisions` additively carries `evidenceLinks` per row (a stored news article resolves to its
+  title and URL; filing, event and fundamentals refs carry a label only). No behaviour or authorization changed.
+- The surface reads each card's "before" from `GET research/theses`; a failed read leaves the card without one.
+
 ## Out of scope / follow-ups
 
-- P6: the confirm card in the SPA decisions module (the REST endpoints exist; until then the owner decides with
-  `decide_thesis_revision` from a personal-token session).
 - P5: the pulse step and persona wiring in lifekit-stack (operator step; the persona core already names the tools).
 - The in-app Ledger reaches every MCP tool in the signed-in person's scope (`McpToolBridge`), so it can still call
   `save_thesis`/`promote_candidate` as `User`. It cannot confirm (FR-002). Closing that is a separate, owner-visible change.

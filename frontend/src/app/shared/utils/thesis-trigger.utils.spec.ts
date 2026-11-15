@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 
-import {type ThesisInvalidationTrigger} from '../models/dossier/dossier.model';
+import {type ThesisInvalidationTrigger} from '../models/thesis/thesis.model';
 import {ThesisTriggerUtils} from './thesis-trigger.utils';
 
 function trigger(overrides: Partial<ThesisInvalidationTrigger> = {}): ThesisInvalidationTrigger {

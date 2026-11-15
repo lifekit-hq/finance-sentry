@@ -1,0 +1,73 @@
+<form
+  [formGroup]="form"
+  (ngSubmit)="send()"
+  class="flex flex-col gap-cmn-5 p-cmn-4 md:p-cmn-6"
+  data-testid="thesis-revision-sheet"
+>
+  <div class="flex flex-col gap-cmn-1">
+    <div class="flex items-center gap-cmn-2">
+      <cmn-tag [variant]="kindVariant[revision.kind]">{{ kindLabel[revision.kind] }}</cmn-tag>
+      <span class="text-cmn-lg font-semibold text-text-primary">{{ revision.ticker }}</span>
+    </div>
+  </div>
+
+  @if (isConfirm) {
+    <cmn-alert [title]="wallTitle" variant="info" data-testid="thesis-revision-sheet-wall">
+      {{ wallText }}
+    </cmn-alert>
+
+    @if (store.refusal(); as refusal) {
+      <cmn-alert
+        variant="error"
+        title="The risk gate refused this promotion"
+        data-testid="thesis-revision-refusal"
+      >
+        {{ refusal.note ?? refusal.ruleKey ?? 'It breaks a risk rule.' }}
+        @if (refusal.maxCompliantSizeUsd !== null) {
+          Largest compliant size: {{ refusal.maxCompliantSizeUsd | money }}.
+        }
+        {{ overrideHint }}
+      </cmn-alert>
+      <cmn-checkbox
+        [label]="overrideLabel"
+        formControlName="overrideRisk"
+        data-testid="thesis-revision-override"
+      />
+    }
+
+    <cmn-form-field label="Note (optional)">
+      <cmn-textarea
+        [maxlength]="maxLength"
+        [rows]="rows"
+        formControlName="text"
+        data-testid="thesis-revision-note"
+      />
+    </cmn-form-field>
+  } @else {
+    <cmn-form-field
+      hint="Kept with the decision so Ledger does not re-propose what you turned down."
+      label="Why are you rejecting it?"
+    >
+      <cmn-textarea
+        [maxlength]="maxLength"
+        [rows]="rows"
+        formControlName="text"
+        data-testid="thesis-revision-reason"
+      />
+    </cmn-form-field>
+  }
+
+  @if (store.errorMessage(); as message) {
+    <cmn-alert variant="error" data-testid="thesis-revision-error">{{ message }}</cmn-alert>
+  }
+
+  <cmn-button
+    [disabled]="!canSend()"
+    [loading]="store.isLoading()"
+    [variant]="isConfirm ? 'primary' : 'destructive'"
+    type="submit"
+    data-testid="thesis-revision-submit"
+  >
+    {{ isConfirm ? 'Confirm change' : 'Reject change' }}
+  </cmn-button>
+</form>

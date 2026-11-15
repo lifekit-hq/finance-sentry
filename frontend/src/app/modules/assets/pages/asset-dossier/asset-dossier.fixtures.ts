@@ -4,6 +4,8 @@ import {vi} from 'vitest';
 
 import {type VerdictDisplay} from '../../../../shared/models/preferences/app-preferences.model';
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {type ThesisDto} from '../../../../shared/models/thesis/thesis.model';
+import {type ThesisRevisionDto} from '../../../../shared/models/thesis-revision/thesis-revision.model';
 import {AppPreferencesStore} from '../../../../shared/store/preferences/app-preferences.store';
 import {
   type AssetChartDto,
@@ -14,7 +16,6 @@ import {
   type DossierQuoteDto,
   type DossierQuoteHeader,
   type MetricValue,
-  type ThesisDto,
   type ValuationSnapshotDto,
 } from '../../models/dossier/dossier.model';
 import {dossierComputed} from '../../store/dossier.computed';
@@ -299,6 +300,9 @@ function createMockStore() {
     clearTarget: vi.fn(),
     decidedRecommendation: signal<RecommendationDto | null>(null),
     decideRecommendation: vi.fn(),
+    pendingRevision: signal<ThesisRevisionDto | null>(null),
+    decidedRevision: signal<ThesisRevisionDto | null>(null),
+    decideRevision: vi.fn(),
   };
 }
 

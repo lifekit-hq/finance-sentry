@@ -388,6 +388,26 @@
         </cmn-alert>
       }
 
+      <!-- Ledger's pending thesis change on this ticker: only the owner's confirm writes the thesis. -->
+      @if (store.pendingRevision(); as revision) {
+        <fns-thesis-revision-card
+          [revision]="revision"
+          [thesis]="dossier.thesis"
+          (decide)="store.decideRevision({revision, verdict: $event})"
+        />
+      } @else if (store.decidedRevision(); as decided) {
+        <cmn-alert
+          [title]="revisionRecordedTitle[decided.status]"
+          variant="info"
+          data-testid="dossier-revision-recorded"
+        >
+          {{ kindLabel[decided.kind] }}.
+          @if (decided.decisionNote; as note) {
+            {{ note }}
+          }
+        </cmn-alert>
+      }
+
       @if (!store.hasDossierSections()) {
         <cmn-card class="block" data-testid="dossier-no-data">
           <cmn-empty-state

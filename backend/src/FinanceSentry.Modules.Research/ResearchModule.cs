@@ -367,6 +367,7 @@ public static class ResearchModule
         services.AddScoped<ICandidateRepository, CandidateRepository>();
         services.AddScoped<IRecommendationRepository, RecommendationRepository>();
         services.AddScoped<IThesisRevisionRepository, ThesisRevisionRepository>();
+        services.AddScoped<IThesisEvidenceLinkResolver, ThesisEvidenceLinkResolver>();
         services.AddScoped<RecommendationPositionReader>();
         services.AddScoped<RecommendationWriter>();
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();

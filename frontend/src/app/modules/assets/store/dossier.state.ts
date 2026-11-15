@@ -1,6 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
+import {type ThesisRevisionDto} from '../../../shared/models/thesis-revision/thesis-revision.model';
 import {DEFAULT_CHART_RANGE} from '../constants/dossier/dossier-chart.constants';
 import {
   type AssetChartDto,
@@ -22,6 +23,10 @@ export interface DossierState {
   isEditingTarget: boolean;
   /** The proposal decided on this page, kept so the card's place shows the verdict rather than going blank. */
   decidedRecommendation: Nullable<RecommendationDto>;
+  /** Ledger's pending thesis change for this ticker, which only the owner can confirm; null when none or not read. */
+  pendingRevision: Nullable<ThesisRevisionDto>;
+  /** The thesis change decided on this page, kept so the card's place shows the verdict rather than going blank. */
+  decidedRevision: Nullable<ThesisRevisionDto>;
 }
 
 export const initialDossierState: DossierState = {
@@ -34,4 +39,6 @@ export const initialDossierState: DossierState = {
   targetDraft: '',
   isEditingTarget: false,
   decidedRecommendation: null,
+  pendingRevision: null,
+  decidedRevision: null,
 };

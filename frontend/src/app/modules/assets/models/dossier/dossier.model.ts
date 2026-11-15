@@ -2,6 +2,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
+import {type ThesisDto} from '../../../../shared/models/thesis/thesis.model';
 
 export interface DossierTaxLotEntry {
   quantity: number;
@@ -170,41 +171,6 @@ export interface AssetChartDto {
 export interface SetPriceTargetRequest {
   targetPrice: number;
   currency: Nullable<string>;
-}
-
-export interface ThesisDataPoint {
-  metric: string;
-  direction: string;
-  threshold: number;
-  source: string;
-}
-
-export interface ThesisCatalyst {
-  date: string;
-  event: string;
-}
-
-export interface ThesisInvalidationTrigger {
-  metric: string;
-  direction: string;
-  threshold: number;
-  proxyTicker: Nullable<string>;
-  consecutivePeriods: number;
-  periodType: string;
-}
-
-export interface ThesisDto {
-  id: string;
-  ticker: string;
-  thesisText: string;
-  keyDataPoints: ThesisDataPoint[];
-  catalysts: ThesisCatalyst[];
-  invalidationTriggers: ThesisInvalidationTrigger[];
-  createdAt: string;
-  updatedAt: string;
-  brokenAt: Nullable<string>;
-  brokenReason: Nullable<string>;
-  entryPrice: Nullable<number>;
 }
 
 export interface MetricValue {

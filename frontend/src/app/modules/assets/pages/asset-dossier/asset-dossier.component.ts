@@ -47,10 +47,16 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
+import {TriggerSentencePipe} from '../../../../shared/pipes/trigger-sentence.pipe';
 import {UnitPricePipe} from '../../../../shared/pipes/unit-price.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {RecommendationCardComponent} from '../../../decisions/components/recommendation-card/recommendation-card.component';
+import {ThesisRevisionCardComponent} from '../../../decisions/components/thesis-revision-card/thesis-revision-card.component';
 import {DECISION_RECORDED_TITLE} from '../../../decisions/constants/recommendation/recommendation.constants';
+import {
+  THESIS_REVISION_KIND_LABEL,
+  THESIS_REVISION_RECORDED_TITLE,
+} from '../../../decisions/constants/thesis-revision/thesis-revision.constants';
 import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation.pipe';
 import {DisposalTaxComponent} from '../../components/disposal-tax/disposal-tax.component';
 import {PriceChartComponent} from '../../components/price-chart/price-chart.component';
@@ -75,7 +81,6 @@ import {
   SignalTypeLabelPipe,
 } from '../../pipes/dossier-label.pipe';
 import {MarkdownPipe} from '../../pipes/markdown.pipe';
-import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
 import {DossierStore} from '../../store/dossier.store';
 
 const SIGNAL_SEVERITY_VARIANT: Record<string, TagVariant> = {
@@ -94,6 +99,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   imports: [
     RecommendationCardComponent,
     RecommendationOutcomePipe,
+    ThesisRevisionCardComponent,
     PageComponent,
     AlertComponent,
     AnalystActionLabelPipe,
@@ -146,6 +152,8 @@ export class AssetDossierComponent {
   public readonly accountsRoute = AppRoute.Accounts;
   public readonly decisionsRoute = AppRoute.LedgerDecisions;
   public readonly decisionRecordedTitle = DECISION_RECORDED_TITLE;
+  public readonly revisionRecordedTitle = THESIS_REVISION_RECORDED_TITLE;
+  public readonly kindLabel = THESIS_REVISION_KIND_LABEL;
   public readonly dossierStatus = computed<AsyncStateStatus>(() => {
     if (this.store.dossierErrorMessage()) {
       return 'error';

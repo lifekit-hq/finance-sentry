@@ -9,7 +9,7 @@ import {
   type VerdictReasonDto,
   type VerdictWord,
 } from '../../../../shared/models/scorecard/scorecard.model';
-import {type ThesisDto} from '../../models/dossier/dossier.model';
+import {type ThesisDto} from '../../../../shared/models/thesis/thesis.model';
 import {VerdictBlockComponent} from './verdict-block.component';
 
 const THESIS: ThesisDto = {

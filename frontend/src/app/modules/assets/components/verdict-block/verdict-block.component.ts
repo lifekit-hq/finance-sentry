@@ -12,13 +12,13 @@ import {
 } from '../../../../shared/constants/scorecard/scorecard.constants';
 import {type VerdictDisplay} from '../../../../shared/models/preferences/app-preferences.model';
 import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
+import {type ThesisDto} from '../../../../shared/models/thesis/thesis.model';
 import {
   THESIS_MISSING_PROMPT,
   THESIS_STATE_VARIANT,
   VERDICT_REASON_MARK_CLASS,
   VERDICT_REASON_STATUS_LABEL,
 } from '../../constants/dossier/dossier-verdict.constants';
-import {type ThesisDto} from '../../models/dossier/dossier.model';
 import {DossierVerdictUtils} from '../../utils/dossier-verdict.utils';
 import {VerdictTrailComponent} from '../verdict-trail/verdict-trail.component';
 

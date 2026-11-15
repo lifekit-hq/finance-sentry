@@ -1,8 +1,8 @@
+import {type ThesisDto} from '../../../shared/models/thesis/thesis.model';
 import {
   type AssetDossierDto,
   type DossierNotableMoveDto,
   type RecommendationTrendDto,
-  type ThesisDto,
   type ValuationSnapshotDto,
 } from '../models/dossier/dossier.model';
 import {DossierViewUtils} from './dossier-view.utils';

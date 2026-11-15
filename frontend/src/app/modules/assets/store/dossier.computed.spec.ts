@@ -6,6 +6,7 @@ import {beforeEach, describe, expect, it} from 'vitest';
 
 import {type AppPreferences} from '../../../shared/models/preferences/app-preferences.model';
 import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
+import {type ThesisDto} from '../../../shared/models/thesis/thesis.model';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {
   type AssetChartDto,
@@ -17,7 +18,6 @@ import {
   type DossierSignalItem,
   type EarningsEventDto,
   type NewsArticleDto,
-  type ThesisDto,
   type ValuationSnapshotDto,
 } from '../models/dossier/dossier.model';
 import {dossierComputed} from './dossier.computed';
