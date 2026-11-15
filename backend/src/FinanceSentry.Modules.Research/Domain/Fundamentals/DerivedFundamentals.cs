@@ -22,9 +22,9 @@ public sealed record FreeCashFlowPeriod(
 
 /// <summary>
 /// One fiscal year's return on equity (parent net income / year-end parent equity), labelled by the year of its
-/// period end (EDGAR's fiscal year is the filing's, so a repeated comparative would carry the wrong one): the proxy for ROIC,
-/// which needs debt, cash and tax lines the fundamentals chain does not carry. Null with
-/// <see cref="Reason"/> when an input is missing or equity is not positive.
+/// period end (EDGAR's fiscal year is the filing's, so a repeated comparative would carry the wrong one): the
+/// cruder sibling of <see cref="ReturnOnInvestedCapitalPeriod"/>, which stays computable when debt or tax lines are
+/// missing. Null with <see cref="Reason"/> when an input is missing or equity is not positive.
 /// </summary>
 public sealed record ReturnOnEquityPeriod(
     DateOnly PeriodEnd,
@@ -32,4 +32,27 @@ public sealed record ReturnOnEquityPeriod(
     decimal? NetIncome,
     decimal? StockholdersEquity,
     decimal? ReturnOnEquity,
+    string? Reason);
+
+/// <summary>
+/// One fiscal year's return on invested capital (#1376): NOPAT / year-end invested capital, where
+/// NOPAT = operating income x (1 - effective tax rate), the rate being income tax / pre-tax income (bounded to
+/// 0-100%), and invested capital = debt + parent stockholders' equity - cash and cash equivalents (marketable
+/// securities are not netted, operating leases are not added). Every input is shown so the figure can be
+/// checked; the whole row is null with <see cref="Reason"/> (naming what is missing or why it cannot be formed)
+/// rather than filled with zeros. <see cref="Debt"/> is borrowings as the filer tags them: the total when it
+/// reports one, otherwise the long-term line plus the current line when that is reported too.
+/// </summary>
+public sealed record ReturnOnInvestedCapitalPeriod(
+    DateOnly PeriodEnd,
+    int? FiscalYear,
+    string? Unit,
+    decimal? OperatingIncome,
+    decimal? EffectiveTaxRate,
+    decimal? Nopat,
+    decimal? Debt,
+    decimal? StockholdersEquity,
+    decimal? Cash,
+    decimal? InvestedCapital,
+    decimal? ReturnOnInvestedCapital,
     string? Reason);

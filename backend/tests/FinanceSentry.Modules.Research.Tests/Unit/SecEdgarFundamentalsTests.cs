@@ -378,6 +378,35 @@ public sealed class SecEdgarFundamentalsTests
     }
 
     [Fact]
+    public async Task ReturnOnInvestedCapitalInputs_AreReadUnderTheirFriendlyConcepts_AndTheBroaderCurrentDebtTagWins()
+    {
+        const string narrowCurrent = """{"label":"Current LTD","units":{"USD":[{"end":"2024-12-31","val":100,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        const string broadCurrent = """{"label":"Debt, current","units":{"USD":[{"end":"2024-12-31","val":150,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        const string tax = """{"label":"Income tax","units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":40,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json("""{"0":{"cik_str":1234567,"ticker":"ACME","title":"Acme Corp"}}""");
+            }
+
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/LongTermDebtCurrent.json" => Json(narrowCurrent),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/DebtCurrent.json" => Json(broadCurrent),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/IncomeTaxExpenseBenefit.json" => Json(tax),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            };
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
+
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.CurrentDebtConcept).Value.Should().Be(150m);
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.IncomeTaxExpenseConcept)
+            .Should().Match<FundamentalFact>(f => f.Value == 40m && f.FiscalPeriod == "FY" && f.PeriodEnd == new DateOnly(2024, 12, 31));
+    }
+
+    [Fact]
     public async Task ReturnOnEquity_LabelsAYearByTheFilingThatFirstReportedIt_NotItsLaterComparative()
     {
         // The FY2024 10-K repeats the 2023 year-end figures as comparatives tagged fy=2024.

@@ -163,9 +163,16 @@ public static class CashFlowMath
     }
 }
 
-/// <summary>Free cash flow and return on equity derived from the chain's facts (#1376).</summary>
+/// <summary>Free cash flow, return on equity and return on invested capital derived from the chain's facts (#1376).</summary>
 public static class DerivedFundamentalsMath
 {
+    public const string IncomeTaxExpenseConcept = "IncomeTaxExpense";
+    public const string PretaxIncomeConcept = "PretaxIncome";
+    public const string LongTermDebtConcept = "LongTermDebt";
+    public const string CurrentDebtConcept = "CurrentDebt";
+    public const string TotalDebtConcept = "TotalDebt";
+    public const string CashConcept = "CashAndEquivalents";
+
     private const int YearEarlierToleranceDays = 45;
 
     public static IReadOnlyList<FreeCashFlowPeriod> FreeCashFlow(
@@ -203,6 +210,85 @@ public static class DerivedFundamentalsMath
                 return new ReturnOnEquityPeriod(end, fy, ni.Value, eq.Value, ni.Value / eq.Value, null);
             })
             .ToList();
+    }
+
+    public static IReadOnlyList<ReturnOnInvestedCapitalPeriod> ReturnOnInvestedCapital(
+        IReadOnlyList<FundamentalFact> facts, int years)
+    {
+        var operating = Annual(facts, "OperatingIncome");
+        var equity = Annual(facts, "StockholdersEquity");
+        var inputs = new RoicInputs(
+            Annual(facts, IncomeTaxExpenseConcept), Annual(facts, PretaxIncomeConcept), Annual(facts, LongTermDebtConcept),
+            Annual(facts, CurrentDebtConcept), Annual(facts, TotalDebtConcept), Annual(facts, CashConcept));
+
+        // One row per fiscal year the operating result or the balance sheet speaks for.
+        return operating.Keys.Union(equity.Keys)
+            .OrderByDescending(end => end)
+            .Take(years)
+            .Select(end => RoicFor(
+                end,
+                operating.GetValueOrDefault(end),
+                equity.GetValueOrDefault(end),
+                inputs))
+            .ToList();
+    }
+
+    private sealed record RoicInputs(
+        Dictionary<DateOnly, FundamentalFact> Tax,
+        Dictionary<DateOnly, FundamentalFact> Pretax,
+        Dictionary<DateOnly, FundamentalFact> LongTermDebt,
+        Dictionary<DateOnly, FundamentalFact> CurrentDebt,
+        Dictionary<DateOnly, FundamentalFact> TotalDebt,
+        Dictionary<DateOnly, FundamentalFact> Cash);
+
+    private static ReturnOnInvestedCapitalPeriod RoicFor(
+        DateOnly end, FundamentalFact? operatingIncome, FundamentalFact? equity, RoicInputs inputs)
+    {
+        var tax = inputs.Tax.GetValueOrDefault(end);
+        var pretax = inputs.Pretax.GetValueOrDefault(end);
+        var cash = inputs.Cash.GetValueOrDefault(end);
+        var total = inputs.TotalDebt.GetValueOrDefault(end);
+        var longTerm = inputs.LongTermDebt.GetValueOrDefault(end);
+        var current = inputs.CurrentDebt.GetValueOrDefault(end);
+
+        // Debt: the filer's total borrowings when it tags one, else the long-term line plus the current line
+        // when that is tagged too. A filer with no debt line reports none, which is not read as "no debt".
+        FundamentalFact[] debtFacts = total is not null ? [total] : longTerm is not null ? [longTerm, .. current is null ? [] : new[] { current }] : [];
+        decimal? debt = debtFacts.Length > 0 ? debtFacts.Sum(f => f.Value) : null;
+
+        var present = new[] { operatingIncome, tax, pretax, equity, cash }.OfType<FundamentalFact>().Concat(debtFacts).ToList();
+        var units = present.Select(f => f.Unit).Distinct(StringComparer.Ordinal).ToList();
+
+        ReturnOnInvestedCapitalPeriod Row(string? reason, decimal? rate = null, decimal? nopat = null, decimal? capital = null, decimal? roic = null)
+            => new(end, end.Year, units.Count == 1 ? units[0] : null, operatingIncome?.Value, rate, nopat, debt,
+                equity?.Value, cash?.Value, capital, roic, reason);
+
+        var missing = new[]
+        {
+            (operatingIncome is null, "operating income"), (tax is null, "income tax expense"), (pretax is null, "pre-tax income"),
+            (equity is null, "stockholders' equity"), (cash is null, "cash and cash equivalents"), (debt is null, "debt"),
+        }.Where(m => m.Item1).Select(m => m.Item2).ToList();
+        if (missing.Count > 0)
+        {
+            return Row($"{string.Join(", ", missing)} not reported for the year (nothing assumed zero)");
+        }
+
+        if (units.Count > 1)
+        {
+            return Row("inputs are reported in different units");
+        }
+
+        if (pretax!.Value <= 0)
+        {
+            return Row("pre-tax income is not positive, so the year has no meaningful tax rate");
+        }
+
+        var rate = Math.Clamp(tax!.Value / pretax.Value, 0m, 1m);
+        var nopat = operatingIncome!.Value * (1 - rate);
+        var capital = debt!.Value + equity!.Value - cash!.Value;
+        return capital <= 0
+            ? Row("invested capital (debt + equity - cash) is not positive", rate, nopat, capital)
+            : Row(null, rate, nopat, capital, nopat / capital);
     }
 
     private static Dictionary<DateOnly, FundamentalFact> Annual(IReadOnlyList<FundamentalFact> facts, string concept)
