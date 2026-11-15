@@ -30,6 +30,7 @@ const PAGE = {items: [], totalCount: 45, unreadCount: 7, page: 2, pageSize: 20, 
 
 function build() {
   return {
+    query: signal<AlertsQuery>({filter: 'all', search: ''}),
     search: signal(''),
     filter: signal<AlertFilter>('all'),
     status: signal<AsyncStatus>('idle'),
@@ -75,6 +76,18 @@ describe('alertsEffects', () => {
     expect(store.setData).toHaveBeenCalledWith([], 45, 7);
     expect(store.setSuccess).toHaveBeenCalledOnce();
     expect(store.setError).not.toHaveBeenCalled();
+  });
+
+  it('reload fetches the first page of the query on screen again', () => {
+    const store = build();
+    store.query.set({filter: 'unread', search: 'rent'});
+    TestBed.runInInjectionContext(() => {
+      alertsEffects(store).reload();
+    });
+
+    expect(api.getAlerts).toHaveBeenCalledWith('unread', 1, ALERTS_PAGE_SIZE, 'rent');
+    expect(store.setLoading).toHaveBeenCalledOnce();
+    expect(store.setSuccess).toHaveBeenCalledOnce();
   });
 
   it('load records an error and no data when the request fails', () => {

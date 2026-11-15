@@ -43,3 +43,7 @@ export const PHONE_TAB_ROUTES: readonly string[] = [
   AppRoute.Transactions,
   AppRoute.Alerts,
 ];
+
+/** Palette action that reloads the page on screen: the keyboard way to what pull to refresh does by touch. */
+export const REFRESH_ACTION_ID = '_refresh_page';
+export const REFRESH_LABEL = 'Refresh this page';

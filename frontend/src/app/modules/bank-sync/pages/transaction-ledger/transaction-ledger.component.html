@@ -1,4 +1,4 @@
-<cmn-page kind="list" fill>
+<cmn-page [reload]="store.load" [reloading]="store.isLoading()" kind="list" fill>
   <!-- One line is held while the figures load, so their arrival does not push the list down. -->
   <p class="mb-cmn-4 min-h-[1lh] text-cmn-sm text-text-secondary" data-testid="ledger-summary">
     @if (store.outflow(); as outflow) {

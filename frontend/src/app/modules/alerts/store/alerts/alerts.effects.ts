@@ -23,6 +23,7 @@ import {ALERTS_PAGE_SIZE} from './alerts.state';
 export const ALERT_SEARCH_DEBOUNCE_MS = 300;
 
 interface EffectsStore {
+  query: Signal<AlertsQuery>;
   search: Signal<string>;
   filter: Signal<AlertFilter>;
   status: Signal<AsyncStatus>;
@@ -48,31 +49,35 @@ export function alertsEffects(store: EffectsStore) {
   const api = inject(AlertsService);
   const firstPageStarted$ = new Subject<void>();
 
-  return {
-    /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands. */
-    load: rxMethod<AlertsQuery>(
-      pipe(
-        tap(() => {
-          firstPageStarted$.next();
-          store.setAppendIdle();
-          store.setLoading();
-        }),
-        switchMap(({filter: kind, search}) =>
-          api.getAlerts(kind, 1, ALERTS_PAGE_SIZE, search).pipe(
-            tap(res => {
-              store.setData(res.items, res.totalCount, res.unreadCount);
-              store.setAppendSuccess();
-              store.setSuccess();
-            }),
-            catchError(() => {
-              store.clearData();
-              store.setError(null);
-              return EMPTY;
-            })
-          )
+  /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands. */
+  const load = rxMethod<AlertsQuery>(
+    pipe(
+      tap(() => {
+        firstPageStarted$.next();
+        store.setAppendIdle();
+        store.setLoading();
+      }),
+      switchMap(({filter: kind, search}) =>
+        api.getAlerts(kind, 1, ALERTS_PAGE_SIZE, search).pipe(
+          tap(res => {
+            store.setData(res.items, res.totalCount, res.unreadCount);
+            store.setAppendSuccess();
+            store.setSuccess();
+          }),
+          catchError(() => {
+            store.clearData();
+            store.setError(null);
+            return EMPTY;
+          })
         )
       )
-    ),
+    )
+  );
+
+  return {
+    load,
+    /** Loads the query on screen again (pull to refresh); the rows stay until the first page lands. */
+    reload: () => load(store.query()),
     /**
      * Appends the next page (the infinite list's paging contract): asked near the end and on retry.
      * The page follows the rows on screen, so a row removed locally is refilled, not skipped.

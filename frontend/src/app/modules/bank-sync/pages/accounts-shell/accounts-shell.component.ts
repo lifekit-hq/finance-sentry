@@ -21,7 +21,12 @@ import {ConnectStore} from '../../store/connect/connect.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [AccountsStore, ConnectStore],
   template: `
-    <cmn-page kind="list" fill>
+    <cmn-page
+      [reload]="accountsStore.load"
+      [reloading]="accountsStore.isLoading()"
+      kind="list"
+      fill
+    >
       <p class="text-cmn-sm text-text-secondary">Balances and holdings across every provider</p>
 
       <cmn-page-scroll class="mt-cmn-6" label="Accounts">
@@ -34,6 +39,8 @@ export class AccountsShellComponent {
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly connectStore = inject(ConnectStore);
+
+  protected readonly accountsStore = inject(AccountsStore);
 
   constructor() {
     inject(CmnPageActionsService)
