@@ -10,6 +10,7 @@ using FinanceSentry.Modules.Research.Domain.Coverage;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.ReferenceUniverse;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
+using FinanceSentry.Modules.Research.Domain.Revisions;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.EntityFrameworkCore;
@@ -57,6 +58,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
     public DbSet<AssetPriceTarget> AssetPriceTargets { get; set; } = null!;
 
     public DbSet<Recommendation> Recommendations { get; set; } = null!;
+
+    public DbSet<ThesisRevision> ThesisRevisions { get; set; } = null!;
 
     public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
 
@@ -694,6 +697,38 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .IsUnique()
             .HasFilter("\"Status\" = 'Pending'")
             .HasDatabaseName("ux_recommendations_user_ticker_pending");
+
+        var trv = modelBuilder.Entity<ThesisRevision>();
+        trv.ToTable("thesis_revisions");
+        trv.HasKey(x => x.Id);
+        trv.Property(x => x.UserId).IsRequired();
+        trv.Property(x => x.Kind).IsRequired().HasMaxLength(20);
+        trv.Property(x => x.Status).IsRequired().HasMaxLength(20);
+        trv.Property(x => x.ProposedBy).IsRequired().HasMaxLength(20);
+        trv.Property(x => x.SubjectType).IsRequired().HasMaxLength(20);
+        trv.Property(x => x.SubjectId).IsRequired();
+        trv.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        trv.Property(x => x.Proposed)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<ThesisRevisionContent>(v, jsonOptions) ?? new ThesisRevisionContent());
+        trv.Property(x => x.Rationale).IsRequired().HasMaxLength(ThesisRevision.MaxRationaleLength);
+        trv.Property(x => x.Evidence)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, jsonOptions),
+                v => v == null ? null : JsonSerializer.Deserialize<ThesisEvidenceRefs>(v, jsonOptions));
+        trv.Property(x => x.ProposedUsd).HasColumnType("numeric(18,2)");
+        trv.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        trv.Property(x => x.ExpiresAt).IsRequired();
+        trv.Property(x => x.DecisionNote).HasMaxLength(ThesisRevision.MaxDecisionNoteLength);
+        trv.HasIndex(x => new { x.UserId, x.Status, x.CreatedAt }).HasDatabaseName("idx_thesis_revisions_user_status_created");
+        // One Pending proposal per (UserId, SubjectId): a newer one supersedes it. Partial, so decided rows stay.
+        trv.HasIndex(x => new { x.UserId, x.SubjectId })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Pending'")
+            .HasDatabaseName("ux_thesis_revisions_user_subject_pending");
     }
 
     private static readonly ValueComparer<float[]> FloatArrayComparer = new(

@@ -4,7 +4,9 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Coverage;
+using FinanceSentry.Modules.Research.Domain.Exceptions;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
+using FinanceSentry.Modules.Research.Domain.Revisions;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
@@ -117,6 +119,66 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         (await asNoOne.Theses.AnyAsync()).Should().BeFalse("no person in scope matches no row");
         (await asNoOne.PolicyStatements.AnyAsync()).Should().BeFalse();
         (await asNoOne.WatchlistItems.AnyAsync()).Should().BeFalse();
+    }
+
+    private static ThesisRevision NewRevision(Guid userId, Guid subjectId, DateTimeOffset? expiresAt = null) => new()
+    {
+        UserId = userId,
+        Kind = ThesisRevisionKind.NarrativeUpdate,
+        ProposedBy = ThesisEventOrigin.Ledger,
+        SubjectType = ThesisSubjectType.Thesis,
+        SubjectId = subjectId,
+        Ticker = "CBRS",
+        Proposed = new ThesisRevisionContent(
+            ThesisText: "Narrowed.", InvalidationTriggers: [new ThesisInvalidationTrigger("price_drawdown", "greaterThan", 0.4m)]),
+        Rationale = "Filing.",
+        Evidence = new ThesisEvidenceRefs(FilingAccessions: ["0001-26-1"]),
+        ExpiresAt = expiresAt ?? DateTimeOffset.UtcNow.AddDays(14),
+    };
+
+    [DockerRequiredFact]
+    public async Task Thesis_revisions_are_private_round_trip_their_content_and_allow_one_pending_per_subject()
+    {
+        var subject = Guid.NewGuid();
+        var mine = NewRevision(_userA, subject);
+        var theirs = NewRevision(_userB, subject);
+
+        await using (var asA = CreateContext(_userA))
+            await new ThesisRevisionRepository(asA).AddPendingAsync(mine);
+        await using (var asB = CreateContext(_userB))
+            await new ThesisRevisionRepository(asB).AddPendingAsync(theirs);
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var read = await repo.GetAsync(_userA, mine.Id);
+            read!.Proposed.ThesisText.Should().Be("Narrowed.");
+            read.Proposed.InvalidationTriggers!.Single().Threshold.Should().Be(0.4m);
+            read.Evidence!.FilingAccessions.Should().Equal("0001-26-1");
+            read.Kind.Should().Be(ThesisRevisionKind.NarrativeUpdate);
+            (await repo.GetAsync(_userA, theirs.Id)).Should().BeNull("the filter holds even when a read names another person's row");
+            (await repo.ListPendingAsync(_userA)).Select(r => r.Id).Should().Equal(mine.Id);
+
+            var duplicate = () => repo.AddPendingAsync(NewRevision(_userA, subject));
+            await duplicate.Should().ThrowAsync<ThesisRevisionConflictException>("one proposal stays open per subject");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.ThesisRevisions.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task The_revision_expiry_sweep_finds_every_users_overdue_proposals_with_no_person_in_scope()
+    {
+        var overdueA = NewRevision(_userA, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-1));
+        var overdueB = NewRevision(_userB, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-2));
+        var live = NewRevision(_userA, Guid.NewGuid());
+        await SeedAsync(overdueA, overdueB, live);
+
+        await using var job = CreateContext();
+        var expired = await new ThesisRevisionRepository(job).ListExpiredUnscopedAsync(DateTimeOffset.UtcNow);
+
+        expired.Select(r => r.Id).Should().BeEquivalentTo([overdueA.Id, overdueB.Id]);
     }
 
     [DockerRequiredFact]

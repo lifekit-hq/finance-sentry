@@ -11,11 +11,11 @@ using Xunit;
 namespace FinanceSentry.Mcp.Tests;
 
 /// <summary>
-/// The split between what Ledger's service token may write and what stays the owner's. Ledger forms, revises, promotes
-/// and rejects theses and keeps the watchlist itself (the owner decides only buy or not), every such change journaled
-/// with its origin so it is visible and reversible. Still owner-session only, hidden from a service token's tools/list
-/// and refused on call: deleting a thesis, registering a thesis source, and anything on the IPS or the risk
-/// measurement behind it. The owner's own session (a personal token) keeps every tool.
+/// The split between what Ledger's service token may write and what stays the owner's. Ledger rejects candidates, keeps
+/// the watchlist and PROPOSES thesis changes (a promotion, a narrative or trigger update, a close); it never writes a
+/// thesis itself. Owner-session only, hidden from a service token's tools/list and refused on call: saving, promoting,
+/// reverting and deleting a thesis, confirming or rejecting a proposal, registering a thesis source, and anything on
+/// the IPS or the risk measurement behind it. The owner's own session (a personal token) keeps every tool.
 /// </summary>
 public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : IClassFixture<McpHttpHostFixture>
 {
@@ -23,25 +23,38 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
 
     private static readonly string[] PersonalTokenOnlyTools =
     [
+        "decide_thesis_revision",
         "delete_thesis",
+        "promote_candidate",
         "record_risk_remeasurement",
         "register_thesis_source",
+        "revert_thesis_revision",
         "save_ips",
+        "save_thesis",
     ];
 
-    /// <summary>What Ledger's service token may now call: every Research tool it forms, revises and undoes theses with.</summary>
-    private static readonly string[] LedgerWritableTools =
+    /// <summary>The thesis writes Ledger's service token must never reach: each one changes a thesis or promotes a candidate.</summary>
+    private static readonly string[] ThesisWriteTools =
     [
+        "decide_thesis_revision",
         "promote_candidate",
-        "reject_candidate",
         "revert_thesis_revision",
         "save_thesis",
+    ];
+
+    /// <summary>What Ledger's service token may call: the candidate and watchlist writes and the thesis proposal.</summary>
+    private static readonly string[] LedgerWritableTools =
+    [
+        "propose_thesis_revision",
+        "reject_candidate",
         "watchlist",
     ];
 
     public static TheoryData<string> PersonalTokenOnlyToolNames() => [.. PersonalTokenOnlyTools];
 
     public static TheoryData<string> LedgerWritableToolNames() => [.. LedgerWritableTools];
+
+    public static TheoryData<string> ThesisWriteToolNames() => [.. ThesisWriteTools];
 
     [Fact]
     public void PersonalTokenGate_CoversExactlyTheOwnerOnlyTools()
@@ -68,7 +81,8 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
         foreach (var tool in LedgerWritableTools)
             body.Should().Contain($"\"{tool}\"");
         body.Should().Contain("\"list_theses\"").And.Contain("\"list_thesis_events\"")
-            .And.Contain("\"propose_recommendation\"").And.Contain("\"score_candidate\"");
+            .And.Contain("\"propose_recommendation\"").And.Contain("\"score_candidate\"")
+            .And.Contain("\"list_thesis_revisions\"");
     }
 
     [Fact]
@@ -91,6 +105,29 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
         var body = await ReadBodyAsync(await CallToolAsync(token, tool, "{}"));
 
         body.Should().Contain("\"error\"").And.Contain("forbidden", Exactly.Once(), "the authorization filter refuses before the tool runs");
+    }
+
+    [Theory]
+    [MemberData(nameof(ThesisWriteToolNames))]
+    public async Task ToolsList_ForServiceToken_DoesNotOfferAnyThesisWrite(string tool)
+    {
+        var token = await ServiceTokenAsync();
+
+        var body = await ReadBodyAsync(await PostAsync(token, """{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"""));
+
+        body.Should().NotContain($"\"{tool}\"");
+    }
+
+    [Theory]
+    [MemberData(nameof(ThesisWriteToolNames))]
+    public async Task CallingAThesisWrite_WithServiceTokenAndRealArguments_IsRefusedBeforeTheToolRuns(string tool)
+    {
+        var token = await ServiceTokenAsync();
+        var arguments = $$"""{"id":"{{Guid.NewGuid()}}","eventId":"{{Guid.NewGuid()}}","verdict":"Confirm"}""";
+
+        var body = await ReadBodyAsync(await CallToolAsync(token, tool, arguments));
+
+        body.Should().Contain("\"error\"").And.Contain("forbidden");
     }
 
     [Theory]

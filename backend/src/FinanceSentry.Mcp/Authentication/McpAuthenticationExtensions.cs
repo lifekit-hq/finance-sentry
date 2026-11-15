@@ -18,8 +18,8 @@ namespace FinanceSentry.Mcp.Authentication;
 /// permission takes effect on its next request; short-lived OAuth access tokens skip both checks. The endpoint
 /// policy (<see cref="AuthPolicies.RequireMcpAccess"/>) gates each token kind by its own permission: personal
 /// tokens by <c>mcp.connect</c>, service tokens by <c>mcp.service</c> alone. Tools on the IPS, the risk
-/// measurement behind it and thesis deletion/sources additionally require <see cref="AuthPolicies.RequireMcpPersonalToken"/>,
-/// which no service token passes; Ledger's thesis, candidate and watchlist writes are open to it and journaled with their origin.
+/// measurement behind it, every thesis write and promotion, and the confirm of a thesis revision additionally require <see cref="AuthPolicies.RequireMcpPersonalToken"/>,
+/// which no service token passes; Ledger's candidate and watchlist writes are open to it and journaled with their origin, and it proposes thesis changes (<c>propose_thesis_revision</c>) for the owner to confirm.
 /// </summary>
 public static class McpAuthenticationExtensions
 {
