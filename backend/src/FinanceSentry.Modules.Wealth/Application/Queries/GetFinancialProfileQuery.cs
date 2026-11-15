@@ -42,6 +42,9 @@ public static class FinancialProfileReasons
     public const string RiskCapacityNotSet = "RISK_CAPACITY_NOT_SET";
     public const string DrawdownNotSet = "DRAWDOWN_TOLERANCE_NOT_SET";
     public const string RiskRemeasurementDue = "RISK_REMEASUREMENT_DUE";
+    public const string NoTaxProfile = "NO_TAX_PROFILE";
+    public const string TaxProfileUnreadable = "TAX_PROFILE_UNREADABLE";
+    public const string TaxJurisdictionNotSet = "TAX_JURISDICTION_NOT_SET";
 }
 
 /// <summary>
@@ -99,6 +102,20 @@ public record IncomeSummary(
 public record CareerSummary(bool Readable, int Events, int CountedEvents);
 
 /// <summary>
+/// The tax profile the person stated (#454): the jurisdiction code, whether they wrote notes and a caveat, and the text of
+/// both when this host can read it. <paramref name="Readable"/> is false on a host that holds no encryption key (the MCP
+/// host): the text is then null while the flags still say what is on file. Surface it and refer; nothing is computed from it.
+/// </summary>
+public record TaxProfileSummary(
+    bool Readable,
+    string? Jurisdiction,
+    bool HasJurisdictionNotes,
+    bool HasCaveat,
+    string? JurisdictionNotes,
+    string? Caveat,
+    string Disclosure = TaxProfileText.Disclosure);
+
+/// <summary>
 /// The capacity indicator with the recorded value beside it (#454 S7). <paramref name="RecordedCapacity"/> is what the IPS
 /// holds today (null until set); <paramref name="DiffersFromRecorded"/> is true when a suggestion exists and is not that
 /// number. The indicator never writes the IPS: the owner records the number (<c>record_risk_remeasurement</c>).
@@ -114,8 +131,8 @@ public record CapacitySuggestion(
     string Label = CapacityIndicator.Label);
 
 /// <summary>
-/// The agent-readable map of the person's money situation (#454 S7): the cashflow, goal, income, career, disposal-tax and
-/// policy-risk summaries in one object, each with its own <see cref="DataQuality"/>, so the reader states what is missing
+/// The agent-readable map of the person's money situation (#454 S7): the cashflow, goal, income, career, disposal-tax, stated
+/// tax-profile and policy-risk summaries in one object, each with its own <see cref="DataQuality"/>, so the reader states what is missing
 /// instead of guessing. <paramref name="MissingSections"/> names the sections that are <see cref="DataQuality.Missing"/>.
 /// Computed on read; nothing is stored. Every figure is context for the person's own planning, never a trading signal.
 /// Amounts are USD except the disposal-tax estimate, which is EUR.
@@ -127,6 +144,7 @@ public record FinancialProfileResponse(
     ProfileSection<IncomeSummary> Income,
     ProfileSection<CareerSummary> Career,
     ProfileSection<DisposalTaxSummary> DisposalTax,
+    ProfileSection<TaxProfileSummary> TaxProfile,
     ProfileSection<IpsRiskProfile> Risk,
     CapacitySuggestion CapacityIndicator,
     IReadOnlyList<string> MissingSections,
@@ -154,6 +172,7 @@ public class GetFinancialProfileQueryHandler(
     IQueryHandler<GetCareerTimelineQuery, CareerTimelineResponse> career,
     ProjectionInputsReader inputs,
     IDisposalTaxSummaryReader disposalTax,
+    IQueryHandler<GetTaxProfileQuery, TaxProfileDto> taxProfile,
     IRiskProfileReader risk,
     TimeProvider clock,
     ILogger<GetFinancialProfileQueryHandler> logger)
@@ -169,6 +188,7 @@ public class GetFinancialProfileQueryHandler(
         var incomeRead = await ReadAsync("income", async () => await income.Handle(new GetIncomeProfileQuery(userId), cancellationToken));
         var careerRead = await ReadAsync("career", async () => await career.Handle(new GetCareerTimelineQuery(userId), cancellationToken));
         var taxRead = await ReadAsync("disposal tax", async () => await disposalTax.ReadAsync(userId, cancellationToken));
+        var taxProfileRead = await ReadAsync("tax profile", async () => await taxProfile.Handle(new GetTaxProfileQuery(userId), cancellationToken));
         var riskRead = await ReadAsync("risk", () => risk.GetCurrentAsync(userId, cancellationToken));
         var spreadRead = await ReadAsync("income spread", async () => IncomeSpreadOf(await inputs.ReadAsync(userId, cancellationToken)));
 
@@ -177,6 +197,7 @@ public class GetFinancialProfileQueryHandler(
         var incomeSection = Section(incomeRead, IncomeOf);
         var careerSection = Section(careerRead, CareerOf);
         var taxSection = Section(taxRead, DisposalTaxOf);
+        var taxProfileSection = Section(taxProfileRead, TaxProfileOf);
         var riskSection = RiskSection(riskRead);
 
         var capacity = CapacityOf(cashflowRead.Value, goalsSection.Data, incomeRead.Value, spreadRead.Value, riskRead.Value);
@@ -188,6 +209,7 @@ public class GetFinancialProfileQueryHandler(
             ("income", incomeSection.DataQuality),
             ("career", careerSection.DataQuality),
             ("disposalTax", taxSection.DataQuality),
+            ("taxProfile", taxProfileSection.DataQuality),
             ("risk", riskSection.DataQuality),
         };
 
@@ -198,6 +220,7 @@ public class GetFinancialProfileQueryHandler(
             incomeSection,
             careerSection,
             taxSection,
+            taxProfileSection,
             riskSection,
             capacity,
             [.. sections.Where(s => s.Quality == DataQuality.Missing).Select(s => s.Name)]);
@@ -310,6 +333,23 @@ public class GetFinancialProfileQueryHandler(
         return t.WithheldCount == 0
             ? new(DataQuality.Complete, [], t)
             : new(t.ShownCount == 0 ? DataQuality.Missing : DataQuality.Partial, [FinancialProfileReasons.PositionsWithheld], t);
+    }
+
+    private static ProfileSection<TaxProfileSummary> TaxProfileOf(TaxProfileDto t)
+    {
+        if (t.IsEmpty)
+            return new(DataQuality.Missing, [FinancialProfileReasons.NoTaxProfile], null);
+
+        var summary = new TaxProfileSummary(
+            t.Readable, t.Jurisdiction, t.HasJurisdictionNotes, t.HasCaveat, t.JurisdictionNotes, t.Caveat);
+
+        var reasons = new List<string>();
+        if (t.Jurisdiction is null)
+            reasons.Add(FinancialProfileReasons.TaxJurisdictionNotSet);
+        if (!t.Readable)
+            reasons.Add(FinancialProfileReasons.TaxProfileUnreadable);
+
+        return new(reasons.Count == 0 ? DataQuality.Complete : DataQuality.Partial, reasons, summary);
     }
 
     private static ProfileSection<IpsRiskProfile> RiskSection(Read<IpsRiskProfile> read)

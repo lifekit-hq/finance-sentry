@@ -27,6 +27,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
     private readonly Mock<IHonestMonthlyFlowReader> _monthlyFlow = new();
     private readonly Mock<IUserFireAssumptionsReader> _assumptions = new();
     private readonly Mock<IDisposalTaxSummaryReader> _tax = new();
+    private readonly Mock<IQueryHandler<GetTaxProfileQuery, TaxProfileDto>> _taxProfile = new();
     private readonly Mock<IRiskProfileReader> _risk = new();
     private readonly FakeTimeProvider _clock = new(Now);
 
@@ -37,6 +38,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
         Income(IncomeWith(IncomeVariance.Matches));
         Career(new CareerTimelineResponse(true, [Event()], 1));
         Tax(new DisposalTaxSummary(2, 2, 0, 410m, 2026, new Dictionary<string, int>()));
+        TaxProfile(StatedTaxProfile());
         Risk(new IpsRiskProfile(3, 3, 25m, Now.AddDays(-30), false, 20, 15_000m));
         Months(5_000m, 5_200m, 5_100m, 4_900m, 5_000m, 5_100m);
     }
@@ -44,7 +46,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
     private GetFinancialProfileQueryHandler CreateHandler() => new(
         _cashflow.Object, _goals.Object, _income.Object, _career.Object,
         new ProjectionInputsReader(_snapshots.Object, _monthlyFlow.Object, _assumptions.Object, NoCoverageHoles.Reader, _clock),
-        _tax.Object, _risk.Object, _clock, NullLogger<GetFinancialProfileQueryHandler>.Instance);
+        _tax.Object, _taxProfile.Object, _risk.Object, _clock, NullLogger<GetFinancialProfileQueryHandler>.Instance);
 
     private Task<FinancialProfileResponse> Read() =>
         CreateHandler().Handle(new GetFinancialProfileQuery(UserId), CancellationToken.None);
@@ -63,6 +65,15 @@ public sealed class GetFinancialProfileQueryHandlerTests
 
     private void Tax(DisposalTaxSummary r) =>
         _tax.Setup(h => h.ReadAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(r);
+
+    private void TaxProfile(TaxProfileDto r) =>
+        _taxProfile.Setup(h => h.Handle(It.IsAny<GetTaxProfileQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(r);
+
+    private static TaxProfileDto StatedTaxProfile(bool readable = true, string? jurisdiction = "IE") => new(
+        readable, jurisdiction, readable ? "Synthetic note: PAYE employee" : null, readable ? "Synthetic caveat: not advice" : null,
+        true, true, Now.AddDays(-3));
+
+    private static TaxProfileDto NoTaxProfile() => new(true, null, null, null, false, false, null);
 
     private void Risk(IpsRiskProfile? r) =>
         _risk.Setup(h => h.GetCurrentAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(r);
@@ -103,6 +114,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
         profile.Income.DataQuality.Should().Be(DataQuality.Complete);
         profile.Career.DataQuality.Should().Be(DataQuality.Complete);
         profile.DisposalTax.DataQuality.Should().Be(DataQuality.Complete);
+        profile.TaxProfile.DataQuality.Should().Be(DataQuality.Complete);
         profile.Risk.DataQuality.Should().Be(DataQuality.Complete);
         profile.MissingSections.Should().BeEmpty();
     }
@@ -121,6 +133,8 @@ public sealed class GetFinancialProfileQueryHandlerTests
         profile.Career.Data.Should().Be(new CareerSummary(true, 1, 1));
         profile.DisposalTax.Data!.EstimatedTaxEur.Should().Be(410m);
         profile.Risk.Data!.RiskCapacity.Should().Be(3);
+        profile.TaxProfile.Data!.Jurisdiction.Should().Be("IE");
+        profile.TaxProfile.Data.Caveat.Should().Be("Synthetic caveat: not advice");
     }
 
     [Fact]
@@ -147,6 +161,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
         Income(IncomeWith(IncomeVariance.NoDeclared));
         Career(new CareerTimelineResponse(true, [], 0));
         Tax(new DisposalTaxSummary(0, 0, 0, null, null, new Dictionary<string, int>()));
+        TaxProfile(NoTaxProfile());
         Risk(null);
 
         var profile = await Read();
@@ -157,9 +172,11 @@ public sealed class GetFinancialProfileQueryHandlerTests
         profile.Income.Reasons.Should().Equal(FinancialProfileReasons.NoDeclaredIncome);
         profile.Career.Reasons.Should().Equal(FinancialProfileReasons.NoCareerEvents);
         profile.DisposalTax.Reasons.Should().Equal(FinancialProfileReasons.NoPositions);
+        profile.TaxProfile.Reasons.Should().Equal(FinancialProfileReasons.NoTaxProfile);
+        profile.TaxProfile.Data.Should().BeNull("nothing stated is not an empty statement");
         profile.Risk.Reasons.Should().Equal(FinancialProfileReasons.NoIps);
         profile.Risk.Data.Should().BeNull();
-        profile.MissingSections.Should().Equal("goals", "income", "career", "disposalTax", "risk");
+        profile.MissingSections.Should().Equal("goals", "income", "career", "disposalTax", "taxProfile", "risk");
     }
 
     [Fact]
@@ -171,6 +188,7 @@ public sealed class GetFinancialProfileQueryHandlerTests
         Income(IncomeWith(IncomeVariance.NoDeclared));
         Career(new CareerTimelineResponse(true, [], 0));
         Tax(new DisposalTaxSummary(0, 0, 0, null, null, new Dictionary<string, int>()));
+        TaxProfile(NoTaxProfile());
         Risk(null);
 
         var profile = await Read();
@@ -181,7 +199,8 @@ public sealed class GetFinancialProfileQueryHandlerTests
         profile.Career.DataQuality.Should().Be(DataQuality.Missing);
         profile.DisposalTax.DataQuality.Should().Be(DataQuality.Missing);
         profile.Risk.DataQuality.Should().Be(DataQuality.Missing);
-        profile.MissingSections.Should().Equal("cashflow", "goals", "income", "career", "disposalTax", "risk");
+        profile.TaxProfile.DataQuality.Should().Be(DataQuality.Missing);
+        profile.MissingSections.Should().Equal("cashflow", "goals", "income", "career", "disposalTax", "taxProfile", "risk");
         profile.AsOf.Should().Be(Now);
         profile.Disclosure.Should().Be(FinancialProfileText.Disclosure);
         profile.CapacityIndicator.Status.Should().Be(CapacityStatus.Insufficient);
@@ -246,6 +265,37 @@ public sealed class GetFinancialProfileQueryHandlerTests
         var profile = await Read();
         profile.DisposalTax.DataQuality.Should().Be(DataQuality.Missing);
         profile.DisposalTax.Data!.WithheldReasons.Should().ContainKey("PROVIDER_NOT_SUPPORTED");
+    }
+
+    [Fact]
+    public async Task ATaxProfileThisHostCannotRead_IsPartial_AndCarriesNoText_ButSaysWhatExists()
+    {
+        TaxProfile(StatedTaxProfile(readable: false));
+
+        var profile = await Read();
+
+        profile.TaxProfile.DataQuality.Should().Be(DataQuality.Partial);
+        profile.TaxProfile.Reasons.Should().Equal(FinancialProfileReasons.TaxProfileUnreadable);
+        profile.TaxProfile.Data.Should().Be(new TaxProfileSummary(false, "IE", true, true, null, null));
+        profile.MissingSections.Should().NotContain("taxProfile", "unreadable is not absent");
+    }
+
+    [Fact]
+    public async Task ATaxProfileWithNoJurisdiction_IsPartial_AndTheNullStaysNull()
+    {
+        TaxProfile(StatedTaxProfile(jurisdiction: null));
+
+        var profile = await Read();
+
+        profile.TaxProfile.DataQuality.Should().Be(DataQuality.Partial);
+        profile.TaxProfile.Reasons.Should().Equal(FinancialProfileReasons.TaxJurisdictionNotSet);
+        profile.TaxProfile.Data!.Jurisdiction.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TheTaxProfileSection_CarriesTheReferNotAdviseDisclosure()
+    {
+        (await Read()).TaxProfile.Data!.Disclosure.Should().Be(TaxProfileText.Disclosure).And.Contain("not tax advice");
     }
 
     [Fact]

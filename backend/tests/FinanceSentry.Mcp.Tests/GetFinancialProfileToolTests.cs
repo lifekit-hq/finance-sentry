@@ -30,9 +30,10 @@ public sealed class GetFinancialProfileToolTests
         new ProfileSection<IncomeSummary>(DataQuality.Missing, ["NO_DECLARED_INCOME"], null),
         new ProfileSection<CareerSummary>(DataQuality.Missing, ["NO_CAREER_EVENTS"], null),
         new ProfileSection<DisposalTaxSummary>(DataQuality.Missing, ["NO_POSITIONS"], null),
+        new ProfileSection<TaxProfileSummary>(DataQuality.Missing, ["NO_TAX_PROFILE"], null),
         new ProfileSection<IpsRiskProfile>(DataQuality.Missing, ["NO_IPS"], null),
         new CapacitySuggestion(CapacityStatus.Insufficient, null, null, false, [], [], CapacityIndicator.RunwayUnknown),
-        ["cashflow", "goals", "income", "career", "disposalTax", "risk"]);
+        ["cashflow", "goals", "income", "career", "disposalTax", "taxProfile", "risk"]);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsTheProfile_ForTheAuthenticatedUser()
@@ -67,8 +68,8 @@ public sealed class GetFinancialProfileToolTests
     {
         var marker = Method.GetCustomAttribute<SensitiveProfileAttribute>();
 
-        marker.Should().NotBeNull("the profile aggregates declared income, goals and career events");
-        marker!.FieldNames.Should().Contain(["Amount", "Cadence", "Kind", "Date"]);
+        marker.Should().NotBeNull("the profile aggregates declared income, goals, career events and the stated tax profile");
+        marker!.FieldNames.Should().Contain(["Amount", "Cadence", "Kind", "Date", "Jurisdiction", "JurisdictionNotes", "Caveat"]);
         SensitiveProfileReads.CatalogOf(typeof(GetFinancialProfileTool).Assembly).Should().ContainKey("get_financial_profile");
     }
 }

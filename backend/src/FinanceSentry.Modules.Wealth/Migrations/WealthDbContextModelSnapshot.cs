@@ -357,6 +357,47 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     b.ToTable("net_worth_snapshot_sources", (string)null);
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.TaxProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Caveat")
+                        .HasColumnType("text")
+                        .HasColumnName("caveat");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Jurisdiction")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("jurisdiction");
+
+                    b.Property<string>("JurisdictionNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("jurisdiction_notes");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_tax_profiles_user");
+
+                    b.ToTable("tax_profiles", (string)null);
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshotSource", b =>
                 {
                     b.HasOne("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshot", null)
