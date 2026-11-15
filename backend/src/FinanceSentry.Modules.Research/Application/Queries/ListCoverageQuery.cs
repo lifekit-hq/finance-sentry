@@ -17,11 +17,22 @@ public sealed record CoverageListView(
     int Count,
     bool OverCap,
     IReadOnlyList<CoverageMemberView> Members,
-    IReadOnlyList<CoverageJournalView> RecentChanges);
+    IReadOnlyList<CoverageJournalView> RecentChanges)
+{
+    /// <summary>Held names in the book (owner call D2).</summary>
+    public int HeldCount { get; init; }
+
+    /// <summary>The soft cap on held names (<c>Coverage:HeldSoftCap</c>, 12); never blocks anything.</summary>
+    public int HeldSoftCap { get; init; }
+
+    /// <summary>True when <see cref="HeldCount"/> passes <see cref="HeldSoftCap"/>.</summary>
+    public bool HeldOverSoftCap => HeldCount > HeldSoftCap;
+}
 
 public sealed class ListCoverageQueryHandler(
     ICoverageRepository coverage,
     CoverageSnapshotReader snapshots,
+    ICoverageMemoRepository memos,
     TimeProvider clock,
     IOptions<CoverageOptions> options) : IQueryHandler<ListCoverageQuery, CoverageListView>
 {
@@ -37,9 +48,13 @@ public sealed class ListCoverageQueryHandler(
             .GroupBy(e => e.Ticker, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Rule, StringComparer.OrdinalIgnoreCase);
 
+        var memoTimes = await memos.LatestTimesUnscopedAsync(query.UserId, ct);
         var members = snapshot.Members
             .Take(config.MaxListed)
-            .Select(m => CoverageExplainer.View(m, snapshot, addedRule.GetValueOrDefault(m.Ticker)))
+            .Select(m => CoverageExplainer.View(m, snapshot, addedRule.GetValueOrDefault(m.Ticker)) with
+            {
+                LatestMemoAt = memoTimes.TryGetValue(m.Ticker, out var at) ? at : null,
+            })
             .ToList();
 
         return new CoverageListView(
@@ -47,6 +62,10 @@ public sealed class ListCoverageQueryHandler(
             snapshot.Members.Count,
             snapshot.Members.Count > config.MaxMembers,
             members,
-            [.. journal.Take(RecentChangeRows).Select(CoverageJournalViews.From)]);
+            [.. journal.Take(RecentChangeRows).Select(CoverageJournalViews.From)])
+        {
+            HeldCount = snapshot.Held.Count,
+            HeldSoftCap = config.HeldSoftCap,
+        };
     }
 }

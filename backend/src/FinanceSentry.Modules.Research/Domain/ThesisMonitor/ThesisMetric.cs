@@ -50,6 +50,9 @@ public static class ThesisMetric
     private static readonly IReadOnlySet<string> AllMetrics = new HashSet<string>(
         FundamentalsMetrics.Concat(PriceMetrics).Concat(RelativeMetrics), StringComparer.Ordinal);
 
+    /// <summary>Every metric a trigger may reference, for a prompt that must name the closed vocabulary.</summary>
+    public static IReadOnlyCollection<string> All => AllMetrics;
+
     public static bool Contains(string metric) => AllMetrics.Contains(metric);
 
     public static bool IsPriceMetric(string metric) => PriceMetrics.Contains(metric);

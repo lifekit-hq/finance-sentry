@@ -5,11 +5,12 @@
 Stage 1 of the discovery funnel. It is distinct from the [reference universe](reference-universe.md), which is
 the pool candidates are drawn from, not the list being watched.
 
-## Store (`research` schema, Research migrations M026 and M027)
+## Store (`research` schema, Research migrations M026, M027 and M030)
 
 - `coverage_members` - `Ticker`, `AddedAt`, `AddedReason` (`Held`, `Watchlist`, `Screen`, `Ledger`; `User` is reserved), `LastEventAt`, `LastScoreId`, `CorrelationToBook` (63-day, rule D1, null when the bars cannot support it), `RemoveAfter`. Unique per (user, ticker).
 - `coverage_journal` - one row per add or remove with the rule that fired, the reason, a detail sentence, and the correlation and rank when a cap-bound add was ranked. Never rewritten.
 - `coverage_events` (M027) - one row per deterministic hit on a covered name and what the review did about it (see Events). Unique per (user, ticker, source, reference); retained `Coverage:EventRetentionDays` (120).
+- `coverage_memos` (M030) - one research memo per ranked coverage add (unique per user and journal entry), with the model, token counts, cost at the configured list price, `Status` (`Structured` or `Unstructured`), the verdict word and the body (see Research memos).
 - `coverage_verdict_observations` - one scorecard verdict reading per (user, ticker, day), retained `Coverage:ObservationRetentionDays` (120). The scorecard is computed on demand, so "Buy twice" and "two consecutive Avoids" need a stored history; this is it.
 
 ## Rules (`CoverageRules`, pure; ids in `CoverageRuleIds`)
@@ -60,6 +61,22 @@ Beside the price-and-attention scan (`opportunity-scan`, 00:00 UTC), three deter
 The tag is a nomination reason on the candidate; the Ledger scoreboard attributes a `Screen` coverage add (`CoverageSourceGradeDto.ScreenTag`) to the first reason that is a screen tag (`ScreenTags.IsScreenTag`), else the first reason, so a candidate the scan or the owner created and a screen later hit is still credited to the screen and each screen is graded against the S&P 500 on its own. No new column, enum value or table: nothing to migrate or roll back.
 
 Per user, a hit is not nominated when the name is already covered, when the user already has an Active candidate carrying the tag (a re-run changes nothing), or when the user's coverage removed it and the evidence is not newer than the removal (`ScreenSuppression`; newer evidence is also held back for `Screens:RemovedCooldownDays`, 30). Caps: `MaxNominationsPerRun` per screen (3, 4, 3), `MaxNominationsPerUserPerRun` over all (10), and the room left under `Coverage:MaxMembers`. A screen that cannot run (the EDGAR source down, the calendar erroring) fails the job after the others have nominated; a missing Finnhub key or a too-small bar pool is a logged skip.
+
+## Held names: the soft cap (owner call D2)
+
+The book is meant to hold at most 12 names (`Coverage:HeldSoftCap`). It is a soft cap: nothing is blocked and no name is removed. `list_coverage` reports `heldCount` (open equity holdings; crypto is out), `heldSoftCap` and `heldOverSoftCap`, and the nightly evaluation logs a warning when the count passes it. Held names always join coverage, so they can take the coverage list over `MaxMembers`; the other 88 names are the funnel's to follow.
+
+## Research memos on entrants (stage 6): the funnel's one model call
+
+For a name a ranked rule added (`Screen` or `Ledger`; a held or watchlisted add is the owner's own act and gets no memo), `coverage-memos` (Hangfire, daily `Coverage:MemoHourUtc:MemoMinuteUtc`, 01:40 UTC - after the 01:10 evaluation; `CoverageMemoJob` -> `CoverageMemoWriter`) makes one single-turn call, no tools, over evidence the pipeline already stored: the journal row that added the name, its deterministic scorecard, its latest coverage events and its correlation to the book. The reply is stored in `coverage_memos` as `business`, `whyNow`, `falsifiers` (metric ones in the thesis-trigger vocabulary of `ThesisMetric`, so a later thesis can adopt them as triggers; the rest narrative), `crowding`, `correlationToBook`, a `Buy`, `Watch` or `Avoid` verdict and `caveats`. A reply that is not that shape is kept as raw text and still counts against the budget. The call goes through the Core port `IMemoLanguageModel` (implemented in the Agent module on its Anthropic credentials; Research takes it optionally, so a host without the Agent module makes no call).
+
+Spend is capped three ways, all checked before each call and none of them a prompt:
+
+- `Coverage:MemoMode` - `LogOnly` (the default, owner call D3 = a: memos are written and stored; nothing acts on them, and the two caps below bound the spend) or `Off` (no call, no spend, whatever else is set; the owner can set it any time).
+- `Coverage:MaxMemosPerDay` (3) across everyone, counted from the rows written that UTC day. Entrants over it wait; a name stays eligible for `Coverage:MemoLookbackDays` (7), best rank first.
+- `Coverage:MemoWeeklyBudgetUsd` (25, owner call D3) over a rolling seven days. A call is made only when the recorded cost of the last seven days plus the call's worst case (the prompt's characters over three, plus `MemoMaxOutputTokens`, at `MemoInputUsdPerMillionTokens` 2 and `MemoOutputUsdPerMillionTokens` 10, the Sonnet list price) fits under it; the run then stops. The prompt is cut at `MemoMaxInputChars`. A failed provider call stops the run and fails the job; the entrant is retried the next night.
+
+Paper-only: no code reads a memo to place, size or change a position or to move a name in or out of coverage; the verdict is a word on a stored row. The Ledger scoreboard already grades every coverage add against the S&P 500 (`get_ledger_scoreboard`), and for the first 30 days nobody sizes on a memo. `explain_coverage` returns the newest memo (`memo`, `paperOnly: true`); `list_coverage` marks members that have one (`latestMemoAt`).
 
 ## Consumers
 

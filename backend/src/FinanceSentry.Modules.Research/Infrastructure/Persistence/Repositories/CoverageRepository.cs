@@ -238,6 +238,15 @@ public sealed class CoverageRepository(ResearchDbContext db) : ICoverageReposito
         return (rows, total, removed, rescored);
     }
 
+    public async Task<IReadOnlyList<CoverageEvent>> ListEventsForTickerUnscopedAsync(
+        Guid userId, string ticker, int take, CancellationToken ct = default)
+        => await db.CoverageEvents.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(e => e.UserId == userId && e.Ticker == ticker)
+            .OrderByDescending(e => e.OccurredAt)
+            .Take(take)
+            .ToListAsync(ct);
+
     public async Task<int> PruneEventsUnscopedAsync(DateTimeOffset before, CancellationToken ct = default)
     {
         var old = await db.CoverageEvents

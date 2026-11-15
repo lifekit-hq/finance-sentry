@@ -75,6 +75,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
 
     public DbSet<CoverageEvent> CoverageEvents { get; set; } = null!;
 
+    public DbSet<CoverageMemo> CoverageMemos { get; set; } = null!;
+
     public DbSet<CatalystEvent> CatalystEvents { get; set; } = null!;
 
     public DbSet<ThemeAttentionDay> ThemeAttentionDays { get; set; } = null!;
@@ -455,6 +457,23 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasDatabaseName("ux_coverage_events_identity");
         cve.HasIndex(x => new { x.UserId, x.OccurredAt }).IsDescending(false, true)
             .HasDatabaseName("idx_coverage_events_user_occurred");
+
+        // Research memos on coverage entrants (discovery funnel stage 6): one per coverage add, logged only.
+        var cmm = modelBuilder.Entity<CoverageMemo>();
+        cmm.ToTable("coverage_memos");
+        cmm.HasKey(x => x.Id);
+        cmm.Property(x => x.UserId).IsRequired();
+        cmm.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        cmm.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        cmm.Property(x => x.ModelId).IsRequired().HasMaxLength(60);
+        cmm.Property(x => x.CostUsd).HasPrecision(10, 4);
+        cmm.Property(x => x.Status).IsRequired().HasMaxLength(12);
+        cmm.Property(x => x.Verdict).HasMaxLength(10);
+        cmm.Property(x => x.Body).IsRequired();
+        cmm.HasIndex(x => new { x.UserId, x.JournalEntryId }).IsUnique().HasDatabaseName("ux_coverage_memos_entry");
+        cmm.HasIndex(x => new { x.UserId, x.Ticker, x.CreatedAt }).IsDescending(false, false, true)
+            .HasDatabaseName("idx_coverage_memos_user_ticker_created");
+        cmm.HasIndex(x => x.CreatedAt).HasDatabaseName("idx_coverage_memos_created");
 
         // Catalyst detection (discovery funnel stage 7): one row per 8-K filing handled for a user, once ever.
         var cat = modelBuilder.Entity<CatalystEvent>();

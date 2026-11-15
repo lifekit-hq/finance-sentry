@@ -17,7 +17,28 @@ public sealed record CoverageMemberView(
     DateTimeOffset? LastEventAt,
     Guid? LastScoreId,
     decimal? CorrelationToBook,
-    DateTimeOffset? RemoveAfter);
+    DateTimeOffset? RemoveAfter)
+{
+    /// <summary>When the newest stage 6 research memo for the name was written; null when it has none.</summary>
+    public DateTimeOffset? LatestMemoAt { get; init; }
+}
+
+/// <summary>
+/// A stage 6 research memo as read back: the structured content when the reply parsed, the raw text when it did not.
+/// Logged only; <see cref="PaperOnly"/> is always true (nothing acts on a memo until the paper record grades it).
+/// </summary>
+public sealed record CoverageMemoView(
+    string Ticker,
+    DateTimeOffset At,
+    string Status,
+    string? Verdict,
+    string ModelId,
+    decimal CostUsd,
+    CoverageMemoContent? Content,
+    string? RawText)
+{
+    public bool PaperOnly => true;
+}
 
 public sealed record CoverageJournalView(
     DateTimeOffset At,
@@ -48,7 +69,11 @@ public sealed record CoverageExplanation(
     IReadOnlyList<CoverageRuleView> RemoveRules,
     CoverageCapView Cap,
     IReadOnlyList<CoverageVerdictDay> RecentVerdicts,
-    IReadOnlyList<CoverageJournalView> Journal);
+    IReadOnlyList<CoverageJournalView> Journal)
+{
+    /// <summary>The newest research memo for the name (stage 6); null when none was written.</summary>
+    public CoverageMemoView? Memo { get; init; }
+}
 
 public static class CoverageJournalViews
 {
