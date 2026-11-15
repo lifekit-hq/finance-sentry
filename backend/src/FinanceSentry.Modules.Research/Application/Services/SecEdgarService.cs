@@ -58,11 +58,17 @@ public sealed class SecEdgarService(
         ("OperatingCashFlow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]),
         ("Capex", ["PaymentsToAcquireProductiveAssets", "PaymentsToAcquirePropertyPlantAndEquipment"]),
         // Return on invested capital inputs (#1376): annual income-statement and year-end balance-sheet lines.
-        // CurrentDebt runs narrowest to broadest (DebtCurrent also holds short-term borrowings).
+        // Current borrowings are three non-overlapping concepts so they can be summed without double counting:
+        // CurrentDebt (DebtCurrent) is the filer's own total of current borrowings and, when reported, is used
+        // alone; otherwise CurrentLongTermDebt (current portion of long-term debt) plus ShortTermDebt are added.
+        // ShortTermDebt is one line whose tags run narrowest to broadest, so a filer tagging CommercialPaper or
+        // NotesPayableCurrent inside ShortTermBorrowings keeps the total once, never both.
         ("IncomeTaxExpense", ["IncomeTaxExpenseBenefit"]),
         ("PretaxIncome", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"]),
         ("LongTermDebt", ["LongTermDebtNoncurrent"]),
-        ("CurrentDebt", ["LongTermDebtCurrent", "DebtCurrent"]),
+        ("CurrentDebt", ["DebtCurrent"]),
+        ("CurrentLongTermDebt", ["LongTermDebtCurrent"]),
+        ("ShortTermDebt", ["NotesPayableCurrent", "CommercialPaper", "ShortTermBorrowings"]),
         ("CashAndEquivalents", ["CashAndCashEquivalentsAtCarryingValue"]),
     ];
 

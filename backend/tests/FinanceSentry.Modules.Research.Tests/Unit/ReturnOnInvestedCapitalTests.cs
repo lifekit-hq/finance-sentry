@@ -52,11 +52,51 @@ public sealed class ReturnOnInvestedCapitalTests
     }
 
     [Fact]
-    public void Roic_WithoutACurrentDebtLine_UsesTheLongTermLineAlone()
+    public void Roic_WithoutAnyCurrentDebtLine_UsesTheLongTermLineAlone_AndSaysSoBesideTheValue()
     {
         var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
 
-        DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single().Debt.Should().Be(1500m);
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.Debt.Should().Be(1500m);
+        roic.ReturnOnInvestedCapital.Should().NotBeNull();
+        roic.Reason.Should().Contain("short-term debt not reported").And.Contain("long-term line only");
+    }
+
+    [Fact]
+    public void Roic_CurrentBorrowingsUnderAnotherTag_AreAddedToTheLongTermLine()
+    {
+        var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
+        facts.Add(Annual(DerivedFundamentalsMath.ShortTermDebtConcept, 300));
+
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.Debt.Should().Be(1800m);
+        roic.InvestedCapital.Should().Be(3800m);
+        roic.Reason.Should().BeNull();
+    }
+
+    [Fact]
+    public void Roic_CurrentPortionOfLongTermDebtAndShortTermDebt_AreBothAdded()
+    {
+        var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
+        facts.Add(Annual(DerivedFundamentalsMath.CurrentLongTermDebtConcept, 200));
+        facts.Add(Annual(DerivedFundamentalsMath.ShortTermDebtConcept, 300));
+
+        DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single().Debt.Should().Be(2000m);
+    }
+
+    [Fact]
+    public void Roic_TheCurrentDebtTotal_IsUsedAloneNotAddedToItsOwnParts()
+    {
+        var facts = FullYear();
+        facts.Add(Annual(DerivedFundamentalsMath.CurrentLongTermDebtConcept, 200));
+        facts.Add(Annual(DerivedFundamentalsMath.ShortTermDebtConcept, 300));
+
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.Debt.Should().Be(2000m);
+        roic.Reason.Should().BeNull();
     }
 
     [Theory]

@@ -41,7 +41,9 @@ public sealed record ReturnOnEquityPeriod(
 /// securities are not netted, operating leases are not added). Every input is shown so the figure can be
 /// checked; the whole row is null with <see cref="Reason"/> (naming what is missing or why it cannot be formed)
 /// rather than filled with zeros. <see cref="Debt"/> is borrowings as the filer tags them: the total when it
-/// reports one, otherwise the long-term line plus the current line when that is reported too.
+/// reports one, otherwise the long-term line plus its current borrowings (the current-debt total, else the current
+/// portion of long-term debt plus short-term borrowings). When no current borrowings are reported the figure is
+/// still computed from the long-term line alone and <see cref="Reason"/> carries that as a caveat beside the value.
 /// </summary>
 public sealed record ReturnOnInvestedCapitalPeriod(
     DateOnly PeriodEnd,

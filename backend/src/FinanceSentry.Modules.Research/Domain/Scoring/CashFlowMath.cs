@@ -170,10 +170,13 @@ public static class DerivedFundamentalsMath
     public const string PretaxIncomeConcept = "PretaxIncome";
     public const string LongTermDebtConcept = "LongTermDebt";
     public const string CurrentDebtConcept = "CurrentDebt";
+    public const string CurrentLongTermDebtConcept = "CurrentLongTermDebt";
+    public const string ShortTermDebtConcept = "ShortTermDebt";
     public const string TotalDebtConcept = "TotalDebt";
     public const string CashConcept = "CashAndEquivalents";
 
     private const int YearEarlierToleranceDays = 45;
+    private const string LongTermOnlyCaveat = "short-term debt not reported; debt is the long-term line only";
 
     public static IReadOnlyList<FreeCashFlowPeriod> FreeCashFlow(
         IReadOnlyList<FundamentalFact> facts, int quarters, int years)
@@ -219,7 +222,8 @@ public static class DerivedFundamentalsMath
         var equity = Annual(facts, "StockholdersEquity");
         var inputs = new RoicInputs(
             Annual(facts, IncomeTaxExpenseConcept), Annual(facts, PretaxIncomeConcept), Annual(facts, LongTermDebtConcept),
-            Annual(facts, CurrentDebtConcept), Annual(facts, TotalDebtConcept), Annual(facts, CashConcept));
+            Annual(facts, CurrentDebtConcept), Annual(facts, CurrentLongTermDebtConcept), Annual(facts, ShortTermDebtConcept),
+            Annual(facts, TotalDebtConcept), Annual(facts, CashConcept));
 
         // One row per fiscal year the operating result or the balance sheet speaks for.
         return operating.Keys.Union(equity.Keys)
@@ -238,6 +242,8 @@ public static class DerivedFundamentalsMath
         Dictionary<DateOnly, FundamentalFact> Pretax,
         Dictionary<DateOnly, FundamentalFact> LongTermDebt,
         Dictionary<DateOnly, FundamentalFact> CurrentDebt,
+        Dictionary<DateOnly, FundamentalFact> CurrentLongTermDebt,
+        Dictionary<DateOnly, FundamentalFact> ShortTermDebt,
         Dictionary<DateOnly, FundamentalFact> TotalDebt,
         Dictionary<DateOnly, FundamentalFact> Cash);
 
@@ -249,12 +255,16 @@ public static class DerivedFundamentalsMath
         var cash = inputs.Cash.GetValueOrDefault(end);
         var total = inputs.TotalDebt.GetValueOrDefault(end);
         var longTerm = inputs.LongTermDebt.GetValueOrDefault(end);
-        var current = inputs.CurrentDebt.GetValueOrDefault(end);
 
-        // Debt: the filer's total borrowings when it tags one, else the long-term line plus the current line
-        // when that is tagged too. A filer with no debt line reports none, which is not read as "no debt".
-        FundamentalFact[] debtFacts = total is not null ? [total] : longTerm is not null ? [longTerm, .. current is null ? [] : new[] { current }] : [];
+        // Debt: the filer's total borrowings when it tags one, else the long-term line plus its current
+        // borrowings (the filer's current-debt total, or the current portion of long-term debt plus short-term
+        // borrowings). A filer with no debt line reports none, which is not read as "no debt".
+        FundamentalFact[] current = inputs.CurrentDebt.GetValueOrDefault(end) is { } currentTotal
+            ? [currentTotal]
+            : new[] { inputs.CurrentLongTermDebt.GetValueOrDefault(end), inputs.ShortTermDebt.GetValueOrDefault(end) }.OfType<FundamentalFact>().ToArray();
+        FundamentalFact[] debtFacts = total is not null ? [total] : longTerm is not null ? [longTerm, .. current] : [];
         decimal? debt = debtFacts.Length > 0 ? debtFacts.Sum(f => f.Value) : null;
+        var longTermOnly = total is null && longTerm is not null && current.Length == 0;
 
         var present = new[] { operatingIncome, tax, pretax, equity, cash }.OfType<FundamentalFact>().Concat(debtFacts).ToList();
         var units = present.Select(f => f.Unit).Distinct(StringComparer.Ordinal).ToList();
@@ -288,7 +298,7 @@ public static class DerivedFundamentalsMath
         var capital = debt!.Value + equity!.Value - cash!.Value;
         return capital <= 0
             ? Row("invested capital (debt + equity - cash) is not positive", rate, nopat, capital)
-            : Row(null, rate, nopat, capital, nopat / capital);
+            : Row(longTermOnly ? LongTermOnlyCaveat : null, rate, nopat, capital, nopat / capital);
     }
 
     private static Dictionary<DateOnly, FundamentalFact> Annual(IReadOnlyList<FundamentalFact> facts, string concept)

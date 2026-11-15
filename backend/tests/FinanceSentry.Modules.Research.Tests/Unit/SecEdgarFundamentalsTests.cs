@@ -378,10 +378,10 @@ public sealed class SecEdgarFundamentalsTests
     }
 
     [Fact]
-    public async Task ReturnOnInvestedCapitalInputs_AreReadUnderTheirFriendlyConcepts_AndTheBroaderCurrentDebtTagWins()
+    public async Task ReturnOnInvestedCapitalInputs_AreReadUnderTheirFriendlyConcepts_AndTheBroaderShortTermDebtTagWins()
     {
-        const string narrowCurrent = """{"label":"Current LTD","units":{"USD":[{"end":"2024-12-31","val":100,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
-        const string broadCurrent = """{"label":"Debt, current","units":{"USD":[{"end":"2024-12-31","val":150,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        static string Annual(string label, int val) =>
+            $$$"""{"label":"{{{label}}}","units":{"USD":[{"end":"2024-12-31","val":{{{val}}},"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
         const string tax = """{"label":"Income tax","units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":40,"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
         var sut = CreateSut(request =>
         {
@@ -392,8 +392,10 @@ public sealed class SecEdgarFundamentalsTests
 
             return request.RequestUri.AbsolutePath switch
             {
-                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/LongTermDebtCurrent.json" => Json(narrowCurrent),
-                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/DebtCurrent.json" => Json(broadCurrent),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/DebtCurrent.json" => Json(Annual("Debt, current", 150)),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/LongTermDebtCurrent.json" => Json(Annual("Current LTD", 100)),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/CommercialPaper.json" => Json(Annual("Commercial paper", 30)),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/ShortTermBorrowings.json" => Json(Annual("Short-term borrowings", 60)),
                 "/api/xbrl/companyconcept/CIK0001234567/us-gaap/IncomeTaxExpenseBenefit.json" => Json(tax),
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound),
             };
@@ -402,8 +404,35 @@ public sealed class SecEdgarFundamentalsTests
         var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
 
         facts.Single(f => f.Concept == DerivedFundamentalsMath.CurrentDebtConcept).Value.Should().Be(150m);
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.CurrentLongTermDebtConcept).Value.Should().Be(100m);
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.ShortTermDebtConcept).Value.Should().Be(60m);
         facts.Single(f => f.Concept == DerivedFundamentalsMath.IncomeTaxExpenseConcept)
             .Should().Match<FundamentalFact>(f => f.Value == 40m && f.FiscalPeriod == "FY" && f.PeriodEnd == new DateOnly(2024, 12, 31));
+    }
+
+    [Fact]
+    public async Task ShortTermDebt_IsReadFromCommercialPaperAndNotesPayableCurrent_WhenShortTermBorrowingsIsAbsent()
+    {
+        static string Annual(string label, int val) =>
+            $$$"""{"label":"{{{label}}}","units":{"USD":[{"end":"2024-12-31","val":{{{val}}},"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json("""{"0":{"cik_str":1234567,"ticker":"ACME","title":"Acme Corp"}}""");
+            }
+
+            return request.RequestUri.AbsolutePath switch
+            {
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/NotesPayableCurrent.json" => Json(Annual("Notes payable", 20)),
+                "/api/xbrl/companyconcept/CIK0001234567/us-gaap/CommercialPaper.json" => Json(Annual("Commercial paper", 30)),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            };
+        });
+
+        var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
+
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.ShortTermDebtConcept).Value.Should().Be(30m);
     }
 
     [Fact]
