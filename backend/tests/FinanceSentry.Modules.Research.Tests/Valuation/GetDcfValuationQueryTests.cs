@@ -378,11 +378,44 @@ public sealed class GetDcfValuationQueryTests
     {
         var converted = await Run(target: Metrics(financialCurrency: "EUR"));
         converted.Flags.Should().Contain(DcfFlags.FxConverted);
-        converted.Summary!.ValuePerShare.Should().NotBe((await Run()).Summary!.ValuePerShare);
 
         var unknown = await Run(target: Metrics(financialCurrency: "ZZZ"));
         unknown.NotEvaluableReason.Should().Be(DcfReasons.EquityBridgeUnavailable);
         unknown.Flags.Should().Contain(DcfFlags.FxUnknown);
+    }
+
+    [Fact]
+    public async Task A_euro_reporter_quoted_in_dollars_is_worth_the_euro_value_times_the_euro_dollar_rate()
+    {
+        var inEuros = (await Run()).Summary!.ValuePerShare;
+
+        var r = await Run(target: Metrics(price: Price * 1.08m, financialCurrency: "EUR"));
+
+        r.Flags.Should().Contain(DcfFlags.FxConverted);
+        r.Summary!.ValuePerShare.Should().BeApproximately(inEuros * 1.08m, 0.02m, "a 20 euro price is 21.60 dollars at 1.08, the same WACC weights");
+    }
+
+    [Fact]
+    public async Task A_pence_quote_with_sterling_financials_is_worth_a_hundred_times_the_pound_value()
+    {
+        var inPounds = (await Run()).Summary!.ValuePerShare;
+
+        var r = await Run(target: Metrics(price: Price * 100m, currency: "GBp", financialCurrency: "GBP"));
+
+        r.Flags.Should().NotContain(DcfFlags.FxConverted);
+        r.Summary!.ValuePerShare.Should().BeApproximately(inPounds * 100m, 0.5m, "2,000p is 20 pounds: the same WACC weights, the value in pence");
+        r.Summary.Price.Should().Be(Price * 100m);
+    }
+
+    [Fact]
+    public async Task A_pence_quote_with_euro_financials_converts_through_pounds_and_pence()
+    {
+        var inEuros = (await Run()).Summary!.ValuePerShare;
+
+        var r = await Run(target: Metrics(price: Price * 100m * 1.08m / 1.27m, currency: "GBp", financialCurrency: "EUR"));
+
+        r.Flags.Should().Contain(DcfFlags.FxConverted);
+        r.Summary!.ValuePerShare.Should().BeApproximately(inEuros * 100m * 1.08m / 1.27m, 0.5m, "euros to pounds at 1.08 / 1.27, then to pence");
     }
 
     // --- fallbacks and flags ---
@@ -400,6 +433,50 @@ public sealed class GetDcfValuationQueryTests
         r.Flags.Should().Contain([DcfFlags.TaxRateDefaulted, DcfFlags.CostOfDebtDefaulted, DcfFlags.NwcAssumedZero]);
         r.Assumptions!.TaxRate.Should().Be(0.21m);
         r.Assumptions.NwcPctOfRevenueChange.Should().Be(0m);
+    }
+
+    private static List<DcfAnnualPeriod> HistoryWithWorkingCapital(decimal change) =>
+    [
+        Year(2025, 1200m, workingCapital: change),
+        Year(2024, 1100m, workingCapital: change),
+        Year(2023, 1000m),
+    ];
+
+    [Fact]
+    public async Task A_working_capital_ratio_beyond_the_revenue_change_is_assumed_zero_with_the_flag()
+    {
+        var flatRevenue = new List<DcfAnnualPeriod>
+        {
+            Year(2025, 1010m, workingCapital: -50m),
+            Year(2024, 1005m, workingCapital: -50m),
+            Year(2023, 1000m),
+        };
+
+        var r = await Run(history: flatRevenue);
+
+        r.Flags.Should().Contain(DcfFlags.NwcAssumedZero);
+        r.Assumptions!.NwcPctOfRevenueChange.Should().Be(0m, "100 invested over a 10 revenue increase is 10x, beyond 1");
+    }
+
+    [Theory]
+    [InlineData(-100, 1)]
+    [InlineData(100, -1)]
+    [InlineData(-110, 1.1)]
+    [InlineData(110, -1.1)]
+    public async Task A_working_capital_ratio_at_or_just_past_plus_or_minus_one_is_kept_only_at_the_bound(int change, double ratio)
+    {
+        var r = await Run(history: HistoryWithWorkingCapital(change));
+
+        if (Math.Abs(ratio) <= 1d)
+        {
+            r.Flags.Should().NotContain(DcfFlags.NwcAssumedZero);
+            r.Assumptions!.NwcPctOfRevenueChange.Should().Be((decimal)ratio);
+        }
+        else
+        {
+            r.Flags.Should().Contain(DcfFlags.NwcAssumedZero);
+            r.Assumptions!.NwcPctOfRevenueChange.Should().Be(0m);
+        }
     }
 
     [Fact]

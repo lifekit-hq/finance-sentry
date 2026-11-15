@@ -382,7 +382,10 @@ public class GetDcfValuationQueryHandler(
 
     // Cash tied up in working capital per unit of revenue growth, over the last three year-on-year steps. Yahoo's
     // "change in working capital" is a cash-flow line (an outflow is negative), so the investment is its negation.
-    // Not derivable -> 0 with a flag, never a silent zero.
+    // Not derivable, or beyond +-100% of the revenue change (near-flat revenue over lumpy working capital) -> 0 with
+    // a flag, never a silent zero.
+    private const decimal MaxWorkingCapitalRatio = 1m;
+
     private static decimal WorkingCapitalRatio(IReadOnlyList<DcfAnnualPeriod> periods, List<string> flags)
     {
         decimal investment = 0m;
@@ -396,7 +399,7 @@ public class GetDcfValuationQueryHandler(
             }
         }
 
-        if (revenueChange > 0m)
+        if (revenueChange > 0m && Math.Abs(investment / revenueChange) <= MaxWorkingCapitalRatio)
         {
             return investment / revenueChange;
         }
