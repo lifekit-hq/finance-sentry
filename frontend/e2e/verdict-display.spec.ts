@@ -167,4 +167,34 @@ test.describe('Verdict display', () => {
     await expect(chip).toHaveText('—');
     await expect(chip).toHaveAttribute('title', new RegExp(GAP_LINES.unreadable));
   });
+
+  // The verdict chip sits beside the ticker and the value column is wide: neither may squeeze the
+  // symbol (it once truncated to nothing at 390px), so the chip or the column wraps first.
+  for (const width of [375, 390]) {
+    test(`a verdict chip never truncates the ticker at ${width}px`, async ({page}) => {
+      await page.setViewportSize({width, height: 844});
+      await page.route(`${API}/research/scorecards/verdicts**`, route =>
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify([
+            {symbol: 'AAPL', word: 'Wait', firedRuleId: 'otherwise', turnsBuyWhen: null},
+          ]),
+        })
+      );
+      await page.goto('/accounts/list');
+      const broker = page.locator(INSTITUTION_ROW, {hasText: 'Interactive Brokers'});
+      await broker.locator('button[aria-controls]').first().click();
+
+      const row = broker.getByTestId('position-row').filter({hasText: 'AAPL'});
+      await expect(row.getByTestId('position-verdict')).toBeVisible();
+      const overflow = await row
+        .getByTestId('position-ticker')
+        .evaluate(ticker => ticker.scrollWidth - ticker.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await expect(row.getByTestId('position-ticker')).toHaveText('AAPL');
+      expect(
+        await row.getByTestId('position-ticker').evaluate(ticker => ticker.clientWidth)
+      ).toBeGreaterThan(0);
+    });
+  }
 });
