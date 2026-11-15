@@ -3,8 +3,10 @@ import {
   ACCOUNT_SIGN_OUT_ID,
   accountMenu,
   type AppLayoutAccount,
-  type MenuItem,
+  CmnWhatsNewService,
   type NavItem,
+  WHATS_NEW_MENU_ID,
+  whatsNewMenuItem,
 } from '@lifekit-hq/ui';
 
 import {AlertsStore} from '../../../modules/alerts/store/alerts/alerts.store';
@@ -15,18 +17,8 @@ import {
   REPORT_PROBLEM_LABEL,
 } from '../../report-problem/constants/report-problem.constants';
 import {ReportProblemPanelService} from '../../report-problem/services/report-problem-panel.service';
-import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../../whats-new/constants/whats-new.constants';
-import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
 import {NAV_ITEMS} from '../app-shell.constants';
 import {NavUtils} from '../utils/nav.utils';
-
-const ACCOUNT_MENU_ITEMS: MenuItem[] = accountMenu({
-  settingsRoute: AppRoute.Settings,
-  extras: [
-    {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone'},
-    {id: REPORT_PROBLEM_ACTION_ID, label: REPORT_PROBLEM_LABEL, icon: 'MessageSquareWarning'},
-  ],
-});
 
 /**
  * What the shell chrome shows and does, shared by the layout wrapper and the phone More page so the
@@ -37,7 +29,7 @@ const ACCOUNT_MENU_ITEMS: MenuItem[] = accountMenu({
 export class ShellChromeService {
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
-  private readonly whatsNewPanel = inject(WhatsNewPanelService);
+  private readonly whatsNew = inject(CmnWhatsNewService);
   private readonly reportProblemPanel = inject(ReportProblemPanelService);
 
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
@@ -54,15 +46,17 @@ export class ShellChromeService {
     label: this.authStore.avatarInitials(),
     name: this.authStore.fullName() || undefined,
     email: this.authStore.email() ?? undefined,
-    menuItems: ACCOUNT_MENU_ITEMS,
+    menuItems: accountMenu({
+      settingsRoute: AppRoute.Settings,
+      extras: [
+        whatsNewMenuItem(this.whatsNew.hasUnread()),
+        {id: REPORT_PROBLEM_ACTION_ID, label: REPORT_PROBLEM_LABEL, icon: 'MessageSquareWarning'},
+      ],
+    }),
   }));
 
   public isPermitted(entry: string): boolean {
     return NavUtils.isPermitted(entry, this.authStore.permissions());
-  }
-
-  public openWhatsNew(): void {
-    this.whatsNewPanel.open();
   }
 
   /**
@@ -74,8 +68,8 @@ export class ShellChromeService {
       case ACCOUNT_SIGN_OUT_ID:
         this.authStore.logout();
         return true;
-      case WHATS_NEW_ACTION_ID:
-        this.openWhatsNew();
+      case WHATS_NEW_MENU_ID:
+        this.whatsNew.open();
         return true;
       case REPORT_PROBLEM_ACTION_ID:
         this.reportProblemPanel.open();

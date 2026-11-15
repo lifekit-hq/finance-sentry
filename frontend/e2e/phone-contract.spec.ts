@@ -89,7 +89,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(page.locator('[data-more-version]')).toContainText(/v\d/);
 
       await page.getByRole('button', {name: "What's new"}).click();
-      const panel = page.getByTestId('whats-new-list');
+      const panel = page.locator('[data-whats-new-list]');
       await expect(panel).toContainText('You can show only money in or only money out.');
       await expect(panel.getByText('Every change in this version').first()).toBeVisible();
     });
@@ -123,6 +123,6 @@ test.describe('desktop keeps the avatar and the chat button', () => {
 
     await page.getByRole('button', {name: 'Account menu'}).click();
     await page.getByRole('menuitem', {name: "What's new"}).click();
-    await expect(page.getByTestId('whats-new-list')).toContainText('only money in');
+    await expect(page.locator('[data-whats-new-list]')).toContainText('only money in');
   });
 });

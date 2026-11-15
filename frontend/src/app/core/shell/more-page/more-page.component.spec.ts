@@ -1,18 +1,19 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {CmnWhatsNewService} from '@lifekit-hq/ui';
 
 import {AlertsStore} from '../../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
 import {Permission} from '../../../shared/enums/permission/permission.enum';
 import {ReportProblemPanelService} from '../../report-problem/services/report-problem-panel.service';
-import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
 import {MorePageComponent} from './more-page.component';
 
 describe('MorePageComponent', () => {
   const logout = vi.fn();
   const open = vi.fn();
+  const hasUnread = signal(false);
   const openReport = vi.fn();
 
   const render = (permissions: string[]): HTMLElement => {
@@ -30,7 +31,7 @@ describe('MorePageComponent', () => {
           },
         },
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
-        {provide: WhatsNewPanelService, useValue: {open}},
+        {provide: CmnWhatsNewService, useValue: {open, hasUnread, version: APP_VERSION}},
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
       ],
     });
@@ -95,6 +96,17 @@ describe('MorePageComponent', () => {
     accountRow(render([]), "What's new")?.click();
 
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("marks What's new with a dot only while the release is unread", () => {
+    expect(accountRow(render([]), "What's new")?.querySelector('.cmn-badge-indicator')).toBeNull();
+
+    TestBed.resetTestingModule();
+    hasUnread.set(true);
+
+    expect(
+      accountRow(render([]), "What's new")?.querySelector('.cmn-badge-indicator')
+    ).not.toBeNull();
   });
 
   it('opens the report sheet from the account card', () => {

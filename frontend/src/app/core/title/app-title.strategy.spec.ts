@@ -3,7 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {Title} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
 import {AppUpdateService} from '@lifekit-hq/core/pwa';
-import {CmnShellService} from '@lifekit-hq/ui';
+import {CmnShellService, CmnWhatsNewService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
@@ -12,7 +12,6 @@ import {AuthStore} from '../../modules/auth/store/auth.store';
 import {provideTitleStrategy} from '../providers/title-strategy.provider';
 import {AppShellComponent} from '../shell/app-shell.component';
 import {PaletteEntitiesService} from '../shell/services/palette-entities.service';
-import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
 import {RouteTitleUtils} from './route-title.utils';
 
 @Component({template: '', changeDetection: ChangeDetectionStrategy.OnPush})
@@ -58,7 +57,15 @@ describe('AppTitleStrategy', () => {
             logout: () => undefined,
           },
         },
-        {provide: WhatsNewPanelService, useValue: {open: vi.fn()}},
+        {
+          provide: CmnWhatsNewService,
+          useValue: {
+            open: vi.fn(),
+            hasUnread: signal(false),
+            version: '1.0.0',
+            versionLabel: 'v1.0.0',
+          },
+        },
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
         {
           provide: PaletteEntitiesService,

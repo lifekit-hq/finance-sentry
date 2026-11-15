@@ -42,7 +42,7 @@ while IFS= read -r f; do
     # image recipe also decide what the cold-load LCP check measures.
     docker/nginx.security-headers.conf|docker/nginx.frontend.conf|docker/Dockerfile.frontend.prod) frontend=true docker_frontend=true ;;
     docker/nginx.*) docker_frontend=true ;;
-    # The frontend image bundles it into the What's new panel (frontend/scripts/build-whats-new.mjs).
+    # The frontend image bundles it into the What's new panel (`lifekit-whats-new --changelog`, frontend's `whats-new` script).
     CHANGELOG.md) docker_frontend=true ;;
     .dockerignore) docker=true docker_frontend=true ;;
     .github/workflows/"$own_workflow") backend=true frontend=true docker=true docker_frontend=true ;;

@@ -7,6 +7,7 @@ import {
   APPEARANCE_PALETTE_ITEMS,
   CmnPullRefreshService,
   CmnShellService,
+  CmnWhatsNewService,
   type MenuItem,
 } from '@lifekit-hq/ui';
 import {of} from 'rxjs';
@@ -17,8 +18,6 @@ import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {ReportProblemPanelService} from '../report-problem/services/report-problem-panel.service';
-import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
-import {WhatsNewStore} from '../whats-new/store/whats-new.store';
 import {AppShellComponent} from './app-shell.component';
 import {PaletteEntitiesService} from './services/palette-entities.service';
 
@@ -72,8 +71,15 @@ describe('AppShellComponent FAB clearance', () => {
         },
         {provide: AppUpdateService, useValue: {updateReady, reload}},
         {provide: CmnPullRefreshService, useValue: {available: refreshAvailable, refresh}},
-        {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
-        {provide: WhatsNewStore, useValue: {hasUnread}},
+        {
+          provide: CmnWhatsNewService,
+          useValue: {
+            open: openWhatsNew,
+            hasUnread,
+            version: APP_VERSION,
+            versionLabel: `v${APP_VERSION} · What's new`,
+          },
+        },
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
         {
@@ -218,6 +224,17 @@ describe('AppShellComponent FAB clearance', () => {
     expect(item).toBeDefined();
     fixture.componentInstance.handleAvatarMenuSelect(item as MenuItem);
     expect(openWhatsNew).toHaveBeenCalledOnce();
+  });
+
+  it("puts the unread dot on the account menu's What's new item", async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const dot = (): boolean | undefined =>
+      fixture.componentInstance.account().menuItems?.find(entry => entry.label === "What's new")
+        ?.dot;
+    expect(dot()).toBe(false);
+
+    hasUnread.set(true);
+    expect(dot()).toBe(true);
   });
 
   it("opens the what's new panel from the command palette", async () => {
