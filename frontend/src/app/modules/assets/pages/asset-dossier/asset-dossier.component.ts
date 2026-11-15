@@ -8,10 +8,8 @@ import {
 } from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
-import {type ChipRowChangeDetail} from '@lifekit-hq/elements';
 import {
   AlertComponent,
-  AreaChartComponent,
   AsyncStateComponent,
   type AsyncStateStatus,
   ButtonComponent,
@@ -25,6 +23,7 @@ import {
   InstitutionAvatarComponent,
   LineChartComponent,
   PageComponent,
+  PriceBlockComponent,
   RelativeTimePipe,
   SegmentedComponent,
   SkeletonComponent,
@@ -61,14 +60,13 @@ import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation
 import {DisposalTaxComponent} from '../../components/disposal-tax/disposal-tax.component';
 import {PriceChartComponent} from '../../components/price-chart/price-chart.component';
 import {VerdictBlockComponent} from '../../components/verdict-block/verdict-block.component';
-import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
+import {CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
 import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
 import {
   DOSSIER_SECTION_ID,
   NO_LINKED_MOVE_ITEMS_MESSAGE,
 } from '../../constants/dossier/dossier-sections.constants';
 import {
-  type ChartRangeId,
   type DossierDeltaDirection,
   type DossierSignalItem,
 } from '../../models/dossier/dossier.model';
@@ -103,7 +101,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     PageComponent,
     AlertComponent,
     AnalystActionLabelPipe,
-    AreaChartComponent,
+    PriceBlockComponent,
     AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
@@ -173,7 +171,6 @@ export class AssetDossierComponent {
 
   public readonly sectionId = DOSSIER_SECTION_ID;
   public readonly noLinkedItemsMessage = NO_LINKED_MOVE_ITEMS_MESSAGE;
-  public readonly chartRanges = CHART_RANGES;
   public readonly chartSkeletonHeight = CHART_SKELETON_HEIGHT;
   public readonly ownershipNote = OWNERSHIP_NOTE;
   public readonly verdictDisplayOptions = VERDICT_DISPLAY_OPTIONS;
@@ -227,11 +224,6 @@ export class AssetDossierComponent {
   // The tick-strip template's context is untyped; this keeps the lookup typed.
   public tickClass(state: RuleState): string {
     return this.ruleTickClass[state];
-  }
-
-  public onChartRangeChange(event: Event): void {
-    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
-    this.store.selectChartRange(value as ChartRangeId);
   }
 
   public generateLedgerRead(symbol: string, force: boolean): void {

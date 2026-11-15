@@ -10,7 +10,6 @@ import {AppPreferencesStore} from '../../../../shared/store/preferences/app-pref
 import {
   type AssetChartDto,
   type AssetDossierDto,
-  type ChartRangeId,
   type DossierAnalystsSection,
   type DossierPositionSection,
   type DossierQuoteDto,
@@ -263,7 +262,6 @@ function createMockStore() {
     chart,
     chartStatus,
     chartErrorMessage,
-    chartRange: signal<ChartRangeId>('1Y'),
     targetDraft,
     isEditingTarget: signal(false),
     isTargetLoading: signal(false),
@@ -292,7 +290,6 @@ function createMockStore() {
     toggleThesisExpanded: vi.fn(),
     generateLedgerRead: vi.fn(),
     loadChart: vi.fn(),
-    selectChartRange: vi.fn(),
     openTargetEditor: vi.fn(),
     closeTargetEditor: vi.fn(),
     setTargetDraft: vi.fn(),

@@ -34,11 +34,11 @@ import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
 import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
 import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
+import {CHART_HISTORY_RANGE} from '../constants/dossier/dossier-chart.constants';
 import {
   type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
-  type ChartRangeId,
   type DossierQuoteDto,
   type DossierUserTargetDto,
 } from '../models/dossier/dossier.model';
@@ -67,7 +67,6 @@ interface StoreMethods {
   setChart(chart: AssetChartDto): void;
   setChartError(errorCode: Nullable<string>): void;
   setChartIdle(): void;
-  setChartRange(range: ChartRangeId): void;
   setTargetLoading(): void;
   setTargetSuccess(): void;
   setTargetError(errorCode: Nullable<string>): void;
@@ -77,7 +76,6 @@ interface StoreMethods {
   setPendingRevision(revision: Nullable<ThesisRevisionDto>): void;
   applyRevisionDecision(result: DecideThesisRevisionResult): void;
   dossier: Signal<Nullable<AssetDossierDto>>;
-  chartRange: Signal<ChartRangeId>;
   parsedTargetDraft: Signal<Nullable<number>>;
 }
 
@@ -129,12 +127,12 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
-  // A failed chart keeps the rest of the page; switchMap drops a range the user already moved past.
-  const loadChart = rxMethod<{symbol: string; range: ChartRangeId}>(
+  // A failed chart keeps the rest of the page. The whole history is read once; the price block cuts it to the period.
+  const loadChart = rxMethod<string>(
     pipe(
       tap(() => store.setChartLoading()),
-      switchMap(({symbol, range}) =>
-        dossierService.getChart(symbol, range).pipe(
+      switchMap(symbol =>
+        dossierService.getChart(symbol, CHART_HISTORY_RANGE).pipe(
           tap(chart => {
             store.setChart(chart);
             store.setChartSuccess();
@@ -147,15 +145,6 @@ export function dossierEffects(store: StoreMethods) {
       )
     )
   );
-
-  const selectChartRange = (range: ChartRangeId): void => {
-    const symbol = store.dossier()?.symbol;
-    if (!symbol || range === store.chartRange()) {
-      return;
-    }
-    store.setChartRange(range);
-    loadChart({symbol, range});
-  };
 
   const putTarget = rxMethod<{symbol: string; targetPrice: number; currency: Nullable<string>}>(
     pipe(
@@ -222,7 +211,7 @@ export function dossierEffects(store: StoreMethods) {
             if (DossierQuoteUtils.isQuotable(dossier)) {
               loadQuote(dossier.symbol);
             }
-            loadChart({symbol: dossier.symbol, range: store.chartRange()});
+            loadChart(dossier.symbol);
             scrollToFragment();
           }),
           StoreErrorUtils.catchAndSetError({
@@ -347,7 +336,6 @@ export function dossierEffects(store: StoreMethods) {
     loadLedgerRead,
     generateLedgerRead,
     loadChart,
-    selectChartRange,
     saveTarget,
     clearTarget,
   };

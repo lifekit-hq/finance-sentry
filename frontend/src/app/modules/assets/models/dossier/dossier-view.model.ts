@@ -1,32 +1,16 @@
-import {type AreaSeries, type Nullable} from '@lifekit-hq/ui';
+import {type PriceSeries} from '@lifekit-hq/charts-core';
+import {type Nullable} from '@lifekit-hq/ui';
 
-import {
-  type ChartRangeId,
-  type DossierCheckAxisDto,
-  type DossierCheckAxisKey,
-} from './dossier.model';
-
-/** A timeframe chip; lk-chip-row reads `{label, value}`. */
-export interface ChartRangeOption {
-  label: string;
-  value: ChartRangeId;
-}
-
-/** A buy or sell placed along the chart's time axis; `leftPct` is its x position, 0-100. */
-export interface ChartTradeTick {
-  leftPct: number;
-  side: 'buy' | 'sell';
-  title: string;
-}
+import {type DossierCheckAxisDto, type DossierCheckAxisKey} from './dossier.model';
 
 /**
- * The price chart as drawn: index-aligned lines (price, S&P 500, average cost) and the trade ticks.
- * The chart's own legend names the lines; `averageCostLabel` adds the cost it cannot show.
+ * The price chart as the price block takes it: the asset's history, then the S&P 500 when it covers the
+ * window. `caption` names the lines; `averageCostLabel` adds the cost the block cannot draw.
  */
 export interface DossierChartView {
-  series: AreaSeries[];
+  series: PriceSeries[];
+  caption: string;
   averageCostLabel: Nullable<string>;
-  ticks: ChartTradeTick[];
 }
 
 /** One leg of the return decomposition; `value` null = the ledger cannot state it. */
