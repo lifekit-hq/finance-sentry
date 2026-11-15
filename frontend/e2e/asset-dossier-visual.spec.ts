@@ -1,4 +1,4 @@
-import {expect, type Page, test} from '@playwright/test';
+import {expect, type Locator, type Page, test} from '@playwright/test';
 
 import {API, LEDGER_READ_NARRATIVE, mockApis} from './support/dossier-mocks';
 import {PLACEHOLDER_IMAGE} from './support/visual-baseline';
@@ -9,7 +9,9 @@ import {PLACEHOLDER_IMAGE} from './support/visual-baseline';
 // are stable, and animations are disabled by the screenshot options below.
 const FROZEN_NOW = new Date('2026-09-01T12:30:00Z');
 // Chart.js times its entry animation off Date.now, which the pinned clock holds still: stepping the
-// clock past the animation lets the price chart finish drawing before the capture.
+// clock past the animation lets a chart finish drawing before the capture. The step only works once
+// the chart exists (its animation starts at the pinned time it was created under), so it follows
+// the chart's canvas appearing instead of the page load.
 const CHART_SETTLE_MS = 5_000;
 // The app shell scrolls inside its own container, so a full-page capture only sees the viewport:
 // the viewports are tall enough to hold the whole dossier.
@@ -19,6 +21,8 @@ const PHONE = {width: 375, height: 2400};
 const PHONE_FULL = {width: 375, height: 4800};
 // The hero's logo comes from a third party: a flat square keeps the baselines off the network.
 const LOGO_HOSTS = ['https://financialmodelingprep.com/**', 'https://assets.coincap.io/**'];
+// The "How has it moved?" chart, on every dossier that holds a position.
+const MOVED_CHART_CANVAS = 'cmn-area-chart canvas';
 const SCREENSHOT_OPTIONS = {
   animations: 'disabled',
   // Glyph anti-aliasing differs a little between the machines that render these baselines.
@@ -41,6 +45,10 @@ async function openDossier(
   await page.goto(`/assets/${symbol}`);
   await expect(page.getByRole('heading', {name: symbol, level: 1})).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+}
+
+async function settleCharts(page: Page, chartCanvas: Locator): Promise<void> {
+  await expect(chartCanvas).toBeVisible();
   await page.clock.setFixedTime(new Date(FROZEN_NOW.getTime() + CHART_SETTLE_MS));
 }
 
@@ -66,6 +74,7 @@ test.describe('Asset dossier visual baseline', () => {
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
     await expectTrendDrawn(page);
+    await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop.png', SCREENSHOT_OPTIONS);
   });
 
@@ -75,6 +84,7 @@ test.describe('Asset dossier visual baseline', () => {
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
     await expectTrendDrawn(page);
+    await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop-dark.png', SCREENSHOT_OPTIONS);
   });
 
@@ -83,13 +93,14 @@ test.describe('Asset dossier visual baseline', () => {
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('trend-list')).toBeVisible();
     await expectTrendDrawn(page);
+    await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-phone.png', SCREENSHOT_OPTIONS);
   });
 
   test('crypto dossier on a phone', async ({page}) => {
     await page.setViewportSize(PHONE_FULL);
     await openDossier(page, 'BTC');
-    await expect(page.getByTestId('price-chart').locator('canvas')).toBeVisible();
+    await settleCharts(page, page.getByTestId('price-chart').locator('canvas'));
     await expect(page).toHaveScreenshot('dossier-crypto-phone.png', SCREENSHOT_OPTIONS);
   });
 
@@ -112,6 +123,7 @@ test.describe('Asset dossier visual baseline', () => {
     );
     await expect(page.getByTestId('ledger-read-narrative')).toContainText(LEDGER_READ_NARRATIVE);
     await expectTrendDrawn(page);
+    await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-ledger-read.png', SCREENSHOT_OPTIONS);
   });
 
