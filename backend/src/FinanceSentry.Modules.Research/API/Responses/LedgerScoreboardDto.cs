@@ -116,10 +116,11 @@ public sealed record CoverageHorizonDto(
     CoverageGradeDto Overall,
     IReadOnlyList<CoverageSourceGradeDto> BySource);
 
-/// <summary>Grades of the memberships one reason (and screen tag) nominated.</summary>
+/// <summary>Grades of the memberships one reason, screen tag and add rule nominated.</summary>
 /// <param name="Source">The <c>CoverageReason</c>: Held, Watchlist, Screen, Ledger or User.</param>
 /// <param name="ScreenTag">The nominating screen's first nomination reason where the candidate carries one; null otherwise.</param>
-public sealed record CoverageSourceGradeDto(string Source, string? ScreenTag, CoverageGradeDto Grade);
+/// <param name="Rule">The add rule the coverage journal recorded (<c>CoverageRuleIds</c>: held, watchlist, ledger_nomination, buy_twice_in_window); null for a member with no journal add.</param>
+public sealed record CoverageSourceGradeDto(string Source, string? ScreenTag, string? Rule, CoverageGradeDto Grade);
 
 /// <summary>Equal-weight figures over memberships at one horizon; percentages are points, figures null without a graded membership.</summary>
 /// <param name="Memberships">Memberships considered (each add is one; a re-added name counts again).</param>

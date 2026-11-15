@@ -4,9 +4,12 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Domain.Coverage;
 
-/// <summary>One stretch of a name being covered: an add to its removal (null while still covered).</summary>
+/// <summary>
+/// One stretch of a name being covered: an add to its removal (null while still covered). <paramref name="Rule"/> is
+/// the add rule the journal recorded (<see cref="CoverageRuleIds"/>), null for a member with no journal add.
+/// </summary>
 public sealed record CoverageMembership(
-    string Ticker, DateTimeOffset Start, DateTimeOffset? End, CoverageReason Reason, string? ScreenTag);
+    string Ticker, DateTimeOffset Start, DateTimeOffset? End, CoverageReason Reason, string? ScreenTag, string? Rule = null);
 
 /// <summary>
 /// Grades the coverage universe against the benchmark from stored adjusted closes: pure arithmetic, no I/O, no model.
@@ -42,11 +45,13 @@ public static class CoverageGrader
             h == HeadlineHorizonDays,
             Summarise(memberships.Select(m => GradeOne(m, h, closes, benchmark, asOf)).ToList(), minimumSample),
             [.. memberships
-                .GroupBy(m => (m.Reason, m.ScreenTag))
+                .GroupBy(m => (m.Reason, m.ScreenTag, m.Rule))
                 .OrderBy(g => g.Key.Reason).ThenBy(g => g.Key.ScreenTag, StringComparer.Ordinal)
+                .ThenBy(g => g.Key.Rule, StringComparer.Ordinal)
                 .Select(g => new CoverageSourceGradeDto(
                     g.Key.Reason.ToString(),
                     g.Key.ScreenTag,
+                    g.Key.Rule,
                     Summarise(g.Select(m => GradeOne(m, h, closes, benchmark, asOf)).ToList(), minimumSample)))]))
             .ToList();
 

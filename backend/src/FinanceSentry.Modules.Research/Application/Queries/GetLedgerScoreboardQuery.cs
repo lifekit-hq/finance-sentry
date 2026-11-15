@@ -170,7 +170,9 @@ public sealed class GetLedgerScoreboardQueryHandler(
 
     private static CoverageMembership Membership(
         string ticker, CoverageJournalEntry added, DateTimeOffset? end, IReadOnlyList<OpportunityCandidate> picks)
-        => new(ticker, added.At, end, added.Reason, ScreenTag(ticker, added.Reason, added.At, picks));
+        => new(
+            ticker, added.At, end, added.Reason, ScreenTag(ticker, added.Reason, added.At, picks),
+            string.IsNullOrWhiteSpace(added.Rule) ? null : added.Rule);
 
     /// <summary>
     /// The nominating screen's tag where the candidate carries one: a <c>Screen</c> add is traced to the newest candidate

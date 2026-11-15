@@ -57,9 +57,10 @@ public sealed class CoverageScoreboardTests
         _bars[ticker] = list;
     }
 
-    private void Add(string ticker, DateTimeOffset at, CoverageReason reason, DateTimeOffset? removedAt = null)
+    private void Add(
+        string ticker, DateTimeOffset at, CoverageReason reason, DateTimeOffset? removedAt = null, string rule = "")
     {
-        _journal.Add(new CoverageJournalEntry { UserId = User, Ticker = ticker, Action = CoverageAction.Added, Reason = reason, At = at });
+        _journal.Add(new CoverageJournalEntry { UserId = User, Ticker = ticker, Action = CoverageAction.Added, Reason = reason, Rule = rule, At = at });
         if (removedAt is { } r)
         {
             _journal.Add(new CoverageJournalEntry { UserId = User, Ticker = ticker, Action = CoverageAction.Removed, Reason = reason, At = r });
@@ -169,6 +170,25 @@ public sealed class CoverageScoreboardTests
         screen.Grade.ExcessPct.Should().Be(30m);   // 100 -> 130 at day 90, benchmark flat
         bySource.Single(s => s.Source == "Ledger").Grade.ExcessPct.Should().Be(0m);
         bySource.Single(s => s.Source == "Held").ScreenTag.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_ledger_add_is_attributed_to_the_journal_rule_that_fired()
+    {
+        Add("AAA", Day0, CoverageReason.Ledger, rule: CoverageRuleIds.LedgerNomination);
+        Add("BBB", Day0, CoverageReason.Ledger, rule: CoverageRuleIds.BuyTwice);
+        Add("CCC", Day0, CoverageReason.Ledger);
+        Series("AAA", Day0, 120, 100m, 140m);
+        Series("BBB", Day0, 120, 100m, 100m);
+        Series("CCC", Day0, 120, 100m, 100m);
+        Series("SPY", Day0, 120, 400m, 400m);
+
+        var bySource = Headline(await Block(Day0.AddDays(100))).BySource;
+
+        bySource.Should().HaveCount(3);
+        bySource.Single(s => s.Rule == CoverageRuleIds.LedgerNomination).Grade.ExcessPct.Should().Be(30m);
+        bySource.Single(s => s.Rule == CoverageRuleIds.BuyTwice).Grade.ExcessPct.Should().Be(0m);
+        bySource.Single(s => s.Rule is null).Grade.Memberships.Should().Be(1);
     }
 
     [Fact]
