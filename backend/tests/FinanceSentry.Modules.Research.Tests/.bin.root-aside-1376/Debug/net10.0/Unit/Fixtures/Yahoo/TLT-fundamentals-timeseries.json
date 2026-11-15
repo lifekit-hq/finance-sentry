@@ -1,0 +1,127 @@
+{
+    "timeseries": {
+        "result": [
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualTotalRevenue"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyNetIncomeCommonStockholders"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyGrossProfit"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualNetIncomeCommonStockholders"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyDilutedEPS"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyStockholdersEquity"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualOperatingIncome"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualDilutedEPS"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyTotalRevenue"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualStockholdersEquity"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "annualGrossProfit"
+                    ]
+                }
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "TLT"
+                    ],
+                    "type": [
+                        "quarterlyOperatingIncome"
+                    ]
+                }
+            }
+        ],
+        "error": null
+    }
+}
