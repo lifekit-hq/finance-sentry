@@ -103,6 +103,33 @@ describe('alertsEffects', () => {
     expect(store.setSuccess).not.toHaveBeenCalled();
   });
 
+  it('a failed reload of the query the rows belong to keeps the rows and records the error', () => {
+    const store = build();
+    store.query.set({filter: 'unread', search: 'rent'});
+    TestBed.runInInjectionContext(() => {
+      const effects = alertsEffects(store);
+      effects.load({filter: 'unread', search: 'rent'});
+      api.getAlerts.mockReturnValue(throwError(() => new Error('offline')));
+      effects.reload();
+    });
+
+    expect(store.clearData).not.toHaveBeenCalled();
+    expect(store.setError).toHaveBeenCalledWith(null);
+  });
+
+  it('a failed load of another query than the rows belong to drops the rows', () => {
+    const store = build();
+    TestBed.runInInjectionContext(() => {
+      const effects = alertsEffects(store);
+      effects.load({filter: 'all', search: ''});
+      api.getAlerts.mockReturnValue(throwError(() => new Error('boom')));
+      effects.load({filter: 'unread', search: ''});
+    });
+
+    expect(store.clearData).toHaveBeenCalledOnce();
+    expect(store.setError).toHaveBeenCalledWith(null);
+  });
+
   it('the hook refetches whenever the query signal changes', () => {
     const store = build();
     const query = signal<AlertsQuery>({filter: 'all', search: ''});

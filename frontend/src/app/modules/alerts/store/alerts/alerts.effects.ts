@@ -48,8 +48,9 @@ interface EffectsStore {
 export function alertsEffects(store: EffectsStore) {
   const api = inject(AlertsService);
   const firstPageStarted$ = new Subject<void>();
+  let rowsQuery: Nullable<AlertsQuery> = null;
 
-  /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands. */
+  /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands; a failure drops them only when they belong to another query. */
   const load = rxMethod<AlertsQuery>(
     pipe(
       tap(() => {
@@ -57,15 +58,19 @@ export function alertsEffects(store: EffectsStore) {
         store.setAppendIdle();
         store.setLoading();
       }),
-      switchMap(({filter: kind, search}) =>
-        api.getAlerts(kind, 1, ALERTS_PAGE_SIZE, search).pipe(
+      switchMap(query =>
+        api.getAlerts(query.filter, 1, ALERTS_PAGE_SIZE, query.search).pipe(
           tap(res => {
+            rowsQuery = query;
             store.setData(res.items, res.totalCount, res.unreadCount);
             store.setAppendSuccess();
             store.setSuccess();
           }),
           catchError(() => {
-            store.clearData();
+            if (rowsQuery?.filter !== query.filter || rowsQuery.search !== query.search) {
+              rowsQuery = null;
+              store.clearData();
+            }
             store.setError(null);
             return EMPTY;
           })
