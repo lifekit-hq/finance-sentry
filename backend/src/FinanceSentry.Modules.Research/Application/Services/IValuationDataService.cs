@@ -22,7 +22,8 @@ public interface IValuationDataService
 /// <see cref="PriceAsOf"/> is when the shared quote path last saw the price (null when only the
 /// quoteSummary price is known). <see cref="TargetLow"/> / <see cref="TargetHigh"/> bound the analysts'
 /// price targets around <see cref="ConsensusTarget"/> (their mean), from <see cref="AnalystCount"/>
-/// opinions; <see cref="Currency"/> is the quote currency every price is in.
+/// opinions; <see cref="Currency"/> is the quote currency every price is in. <see cref="Beta"/> is Yahoo's
+/// five-year monthly beta against the market (the DCF's cost-of-equity input); null when Yahoo has none.
 /// </summary>
 public sealed record ValuationCurrentMetrics(
     string Ticker,
@@ -43,7 +44,8 @@ public sealed record ValuationCurrentMetrics(
     int? AnalystCount = null,
     string? Currency = null,
     decimal? MarketCap = null,
-    ValuationCompsInputs? Comps = null);
+    ValuationCompsInputs? Comps = null,
+    decimal? Beta = null);
 
 /// <summary>
 /// The raw trailing-twelve-month figures from the same Yahoo <c>quoteSummary</c> call that the comps

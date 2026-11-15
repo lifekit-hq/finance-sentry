@@ -90,6 +90,27 @@ public sealed class YahooValuationModulesContractTests
         metrics.ConsensusTarget.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData("""{ "summaryDetail": { "beta": { "raw": 0.43 } } }""", 0.43)]
+    [InlineData("""{ "defaultKeyStatistics": { "beta": { "raw": 1.25 } } }""", 1.25)]
+    [InlineData("""{ "summaryDetail": { "beta": { "raw": 0.43 } }, "defaultKeyStatistics": { "beta": { "raw": 1.25 } } }""", 0.43)]
+    public void Parse_reads_beta_from_summary_detail_then_key_statistics(string modules, double expected)
+    {
+        var json = $$"""{ "quoteSummary": { "result": [ { "price": { "quoteType": "EQUITY" }, {{modules.Trim()[1..^1]}} } ], "error": null } }""";
+
+        YahooValuationDataService.Parse(json, "MCD")!.Beta.Should().Be((decimal)expected);
+    }
+
+    [Fact]
+    public void Parse_leaves_beta_null_when_yahoo_has_none()
+    {
+        const string noBeta = """
+        { "quoteSummary": { "result": [ { "price": { "quoteType": "EQUITY" }, "summaryDetail": { "trailingPE": { "raw": 30.0 } } } ], "error": null } }
+        """;
+
+        YahooValuationDataService.Parse(noBeta, "MCD")!.Beta.Should().BeNull("a missing beta must not default to 1.0");
+    }
+
     [Fact]
     public void Parse_flags_non_equity_quote_types_as_not_applicable()
     {
