@@ -102,8 +102,8 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(coverageOptions.EvaluationHourUtc, coverageOptions.EvaluationMinuteUtc));
 
-            // Stage 6 research memos on coverage entrants: after the evaluation whose adds it writes up. Off by
-            // default (Coverage:MemoMode), so registering the job spends nothing.
+            // Stage 6 research memos on coverage entrants: after the evaluation whose adds it writes up. Capped per
+            // day and per week, and Coverage:MemoMode=Off makes it a no-op.
             mgr.AddOrUpdate<CoverageMemoJob>(
                 CoverageMemoJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),

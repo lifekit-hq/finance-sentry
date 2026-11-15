@@ -80,9 +80,10 @@ public sealed class CoverageOptions
 
     /// <summary>
     /// Whether the research memo on coverage entrants (stage 6, the funnel's only model call) runs. Defaults to
-    /// <see cref="CoverageMemoMode.Off"/>: merging the code spends nothing until the owner sets <c>Coverage:MemoMode</c>.
+    /// <see cref="CoverageMemoMode.LogOnly"/> (owner call D3): the daily cap and the weekly budget bound the spend whatever the
+    /// mode; <see cref="CoverageMemoMode.Off"/> makes no call.
     /// </summary>
-    public CoverageMemoMode MemoMode { get; set; } = CoverageMemoMode.Off;
+    public CoverageMemoMode MemoMode { get; set; } = CoverageMemoMode.LogOnly;
 
     /// <summary>Most memos written in one UTC day across the run; entrants over it wait for a later night (still inside <see cref="MemoLookbackDays"/>).</summary>
     public int MaxMemosPerDay { get; set; } = 3;
@@ -124,9 +125,9 @@ public sealed class CoverageOptions
 /// <summary>What the stage 6 memo step does.</summary>
 public enum CoverageMemoMode
 {
-    /// <summary>No call, no spend. The default.</summary>
+    /// <summary>No call, no spend.</summary>
     Off,
 
-    /// <summary>Entrants get a memo, stored and readable through MCP; nothing acts on it (paper-only).</summary>
+    /// <summary>Entrants get a memo, stored and readable through MCP; nothing acts on it (paper-only). The default.</summary>
     LogOnly,
 }

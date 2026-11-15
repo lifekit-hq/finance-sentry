@@ -72,7 +72,7 @@ For a name a ranked rule added (`Screen` or `Ledger`; a held or watchlisted add 
 
 Spend is capped three ways, all checked before each call and none of them a prompt:
 
-- `Coverage:MemoMode` - `Off` (the default: no call, no spend, whatever else is set) or `LogOnly` (memos are written and stored; nothing acts on them). Merging the code does not start spending; the owner sets `LogOnly`.
+- `Coverage:MemoMode` - `LogOnly` (the default, owner call D3 = a: memos are written and stored; nothing acts on them, and the two caps below bound the spend) or `Off` (no call, no spend, whatever else is set; the owner can set it any time).
 - `Coverage:MaxMemosPerDay` (3) across everyone, counted from the rows written that UTC day. Entrants over it wait; a name stays eligible for `Coverage:MemoLookbackDays` (7), best rank first.
 - `Coverage:MemoWeeklyBudgetUsd` (25, owner call D3) over a rolling seven days. A call is made only when the recorded cost of the last seven days plus the call's worst case (the prompt's characters over three, plus `MemoMaxOutputTokens`, at `MemoInputUsdPerMillionTokens` 2 and `MemoOutputUsdPerMillionTokens` 10, the Sonnet list price) fits under it; the run then stops. The prompt is cut at `MemoMaxInputChars`. A failed provider call stops the run and fails the job; the entrant is retried the next night.
 

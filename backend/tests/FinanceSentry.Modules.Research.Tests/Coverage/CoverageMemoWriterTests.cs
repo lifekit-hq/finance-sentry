@@ -18,7 +18,7 @@ using Moq;
 using Xunit;
 
 /// <summary>
-/// Stage 6, the research memo on coverage entrants: off by default, one call per ranked entrant, capped per day and by a
+/// Stage 6, the research memo on coverage entrants: LogOnly by default, one call per ranked entrant, capped per day and by a
 /// rolling weekly budget, never for the owner's own held or watchlisted names.
 /// </summary>
 public sealed class CoverageMemoWriterTests
@@ -53,8 +53,8 @@ public sealed class CoverageMemoWriterTests
     }
 
     [Fact]
-    public async Task ModeOff_IsTheDefaultOfTheOptions()
-        => new CoverageOptions().MemoMode.Should().Be(CoverageMemoMode.Off);
+    public async Task ModeLogOnly_IsTheDefaultOfTheOptions()
+        => new CoverageOptions().MemoMode.Should().Be(CoverageMemoMode.LogOnly);
 
     [Fact]
     public async Task NoModelOrNoKey_MakesNoCall()

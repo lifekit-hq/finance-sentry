@@ -19,7 +19,7 @@ public sealed record CoverageMemoRunSummary(int Written, int Unstructured, int D
 /// The research memo on coverage entrants (discovery funnel stage 6), the funnel's only model call. For each ranked
 /// coverage add that has no memo yet it makes one single-turn call over evidence the pipeline already stored and keeps
 /// the reply as a <see cref="CoverageMemo"/>. Three limits keep the spend bounded and are checked before every call:
-/// the mode (<see cref="CoverageMemoMode.Off"/> by default makes no call), <see cref="CoverageOptions.MaxMemosPerDay"/>
+/// the mode (<see cref="CoverageMemoMode.Off"/> makes no call), <see cref="CoverageOptions.MaxMemosPerDay"/>
 /// across everyone, and a rolling seven-day budget (<see cref="CoverageOptions.MemoWeeklyBudgetUsd"/>) that the call's
 /// worst-case cost must fit under on top of what was already recorded. Entrants a limit passed over stay eligible for
 /// <see cref="CoverageOptions.MemoLookbackDays"/>. Logged only: nothing reads a memo to act.
