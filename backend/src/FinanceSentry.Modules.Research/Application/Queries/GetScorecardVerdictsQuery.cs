@@ -2,13 +2,15 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// The verdict word (and what would turn it into BUY) of many symbols in one read, for the Accounts position rows (spec 726 US2): one request
 /// instead of one scorecard call per row. Each symbol goes through the same <see cref="GetScorecardQuery"/> as the
-/// single read, so a chip can never disagree with the dossier. A symbol whose scorecard cannot be read is left out
-/// (and logged), so one bad name never blanks the rest. Input is trimmed, upper-cased, de-duplicated and capped at
+/// single read, so a chip can never disagree with the dossier. A symbol whose scorecard cannot be read keeps a row
+/// with the typed gap reason <see cref="ScorecardGapReason.Unreadable"/> (and is logged), so one bad name never blanks the rest and
+/// its chip says why instead of vanishing. Input is trimmed, upper-cased, de-duplicated and capped at
 /// <see cref="MaxSymbols"/>.
 /// </summary>
 public sealed record GetScorecardVerdictsQuery(IReadOnlyList<string> Symbols) : IQuery<IReadOnlyList<ScorecardVerdictSummary>>
@@ -46,7 +48,8 @@ public sealed class GetScorecardVerdictsQueryHandler(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Scorecard verdict for {Symbol} could not be read and was left out", symbol);
+                logger.LogWarning(ex, "Scorecard verdict for {Symbol} could not be read and was reported as a gap", symbol);
+                result.Add(new ScorecardVerdictSummary(symbol, null, null, null, null, ScorecardGapReason.Unreadable));
             }
         }
 

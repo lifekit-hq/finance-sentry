@@ -213,14 +213,22 @@ describe('holdingsEffects', () => {
       expect(store.setVerdicts).not.toHaveBeenCalled();
     });
 
-    it('keeps the positions and shows no chip when the batch read fails', () => {
+    it('keeps the positions and gives each listed stock an unreadable dash when the batch read fails', () => {
       const getVerdicts = vi.fn().mockReturnValue(throwError(() => new Error('403')));
 
       const store = owned(getVerdicts);
 
       expect(store.setPositions).toHaveBeenCalled();
       expect(store.setError).not.toHaveBeenCalled();
-      expect(store.setVerdicts).not.toHaveBeenCalled();
+      expect(store.setVerdicts).toHaveBeenCalledWith({
+        AAPL: {
+          symbol: 'AAPL',
+          word: null,
+          firedRuleId: null,
+          turnsBuyWhen: null,
+          gapReason: 'unreadable',
+        },
+      });
     });
 
     it('skips the call when nothing is a listed stock', () => {

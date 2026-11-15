@@ -28,7 +28,7 @@ public sealed class GetScorecardVerdictsQueryTests
     }
 
     [Fact]
-    public async Task Handle_LeavesOutASymbolThatCannotBeRead_AndKeepsTheRest()
+    public async Task Handle_ReportsASymbolThatCannotBeReadAsAnUnreadableGap_AndKeepsTheRest()
     {
         var single = SingleRead(("AAA", 78));
         single.Setup(h => h.Handle(It.Is<GetScorecardQuery>(q => q.Symbol == "BAD"), It.IsAny<CancellationToken>()))
@@ -36,7 +36,11 @@ public sealed class GetScorecardVerdictsQueryTests
 
         var result = await HandlerFor(single).Handle(new GetScorecardVerdictsQuery(["BAD", "AAA"]), CancellationToken.None);
 
-        result.Select(r => r.Symbol).Should().Equal("AAA");
+        result.Select(r => r.Symbol).Should().Equal("BAD", "AAA");
+        result[0].Word.Should().BeNull();
+        result[0].GapReason.Should().Be(ScorecardGapReason.Unreadable, "the chip says why instead of vanishing");
+        result[1].Word.Should().Be("Buy");
+        result[1].GapReason.Should().BeNull();
     }
 
     [Fact]
@@ -59,7 +63,7 @@ public sealed class GetScorecardVerdictsQueryTests
             new GetScorecardVerdictsQuery(["AAA"]), CancellationToken.None);
 
         typeof(ScorecardVerdictSummary).GetProperties().Select(p => p.Name)
-            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId", "TurnsBuyWhen", "WaitReasonLabel");
+            .Should().BeEquivalentTo("Symbol", "Word", "FiredRuleId", "TurnsBuyWhen", "WaitReasonLabel", "GapReason");
         result.Should().ContainSingle();
     }
 

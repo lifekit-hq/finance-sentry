@@ -347,6 +347,7 @@ describe('AccountsListComponent positions in a brokerage or exchange', () => {
       dayChangeUsd: -15,
       hiddenReason: null,
       verdict: null,
+      verdictGap: null,
       verdictNote: null,
       weightPercent: 50,
       ...overrides,

@@ -1,7 +1,9 @@
 import {TestBed} from '@angular/core/testing';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {ToastService} from '@lifekit-hq/ui';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {type VerdictWord} from '../../models/scorecard/scorecard.model';
+import {SCORECARD_GAP_COPY} from '../../constants/scorecard/scorecard.constants';
+import {type ScorecardGapReason, type VerdictWord} from '../../models/scorecard/scorecard.model';
 import {VerdictChipComponent} from './verdict-chip.component';
 
 const WORDS: readonly [VerdictWord, string][] = [
@@ -36,5 +38,55 @@ describe('VerdictChipComponent', () => {
     const host = render('Buy');
 
     expect(host.querySelector('a, button, [tabindex]')).toBeNull();
+  });
+
+  describe('with no verdict (issue #1414)', () => {
+    const REASONS: readonly ScorecardGapReason[] = ['no_role', 'outside_universe', 'unreadable'];
+    const info = vi.fn();
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({providers: [{provide: ToastService, useValue: {info}}]});
+    });
+
+    const renderGap = (gap: ScorecardGapReason) => {
+      const fixture = TestBed.createComponent(VerdictChipComponent);
+      fixture.componentRef.setInput('gap', gap);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    beforeEach(() => info.mockClear());
+
+    it.each(REASONS)('shows a dash and says %s on hover and to a screen reader', gap => {
+      const element = renderGap(gap);
+      const chip = element.querySelector('[data-testid="verdict-chip-gap"]');
+      const text = `${SCORECARD_GAP_COPY[gap].line} ${SCORECARD_GAP_COPY[gap].hint}`;
+
+      expect(chip?.textContent?.trim()).toBe('—');
+      expect(chip?.getAttribute('title')).toBe(text);
+      expect(chip?.getAttribute('aria-label')).toBe(`No verdict. ${text}`);
+      expect(element.querySelector('[data-testid="verdict-chip"]')).toBeNull();
+    });
+
+    it('says the reason in a toast on a tap, and does not follow the row link', () => {
+      const chip = renderGap('no_role').querySelector<HTMLElement>(
+        '[data-testid="verdict-chip-gap"]'
+      );
+      const click = new MouseEvent('click', {bubbles: true, cancelable: true});
+
+      chip?.dispatchEvent(click);
+
+      expect(info).toHaveBeenCalledWith(
+        `${SCORECARD_GAP_COPY.no_role.line} ${SCORECARD_GAP_COPY.no_role.hint}`
+      );
+      expect(click.defaultPrevented).toBe(true);
+    });
+
+    it('shows nothing when there is neither a word nor a reason', () => {
+      const fixture = TestBed.createComponent(VerdictChipComponent);
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).children.length).toBe(0);
+    });
   });
 });

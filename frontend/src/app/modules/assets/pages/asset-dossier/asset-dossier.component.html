@@ -363,6 +363,25 @@
             class="mt-cmn-3"
           />
         </cmn-card>
+      } @else if (store.verdictGap(); as gap) {
+        <!-- No verdict is said, never hidden (#1414): a reason in one line, and a retry only where a read can work again. -->
+        <cmn-card class="block" data-testid="dossier-verdict-gap">
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
+          <cmn-async-state
+            [status]="store.verdictAsyncStatus()"
+            [errorMessage]="verdictGapCopy[gap].line"
+            [isEmpty]="!verdictGapCopy[gap].retryable"
+            [emptyMessage]="verdictGapCopy[gap].line"
+            [emptySubMessage]="verdictGapCopy[gap].hint"
+            [skeletonRows]="1"
+            [keepContent]="false"
+            [crossfade]="false"
+            (retry)="store.retryVerdict(dossier.symbol)"
+            class="mt-cmn-2 block"
+            emptyIcon="Search"
+            retryable
+          />
+        </cmn-card>
       }
 
       <!-- Ledger's pending proposal on this ticker (#1069): the owner decides; Finance Sentry never trades. -->

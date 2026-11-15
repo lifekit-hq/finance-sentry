@@ -41,6 +41,7 @@ import {
   VERDICT_DISPLAY_LABEL,
   VERDICT_DISPLAY_OPTIONS,
 } from '../../../../shared/constants/preferences/app-preferences.constants';
+import {SCORECARD_GAP_COPY} from '../../../../shared/constants/scorecard/scorecard.constants';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
@@ -152,6 +153,7 @@ export class AssetDossierComponent {
   public readonly decisionRecordedTitle = DECISION_RECORDED_TITLE;
   public readonly revisionRecordedTitle = THESIS_REVISION_RECORDED_TITLE;
   public readonly kindLabel = THESIS_REVISION_KIND_LABEL;
+  public readonly verdictGapCopy = SCORECARD_GAP_COPY;
   public readonly dossierStatus = computed<AsyncStateStatus>(() => {
     if (this.store.dossierErrorMessage()) {
       return 'error';

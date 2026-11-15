@@ -1,7 +1,10 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
-import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
+import {
+  type ScorecardDto,
+  type ScorecardGapReason,
+} from '../../../../shared/models/scorecard/scorecard.model';
 import {type ThesisDto} from '../../../../shared/models/thesis/thesis.model';
 
 export interface DossierTaxLotEntry {
@@ -331,6 +334,8 @@ export interface AssetDossierDto {
    * absent from older API builds. An ETF carries its look-through basis; any other non-equity reads NotScored.
    */
   scorecard?: Nullable<ScorecardDto>;
+  /** Why `scorecard` is null (issue #1414); absent when it is present or on payloads from before. */
+  scorecardGap?: Nullable<ScorecardGapReason>;
 }
 
 /**

@@ -14,7 +14,8 @@ using FinanceSentry.Modules.Research.Domain.Tax;
 /// rules (always present; an axis that does not apply is absent). UserTarget: null = none set.
 /// PendingRecommendation: Ledger's pending proposal on the name (#1069), null = none.
 /// NotableMoves: days whose return reached the threshold, each with the news and signals near it (#1218); null = no price history.
-/// Scorecard: the four-axis scorecard and its verdict word (spec 726 US2), null = it could not be read.
+/// Scorecard: the four-axis scorecard and its verdict word (spec 726 US2), null = no verdict, and <c>ScorecardGap</c> says why
+/// (<c>no_role</c>, <c>outside_universe</c> or <c>unreadable</c>, see <c>ScorecardGapReason</c>; issue #1414); null whenever a scorecard is present.
 /// </summary>
 public sealed record AssetDossierResult(
     string Symbol,
@@ -31,7 +32,8 @@ public sealed record AssetDossierResult(
     DossierUserTarget? UserTarget = null,
     RecommendationDto? PendingRecommendation = null,
     ScorecardResult? Scorecard = null,
-    DossierNotableMoves? NotableMoves = null);
+    DossierNotableMoves? NotableMoves = null,
+    string? ScorecardGap = null);
 
 /// <summary>The user's own fair-value target, in <see cref="Currency"/> (the quote currency it was set in).</summary>
 public sealed record DossierUserTarget(decimal TargetPrice, string? Currency, DateTimeOffset UpdatedAt);

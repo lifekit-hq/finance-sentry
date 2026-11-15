@@ -3,6 +3,7 @@ import {type TagVariant} from '@lifekit-hq/ui';
 
 import {
   type LookThroughSource,
+  type ScorecardGapReason,
   type VerdictAxis,
   type VerdictOperator,
   type VerdictStructureBasis,
@@ -24,6 +25,33 @@ export const VERDICT_WORD_VARIANT: Readonly<Record<VerdictWord, TagVariant>> = {
   Avoid: 'error',
   NotScored: 'neutral',
 };
+
+/**
+ * What a missing verdict says (issue #1414). `line` is the one-line reason; `hint` is the second line the
+ * empty state needs and the chip's hover text. A reason, never an instruction to trade.
+ */
+export const SCORECARD_GAP_COPY: Readonly<
+  Record<ScorecardGapReason, {line: string; hint: string; retryable: boolean}>
+> = {
+  no_role: {
+    line: 'No verdict for your role.',
+    hint: 'Research verdicts are shown to the account owner.',
+    retryable: false,
+  },
+  outside_universe: {
+    line: 'Outside the scoring universe (crypto / fund type).',
+    hint: 'The verdict scores listed single stocks, so this holding has none.',
+    retryable: false,
+  },
+  unreadable: {
+    line: 'The verdict could not be read, retry.',
+    hint: 'The rest of the page is unaffected.',
+    retryable: true,
+  },
+};
+
+/** The chip's stand-in where there is no word to show. */
+export const SCORECARD_GAP_DASH = '—';
 
 export const VERDICT_AXIS_LABEL: Readonly<Record<VerdictAxis, string>> = {
   Structure: 'Structure',

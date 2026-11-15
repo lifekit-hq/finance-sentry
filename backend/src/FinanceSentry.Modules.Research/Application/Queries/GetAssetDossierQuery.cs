@@ -110,6 +110,7 @@ public sealed class GetAssetDossierQueryHandler(
                 valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList(),
                 lookThrough: !DossierTickers.IsCrypto(bookPosition?.AssetClass)))
             : null;
+        var scorecardGap = ScorecardGapFor(request.IncludeVerdicts, scorecard is not null, scorecardValuation.NotApplicable);
 
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 
@@ -157,7 +158,27 @@ public sealed class GetAssetDossierQueryHandler(
                 : new DossierUserTarget(userTarget.TargetPrice, userTarget.Currency, userTarget.UpdatedAt),
             PendingRecommendation: pending is null ? null : RecommendationDto.From(pending),
             Scorecard: scorecard,
-            NotableMoves: notableMoves);
+            NotableMoves: notableMoves,
+            ScorecardGap: scorecardGap);
+    }
+
+    /// <summary>
+    /// Why the dossier carries no scorecard (issue #1414), null when it does: the caller is not the owner, the name is
+    /// outside what the verdict scores (so reading it again cannot help), or the read threw and may succeed on retry.
+    /// </summary>
+    public static string? ScorecardGapFor(bool includeVerdicts, bool hasScorecard, bool outsideUniverse)
+    {
+        if (!includeVerdicts)
+        {
+            return ScorecardGapReason.NoRole;
+        }
+
+        if (hasScorecard)
+        {
+            return null;
+        }
+
+        return outsideUniverse ? ScorecardGapReason.OutsideUniverse : ScorecardGapReason.Unreadable;
     }
 
     /// <summary>

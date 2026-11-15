@@ -8,10 +8,12 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
+import {ScorecardFixtures} from '../../../shared/models/scorecard/scorecard.fixtures';
 import {ThesisRevisionFixtures} from '../../../shared/models/thesis-revision/thesis-revision.fixtures';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
+import {ScorecardService} from '../../decisions/services/scorecard.service';
 import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
 import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
 import {
@@ -174,6 +176,7 @@ describe('DossierStore', () => {
   let sheet: {open: ReturnType<typeof vi.fn>};
   let revisions: {list: ReturnType<typeof vi.fn>};
   let revisionSheet: {open: ReturnType<typeof vi.fn>};
+  let scorecards: {read: ReturnType<typeof vi.fn>};
 
   function inject(): InstanceType<typeof DossierStore> {
     TestBed.configureTestingModule({
@@ -190,6 +193,7 @@ describe('DossierStore', () => {
         {provide: DecisionSheetService, useValue: sheet},
         {provide: ThesisRevisionService, useValue: revisions},
         {provide: ThesisRevisionSheetService, useValue: revisionSheet},
+        {provide: ScorecardService, useValue: scorecards},
       ],
     });
     return TestBed.inject(DossierStore);
@@ -202,6 +206,7 @@ describe('DossierStore', () => {
     sheet = {open: vi.fn().mockReturnValue(of(undefined))};
     revisions = {list: vi.fn().mockReturnValue(of({pending: [], decided: []}))};
     revisionSheet = {open: vi.fn().mockReturnValue(of(undefined))};
+    scorecards = {read: vi.fn().mockReturnValue(of(ScorecardFixtures.scorecard({symbol: 'AAPL'})))};
     service = {
       getDossier: vi.fn().mockReturnValue(of(DOSSIER)),
       getQuotes: vi.fn().mockReturnValue(of([QUOTE])),
@@ -539,6 +544,45 @@ describe('DossierStore', () => {
 
     expect(store.dossier()?.pendingRecommendation).toEqual(pending);
     expect(store.decidedRecommendation()).toBeNull();
+  });
+
+  describe('the verdict gap (issue #1414)', () => {
+    const unreadable: AssetDossierDto = {...DOSSIER, scorecard: null, scorecardGap: 'unreadable'};
+
+    it('names the reason the dossier carries and offers the retry only for an unreadable read', () => {
+      service.getDossier.mockReturnValue(of(unreadable));
+      const store = inject();
+      TestBed.tick();
+
+      expect(store.verdictGap()).toBe('unreadable');
+      expect(store.verdictAsyncStatus()).toBe('error');
+    });
+
+    it('reads the scorecard again on retry and swaps the gap for the verdict, without reloading the page', () => {
+      service.getDossier.mockReturnValue(of(unreadable));
+      const store = inject();
+      TestBed.tick();
+
+      store.retryVerdict('AAPL');
+
+      expect(scorecards.read).toHaveBeenCalledWith('AAPL');
+      expect(store.dossier()?.scorecard?.symbol).toBe('AAPL');
+      expect(store.verdictGap()).toBeNull();
+      expect(service.getDossier).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the gap and the retry when the retry fails too', () => {
+      service.getDossier.mockReturnValue(of(unreadable));
+      scorecards.read.mockReturnValue(httpError('SOME_UNREGISTERED_CODE'));
+      const store = inject();
+      TestBed.tick();
+
+      store.retryVerdict('AAPL');
+
+      expect(store.verdictGap()).toBe('unreadable');
+      expect(store.verdictAsyncStatus()).toBe('error');
+      expect(store.dossier()?.symbol).toBe('AAPL');
+    });
   });
 
   describe('thesis change', () => {

@@ -4,6 +4,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {
+  type ScorecardGapReason,
   type ScorecardVerdictSummary,
   type VerdictWord,
 } from '../../../shared/models/scorecard/scorecard.model';
@@ -49,6 +50,8 @@ export interface PositionRow {
   hiddenReason: Nullable<HiddenReason>;
   /** The research verdict word for a held listed stock (owner only); null shows no chip. */
   verdict: Nullable<VerdictWord>;
+  /** Why a held stock shows a dash where its chip would be (issue #1414); null when it has a word or no read was made. */
+  verdictGap: Nullable<ScorecardGapReason>;
   /** One sentence naming what would turn the verdict into BUY; null where the API names no bar. */
   verdictNote: Nullable<string>;
   weightPercent: number;
@@ -122,6 +125,7 @@ export function holdingsComputed(store: StateSignals) {
         dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
         hiddenReason: p.hiddenReason ?? null,
         verdict: verdict?.word ?? null,
+        verdictGap: verdict?.word ? null : (verdict?.gapReason ?? null),
         verdictNote: ScorecardUtils.heldRowLine(verdict?.turnsBuyWhen ?? null),
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };

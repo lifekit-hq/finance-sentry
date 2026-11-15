@@ -63,11 +63,22 @@ export interface VerdictDto {
   priceLens?: Nullable<VerdictPriceLens>;
 }
 
-/** One symbol's verdict word from the batch read behind the Accounts rows, with what would turn it into BUY. */
+/**
+ * Why a symbol has no verdict to show (issue #1414): the caller is not the owner (`no_role`), the name is
+ * outside what the verdict scores (`outside_universe`), or the read failed and may work again (`unreadable`).
+ */
+export type ScorecardGapReason = 'no_role' | 'outside_universe' | 'unreadable';
+
+/**
+ * One symbol's verdict word from the batch read behind the Accounts rows, with what would turn it into BUY.
+ * A symbol whose verdict could not be read keeps its row with no word and a `gapReason`, so its chip says why.
+ */
 export interface ScorecardVerdictSummary {
   symbol: string;
-  word: VerdictWord;
-  firedRuleId: string;
+  word: Nullable<VerdictWord>;
+  firedRuleId: Nullable<string>;
+  /** Set only when there is no word; absent on payloads from before #1414. */
+  gapReason?: Nullable<ScorecardGapReason>;
   /** The same line the full scorecard carries; null when there is no bar to name (BUY or better, or not scored). */
   turnsBuyWhen: Nullable<string>;
   /** The named reason of a WAIT, as a short label. */
