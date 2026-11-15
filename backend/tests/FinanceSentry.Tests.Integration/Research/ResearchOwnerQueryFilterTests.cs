@@ -87,7 +87,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(17);
+        perUser.Should().HaveCount(18);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -221,6 +221,56 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
             released.DecidedAt.Should().BeNull();
             released.DecisionNote.Should().BeNull();
         }
+    }
+
+    [DockerRequiredFact]
+    public async Task A_proposal_cannot_supersede_a_revision_a_decision_has_claimed()
+    {
+        var subject = Guid.NewGuid();
+        var live = NewRevision(_userA, subject);
+        await SeedAsync(live);
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ThesisRevisionRepository(asA);
+            var loaded = await repo.FindPendingAsync(_userA, subject);
+            (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", now)).Should().BeTrue();
+
+            var next = NewRevision(_userA, subject);
+            loaded!.Status = ThesisRevisionStatus.Superseded;
+            loaded.SupersededById = next.Id;
+            var supersede = () => repo.AddPendingAsync(next, loaded);
+            await supersede.Should().ThrowAsync<ThesisRevisionConflictException>("the claimed row is no longer pending");
+        }
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var after = await new ThesisRevisionRepository(asA).GetAsync(_userA, live.Id);
+            after!.Status.Should().Be(ThesisRevisionStatus.Confirmed, "a blind update must not overwrite the claim");
+            (await asA.ThesisRevisions.CountAsync(r => r.SubjectId == subject)).Should().Be(1);
+        }
+    }
+
+    [DockerRequiredFact]
+    public async Task Releasing_a_claim_after_a_newer_proposal_took_the_subject_supersedes_it()
+    {
+        var subject = Guid.NewGuid();
+        var live = NewRevision(_userA, subject);
+        await SeedAsync(live);
+
+        await using var asA = CreateContext(_userA);
+        var repo = new ThesisRevisionRepository(asA);
+        (await repo.TryClaimAsync(_userA, live.Id, ThesisRevisionStatus.Confirmed, "ok", DateTimeOffset.UtcNow)).Should().BeTrue();
+        var newer = NewRevision(_userA, subject);
+        await repo.AddPendingAsync(newer);
+
+        (await repo.ReleaseClaimAsync(_userA, live.Id)).Should().Be(ThesisRevisionStatus.Superseded);
+
+        await using var check = CreateContext(_userA);
+        var old = await new ThesisRevisionRepository(check).GetAsync(_userA, live.Id);
+        old!.Status.Should().Be(ThesisRevisionStatus.Superseded);
+        old.SupersededById.Should().Be(newer.Id);
     }
 
     [DockerRequiredFact]

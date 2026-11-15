@@ -57,17 +57,26 @@ internal sealed class InMemoryThesisRevisionRepository : IThesisRevisionReposito
         return Task.FromResult(true);
     }
 
-    public Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
+    public Task<ThesisRevisionStatus> ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
         var row = Rows.FirstOrDefault(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed);
-        if (row is not null)
+        if (row is null)
         {
-            row.Status = ThesisRevisionStatus.Pending;
-            row.DecidedAt = null;
-            row.DecisionNote = null;
+            return Task.FromResult(ThesisRevisionStatus.Pending);
         }
 
-        return Task.CompletedTask;
+        var newer = Rows.FirstOrDefault(r => r.UserId == userId && r.SubjectId == row.SubjectId && r.Status == ThesisRevisionStatus.Pending);
+        row.DecisionNote = null;
+        if (newer is not null)
+        {
+            row.Status = ThesisRevisionStatus.Superseded;
+            row.SupersededById = newer.Id;
+            return Task.FromResult(ThesisRevisionStatus.Superseded);
+        }
+
+        row.Status = ThesisRevisionStatus.Pending;
+        row.DecidedAt = null;
+        return Task.FromResult(ThesisRevisionStatus.Pending);
     }
 
     public Task UpdateAsync(ThesisRevision revision, CancellationToken ct = default) => Task.CompletedTask;

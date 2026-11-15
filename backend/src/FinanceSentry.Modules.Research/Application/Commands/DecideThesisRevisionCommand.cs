@@ -222,10 +222,12 @@ public sealed class DecideThesisRevisionCommandHandler(
 
     private async Task ReleaseClaimAsync(ThesisRevision revision)
     {
-        await revisions.ReleaseClaimAsync(revision.UserId, revision.Id, CancellationToken.None);
-        revision.Status = ThesisRevisionStatus.Pending;
-        revision.DecidedAt = null;
+        revision.Status = await revisions.ReleaseClaimAsync(revision.UserId, revision.Id, CancellationToken.None);
         revision.DecisionNote = null;
+        if (revision.Status == ThesisRevisionStatus.Pending)
+        {
+            revision.DecidedAt = null;
+        }
     }
 
     private static string ConfirmedRationale(ThesisRevision revision)

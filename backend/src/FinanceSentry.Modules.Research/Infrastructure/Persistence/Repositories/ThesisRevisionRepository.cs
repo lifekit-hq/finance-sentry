@@ -52,8 +52,19 @@ public sealed class ThesisRevisionRepository(ResearchDbContext db) : IThesisRevi
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (supersedes is not null)
         {
-            db.ThesisRevisions.Update(supersedes);
-            await db.SaveChangesAsync(ct);
+            var settled = await db.ThesisRevisions
+                .Where(r => r.UserId == supersedes.UserId && r.Id == supersedes.Id && r.Status == ThesisRevisionStatus.Pending)
+                .ExecuteUpdateAsync(
+                    set => set
+                        .SetProperty(r => r.Status, supersedes.Status)
+                        .SetProperty(r => r.DecidedAt, supersedes.DecidedAt)
+                        .SetProperty(r => r.SupersededById, supersedes.SupersededById),
+                    ct);
+            db.Entry(supersedes).State = EntityState.Detached;
+            if (settled == 0)
+            {
+                throw new ThesisRevisionConflictException(revision.Ticker);
+            }
         }
 
         db.ThesisRevisions.Add(revision);
@@ -82,15 +93,45 @@ public sealed class ThesisRevisionRepository(ResearchDbContext db) : IThesisRevi
                     .SetProperty(r => r.DecisionNote, note),
                 ct) == 1;
 
-    public async Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
-        => await db.ThesisRevisions
-            .Where(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed)
-            .ExecuteUpdateAsync(
-                set => set
-                    .SetProperty(r => r.Status, ThesisRevisionStatus.Pending)
-                    .SetProperty(r => r.DecidedAt, (DateTimeOffset?)null)
-                    .SetProperty(r => r.DecisionNote, (string?)null),
-                ct);
+    public async Task<ThesisRevisionStatus> ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default)
+    {
+        var claimed = await db.ThesisRevisions.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed, ct);
+        if (claimed is null)
+        {
+            return ThesisRevisionStatus.Pending;
+        }
+
+        try
+        {
+            await db.ThesisRevisions
+                .Where(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed)
+                .ExecuteUpdateAsync(
+                    set => set
+                        .SetProperty(r => r.Status, ThesisRevisionStatus.Pending)
+                        .SetProperty(r => r.DecidedAt, (DateTimeOffset?)null)
+                        .SetProperty(r => r.DecisionNote, (string?)null),
+                    ct);
+            return ThesisRevisionStatus.Pending;
+        }
+        catch (Exception ex) when (ex is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            || ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            var newerId = await db.ThesisRevisions.AsNoTracking()
+                .Where(r => r.UserId == userId && r.SubjectId == claimed.SubjectId && r.Status == ThesisRevisionStatus.Pending)
+                .Select(r => (Guid?)r.Id)
+                .FirstOrDefaultAsync(ct);
+            await db.ThesisRevisions
+                .Where(r => r.UserId == userId && r.Id == id && r.Status == ThesisRevisionStatus.Confirmed)
+                .ExecuteUpdateAsync(
+                    set => set
+                        .SetProperty(r => r.Status, ThesisRevisionStatus.Superseded)
+                        .SetProperty(r => r.SupersededById, newerId)
+                        .SetProperty(r => r.DecisionNote, (string?)null),
+                    ct);
+            return ThesisRevisionStatus.Superseded;
+        }
+    }
 
     public async Task UpdateAsync(ThesisRevision revision, CancellationToken ct = default)
     {

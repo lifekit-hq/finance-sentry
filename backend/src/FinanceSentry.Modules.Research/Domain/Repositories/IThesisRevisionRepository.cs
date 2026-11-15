@@ -23,8 +23,9 @@ public interface IThesisRevisionRepository
 
     /// <summary>
     /// Inserts a pending proposal. Throws <see cref="Exceptions.ThesisRevisionConflictException"/> when another pending
-    /// proposal on the subject landed first (the partial unique index). <paramref name="supersedes"/>, an already-changed
-    /// tracked row, is saved in the same transaction so a failed insert leaves it as it was.
+    /// proposal on the subject landed first (the partial unique index) or when <paramref name="supersedes"/> is no longer
+    /// pending (a decision claimed it). <paramref name="supersedes"/>, an already-changed row, is written in the same
+    /// transaction as a conditional update, so a failed insert leaves it as it was.
     /// </summary>
     Task AddPendingAsync(ThesisRevision revision, ThesisRevision? supersedes = null, CancellationToken ct = default);
 
@@ -35,8 +36,11 @@ public interface IThesisRevisionRepository
     Task<bool> TryClaimAsync(
         Guid userId, Guid id, ThesisRevisionStatus status, string? note, DateTimeOffset decidedAt, CancellationToken ct = default);
 
-    /// <summary>Puts a claimed (Confirmed) proposal back to Pending when the confirm wrote nothing.</summary>
-    Task ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default);
+    /// <summary>
+    /// Puts a claimed (Confirmed) proposal back to Pending when the confirm wrote nothing. When a newer proposal took the
+    /// subject meanwhile, the claimed one is marked Superseded instead. Returns the status it ends in.
+    /// </summary>
+    Task<ThesisRevisionStatus> ReleaseClaimAsync(Guid userId, Guid id, CancellationToken ct = default);
 
     /// <summary>Saves a changed row. The expiry job writes with no person in scope; SaveChanges is not filtered.</summary>
     Task UpdateAsync(ThesisRevision revision, CancellationToken ct = default);
