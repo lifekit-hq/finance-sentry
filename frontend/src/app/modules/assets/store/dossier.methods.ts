@@ -3,6 +3,10 @@ import {getState, patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {
+  type DecideThesisRevisionResult,
+  type ThesisRevisionDto,
+} from '../../../shared/models/thesis-revision/thesis-revision.model';
+import {
   type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
@@ -67,6 +71,21 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
       patchState(store, state => ({
         dossier: state.dossier ? {...state.dossier, pendingRecommendation: null} : null,
         decidedRecommendation: decided,
+      }));
+    },
+    setPendingRevision(pendingRevision: Nullable<ThesisRevisionDto>): void {
+      patchState(store, {pendingRevision});
+    },
+    // A recorded verdict takes the pending change off the page. A confirm also lands on the thesis card: the
+    // thesis it wrote (or none, after a close).
+    applyRevisionDecision(result: DecideThesisRevisionResult): void {
+      patchState(store, state => ({
+        pendingRevision: null,
+        decidedRevision: result.revision,
+        dossier:
+          state.dossier && result.revision.status === 'Confirmed'
+            ? {...state.dossier, thesis: result.thesis}
+            : state.dossier,
       }));
     },
   };

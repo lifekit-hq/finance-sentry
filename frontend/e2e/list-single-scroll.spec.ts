@@ -245,6 +245,10 @@ async function mockApis(page: Page, count: number): Promise<void> {
     )
   );
   await page.route(`${API}/research/scorecards**`, route => route.fulfill(json([])));
+  await page.route(`${API}/research/thesis-revisions`, route =>
+    route.fulfill(json({pending: [], decided: []}))
+  );
+  await page.route(`${API}/research/theses`, route => route.fulfill(json([])));
   await page.route(`${API}/dashboard/flow-breakdown**`, route =>
     route.fulfill(
       json({

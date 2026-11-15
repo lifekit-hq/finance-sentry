@@ -23,10 +23,17 @@ import {
   type RecommendationDto,
   type RecommendationVerdict,
 } from '../../../shared/models/recommendation/recommendation.model';
+import {
+  type DecideThesisRevisionResult,
+  type ThesisRevisionDto,
+  type ThesisRevisionVerdict,
+} from '../../../shared/models/thesis-revision/thesis-revision.model';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
+import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
+import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -67,6 +74,8 @@ interface StoreMethods {
   setTargetIdle(): void;
   setUserTarget(target: Nullable<DossierUserTargetDto>): void;
   applyRecommendationDecision(decided: RecommendationDto): void;
+  setPendingRevision(revision: Nullable<ThesisRevisionDto>): void;
+  applyRevisionDecision(result: DecideThesisRevisionResult): void;
   dossier: Signal<Nullable<AssetDossierDto>>;
   chartRange: Signal<ChartRangeId>;
   parsedTargetDraft: Signal<Nullable<number>>;
@@ -78,6 +87,8 @@ export function dossierEffects(store: StoreMethods) {
   const document = inject(DOCUMENT);
   const injector = inject(Injector);
   const decisionSheet = inject(DecisionSheetService);
+  const revisions = inject(ThesisRevisionService);
+  const revisionSheet = inject(ThesisRevisionSheetService);
   const authStore = inject(AuthStore);
   const preferences = inject(AppPreferencesStore);
 
@@ -273,6 +284,35 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
+  // Ledger's pending thesis change for this ticker (owner only). The Decisions queue is the surface that reports a
+  // failed read; here a failure leaves the page without the card rather than raising an error over the dossier.
+  const loadRevision = rxMethod<string>(
+    pipe(
+      switchMap(symbol =>
+        revisions.list().pipe(
+          tap(result =>
+            store.setPendingRevision(
+              result.pending.find(revision => revision.ticker === symbol) ?? null
+            )
+          ),
+          catchError(() => EMPTY),
+          takeUntil(symbolChanged$)
+        )
+      )
+    )
+  );
+
+  /** Opens the Confirm or Reject sheet for the pending thesis change; a recorded verdict replaces the card. */
+  const decideRevision = rxMethod<{revision: ThesisRevisionDto; verdict: ThesisRevisionVerdict}>(
+    pipe(
+      exhaustMap(({revision, verdict}) =>
+        revisionSheet.open(revision, verdict).pipe(takeUntil(symbolChanged$))
+      ),
+      filter((decided): decided is DecideThesisRevisionResult => decided !== undefined),
+      tap(decided => store.applyRevisionDecision(decided))
+    )
+  );
+
   // A symbol change in place (palette search from one dossier to another) reuses this component, so
   // the previous symbol's content is dropped before the new one loads.
   const openSymbol = (symbol: string): void => {
@@ -285,6 +325,7 @@ export function dossierEffects(store: StoreMethods) {
     loadDossier(symbol);
     if (authStore.canUseAi()) {
       loadLedgerRead(symbol);
+      loadRevision(symbol);
     }
   };
 
@@ -302,6 +343,7 @@ export function dossierEffects(store: StoreMethods) {
     setVerdictDisplay,
     loadDossier,
     decideRecommendation,
+    decideRevision,
     loadLedgerRead,
     generateLedgerRead,
     loadChart,

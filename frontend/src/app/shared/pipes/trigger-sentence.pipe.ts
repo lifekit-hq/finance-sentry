@@ -1,6 +1,6 @@
 import {Pipe, type PipeTransform} from '@angular/core';
 
-import {type ThesisInvalidationTrigger} from '../models/dossier/dossier.model';
+import {type ThesisInvalidationTrigger} from '../models/thesis/thesis.model';
 import {ThesisTriggerUtils} from '../utils/thesis-trigger.utils';
 
 @Pipe({name: 'triggerSentence'})

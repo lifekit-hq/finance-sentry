@@ -6,6 +6,7 @@ import {ASYNC_STATE_SHOW_DELAY_MS, TagComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, onTestFinished, vi} from 'vitest';
 
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
+import {ThesisRevisionFixtures} from '../../../../shared/models/thesis-revision/thesis-revision.fixtures';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {PriceChartComponent} from '../../components/price-chart/price-chart.component';
 import {
@@ -220,6 +221,39 @@ describe('AssetDossierComponent', () => {
       verdict: 'reject',
     });
     expect(byTestId('dossier-decision-recorded')).toBeNull();
+  });
+
+  it("shows Ledger's pending thesis change under the hero against the thesis on file, and hands the verdict to the store", () => {
+    const revision = ThesisRevisionFixtures.revision({ticker: 'DRAM'});
+    mockStore.dossier.set(DOSSIER);
+    mockStore.pendingRevision.set(revision);
+    fixture.detectChanges();
+
+    const card = byTestId('thesis-revision-card-DRAM');
+    expect(card).not.toBeNull();
+    expect(card?.querySelector('a[href^="/assets"]')).toBeNull();
+    expect(card?.querySelector('[data-testid="thesis-revision-before"]')?.textContent).toContain(
+      'Memory cycle is turning.'
+    );
+
+    root().querySelector<HTMLElement>('[data-testid="thesis-revision-confirm"] button')?.click();
+    expect(mockStore.decideRevision).toHaveBeenCalledWith({revision, verdict: 'confirm'});
+    expect(byTestId('dossier-revision-recorded')).toBeNull();
+  });
+
+  it('says what was recorded once the thesis change is decided', () => {
+    mockStore.decidedRevision.set(
+      ThesisRevisionFixtures.revision({
+        status: 'Rejected',
+        decisionNote: 'The S-1 changes nothing for me.',
+      })
+    );
+    fixture.detectChanges();
+
+    const note = byTestId('dossier-revision-recorded');
+    expect(note?.textContent).toContain('Thesis change rejected');
+    expect(note?.textContent).toContain('The S-1 changes nothing for me.');
+    expect(byTestId('thesis-revision-card-CBRS')).toBeNull();
   });
 
   it('shows no verdict card without a scorecard', () => {

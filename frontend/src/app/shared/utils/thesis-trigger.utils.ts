@@ -1,5 +1,5 @@
-import {MoneyUtils} from '../../../shared/utils/money.utils';
-import {type ThesisInvalidationTrigger} from '../models/dossier/dossier.model';
+import {type ThesisInvalidationTrigger} from '../models/thesis/thesis.model';
+import {MoneyUtils} from './money.utils';
 
 const PERCENT_FACTOR = 100;
 const PERCENT_FRACTION_DIGITS = 1;

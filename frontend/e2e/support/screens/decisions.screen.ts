@@ -11,9 +11,11 @@ export const DECISIONS_SCREEN: VisualScreen = {
   ready: async page => {
     await expect(page.getByTestId('decision-row-DRAM')).toBeVisible();
     await expect(page.getByTestId('decisions-decided')).toContainText('NVDA');
+    await expect(page.getByTestId('thesis-revision-card-CBRS')).toBeVisible();
   },
-  desktopHeight: 1000,
-  phoneHeight: 1100,
+  // Tall enough to hold the thesis-change card under the queue.
+  desktopHeight: 1400,
+  phoneHeight: 1700,
 };
 
 export const DECISION_DETAIL_SCREEN: VisualScreen = {

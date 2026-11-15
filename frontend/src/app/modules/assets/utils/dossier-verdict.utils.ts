@@ -5,7 +5,9 @@ import {
   VERDICT_WORD_VARIANT,
 } from '../../../shared/constants/scorecard/scorecard.constants';
 import {type ScorecardDto} from '../../../shared/models/scorecard/scorecard.model';
+import {type ThesisDto} from '../../../shared/models/thesis/thesis.model';
 import {ScorecardUtils} from '../../../shared/utils/scorecard.utils';
+import {ThesisTriggerUtils} from '../../../shared/utils/thesis-trigger.utils';
 import {
   KILL_SWITCH_NONE_LABEL,
   KILL_SWITCH_TRIPPED_LABEL,
@@ -16,12 +18,10 @@ import {
   VERDICT_HEADER_NEW_MONEY_PILL,
   VERDICT_HEADER_WORD_LABEL,
 } from '../constants/dossier/dossier-verdict.constants';
-import {type ThesisDto} from '../models/dossier/dossier.model';
 import {
   type ThesisStatusView,
   type VerdictHeaderView,
 } from '../models/dossier/dossier-verdict.model';
-import {ThesisTriggerUtils} from './thesis-trigger.utils';
 
 /** Display helpers for the verdict block's thesis / kill-switch side. */
 export class DossierVerdictUtils {

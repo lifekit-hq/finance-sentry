@@ -1,0 +1,144 @@
+@let rev = revision();
+<cmn-card [attr.data-testid]="'thesis-revision-card-' + rev.ticker">
+  <article
+    [attr.aria-label]="kindLabel[rev.kind] + ' ' + rev.ticker"
+    class="flex flex-col gap-cmn-4"
+  >
+    <header class="flex flex-wrap items-center justify-between gap-cmn-2">
+      <div class="flex min-w-0 flex-wrap items-center gap-cmn-2">
+        <cmn-tag [variant]="kindVariant[rev.kind]">{{ kindLabel[rev.kind] }}</cmn-tag>
+        @if (linkTicker()) {
+          <a
+            [routerLink]="[dossierRoute, rev.ticker]"
+            class="font-semibold text-text-primary underline-offset-2 hover:underline"
+          >
+            {{ rev.ticker }}
+          </a>
+        } @else {
+          <span class="font-semibold text-text-primary">{{ rev.ticker }}</span>
+        }
+        <span class="text-cmn-xs text-text-secondary">
+          {{ rev.proposedBy }} · {{ rev.createdAt | date: 'mediumDate' }}
+        </span>
+      </div>
+      <span class="text-cmn-xs text-text-secondary" data-testid="thesis-revision-expires">
+        Expires {{ rev.expiresAt | date: 'mediumDate' }}
+      </span>
+    </header>
+
+    <section class="flex flex-col gap-cmn-1">
+      <h2 class="text-cmn-xs font-semibold text-text-secondary">Why</h2>
+      <p
+        class="whitespace-pre-line text-cmn-sm text-text-primary"
+        data-testid="thesis-revision-why"
+      >
+        {{ rev.rationale }}
+      </p>
+    </section>
+
+    @if (rev.kind === 'Close') {
+      <p class="text-cmn-sm text-text-primary" data-testid="thesis-revision-close">
+        {{ closeText }}
+      </p>
+    } @else {
+      @if (usesDefaults()) {
+        <p class="text-cmn-sm text-text-secondary" data-testid="thesis-revision-defaults">
+          {{ defaultsText }}
+        </p>
+      }
+      @for (change of changes(); track change.field) {
+        <section
+          [attr.data-testid]="'thesis-revision-change-' + change.field"
+          class="flex flex-col gap-cmn-2"
+        >
+          <h2 class="text-cmn-xs font-semibold text-text-secondary">{{ change.label }}</h2>
+          @if (change.shape === 'text') {
+            <div class="grid gap-cmn-3 sm:grid-cols-2">
+              <div class="flex flex-col gap-cmn-1">
+                <span class="text-cmn-xs text-text-secondary">Before</span>
+                <p
+                  class="whitespace-pre-line break-words text-cmn-sm text-text-secondary"
+                  data-testid="thesis-revision-before"
+                >
+                  {{ change.before ?? noBeforeText }}
+                </p>
+              </div>
+              <div class="flex flex-col gap-cmn-1">
+                <span class="text-cmn-xs text-text-secondary">After</span>
+                <p
+                  class="whitespace-pre-line break-words text-cmn-sm text-text-primary"
+                  data-testid="thesis-revision-after"
+                >
+                  {{ change.after }}
+                </p>
+              </div>
+            </div>
+          } @else {
+            <ul class="flex flex-col gap-cmn-1 text-cmn-sm" data-testid="thesis-revision-diff">
+              @for (item of change.added; track $index) {
+                <li [class]="addedClass" class="break-words">+ {{ item }}</li>
+              }
+              @for (item of change.removed; track $index) {
+                <li [class]="removedClass" class="break-words line-through">− {{ item }}</li>
+              }
+              @for (item of change.kept; track $index) {
+                <li class="break-words text-text-secondary">{{ item }}</li>
+              }
+              @if (
+                change.added.length === 0 && change.removed.length === 0 && change.kept.length === 0
+              ) {
+                <li class="text-text-secondary">None</li>
+              } @else if (change.added.length === 0 && change.removed.length === 0) {
+                <li class="text-cmn-xs text-text-secondary">{{ unchangedText }}</li>
+              }
+            </ul>
+          }
+        </section>
+      }
+    }
+
+    @if (rev.evidenceLinks; as links) {
+      @if (links.length > 0) {
+        <section class="flex flex-col gap-cmn-2">
+          <h2 class="text-cmn-xs font-semibold text-text-secondary">Evidence</h2>
+          <ul class="flex flex-col gap-cmn-2" data-testid="thesis-revision-evidence">
+            @for (link of links; track $index) {
+              <li class="flex items-start gap-cmn-2 text-cmn-sm">
+                <cmn-tag class="shrink-0" variant="neutral">{{ link.kind }}</cmn-tag>
+                @if (link.url; as url) {
+                  <a
+                    [href]="url"
+                    class="min-w-0 break-words text-text-primary underline underline-offset-2"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {{ link.label }}
+                  </a>
+                } @else {
+                  <span class="min-w-0 break-words text-text-primary">{{ link.label }}</span>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+
+    <p class="text-cmn-xs text-text-secondary" data-testid="thesis-revision-wall">
+      <span class="font-medium">{{ wallTitle }}</span> {{ wallText }}
+    </p>
+
+    <footer class="flex flex-wrap justify-end gap-cmn-2">
+      <cmn-button
+        (clicked)="decide.emit('reject')"
+        variant="secondary"
+        data-testid="thesis-revision-reject"
+      >
+        Reject
+      </cmn-button>
+      <cmn-button (clicked)="decide.emit('confirm')" data-testid="thesis-revision-confirm">
+        Confirm…
+      </cmn-button>
+    </footer>
+  </article>
+</cmn-card>

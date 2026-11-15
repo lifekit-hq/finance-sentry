@@ -912,6 +912,14 @@ export async function mockApis(page: Page): Promise<void> {
       body: JSON.stringify(route.request().url().includes('tickers=AAPL') ? [QUOTE_AAPL] : []),
     })
   );
+  // Default: no thesis change waiting. A test that needs one routes its own queue after this.
+  await page.route(`${API}/research/thesis-revisions`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({pending: [], decided: []}),
+    })
+  );
   // Default: nothing generated yet. Individual tests re-route to cover the cached/stale/error paths.
   for (const symbol of ['AAPL', 'BTC']) {
     await page.route(`${API}/research/assets/${symbol}/narrative**`, route =>

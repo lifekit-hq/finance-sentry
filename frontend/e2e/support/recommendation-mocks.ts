@@ -1,6 +1,7 @@
 import type {Page} from '@playwright/test';
 
 import {API} from './dossier-mocks';
+import {mockThesisRevisions, REVISION_CBRS, REVISION_DECIDED} from './thesis-revision-mocks';
 
 // Ledger proposals (#1069) as `research/recommendations` and the dossier return them. DRAM is the
 // first real case: a quarter of the book on a name with no thesis or exit rule behind it.
@@ -126,7 +127,7 @@ export const DECIDED = [
   },
 ];
 
-/** The Decisions queue: DRAM first (oldest), then AAPL, with two decided in the last 30 days. */
+/** The Decisions queue: DRAM first (oldest), then AAPL, with two decided in the last 30 days, and one thesis change. */
 export async function mockRecommendations(page: Page): Promise<void> {
   await page.route(`${API}/research/recommendations`, route =>
     route.fulfill({
@@ -135,4 +136,6 @@ export async function mockRecommendations(page: Page): Promise<void> {
       body: JSON.stringify({pending: [PENDING_DRAM, PENDING_AAPL], decided: DECIDED}),
     })
   );
+  // The thesis changes Ledger proposes sit on the same page, below the recommendations.
+  await mockThesisRevisions(page, {pending: [REVISION_CBRS], decided: [REVISION_DECIDED]});
 }

@@ -8,9 +8,12 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
+import {ThesisRevisionFixtures} from '../../../shared/models/thesis-revision/thesis-revision.fixtures';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {AuthStore} from '../../auth/store/auth.store';
 import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
+import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
+import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -169,6 +172,8 @@ describe('DossierStore', () => {
   let preferences: {preferences: ReturnType<typeof signal>; patch: ReturnType<typeof vi.fn>};
   let params: BehaviorSubject<ParamMap>;
   let sheet: {open: ReturnType<typeof vi.fn>};
+  let revisions: {list: ReturnType<typeof vi.fn>};
+  let revisionSheet: {open: ReturnType<typeof vi.fn>};
 
   function inject(): InstanceType<typeof DossierStore> {
     TestBed.configureTestingModule({
@@ -183,6 +188,8 @@ describe('DossierStore', () => {
         {provide: AuthStore, useValue: {canUseAi: () => canUseAi}},
         {provide: AppPreferencesStore, useValue: preferences},
         {provide: DecisionSheetService, useValue: sheet},
+        {provide: ThesisRevisionService, useValue: revisions},
+        {provide: ThesisRevisionSheetService, useValue: revisionSheet},
       ],
     });
     return TestBed.inject(DossierStore);
@@ -193,6 +200,8 @@ describe('DossierStore', () => {
     preferences = {preferences: signal(null), patch: vi.fn().mockResolvedValue(true)};
     params = new BehaviorSubject(convertToParamMap({symbol: 'AAPL'}));
     sheet = {open: vi.fn().mockReturnValue(of(undefined))};
+    revisions = {list: vi.fn().mockReturnValue(of({pending: [], decided: []}))};
+    revisionSheet = {open: vi.fn().mockReturnValue(of(undefined))};
     service = {
       getDossier: vi.fn().mockReturnValue(of(DOSSIER)),
       getQuotes: vi.fn().mockReturnValue(of([QUOTE])),
@@ -548,6 +557,88 @@ describe('DossierStore', () => {
 
     expect(store.dossier()?.pendingRecommendation).toEqual(pending);
     expect(store.decidedRecommendation()).toBeNull();
+  });
+
+  describe('thesis change', () => {
+    const REVISION = ThesisRevisionFixtures.revision({ticker: 'AAPL'});
+
+    it("picks this ticker's pending change out of the owner's queue", () => {
+      revisions.list.mockReturnValue(
+        of({
+          pending: [ThesisRevisionFixtures.revision({id: 'other', ticker: 'NVDA'}), REVISION],
+          decided: [],
+        })
+      );
+      const store = inject();
+      TestBed.tick();
+
+      expect(store.pendingRevision()).toEqual(REVISION);
+    });
+
+    it('reads no queue for someone without Ledger', () => {
+      canUseAi = false;
+      const store = inject();
+      TestBed.tick();
+
+      expect(revisions.list).not.toHaveBeenCalled();
+      expect(store.pendingRevision()).toBeNull();
+    });
+
+    it('leaves the page without the card, and without an error, when the queue cannot be read', () => {
+      revisions.list.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));
+      const store = inject();
+      TestBed.tick();
+
+      expect(store.pendingRevision()).toBeNull();
+      expect(store.dossier()?.symbol).toBe('AAPL');
+      expect(store.dossierStatus()).toBe('success');
+    });
+
+    it('writes the confirmed thesis onto the page and keeps the verdict in the card place', () => {
+      const written = ThesisRevisionFixtures.thesis({id: 'new', ticker: 'AAPL'});
+      const confirmed = {...REVISION, status: 'Confirmed' as const};
+      revisions.list.mockReturnValue(of({pending: [REVISION], decided: []}));
+      revisionSheet.open.mockReturnValue(
+        of({revision: confirmed, thesis: written, gate: null, note: null})
+      );
+      const store = inject();
+      TestBed.tick();
+
+      store.decideRevision({revision: REVISION, verdict: 'confirm'});
+
+      expect(revisionSheet.open).toHaveBeenCalledWith(REVISION, 'confirm');
+      expect(store.pendingRevision()).toBeNull();
+      expect(store.decidedRevision()).toEqual(confirmed);
+      expect(store.dossier()?.thesis).toEqual(written);
+    });
+
+    it('leaves the thesis on the page when the change is rejected', () => {
+      const rejected = {...REVISION, status: 'Rejected' as const, decisionNote: 'No.'};
+      revisions.list.mockReturnValue(of({pending: [REVISION], decided: []}));
+      revisionSheet.open.mockReturnValue(
+        of({revision: rejected, thesis: null, gate: null, note: null})
+      );
+      service.getDossier.mockReturnValue(of({...DOSSIER, thesis: ThesisRevisionFixtures.thesis()}));
+      const store = inject();
+      TestBed.tick();
+
+      store.decideRevision({revision: REVISION, verdict: 'reject'});
+
+      expect(store.pendingRevision()).toBeNull();
+      expect(store.decidedRevision()).toEqual(rejected);
+      expect(store.dossier()?.thesis).toEqual(ThesisRevisionFixtures.thesis());
+    });
+
+    it('keeps the pending change when the sheet is dismissed', () => {
+      revisions.list.mockReturnValue(of({pending: [REVISION], decided: []}));
+      const store = inject();
+      TestBed.tick();
+
+      store.decideRevision({revision: REVISION, verdict: 'confirm'});
+
+      expect(store.pendingRevision()).toEqual(REVISION);
+      expect(store.decidedRevision()).toBeNull();
+    });
   });
 
   it('saves the verdict display to the account and reads it back from there', () => {

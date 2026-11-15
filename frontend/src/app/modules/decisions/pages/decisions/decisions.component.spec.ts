@@ -19,6 +19,9 @@ import {DECISIONS_EMPTY_COPY} from '../../constants/recommendation/recommendatio
 import {DecisionSheetService} from '../../services/decision-sheet.service';
 import {RecommendationService} from '../../services/recommendation.service';
 import {ScorecardService} from '../../services/scorecard.service';
+import {ThesisService} from '../../services/thesis.service';
+import {ThesisRevisionService} from '../../services/thesis-revision.service';
+import {ThesisRevisionSheetService} from '../../services/thesis-revision-sheet.service';
 import {DecisionsComponent} from './decisions.component';
 
 function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
@@ -61,6 +64,9 @@ describe('DecisionsComponent', () => {
   let list: ReturnType<typeof vi.fn>;
   let open: ReturnType<typeof vi.fn>;
   let read: ReturnType<typeof vi.fn>;
+  let revisionList: ReturnType<typeof vi.fn>;
+  let revisionOpen: ReturnType<typeof vi.fn>;
+  let thesisList: ReturnType<typeof vi.fn>;
 
   const render = (result: RecommendationsResult) => {
     list.mockReturnValue(of(result));
@@ -70,6 +76,9 @@ describe('DecisionsComponent', () => {
         {provide: RecommendationService, useValue: {list}},
         {provide: DecisionSheetService, useValue: {open}},
         {provide: ScorecardService, useValue: {read}},
+        {provide: ThesisRevisionService, useValue: {list: revisionList}},
+        {provide: ThesisRevisionSheetService, useValue: {open: revisionOpen}},
+        {provide: ThesisService, useValue: {list: thesisList}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
     });
@@ -83,6 +92,9 @@ describe('DecisionsComponent', () => {
     list = vi.fn().mockReturnValue(NEVER);
     open = vi.fn().mockReturnValue(of(undefined));
     read = vi.fn().mockReturnValue(EMPTY);
+    revisionList = vi.fn().mockReturnValue(of({pending: [], decided: []}));
+    revisionOpen = vi.fn().mockReturnValue(of(undefined));
+    thesisList = vi.fn().mockReturnValue(of([]));
   });
 
   it('says plainly that Finance Sentry never trades', () => {
@@ -102,6 +114,9 @@ describe('DecisionsComponent', () => {
         {provide: RecommendationService, useValue: {list}},
         {provide: DecisionSheetService, useValue: {open}},
         {provide: ScorecardService, useValue: {read}},
+        {provide: ThesisRevisionService, useValue: {list: revisionList}},
+        {provide: ThesisRevisionSheetService, useValue: {open: revisionOpen}},
+        {provide: ThesisService, useValue: {list: thesisList}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
     });
