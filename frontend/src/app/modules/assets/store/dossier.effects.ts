@@ -37,6 +37,7 @@ import {ScorecardService} from '../../decisions/services/scorecard.service';
 import {ThesisRevisionService} from '../../decisions/services/thesis-revision.service';
 import {ThesisRevisionSheetService} from '../../decisions/services/thesis-revision-sheet.service';
 import {CHART_HISTORY_RANGE} from '../constants/dossier/dossier-chart.constants';
+import {DOSSIER_FACTS_ID} from '../constants/dossier/dossier-sections.constants';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -46,6 +47,7 @@ import {
 } from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
+import {DossierTilesUtils} from '../utils/dossier-tiles.utils';
 
 interface StoreMethods {
   resetForSymbol(): void;
@@ -106,7 +108,9 @@ export function dossierEffects(store: StoreMethods) {
     if (!fragment) {
       return;
     }
-    afterNextRender(() => document.getElementById(fragment)?.scrollIntoView({block: 'start'}), {
+    // A card that became a tile has no element of its own: the grid opens it from the same fragment, so land on the grid.
+    const targetId = DossierTilesUtils.isTileId(fragment) ? DOSSIER_FACTS_ID : fragment;
+    afterNextRender(() => document.getElementById(targetId)?.scrollIntoView({block: 'start'}), {
       injector,
     });
   };

@@ -11,6 +11,15 @@ import {
   mockApis,
 } from './support/dossier-mocks';
 
+// The facts grid: a tile is a button named by its label and headline; its panel draws only while it is open.
+const facts = (page: Page) => page.getByTestId('dossier-facts');
+const tile = (page: Page, label: string) =>
+  facts(page).getByRole('button', {name: new RegExp(`^${label}`)});
+const openTile = async (page: Page, label: string): Promise<void> => {
+  await tile(page, label).click();
+  await expect(tile(page, label)).toHaveAttribute('aria-expanded', 'true');
+};
+
 test.describe('Asset Dossier', () => {
   test.beforeEach(async ({page}) => {
     await mockApis(page);
@@ -126,21 +135,88 @@ test.describe('Asset Dossier', () => {
     await expect(strip.getByTestId('position-provider-link')).toBeVisible();
   });
 
-  test('section chips jump to their section', async ({page}) => {
+  test('section chips open their tile and land on the grid', async ({page}) => {
     await page.goto('/assets/AAPL');
     const chips = page.getByTestId('dossier-chips');
     await expect(chips).toBeVisible();
 
     await chips.getByRole('button', {name: 'News'}).click();
 
-    await expect(page.locator('#recent-news')).toBeInViewport();
+    await expect(tile(page, 'News')).toHaveAttribute('aria-expanded', 'true');
+    await expect(facts(page)).toBeInViewport();
+    await expect(page.getByText('Apple reports record services revenue in Q3')).toBeVisible();
+  });
+
+  test('the facts are a grid of one-line tiles: three across on a desktop, two on a phone', async ({
+    page,
+  }) => {
+    await page.setViewportSize({width: 1280, height: 900});
+    await page.goto('/assets/AAPL');
+    const tiles = facts(page).getByRole('button');
+    await expect(tiles.first()).toBeVisible();
+    const rows = async (): Promise<number> =>
+      new Set(
+        await tiles.evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().top)))
+      ).size;
+    const count = await tiles.count();
+
+    expect(await rows()).toBe(Math.ceil(count / 3));
+
+    await page.setViewportSize({width: 390, height: 900});
+    await expect.poll(rows).toBe(Math.ceil(count / 2));
+  });
+
+  test('one panel is shared: opening a tile closes the one before it, and a tile can be shut', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+    await openTile(page, 'Analysts');
+    await expect(page.getByTestId('recommendation-verdict')).toBeVisible();
+
+    await openTile(page, 'News');
+
+    await expect(tile(page, 'Analysts')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('recommendation-verdict')).toHaveCount(0);
+    await expect(facts(page).getByRole('region')).toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await expect(facts(page).getByRole('region')).toHaveCount(0);
+  });
+
+  test('an alert fragment opens the tile its card had', async ({page}) => {
+    await page.goto('/assets/AAPL#analyst-coverage');
+
+    await expect(tile(page, 'Analysts')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('recommendation-verdict')).toBeVisible();
+    await expect(facts(page)).toBeInViewport();
+  });
+
+  test('why it moved is a tile per day, with the size of the move and its causes', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+    await expect(tile(page, 'Moved 15 Aug')).toContainText('+6.4% · news, signal');
+    await expect(tile(page, 'Moved 6 Aug')).toContainText('-5.3% · no cause found');
+
+    await openTile(page, 'Moved 15 Aug');
+    const move = page.getByTestId('notable-move');
+    await expect(page.getByTestId('move-summary')).toContainText('+6.4%');
+    await expect(page.getByTestId('move-cause-news')).toContainText('1 news');
+    await expect(page.getByTestId('move-cause-signal')).toContainText('1 signal');
+    await expect(move.getByRole('link', {name: /record services revenue/})).toBeVisible();
+
+    await openTile(page, 'Moved 6 Aug');
+    await expect(page.getByTestId('notable-move')).toContainText('no linked news or signal found');
   });
 
   test('dossier page writes enums in words and renders yield and peers', async ({page}) => {
     await page.goto('/assets/AAPL');
+    await openTile(page, 'Analysts');
     await expect(page.getByText('Target changed')).toBeVisible();
-    await expect(page.locator('#recent-news').getByText('Yahoo Finance')).toBeVisible();
+    await openTile(page, 'News');
+    await expect(facts(page).getByText('Yahoo Finance')).toBeVisible();
     await expect(page.getByText('yahoo:AAPL')).toHaveCount(0);
+    await openTile(page, 'Valuation');
     const dividend = page.getByTestId('fundamental-dividend-yield');
     await expect(dividend).toContainText('Dividend yield');
     await expect(dividend).toContainText('0.50%');
@@ -150,20 +226,21 @@ test.describe('Asset Dossier', () => {
 
   test('dossier page renders thesis section', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByRole('heading', {name: "What's the plan?"})).toBeVisible();
+    await expect(tile(page, 'Plan')).toContainText('Active');
+    await openTile(page, 'Plan');
     await expect(page.getByText('Apple continues to expand its services revenue')).toBeVisible();
-    await expect(page.getByText('Active', {exact: true})).toBeVisible();
   });
 
   test('dossier page renders analyst coverage', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByRole('heading', {name: 'What do analysts say?'})).toBeVisible();
+    await openTile(page, 'Analysts');
     await expect(page.getByText('Goldman Sachs')).toBeVisible();
   });
 
   test('dossier page renders recent news', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByText('Recent News')).toBeVisible();
+    await expect(tile(page, 'News')).toContainText('2 articles');
+    await openTile(page, 'News');
     await expect(page.getByText('Apple reports record services revenue in Q3')).toBeVisible();
   });
 
@@ -209,14 +286,16 @@ test.describe('Asset Dossier', () => {
     await expect(lots).toBeVisible();
     await expect(lots).not.toHaveAttribute('open', '');
     await expect(lots.locator('summary')).toContainText('Tax lots (');
-    // The verdict block's kill-switch lists the same rule, so look in the thesis card.
+    // The verdict block's kill-switch lists the same rule, so look in the thesis panel.
+    await openTile(page, 'Plan');
     await expect(
-      page.locator('#thesis').getByText('Revenue growth (YoY) falls below 5.0%')
+      page.getByTestId('thesis').getByText('Revenue growth (YoY) falls below 5.0%')
     ).toBeVisible();
   });
 
   test('dossier page renders the recommendation trend as one verdict and bar', async ({page}) => {
     await page.goto('/assets/AAPL');
+    await openTile(page, 'Analysts');
     await expect(page.getByText('Recommendation Trend')).toBeVisible();
     await expect(page.getByTestId('recommendation-verdict')).toContainText(
       '30 of 36 analysts rate it Buy'
@@ -228,7 +307,8 @@ test.describe('Asset Dossier', () => {
 
   test('dossier page renders the radar trend sparkline for multiple signals', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByText('Radar Signals')).toBeVisible();
+    await expect(tile(page, 'Signals')).toContainText('3 signals');
+    await openTile(page, 'Signals');
     // The sparkline is rendered when there are >= 2 signals
     await expect(page.locator('cmn-line-chart canvas')).toBeVisible();
     // Latest reading is shown in the header
@@ -244,8 +324,7 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByTestId('dossier-no-data')).toContainText('Nothing on file for ZZZZ');
     // No section card is rendered at all — not even a hollow one.
     await expect(page.getByText('Position', {exact: true})).toHaveCount(0);
-    await expect(page.getByRole('heading', {name: "What's the plan?"})).toHaveCount(0);
-    await expect(page.getByText('Radar Signals')).toHaveCount(0);
+    await expect(page.getByTestId('dossier-facts')).toHaveCount(0);
     await expect(page.getByTestId('ledger-read-card')).toHaveCount(0);
   });
 });
@@ -309,6 +388,7 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
 
   test('"Is it cheap?" names the analyst source and saves a target of your own', async ({page}) => {
     await page.goto('/assets/AAPL');
+    await openTile(page, 'Valuation');
     const valuation = page.getByTestId('valuation');
     await expect(valuation.getByTestId('target-range')).toBeVisible();
     await expect(valuation.getByTestId('target-source')).toContainText('36 analysts');
@@ -333,6 +413,7 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     page,
   }) => {
     await page.goto('/assets/AAPL');
+    await openTile(page, 'Ownership');
     await expect(page.getByTestId('ownership')).toContainText('Not available');
     await expect(page.getByTestId('data-status-chart')).toContainText('Yahoo Finance');
     await expect(page.getByTestId('data-status-returns')).toContainText('3 fills');
@@ -348,6 +429,7 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await expect(page.getByTestId('dossier-checks')).toContainText('3 of 4 pass');
     await expect(page.getByTestId('check-axis-value')).toHaveCount(0);
     await expect(page.getByTestId('checks-wheel')).toHaveCount(0);
+    await openTile(page, 'Price & target');
     await expect(page.getByTestId('valuation')).toContainText('Price & your target');
     await expect(page.getByTestId('target-band')).toBeVisible();
     await expect(page.getByTestId('my-target')).toBeVisible();
@@ -356,7 +438,8 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await expect(page.getByTestId('fundamentals')).toHaveCount(0);
     await expect(page.getByTestId('valuation-peers')).toHaveCount(0);
     await expect(page.getByTestId('recommendation-verdict')).toHaveCount(0);
-    await expect(page.getByTestId('ownership')).toHaveCount(0);
+    await expect(tile(page, 'Ownership')).toHaveCount(0);
+    await expect(tile(page, 'Analysts')).toHaveCount(0);
   });
 });
 

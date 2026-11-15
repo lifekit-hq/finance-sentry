@@ -384,7 +384,7 @@ An alert is about something you hold, says why it matters, and opens its entity.
 
 - **What it is:** IBKR's scoping and content. Earnings alerts carry consensus EPS and
   before-open/after-close timing; one deduplicated rating-change alert per held name per day links
-  to the dossier's analyst card. Held names are on by default, the watchlist is opt-in (Robinhood
+  to the dossier's Analysts tile. Held names are on by default, the watchlist is opt-in (Robinhood
   does the same). Push text stays amount-free.
 - **Compare against:** [IBKR, For You
   notifications](https://www.interactivebrokers.com/en/trading/for-you-notifications.php) and

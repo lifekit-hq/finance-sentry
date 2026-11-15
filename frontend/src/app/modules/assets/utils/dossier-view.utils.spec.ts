@@ -261,6 +261,23 @@ describe('DossierViewUtils.sectionChips', () => {
     expect(labels([{date: '2026-10-20', returnPct: 6, links: []}])).toContain('Moves');
   });
 
+  it('points the Moves chip at the newest move tile', () => {
+    const moves = {thresholdPct: 5, windowDays: 1, visibleDays: 30};
+    const chips = DossierViewUtils.sectionChips(
+      dossier({
+        notableMoves: {
+          ...moves,
+          moves: [
+            {date: '2026-10-20', returnPct: 6, links: []},
+            {date: '2026-10-14', returnPct: -7, links: []},
+          ],
+        },
+      })
+    );
+
+    expect(chips.find(c => c.label === 'Moves')?.id).toBe('move-2026-10-20');
+  });
+
   it('is empty without a dossier', () => {
     expect(DossierViewUtils.sectionChips(null)).toEqual([]);
   });

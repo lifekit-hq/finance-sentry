@@ -37,6 +37,15 @@ describe('AssetDossierComponent', () => {
   const byTestId = (id: string): HTMLElement | null =>
     root().querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
+  // The grid draws a tile's panel only while that tile is open.
+  const openTile = async (id: string): Promise<void> => {
+    fixture.detectChanges();
+    fixture.componentInstance.openTile.set(id);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
   beforeEach(async () => {
     canUseAi = signal(true);
     mockStore = buildMockStore();
@@ -376,8 +385,8 @@ describe('AssetDossierComponent', () => {
     );
   });
 
-  it('links an analyst action to its source only when one exists', () => {
-    fixture.detectChanges();
+  it('links an analyst action to its source only when one exists', async () => {
+    await openTile('analyst-coverage');
 
     const links = root().querySelectorAll<HTMLAnchorElement>('[data-testid="analyst-action-link"]');
     expect(links).toHaveLength(1);
@@ -393,16 +402,16 @@ describe('AssetDossierComponent', () => {
     expect(lots.querySelector('summary')?.textContent).toContain('Tax lots (1)');
   });
 
-  it('renders invalidation triggers as sentences', () => {
-    fixture.detectChanges();
+  it('renders invalidation triggers as sentences', async () => {
+    await openTile('thesis');
 
     const text = root().textContent ?? '';
     expect(text).toContain('Revenue growth (YoY) falls below 30.0%');
     expect(text).not.toContain('revenue_yoy');
   });
 
-  it('shows "Read more" only when the thesis has further paragraphs', () => {
-    fixture.detectChanges();
+  it('shows "Read more" only when the thesis has further paragraphs', async () => {
+    await openTile('thesis');
     expect(byTestId('thesis-toggle')).toBeNull();
 
     mockStore.thesisHasMore.set(true);
@@ -413,8 +422,8 @@ describe('AssetDossierComponent', () => {
     expect(mockStore.toggleThesisExpanded).toHaveBeenCalled();
   });
 
-  it('renders news as title, source and relative time without the summary', () => {
-    fixture.detectChanges();
+  it('renders news as title, source and relative time without the summary', async () => {
+    await openTile('recent-news');
 
     const text = root().textContent ?? '';
     expect(text).toContain('Memory prices climb');
@@ -422,8 +431,8 @@ describe('AssetDossierComponent', () => {
     expect(text).not.toContain('should not render');
   });
 
-  it('renders the recommendation trend as one verdict over a stacked bar', () => {
-    fixture.detectChanges();
+  it('renders the recommendation trend as one verdict over a stacked bar', async () => {
+    await openTile('analyst-coverage');
 
     expect(byTestId('recommendation-verdict')?.textContent).toContain('17 of 26 analysts');
     expect(byTestId('recommendation-verdict')?.textContent).toContain('rate it Buy');
@@ -471,7 +480,7 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('position-pnl')?.className).toContain('text-loss');
     });
 
-    it('names the company with its sector and industry', () => {
+    it('names the company with its sector and industry', async () => {
       mockStore.dossier.set({
         ...DOSSIER,
         valuation: {
@@ -519,7 +528,7 @@ describe('AssetDossierComponent', () => {
           priceAsOf: null,
         },
       });
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('dossier-name')?.textContent).toContain('Dram Memory Corp');
       expect(byTestId('dossier-profile')?.textContent).toContain(
@@ -532,19 +541,19 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('valuation-peer-subject')?.textContent).toContain('DRAM');
     });
 
-    it('dates the stale valuation tag by the price it was quoted at', () => {
+    it('dates the stale valuation tag by the price it was quoted at', async () => {
       mockStore.dossier.set({
         ...DOSSIER,
         valuation: {...STALE_VALUATION, priceAsOf: '2026-08-28T20:00:00Z'},
       });
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('valuation-stale')?.textContent).toMatch(/Stale\s*·\s*as of\s+Aug 28, 2026/);
     });
 
-    it('leaves the stale valuation tag undated when the price date is unknown', () => {
+    it('leaves the stale valuation tag undated when the price date is unknown', async () => {
       mockStore.dossier.set({...DOSSIER, valuation: STALE_VALUATION});
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('valuation-stale')?.textContent?.trim()).toBe('Stale');
     });
@@ -566,17 +575,19 @@ describe('AssetDossierComponent', () => {
       );
       expect(chips.map(c => c.textContent?.trim())).toEqual(['Analysts', 'Plan', 'News', 'Data']);
 
-      const target = root().ownerDocument.getElementById('analyst-coverage');
+      // A section that is a tile has no element of its own: its chip opens the tile and lands on the grid.
+      const grid = byTestId('dossier-facts');
       const scrollSpy = vi.fn();
-      if (target) {
-        target.scrollIntoView = scrollSpy;
+      if (grid) {
+        grid.scrollIntoView = scrollSpy;
       }
       chips[0].querySelector('button')?.click();
+      expect(fixture.componentInstance.openTile()).toBe('analyst-coverage');
       expect(scrollSpy).toHaveBeenCalled();
     });
   });
 
-  it('writes analyst actions and the news provider in words', () => {
+  it('writes analyst actions and the news provider in words', async () => {
     mockStore.dossier.set({
       ...DOSSIER,
       analysts: {
@@ -585,13 +596,14 @@ describe('AssetDossierComponent', () => {
       },
       recentNews: [{...DOSSIER.recentNews[0], source: 'yahoo:DRAM'}],
     });
-    fixture.detectChanges();
+    await openTile('analyst-coverage');
 
-    const text = root().textContent ?? '';
-    expect(text).toContain('Target changed');
-    expect(text).not.toContain('TargetChange');
-    expect(text).toContain('Yahoo Finance');
-    expect(text).not.toContain('yahoo:DRAM');
+    expect(root().textContent).toContain('Target changed');
+    expect(root().textContent).not.toContain('TargetChange');
+    await openTile('recent-news');
+
+    expect(root().textContent).toContain('Yahoo Finance');
+    expect(root().textContent).not.toContain('yahoo:DRAM');
   });
 
   describe('Ledger read (Owner: ai.use)', () => {
@@ -631,8 +643,8 @@ describe('AssetDossierComponent', () => {
       expect(narrative?.textContent).toContain('<img');
     });
 
-    it('shows coverage and trend period as plain language', () => {
-      fixture.detectChanges();
+    it('shows coverage and trend period as plain language', async () => {
+      await openTile('analyst-coverage');
 
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('In your research universe');
@@ -687,7 +699,8 @@ describe('AssetDossierComponent', () => {
       fixture.detectChanges();
     });
 
-    it('tones each tag by the severity the API emits', () => {
+    it('tones each tag by the severity the API emits', async () => {
+      await openTile('radar-signals');
       const tags = fixture.debugElement
         .queryAll(By.directive(TagComponent))
         .filter(t => ['info', 'notable', 'alerted'].includes(t.nativeElement.textContent.trim()));
@@ -844,8 +857,8 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('returns-currency')?.textContent).toContain('Not available');
     });
 
-    it('places the price, the analyst target and the user target on the band with the source', () => {
-      fixture.detectChanges();
+    it('places the price, the analyst target and the user target on the band with the source', async () => {
+      await openTile('valuation');
 
       expect(byTestId('target-range')).not.toBeNull();
       expect(byTestId('target-marker-price')).not.toBeNull();
@@ -855,15 +868,15 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('my-target-value')?.textContent).toContain('$55.00');
     });
 
-    it('shows each fundamental or the reason it is missing', () => {
-      fixture.detectChanges();
+    it('shows each fundamental or the reason it is missing', async () => {
+      await openTile('valuation');
 
       expect(byTestId('fundamental-market-cap')?.textContent).toContain('$4.20B');
       expect(byTestId('fundamental-ev-ebitda')?.textContent).toContain('not reported');
     });
 
-    it('opens, clears and edits the user target through the store', () => {
-      fixture.detectChanges();
+    it('opens, clears and edits the user target through the store', async () => {
+      await openTile('valuation');
 
       byTestId('my-target-clear')?.querySelector('button')?.click();
       byTestId('my-target-edit')?.querySelector('button')?.click();
@@ -872,10 +885,10 @@ describe('AssetDossierComponent', () => {
       expect(mockStore.openTargetEditor).toHaveBeenCalled();
     });
 
-    it('saves a valid draft and flags an invalid one', () => {
+    it('saves a valid draft and flags an invalid one', async () => {
       mockStore.isEditingTarget.set(true);
       mockStore.targetDraft.set('abc');
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('my-target')?.textContent).toContain('Enter a price above zero.');
 
@@ -888,15 +901,15 @@ describe('AssetDossierComponent', () => {
       expect(mockStore.closeTargetEditor).toHaveBeenCalled();
     });
 
-    it('shows a failed save under the editor', () => {
+    it('shows a failed save under the editor', async () => {
       mockStore.targetErrorMessage.set('Failed to save your target.');
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('my-target-error')?.textContent).toContain('Failed to save your target.');
     });
 
-    it('marks ownership as not available and lists the data status', () => {
-      fixture.detectChanges();
+    it('marks ownership as not available and lists the data status', async () => {
+      await openTile('ownership');
 
       expect(byTestId('ownership')?.textContent).toContain('Not available');
       expect(byTestId('data-status-valuation')?.textContent).toContain('Yahoo');
@@ -906,7 +919,7 @@ describe('AssetDossierComponent', () => {
       );
     });
 
-    it('keeps the price and your own target on the band for crypto and hides analysts, fundamentals, peers and ownership', () => {
+    it('keeps the price and your own target on the band for crypto and hides analysts, fundamentals, peers and ownership', async () => {
       const stockValuation = STOCK.valuation as ValuationSnapshotDto;
       mockStore.dossier.set({
         ...STOCK,
@@ -920,7 +933,7 @@ describe('AssetDossierComponent', () => {
         },
         checks: {axes: [axis('momentum', true, false), axis('fit', true, true)]},
       });
-      fixture.detectChanges();
+      await openTile('valuation');
 
       expect(byTestId('valuation')?.textContent).toContain('Price & your target');
       expect(byTestId('valuation')?.textContent).not.toContain('Is it cheap?');
@@ -934,7 +947,10 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('fundamentals')).toBeNull();
       expect(byTestId('valuation-peers')).toBeNull();
       expect(byTestId('recommendation-verdict')).toBeNull();
-      expect(byTestId('ownership')).toBeNull();
+      const tileIds = mockStore.factTiles().map(tile => tile.id);
+      expect(tileIds).toContain('valuation');
+      expect(tileIds).not.toContain('analyst-coverage');
+      expect(tileIds).not.toContain('ownership');
       expect(byTestId('checks-wheel')).toBeNull();
       expect(byTestId('check-axis-momentum')).not.toBeNull();
       const chips = Array.from(

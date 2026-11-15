@@ -52,28 +52,11 @@ async function settleCharts(page: Page, chartCanvas: Locator): Promise<void> {
   await page.clock.setFixedTime(new Date(FROZEN_NOW.getTime() + CHART_SETTLE_MS));
 }
 
-// The compact trend chart does not animate, so once its canvas has drawn pixels the capture shows
-// the real line rather than a frozen intermediate frame.
-async function expectTrendDrawn(page: Page): Promise<void> {
-  const canvas = page.locator('cmn-line-chart canvas');
-  await expect(canvas).toBeVisible();
-  await expect
-    .poll(() =>
-      canvas.evaluate(el => {
-        const c = el as HTMLCanvasElement;
-        const data = c.getContext('2d')?.getImageData(0, 0, c.width, c.height).data;
-        return data ? data.some((v, i) => i % 4 === 3 && v > 0) : false;
-      })
-    )
-    .toBe(true);
-}
-
 test.describe('Asset dossier visual baseline', () => {
   test('full dossier on desktop', async ({page}) => {
     await page.setViewportSize(DESKTOP);
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop.png', SCREENSHOT_OPTIONS);
   });
@@ -83,7 +66,6 @@ test.describe('Asset dossier visual baseline', () => {
     await page.setViewportSize(DESKTOP);
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-desktop-dark.png', SCREENSHOT_OPTIONS);
   });
@@ -91,8 +73,7 @@ test.describe('Asset dossier visual baseline', () => {
   test('full dossier on a phone', async ({page}) => {
     await page.setViewportSize(PHONE_FULL);
     await openDossier(page, 'AAPL');
-    await expect(page.getByTestId('trend-list')).toBeVisible();
-    await expectTrendDrawn(page);
+    await expect(page.getByTestId('dossier-facts')).toBeVisible();
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-phone.png', SCREENSHOT_OPTIONS);
   });
@@ -122,7 +103,6 @@ test.describe('Asset dossier visual baseline', () => {
       )
     );
     await expect(page.getByTestId('ledger-read-narrative')).toContainText(LEDGER_READ_NARRATIVE);
-    await expectTrendDrawn(page);
     await settleCharts(page, page.locator(MOVED_CHART_CANVAS));
     await expect(page).toHaveScreenshot('dossier-ledger-read.png', SCREENSHOT_OPTIONS);
   });
