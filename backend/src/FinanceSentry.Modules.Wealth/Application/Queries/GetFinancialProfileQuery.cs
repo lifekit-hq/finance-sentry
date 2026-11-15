@@ -346,7 +346,7 @@ public class GetFinancialProfileQueryHandler(
         var reasons = new List<string>();
         if (t.Jurisdiction is null)
             reasons.Add(FinancialProfileReasons.TaxJurisdictionNotSet);
-        if (!t.Readable)
+        if (!t.Readable && (t.HasJurisdictionNotes || t.HasCaveat))
             reasons.Add(FinancialProfileReasons.TaxProfileUnreadable);
 
         return new(reasons.Count == 0 ? DataQuality.Complete : DataQuality.Partial, reasons, summary);

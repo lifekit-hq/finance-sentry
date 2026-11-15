@@ -281,6 +281,18 @@ public sealed class GetFinancialProfileQueryHandlerTests
     }
 
     [Fact]
+    public async Task AKeylessHostWithOnlyAJurisdictionStated_IsComplete_BecauseNoTextIsHidden()
+    {
+        TaxProfile(new TaxProfileDto(false, "IE", null, null, false, false, Now.AddDays(-3)));
+
+        var profile = await Read();
+
+        profile.TaxProfile.DataQuality.Should().Be(DataQuality.Complete);
+        profile.TaxProfile.Reasons.Should().BeEmpty();
+        profile.TaxProfile.Data.Should().Be(new TaxProfileSummary(false, "IE", false, false, null, null));
+    }
+
+    [Fact]
     public async Task ATaxProfileWithNoJurisdiction_IsPartial_AndTheNullStaysNull()
     {
         TaxProfile(StatedTaxProfile(jurisdiction: null));

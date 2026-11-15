@@ -2026,7 +2026,7 @@ person's own planning, never a trading signal: nothing here produces a buy, sell
   or date or has no history; income `Missing` with nothing declared, `Partial` when the declared figure is unreadable, not
   comparable or has no observed income to meet; career `Missing` with no events, `Partial` when unreadable; disposal tax `Missing`
   with no positions or all withheld, `Partial` when some are withheld; tax profile `Missing` with nothing stated
-  (`NO_TAX_PROFILE`), `Partial` with no jurisdiction (`TAX_JURISDICTION_NOT_SET`) or unreadable text (`TAX_PROFILE_UNREADABLE`); risk `Missing` with no IPS, `Partial` with capacity or
+  (`NO_TAX_PROFILE`), `Partial` with no jurisdiction (`TAX_JURISDICTION_NOT_SET`) or notes or a caveat unreadable on this host (`TAX_PROFILE_UNREADABLE`); risk `Missing` with no IPS, `Partial` with capacity or
   drawdown unset or a re-measurement due. **Missing is not zero**: a person with no declared income has not told us their income.
 - **Summaries, not copies.** The income and career sections carry counts and the declared and observed monthly figures, never a
   source's or event's label, amount or note; the goals section carries each goal's standing without the return ranges (§16 has
@@ -2077,6 +2077,7 @@ band or exemption because the profile says so. It is never tax advice: a respons
 - **REST.** `GET /api/v1/wealth/tax-profile` (empty until set), `PUT` (restates the whole profile; an omitted field is cleared;
   at least one value is required) and `DELETE` (idempotent). All require sign-in; the Owner filter scopes them to the caller.
 - **In the profile (§20).** The `taxProfile` section: `Missing` (`NO_TAX_PROFILE`) with nothing stated; `Partial` with no
-  jurisdiction (`TAX_JURISDICTION_NOT_SET`) or with the text unreadable on this host (`TAX_PROFILE_UNREADABLE`); otherwise
+  jurisdiction (`TAX_JURISDICTION_NOT_SET`) or with notes or a caveat that exist but are unreadable on this host
+  (`TAX_PROFILE_UNREADABLE`; a keyless host with only a jurisdiction stated hides no text and stays `Complete`); otherwise
   `Complete`. On the MCP host, which holds no encryption key, the notes and caveat are null while `hasJurisdictionNotes` and
   `hasCaveat` still say whether they exist - the same rule as §18 and §19. **Unreadable is not "no profile".**
