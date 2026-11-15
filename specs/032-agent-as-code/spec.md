@@ -2,7 +2,7 @@
 
 **Feature Branch**: `032-agent-as-code`
 **Created**: 2026-07-22
-**Status**: Draft
+**Status**: Implemented
 **Input**: User description: "Place the finance agent in the Finance Sentry repo and manage it as part of this project. Finance Sentry is the core; the agent is just an agent with tools. FS provides the data and tools; the agent's definition (persona, jobs, policy) should be version-controlled in the repo and deployed to the OpenClaw runtime by CI. The gateway/runtime itself stays external."
 
 ## Overview

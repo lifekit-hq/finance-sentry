@@ -24,6 +24,13 @@ public class GetBenchmarkTrackRecordQueryHandler(
 {
     private const string Cadence = "weekly";
 
+    private const string HorizonNote =
+        "Judge the S&P 500 comparison on the headline windows (rolling 12 months and since inception); " +
+        "1M and 3M are context for a short stretch, not a verdict on the strategy.";
+
+    private static readonly BenchmarkHorizonDto Horizon = new(
+        BenchmarkHorizon.Headline.Select(w => w.ToString()).ToList(), HorizonNote);
+
     private static readonly Dictionary<string, TrackRecordWindow> WindowAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["1M"] = TrackRecordWindow.OneMonth,
@@ -73,11 +80,12 @@ public class GetBenchmarkTrackRecordQueryHandler(
             latest.BenchmarkTicker,
             ruleDto,
             rows,
-            rows.Count == 0 ? "No stored rows match the filter." : null);
+            rows.Count == 0 ? "No stored rows match the filter." : null,
+            Horizon);
     }
 
     private static BenchmarkTrackRecordDto Empty(UnderperformanceRuleDto rule, string note)
-        => new(null, null, ThesisEventRecorder.DefaultBenchmarkTicker, rule, [], note);
+        => new(null, null, ThesisEventRecorder.DefaultBenchmarkTicker, rule, [], note, Horizon);
 
     private static bool TryParseScope(string? value, out TrackRecordScope? scope)
     {
@@ -136,5 +144,6 @@ public class GetBenchmarkTrackRecordQueryHandler(
         r.NetExcessReturnPct,
         r.NetGate,
         r.UnderperformingRuns,
-        r.SustainedUnderperformance);
+        r.SustainedUnderperformance,
+        BenchmarkHorizon.IsHeadline(r.Window));
 }

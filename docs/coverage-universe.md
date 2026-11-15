@@ -65,7 +65,7 @@ Per user, a hit is not nominated when the name is already covered, when the user
 
 - `ICoverageUniverseReader` (Core port; freshest activity first, then by ticker) - the portfolio-construction universe screen reads it instead of the old hard-coded list (`PortfolioConstructionOptions.CuratedUniverse` is gone).
 - MCP `list_coverage`, `explain_coverage(ticker)` and `list_coverage_events` ([mcp.md](mcp.md)).
-- A coverage name may carry a Ledger thesis, not only a scorecard; an active thesis protects it from removal.
+- A coverage name carries a candidate scorecard plus a decision note, not a Ledger thesis: a thesis exists only for a held name (owner ruling 2026-11-15). A thesis already on file still protects the name from removal.
 
 ## Catalyst nominations
 
