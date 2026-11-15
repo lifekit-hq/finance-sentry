@@ -58,17 +58,20 @@ public sealed class SecEdgarService(
         ("OperatingCashFlow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]),
         ("Capex", ["PaymentsToAcquireProductiveAssets", "PaymentsToAcquirePropertyPlantAndEquipment"]),
         // Return on invested capital inputs (#1376): annual income-statement and year-end balance-sheet lines.
-        // Current borrowings are three non-overlapping concepts so they can be summed without double counting:
+        // Current borrowings are kept as separate concepts so they can be summed without double counting:
         // CurrentDebt (DebtCurrent) is the filer's own total of current borrowings and, when reported, is used
-        // alone; otherwise CurrentLongTermDebt (current portion of long-term debt) plus ShortTermDebt are added.
-        // ShortTermDebt is one line whose tags run narrowest to broadest, so a filer tagging CommercialPaper or
-        // NotesPayableCurrent inside ShortTermBorrowings keeps the total once, never both.
+        // alone; otherwise CurrentLongTermDebt (current portion of long-term debt) plus ShortTermDebt
+        // (ShortTermBorrowings, the short-term total) are added. CommercialPaper and NotesPayableCurrent are read
+        // apart because they may be components of ShortTermBorrowings: they stand in for it only when it is absent,
+        // and when both are reported without that total the short-term debt is not determinable (never summed).
         ("IncomeTaxExpense", ["IncomeTaxExpenseBenefit"]),
         ("PretaxIncome", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"]),
         ("LongTermDebt", ["LongTermDebtNoncurrent"]),
         ("CurrentDebt", ["DebtCurrent"]),
         ("CurrentLongTermDebt", ["LongTermDebtCurrent"]),
-        ("ShortTermDebt", ["NotesPayableCurrent", "CommercialPaper", "ShortTermBorrowings"]),
+        ("ShortTermDebt", ["ShortTermBorrowings"]),
+        ("CommercialPaper", ["CommercialPaper"]),
+        ("NotesPayableCurrent", ["NotesPayableCurrent"]),
         ("CashAndEquivalents", ["CashAndCashEquivalentsAtCarryingValue"]),
     ];
 

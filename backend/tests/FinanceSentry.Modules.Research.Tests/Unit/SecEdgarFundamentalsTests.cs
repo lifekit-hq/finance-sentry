@@ -378,7 +378,7 @@ public sealed class SecEdgarFundamentalsTests
     }
 
     [Fact]
-    public async Task ReturnOnInvestedCapitalInputs_AreReadUnderTheirFriendlyConcepts_AndTheBroaderShortTermDebtTagWins()
+    public async Task ReturnOnInvestedCapitalInputs_AreReadUnderTheirFriendlyConcepts_AndShortTermBorrowingsIsTheShortTermDebtLine()
     {
         static string Annual(string label, int val) =>
             $$$"""{"label":"{{{label}}}","units":{"USD":[{"end":"2024-12-31","val":{{{val}}},"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
@@ -411,7 +411,7 @@ public sealed class SecEdgarFundamentalsTests
     }
 
     [Fact]
-    public async Task ShortTermDebt_IsReadFromCommercialPaperAndNotesPayableCurrent_WhenShortTermBorrowingsIsAbsent()
+    public async Task CommercialPaperAndNotesPayableCurrent_AreReadAsTheirOwnConcepts_NotMergedIntoOneShortTermDebtLine()
     {
         static string Annual(string label, int val) =>
             $$$"""{"label":"{{{label}}}","units":{"USD":[{"end":"2024-12-31","val":{{{val}}},"accn":"0000000001-25-000001","fy":2024,"fp":"FY","form":"10-K"}]}}""";
@@ -432,7 +432,9 @@ public sealed class SecEdgarFundamentalsTests
 
         var facts = (await sut.GetTaxonomyFundamentalsAsync("ACME", FundamentalFact.UsGaapTaxonomy)).Facts;
 
-        facts.Single(f => f.Concept == DerivedFundamentalsMath.ShortTermDebtConcept).Value.Should().Be(30m);
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.NotesPayableCurrentConcept).Value.Should().Be(20m);
+        facts.Single(f => f.Concept == DerivedFundamentalsMath.CommercialPaperConcept).Value.Should().Be(30m);
+        facts.Should().NotContain(f => f.Concept == DerivedFundamentalsMath.ShortTermDebtConcept);
     }
 
     [Fact]

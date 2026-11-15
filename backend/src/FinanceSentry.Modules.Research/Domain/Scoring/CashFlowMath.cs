@@ -172,6 +172,8 @@ public static class DerivedFundamentalsMath
     public const string CurrentDebtConcept = "CurrentDebt";
     public const string CurrentLongTermDebtConcept = "CurrentLongTermDebt";
     public const string ShortTermDebtConcept = "ShortTermDebt";
+    public const string CommercialPaperConcept = "CommercialPaper";
+    public const string NotesPayableCurrentConcept = "NotesPayableCurrent";
     public const string TotalDebtConcept = "TotalDebt";
     public const string CashConcept = "CashAndEquivalents";
 
@@ -223,6 +225,7 @@ public static class DerivedFundamentalsMath
         var inputs = new RoicInputs(
             Annual(facts, IncomeTaxExpenseConcept), Annual(facts, PretaxIncomeConcept), Annual(facts, LongTermDebtConcept),
             Annual(facts, CurrentDebtConcept), Annual(facts, CurrentLongTermDebtConcept), Annual(facts, ShortTermDebtConcept),
+            Annual(facts, CommercialPaperConcept), Annual(facts, NotesPayableCurrentConcept),
             Annual(facts, TotalDebtConcept), Annual(facts, CashConcept));
 
         // One row per fiscal year the operating result or the balance sheet speaks for.
@@ -244,6 +247,8 @@ public static class DerivedFundamentalsMath
         Dictionary<DateOnly, FundamentalFact> CurrentDebt,
         Dictionary<DateOnly, FundamentalFact> CurrentLongTermDebt,
         Dictionary<DateOnly, FundamentalFact> ShortTermDebt,
+        Dictionary<DateOnly, FundamentalFact> CommercialPaper,
+        Dictionary<DateOnly, FundamentalFact> NotesPayable,
         Dictionary<DateOnly, FundamentalFact> TotalDebt,
         Dictionary<DateOnly, FundamentalFact> Cash);
 
@@ -259,10 +264,19 @@ public static class DerivedFundamentalsMath
         // Debt: the filer's total borrowings when it tags one, else the long-term line plus its current
         // borrowings (the filer's current-debt total, or the current portion of long-term debt plus short-term
         // borrowings). A filer with no debt line reports none, which is not read as "no debt".
+        // Short-term borrowings: the filer's total when tagged, else the one component line it reported. Commercial
+        // paper and notes payable together without a total may overlap or be separate, so debt is not determinable.
+        var shortTermTotal = inputs.ShortTermDebt.GetValueOrDefault(end);
+        var commercialPaper = inputs.CommercialPaper.GetValueOrDefault(end);
+        var notesPayable = inputs.NotesPayable.GetValueOrDefault(end);
+        var shortTermSplit = inputs.CurrentDebt.GetValueOrDefault(end) is null && shortTermTotal is null
+            && commercialPaper is not null && notesPayable is not null;
+        var shortTerm = shortTermTotal ?? commercialPaper ?? notesPayable;
         FundamentalFact[] current = inputs.CurrentDebt.GetValueOrDefault(end) is { } currentTotal
             ? [currentTotal]
-            : new[] { inputs.CurrentLongTermDebt.GetValueOrDefault(end), inputs.ShortTermDebt.GetValueOrDefault(end) }.OfType<FundamentalFact>().ToArray();
-        FundamentalFact[] debtFacts = total is not null ? [total] : longTerm is not null ? [longTerm, .. current] : [];
+            : new[] { inputs.CurrentLongTermDebt.GetValueOrDefault(end), shortTerm }.OfType<FundamentalFact>().ToArray();
+        var debtUndeterminable = total is null && longTerm is not null && shortTermSplit;
+        FundamentalFact[] debtFacts = total is not null ? [total] : longTerm is not null && !debtUndeterminable ? [longTerm, .. current] : [];
         decimal? debt = debtFacts.Length > 0 ? debtFacts.Sum(f => f.Value) : null;
         var longTermOnly = total is null && longTerm is not null && current.Length == 0;
 
@@ -272,6 +286,11 @@ public static class DerivedFundamentalsMath
         ReturnOnInvestedCapitalPeriod Row(string? reason, decimal? rate = null, decimal? nopat = null, decimal? capital = null, decimal? roic = null)
             => new(end, end.Year, units.Count == 1 ? units[0] : null, operatingIncome?.Value, rate, nopat, debt,
                 equity?.Value, cash?.Value, capital, roic, reason);
+
+        if (debtUndeterminable)
+        {
+            return Row("short-term debt is split across notes payable and commercial paper with no total, so debt is not determinable");
+        }
 
         var missing = new[]
         {

@@ -86,6 +86,48 @@ public sealed class ReturnOnInvestedCapitalTests
         DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single().Debt.Should().Be(2000m);
     }
 
+    [Theory]
+    [InlineData(DerivedFundamentalsMath.CommercialPaperConcept)]
+    [InlineData(DerivedFundamentalsMath.NotesPayableCurrentConcept)]
+    public void Roic_ASingleShortTermComponentTag_IsAddedToTheLongTermLine(string concept)
+    {
+        var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
+        facts.Add(Annual(concept, 300));
+
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.Debt.Should().Be(1800m);
+        roic.Reason.Should().BeNull();
+    }
+
+    [Fact]
+    public void Roic_CommercialPaperAndNotesPayableWithoutATotal_AreNotDeterminable_NeverUnderstated()
+    {
+        var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
+        facts.Add(Annual(DerivedFundamentalsMath.CommercialPaperConcept, 300));
+        facts.Add(Annual(DerivedFundamentalsMath.NotesPayableCurrentConcept, 200));
+
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.ReturnOnInvestedCapital.Should().BeNull();
+        roic.Debt.Should().BeNull();
+        roic.Reason.Should().Contain("not determinable");
+    }
+
+    [Fact]
+    public void Roic_ShortTermBorrowingsTotal_WinsOverItsComponentTags()
+    {
+        var facts = FullYear().Where(f => f.Concept != DerivedFundamentalsMath.CurrentDebtConcept).ToList();
+        facts.Add(Annual(DerivedFundamentalsMath.ShortTermDebtConcept, 400));
+        facts.Add(Annual(DerivedFundamentalsMath.CommercialPaperConcept, 300));
+        facts.Add(Annual(DerivedFundamentalsMath.NotesPayableCurrentConcept, 200));
+
+        var roic = DerivedFundamentalsMath.ReturnOnInvestedCapital(facts, 5).Single();
+
+        roic.Debt.Should().Be(1900m);
+        roic.Reason.Should().BeNull();
+    }
+
     [Fact]
     public void Roic_TheCurrentDebtTotal_IsUsedAloneNotAddedToItsOwnParts()
     {
