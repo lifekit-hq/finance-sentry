@@ -9,13 +9,7 @@
 
 > **Single source of truth for *done-or-not* is each spec's `Status:` line** (flipped to `Implemented` at merge). This table only orders what's left and why — it holds priority/sequencing, not status. If a spec here has flipped to `Implemented`, drop it from this list.
 
-| Spec | Kind | Depends on | Note |
-|---|---|---|---|
-| `032-agent-as-code` | Architecture | 031 (proves the pattern) | Draft — agent definition in the repo, CI-deployed to the runtime |
-| `026-event-bus-outbox` | Platform | — | In-monolith broker + transactional outbox (031 is a focused precursor) |
-| `027-k8s-migration` | Platform | — | Single-node cluster replaces compose in prod. **Carries 025 fast-fail fix** (short connect-timeout / split long-poll cluster — see 025 spec Known Limitation) |
-| `028-extract-market-data-service` | Platform | 026, radar stable | First module extracted to its own service |
-| `029-grpc-internal-contract` | Platform | 028 | One internal call goes contract-first RPC |
+None: every numbered spec in the radar and agent tracks is implemented, superseded or dropped (026-029 dropped 2026-11-15, see the Platform track below). Open work lives in GitHub issues and the individual specs marked Draft (e.g. `038-earnings-stance-engine`, `726-portfolio-construction`).
 
 *(`002-investment-tracking` is `Superseded` — delivered under 008/009/010 + the research suite — not backlog.)*
 
@@ -154,14 +148,7 @@ Multi-agent LLM trading framework (~92k stars, Apache-2.0, active; arXiv 2412.20
 
 # Platform — Production-Practice Track (added 2026-07-09)
 
-Separate from the Radar program: a deliberate production-engineering ladder (observability → retention → gateway → messaging → orchestration → service extraction → RPC). Each step is one specced, versioned release; order is load-bearing (don't orchestrate what you can't observe).
-
-| Spec | Feature | Depends on |
-|---|---|---|
-| `026-event-bus-outbox` | Broker + transactional outbox inside the monolith | — |
-| `027-k8s-migration` | Single-node cluster replaces compose in prod (also lands the deferred 025 fast-fail fix) | — |
-| `028-extract-market-data-service` | Radar/market-data becomes its own service | 026, radar (018) stable |
-| `029-grpc-internal-contract` | One internal call goes contract-first RPC | 028 |
+Separate from the Radar program: a production-engineering ladder (observability → retention → gateway). The rungs past it (event bus 026, Kubernetes 027, market-data service extraction 028, internal gRPC 029) were dropped on 2026-11-15: none traces to the north star, and 027 contradicts the no-new-machine goal. Their spec folders are removed; revive one by writing a fresh spec.
 
 ### 024 follow-ups (implemented; deferred bits)
 

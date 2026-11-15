@@ -60,6 +60,32 @@ public class GetBenchmarkTrackRecordQueryHandlerTests
     }
 
     [Fact]
+    public async Task PinnedHorizon_IsRollingTwelveMonthsPlusSinceInception_OnTheResponseAndTheRows()
+    {
+        Seed(
+            Row(TrackRecordScope.Book, "book", "Book", TrackRecordWindow.OneMonth),
+            Row(TrackRecordScope.Book, "book", "Book", TrackRecordWindow.ThreeMonths),
+            Row(TrackRecordScope.Book, "book", "Book", TrackRecordWindow.OneYear),
+            Row(TrackRecordScope.Book, "book", "Book", TrackRecordWindow.SinceInception));
+
+        var result = await Sut().Handle(new GetBenchmarkTrackRecordQuery(UserId, null, null, null), CancellationToken.None);
+
+        result.Horizon!.HeadlineWindows.Should().Equal("OneYear", "SinceInception");
+        result.Rows.Where(r => r.Headline).Select(r => r.Window).Should().Equal("OneYear", "SinceInception");
+        result.Rows.Where(r => !r.Headline).Select(r => r.Window).Should().Equal("OneMonth", "ThreeMonths");
+    }
+
+    [Fact]
+    public async Task PinnedHorizon_IsStatedEvenWhenNothingIsMaterialized()
+    {
+        Seed();
+
+        var result = await Sut().Handle(new GetBenchmarkTrackRecordQuery(UserId, null, null, null), CancellationToken.None);
+
+        result.Horizon!.HeadlineWindows.Should().Equal("OneYear", "SinceInception");
+    }
+
+    [Fact]
     public async Task NoFilter_ReturnsTheWholeRun_OrderedByScope()
     {
         Seed(Run());

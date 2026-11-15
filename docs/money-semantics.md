@@ -1450,6 +1450,12 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   `ThesisPerformanceCalculator`'s, so these figures agree with `get_thesis_performance`.
   Every thesis with a series counts, including closed and deleted ones, so the record has no
   survivorship bias. A closed thesis's closing point is its `Closed` event.
+- **Horizon (pinned 2026-11-15).** The S&P 500 comparison is judged on two headline windows,
+  rolling 12 months (`1Y`) and since inception. Their rows carry `headline = true` and the
+  response lists them in `horizon.headlineWindows`. `1M` and `3M` stay on the record as
+  context, so a short bad stretch is visible without judging the strategy on it. The
+  sustained-underperformance alert is a separate rule with its own configured window
+  (`ThesisTrackRecord:RelativePerformance:Window`).
 - **Windows.** `1M`, `3M`, `1Y`, and since inception. The closing point is the latest point.
   A thesis that ended inside a trailing window contributes the part of the window it was live
   (window-start anchor to its `Closed` event, the benchmark over the same span), and its stored

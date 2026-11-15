@@ -1,11 +1,11 @@
 # Research: Companion Notification Modes + Event-Driven Push
 
-## R1. Reliable dispatch — build on 026, or a focused outbox now?
+## R1. Reliable dispatch — a full event bus, or a focused outbox?
 
-**Decision**: A **focused outbound outbox** owned by the Companion module (`companion_events` + a Hangfire relay), NOT a dependency on `026-event-bus-outbox`.
+**Decision**: A **focused outbound outbox** owned by the Companion module (`companion_events` + a Hangfire relay), NOT a full event bus (the roadmap's `026-event-bus-outbox`, since dropped).
 **Rationale**: 026 is a large, unimplemented in-monolith *pub/sub* infrastructure (broker + cross-module rewiring). 031 needs reliable *outbound* delivery for one flow (material event → wake agent) with no-loss/retry/dedup — a tiny fraction of 026, and 026 is *internal* so it wouldn't even provide the outbound hop. The focused outbox borrows 026's transactional-outbox pattern and is a deliberate stepping-stone.
 **Alternatives considered**: (a) wait for 026 — rejected, blocks a small feature behind large infra; (b) fire-and-forget HTTP from the detector — rejected, loses events on failure and has no mode gating.
-**Migration path**: when 026 lands, the *internal capture* half can subscribe to the bus instead of polling; the outbound relay stays.
+**Migration path**: none planned — 026 was dropped on 2026-11-15, so the polling capture and the outbound relay stay as built.
 
 ## R2. Event capture — hook the detectors, or poll?
 

@@ -43,7 +43,7 @@ Denys → Kit (orchestrator) → Ledger (you); build work = a note via Kit
 
 ## Cadence (event-driven push)
 
-- **Event-driven push**, no morning brief. Held events (news, earnings, catalyst notices, sync failures) roll up into one digest at his digest hour, only when something is held.
+- **Event-driven push** plus a daily digest at his digest hour (held events; only when any are held) and the Sunday positioning digest.
 - **Silence-check:** zero notifications in `silence_window_days` (7) → one short digest leading with liquidity, the material change and one next action, not headline wealth. Never routine.
 - **THESIS BREAK:** always notify — bypasses the silence window.
 
