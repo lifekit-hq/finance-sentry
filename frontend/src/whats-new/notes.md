@@ -1,5 +1,5 @@
 <!--
-Plain notes for the "What's new" panel, read by scripts/build-whats-new.mjs.
+Plain notes for the "What's new" panel, built into public/whats-new.json by `lifekit-whats-new` (npm run whats-new).
 One `## x.y.z` heading per release, newest first, with 3-6 one-line bullets under it: second person,
 what a person can now do or no longer runs into, no library or module names, no issue numbers.
 End a bullet with `(owner)` when only the owner should see it. A version without notes shows the
