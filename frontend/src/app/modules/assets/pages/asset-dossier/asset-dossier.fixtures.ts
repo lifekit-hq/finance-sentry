@@ -1,4 +1,5 @@
 import {computed, Injector, runInInjectionContext, signal} from '@angular/core';
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {vi} from 'vitest';
 
@@ -211,6 +212,7 @@ export function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Re
 function createMockStore() {
   const dossier = signal<AssetDossierDto | null>(DOSSIER);
   const chart = signal<AssetChartDto | null>(null);
+  const chartPeriod = signal<PricePeriod>('1Y');
   const chartStatus = signal<AsyncStatus>('success');
   const chartErrorMessage = signal('');
   const targetDraft = signal('');
@@ -226,6 +228,7 @@ function createMockStore() {
       isThesisExpanded: signal(false),
       quote,
       chart,
+      chartPeriod,
       chartStatus,
       chartErrorMessage,
       targetDraft,
@@ -260,6 +263,8 @@ function createMockStore() {
     setVerdictDisplay: vi.fn(),
     isQuoteLoading: signal(false),
     chart,
+    chartPeriod,
+    setChartPeriod: (period: PricePeriod) => chartPeriod.set(period),
     chartStatus,
     chartErrorMessage,
     targetDraft,

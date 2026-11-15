@@ -664,7 +664,8 @@
                       [currency]="store.chart()?.currency ?? 'USD'"
                       [label]="'How has ' + dossier.symbol + ' moved?'"
                       [emptyMessage]="'No price history for ' + dossier.symbol + ' in this period.'"
-                      period="1Y"
+                      [period]="store.chartPeriod()"
+                      (periodChange)="store.setChartPeriod($event)"
                       data-testid="price-block"
                     />
                     @if (view.averageCostLabel) {

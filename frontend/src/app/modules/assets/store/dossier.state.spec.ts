@@ -21,6 +21,7 @@ describe('initialDossierState', () => {
 
   it('starts with no chart and the target editor closed', () => {
     expect(initialDossierState.chart).toBeNull();
+    expect(initialDossierState.chartPeriod).toBe('1Y');
     expect(initialDossierState.isEditingTarget).toBe(false);
     expect(initialDossierState.targetDraft).toBe('');
   });

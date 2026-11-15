@@ -1,3 +1,4 @@
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
@@ -40,6 +41,9 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
     },
     setChart(chart: AssetChartDto): void {
       patchState(store, {chart});
+    },
+    setChartPeriod(chartPeriod: PricePeriod): void {
+      patchState(store, {chartPeriod});
     },
     setTargetDraft(targetDraft: string): void {
       patchState(store, {targetDraft});

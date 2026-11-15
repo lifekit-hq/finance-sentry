@@ -1,3 +1,4 @@
+import {type PricePeriod} from '@lifekit-hq/charts-core';
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
@@ -15,6 +16,8 @@ export interface DossierState {
   isThesisExpanded: boolean;
   quote: Nullable<DossierQuoteDto>;
   chart: Nullable<AssetChartDto>;
+  /** The price block's selected period; the S&P 500 overlay depends on it. */
+  chartPeriod: PricePeriod;
   /** The target editor's text; parsed and validated in the computeds. */
   targetDraft: string;
   isEditingTarget: boolean;
@@ -32,6 +35,7 @@ export const initialDossierState: DossierState = {
   isThesisExpanded: false,
   quote: null,
   chart: null,
+  chartPeriod: '1Y',
   targetDraft: '',
   isEditingTarget: false,
   decidedRecommendation: null,

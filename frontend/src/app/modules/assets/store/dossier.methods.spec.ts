@@ -134,6 +134,15 @@ describe('dossierMethods', () => {
     expect(state.chart()).toEqual(chart);
   });
 
+  it('setChartPeriod stores the selected period', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+
+    methods.setChartPeriod('MAX');
+
+    expect(state.chartPeriod()).toBe('MAX');
+  });
+
   it('openTargetEditor starts from the saved target, or blank without one', () => {
     const state = signalState(initialDossierState);
     const methods = dossierMethods(state);

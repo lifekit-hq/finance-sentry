@@ -8,9 +8,11 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// <see cref="IPriceHistoryService"/> over Yahoo's free chart endpoint (the one the quote path already
-/// reads): daily bars up to a year, weekly for five years, monthly for the whole history, so no range
-/// returns more than a few hundred points. Results are cached per ticker and range for 30 minutes; a
-/// failure is not cached. Singleton so the cache survives across requests.
+/// reads): daily bars for every range but five years (weekly). The whole history is daily too, so a
+/// long-listed ticker's MAX series runs to some ten thousand bars and the dossier price block can cut
+/// any period from it at day resolution. Results are cached per ticker and range for 30 minutes (the
+/// cache bound counts series, not bars); a failure is not cached. Singleton so the cache survives
+/// across requests.
 /// </summary>
 public sealed class YahooPriceHistoryService(
     IHttpClientFactory httpFactory,
