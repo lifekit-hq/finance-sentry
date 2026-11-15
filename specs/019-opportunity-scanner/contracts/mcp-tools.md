@@ -32,15 +32,13 @@ repos, scorers) in `ToolParityTests`.
 - **Params**: `status?` (Active|Promoted|Rejected|Expired), `source?` (User|Scan), `userId?`
 - **Returns**: candidates with their latest score + status/links. Rejected/expired remain listed (SC-005).
 
-## Authorization and origin (owner ruling 2026-11-13)
-`promote_candidate`, `reject_candidate` and `save_thesis` are open to the service token (Ledger): the owner's only
-decision is buy or not, so Ledger nominates, promotes and rejects without a confirm step. The write is stamped
-`origin` (`Ledger` for a service token, `User` for the owner's session and stdio) on its `thesis_events` row
-(`ThesisEvent.Origin`, migration M024), and `list_candidates` shows it as `decisionOrigin` (the origin of the
-latest `Promoted`/`Rejected` event; `User` while Active). The risk gate, trigger validation and the one-thesis rules
-are unchanged for every caller. `delete_thesis` and everything on the IPS stay owner-session only. A promoted
-thesis's own `Created` event carries the audit payload (see docs/mcp.md); the `Promoted` event carries the
-`decisionNote` as `audit.rationale`. Pinned by `ResearchWriteAuthorizationTests`.
+## Authorization and origin (owner ruling 2026-11-13, narrowed 2026-11-15)
+`reject_candidate` is open to the service token (Ledger); `promote_candidate` and `save_thesis` are owner-session only
+since the 2026-11-15 ruling (Ledger proposes through `propose_thesis_revision`, the owner confirms; see
+`specs/050-thesis-revisions/spec.md`). The authoritative split and the `origin` audit trail (`Ledger` for a service
+token, `User` for the owner's session and stdio, on the `thesis_events` row, shown by `list_candidates` as
+`decisionOrigin`) are in `docs/mcp.md`. The risk gate, trigger validation and the one-thesis rules are unchanged for
+every caller. Pinned by `ResearchWriteAuthorizationTests`.
 
 ## `promote_candidate`
 - **Params**: `id: Guid`, `triggers?: ThesisInvalidationTrigger[]` (override the deterministic prefill),

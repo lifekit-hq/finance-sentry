@@ -1,7 +1,7 @@
 # Coverage universe
 
 "Our own index": the capped list of companies the pipeline keeps in view, maintained with no one's confirmation
-(owner ruling 2026-11-13: he decides buy or sell; finding, thesising and curating are the pipeline's and Ledger's).
+(owner ruling 2026-11-13: he decides buy or sell; finding and curating are the pipeline's and Ledger's; Ledger proposes theses and the owner confirms, ruling 2026-11-15).
 Stage 1 of the discovery funnel. It is distinct from the [reference universe](reference-universe.md), which is
 the pool candidates are drawn from, not the list being watched.
 
