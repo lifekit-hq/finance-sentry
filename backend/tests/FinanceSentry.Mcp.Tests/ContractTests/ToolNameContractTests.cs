@@ -65,6 +65,7 @@ public sealed class ToolNameContractTests
         "get_relative_strength",
         "get_sector_rotation",
         "get_valuation_snapshot",
+        "get_verdict_coverage_audit",
         "list_active_alerts",
         "list_candidates",
         "list_catalyst_events",

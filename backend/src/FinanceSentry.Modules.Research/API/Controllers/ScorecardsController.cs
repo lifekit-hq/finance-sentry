@@ -17,8 +17,18 @@ using Microsoft.AspNetCore.Mvc;
 [Route("research/scorecards")]
 public class ScorecardsController(
     IQueryHandler<GetScorecardQuery, ScorecardResult> handler,
-    IQueryHandler<GetScorecardVerdictsQuery, IReadOnlyList<ScorecardVerdictSummary>> verdictsHandler) : ControllerBase
+    IQueryHandler<GetScorecardVerdictsQuery, IReadOnlyList<ScorecardVerdictSummary>> verdictsHandler,
+    IQueryHandler<GetVerdictCoverageAuditQuery, VerdictCoverageAudit> coverageAuditHandler) : ControllerBase
 {
+    /// <summary>
+    /// The verdict-coverage audit (#1413): every held, thesis, watched and coverage symbol of the caller with the state of
+    /// each axis and section a verdict reads and a typed gap reason where one has no data. Read-only; the caller's own
+    /// holdings are read at request time. Same <c>ai.use</c> gate as the verdicts it audits.
+    /// </summary>
+    [HttpGet("coverage-audit")]
+    public async Task<IActionResult> GetCoverageAudit(CancellationToken ct) =>
+        Ok(await coverageAuditHandler.Handle(new GetVerdictCoverageAuditQuery(User.RequireUserId()), ct));
+
     /// <summary>
     /// The verdict word of a comma-separated list of symbols in one call (the Accounts position chips). Same
     /// <c>ai.use</c> gate as the single read: a caller without it gets 403, never a word.
