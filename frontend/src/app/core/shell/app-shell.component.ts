@@ -11,6 +11,7 @@ import {
   ACCOUNT_SIGN_OUT_ID,
   APPEARANCE_PALETTE_ITEMS,
   AppLayoutComponent,
+  CmnPullRefreshService,
   CmnShellService,
   CommandPaletteItem,
   type MenuItem,
@@ -27,7 +28,12 @@ import {
 } from '../report-problem/constants/report-problem.constants';
 import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../whats-new/constants/whats-new.constants';
 import {WhatsNewStore} from '../whats-new/store/whats-new.store';
-import {CONNECT_ACTION_ID, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {
+  CONNECT_ACTION_ID,
+  PHONE_TAB_ROUTES,
+  REFRESH_ACTION_ID,
+  REFRESH_LABEL,
+} from './app-shell.constants';
 import {ShellChromeService} from './services/shell-chrome.service';
 import {PaletteEntitiesStore} from './store/palette-entities.store';
 
@@ -55,6 +61,13 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   ...APPEARANCE_PALETTE_ITEMS,
   {id: ACCOUNT_SIGN_OUT_ID, label: 'Sign out', icon: 'LogOut', group: 'Actions'},
 ];
+
+const REFRESH_PALETTE_ITEM: CommandPaletteItem = {
+  id: REFRESH_ACTION_ID,
+  label: REFRESH_LABEL,
+  icon: 'RefreshCw',
+  group: 'Actions',
+};
 
 @Component({
   selector: 'fns-app-shell',
@@ -97,6 +110,7 @@ export class AppShellComponent {
   private readonly shell = inject(CmnShellService);
   private readonly chrome = inject(ShellChromeService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
+  private readonly pullRefresh = inject(CmnPullRefreshService);
 
   public readonly appUpdate = inject(AppUpdateService);
 
@@ -108,9 +122,12 @@ export class AppShellComponent {
   public readonly navItems = this.chrome.navItems;
   public readonly account = this.chrome.account;
   public readonly paletteItems = computed(() =>
-    [...PALETTE_ITEMS, ...this.paletteEntities.items()].filter(item =>
-      this.chrome.isPermitted(item.id)
-    )
+    [
+      ...PALETTE_ITEMS,
+      // Pull to refresh is a touch gesture; this is the keyboard and screen-reader way to the same reload.
+      ...(this.pullRefresh.available() ? [REFRESH_PALETTE_ITEM] : []),
+      ...this.paletteEntities.items(),
+    ].filter(item => this.chrome.isPermitted(item.id))
   );
 
   /** The rail and the sidebar leave navigating to the app; the phone tab bar navigates itself. */
@@ -131,7 +148,9 @@ export class AppShellComponent {
 
   /** The layout navigates to pages and applies the appearance entries itself. */
   public handlePaletteAction(id: string): void {
-    if (!this.chrome.handle(id) && id === CONNECT_ACTION_ID) {
+    if (id === REFRESH_ACTION_ID) {
+      void this.pullRefresh.refresh();
+    } else if (!this.chrome.handle(id) && id === CONNECT_ACTION_ID) {
       void this.router.navigateByUrl(AppRoute.AccountsList);
     }
   }

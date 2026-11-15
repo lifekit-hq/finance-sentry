@@ -5,6 +5,7 @@ import {AppUpdateService} from '@lifekit-hq/core/pwa';
 import {
   ACCOUNT_SIGN_OUT_ID,
   APPEARANCE_PALETTE_ITEMS,
+  CmnPullRefreshService,
   CmnShellService,
   type MenuItem,
 } from '@lifekit-hq/ui';
@@ -35,6 +36,8 @@ describe('AppShellComponent FAB clearance', () => {
   const hasUnread = signal(false);
   const updateReady = signal(false);
   const reload = vi.fn().mockResolvedValue(undefined);
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  const refreshAvailable = signal(false);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
@@ -43,6 +46,8 @@ describe('AppShellComponent FAB clearance', () => {
     hasUnread.set(false);
     updateReady.set(false);
     reload.mockClear();
+    refresh.mockClear();
+    refreshAvailable.set(false);
   });
   const canUseAi = signal(true);
 
@@ -66,6 +71,7 @@ describe('AppShellComponent FAB clearance', () => {
           },
         },
         {provide: AppUpdateService, useValue: {updateReady, reload}},
+        {provide: CmnPullRefreshService, useValue: {available: refreshAvailable, refresh}},
         {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
         {provide: WhatsNewStore, useValue: {hasUnread}},
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
@@ -242,6 +248,19 @@ describe('AppShellComponent FAB clearance', () => {
     expect(entry).toBeDefined();
     fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
     expect(openReport).toHaveBeenCalledOnce();
+  });
+
+  it('offers a palette refresh only while the page on screen registered a reload', async () => {
+    const fixture = await setup(AppRoute.Dashboard, true);
+    const find = () =>
+      fixture.componentInstance.paletteItems().find(item => item.label === 'Refresh this page');
+    expect(find()).toBeUndefined();
+
+    refreshAvailable.set(true);
+    const entry = find();
+    expect(entry).toBeDefined();
+    fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   describe('sidebar version footer', () => {

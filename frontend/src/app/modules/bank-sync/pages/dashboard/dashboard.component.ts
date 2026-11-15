@@ -84,7 +84,11 @@ const HISTORY_RANGES: ChipRowOption[] = [
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DashboardStore, provideDashboardBridgeWindow()],
   template: `
-    <cmn-page kind="overview">
+    <cmn-page
+      [reload]="store.reload"
+      [reloading]="store.isLoading() || store.isHistoryLoading()"
+      kind="overview"
+    >
       <div>
         @if (view().offlineNotice; as notice) {
           <cmn-alert variant="info" class="mb-cmn-3 block" data-testid="offline-notice">{{

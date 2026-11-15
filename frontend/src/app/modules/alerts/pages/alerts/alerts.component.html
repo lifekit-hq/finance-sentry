@@ -1,4 +1,4 @@
-<cmn-page kind="list" fill>
+<cmn-page [reload]="store.reload" [reloading]="store.isLoading()" kind="list" fill>
   <p class="text-cmn-sm text-text-secondary" data-testid="alerts-subtitle">
     {{ alertsSubtitle() }}
   </p>

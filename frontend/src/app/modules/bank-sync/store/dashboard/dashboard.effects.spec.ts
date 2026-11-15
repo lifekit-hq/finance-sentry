@@ -95,3 +95,48 @@ describe('dashboardHooks auto-refresh', () => {
     expect(base.setData).toHaveBeenLastCalledWith(rangeData, '1y');
   });
 });
+
+describe('dashboardEffects reload', () => {
+  const service = {getDashboardData: vi.fn(), getNetWorthHistory: vi.fn()};
+
+  beforeEach(() => {
+    service.getDashboardData.mockReset().mockReturnValue(of(DATA));
+    service.getNetWorthHistory
+      .mockReset()
+      .mockReturnValue(
+        of({snapshots: [], hasHistory: false, scopeChanges: [], changeHeadline: null})
+      );
+    TestBed.configureTestingModule({
+      providers: [{provide: BankSyncService, useValue: service}],
+    });
+  });
+
+  it('fetches the statistics and the history again for the range on screen', () => {
+    const store = buildStore();
+    store.historyRange.set('1y');
+    const effects = TestBed.runInInjectionContext(() => dashboardEffects(store));
+
+    effects.reload();
+
+    expect(service.getNetWorthHistory).toHaveBeenCalledTimes(1);
+    expect(service.getNetWorthHistory).toHaveBeenCalledWith('1y');
+    expect(service.getDashboardData).toHaveBeenCalledTimes(1);
+    expect(store.setLoading).toHaveBeenCalledTimes(1);
+    expect(store.setHistoryLoading).toHaveBeenCalledWith(true);
+    expect(store.setData).toHaveBeenCalledWith(DATA, '1y');
+    expect(store.setHistoryLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('keeps the history loading while only the statistics have landed', () => {
+    const store = buildStore();
+    const lateHistory = new Subject<unknown>();
+    service.getNetWorthHistory.mockReturnValue(lateHistory);
+    const effects = TestBed.runInInjectionContext(() => dashboardEffects(store));
+
+    effects.reload();
+
+    expect(store.setSuccess).toHaveBeenCalledTimes(1);
+    expect(store.setHistoryLoading).toHaveBeenCalledWith(true);
+    expect(store.setHistoryLoading).not.toHaveBeenCalledWith(false);
+  });
+});

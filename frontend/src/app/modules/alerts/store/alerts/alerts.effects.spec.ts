@@ -30,6 +30,7 @@ const PAGE = {items: [], totalCount: 45, unreadCount: 7, page: 2, pageSize: 20, 
 
 function build() {
   return {
+    query: signal<AlertsQuery>({filter: 'all', search: ''}),
     search: signal(''),
     filter: signal<AlertFilter>('all'),
     status: signal<AsyncStatus>('idle'),
@@ -77,6 +78,18 @@ describe('alertsEffects', () => {
     expect(store.setError).not.toHaveBeenCalled();
   });
 
+  it('reload fetches the first page of the query on screen again', () => {
+    const store = build();
+    store.query.set({filter: 'unread', search: 'rent'});
+    TestBed.runInInjectionContext(() => {
+      alertsEffects(store).reload();
+    });
+
+    expect(api.getAlerts).toHaveBeenCalledWith('unread', 1, ALERTS_PAGE_SIZE, 'rent');
+    expect(store.setLoading).toHaveBeenCalledOnce();
+    expect(store.setSuccess).toHaveBeenCalledOnce();
+  });
+
   it('load records an error and no data when the request fails', () => {
     api.getAlerts.mockReturnValue(throwError(() => new Error('boom')));
     const store = build();
@@ -88,6 +101,33 @@ describe('alertsEffects', () => {
     expect(store.clearData).toHaveBeenCalled();
     expect(store.setData).not.toHaveBeenCalled();
     expect(store.setSuccess).not.toHaveBeenCalled();
+  });
+
+  it('a failed reload of the query the rows belong to keeps the rows and records the error', () => {
+    const store = build();
+    store.query.set({filter: 'unread', search: 'rent'});
+    TestBed.runInInjectionContext(() => {
+      const effects = alertsEffects(store);
+      effects.load({filter: 'unread', search: 'rent'});
+      api.getAlerts.mockReturnValue(throwError(() => new Error('offline')));
+      effects.reload();
+    });
+
+    expect(store.clearData).not.toHaveBeenCalled();
+    expect(store.setError).toHaveBeenCalledWith(null);
+  });
+
+  it('a failed load of another query than the rows belong to drops the rows', () => {
+    const store = build();
+    TestBed.runInInjectionContext(() => {
+      const effects = alertsEffects(store);
+      effects.load({filter: 'all', search: ''});
+      api.getAlerts.mockReturnValue(throwError(() => new Error('boom')));
+      effects.load({filter: 'unread', search: ''});
+    });
+
+    expect(store.clearData).toHaveBeenCalledOnce();
+    expect(store.setError).toHaveBeenCalledWith(null);
   });
 
   it('the hook refetches whenever the query signal changes', () => {
