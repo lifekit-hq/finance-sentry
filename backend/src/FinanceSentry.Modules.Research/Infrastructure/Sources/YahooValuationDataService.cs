@@ -195,7 +195,8 @@ public sealed class YahooValuationDataService(
                 ReadRaw(financialData, "totalDebt"),
                 ReadRaw(financialData, "totalCash"),
                 ReadRaw(keyStats, "sharesOutstanding"),
-                ReadString(financialData, "financialCurrency")));
+                ReadString(financialData, "financialCurrency")),
+            Beta: ReadRaw(summaryDetail, "beta") ?? ReadRaw(keyStats, "beta"));
     }
 
     private static IReadOnlyList<string> ParsePeers(string json, string self)

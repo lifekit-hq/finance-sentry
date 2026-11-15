@@ -303,6 +303,11 @@ public static class ResearchModule
             sp.GetRequiredService<ISecEdgarService>(), FundamentalFact.IfrsTaxonomy));
         services.AddSingleton<IFundamentalsSource, YahooFundamentalsSource>();
         services.AddSingleton<IFundamentalsService, FundamentalsChainService>();
+
+        // The DCF's statement history (#1269): the same key-less Yahoo timeseries endpoint and HTTP client, asked
+        // for the income-statement and cash-flow lines the chain does not carry.
+        services.Configure<ValuationOptions>(config.GetSection(ValuationOptions.SectionName));
+        services.AddSingleton<IDcfInputsSource, YahooDcfInputsSource>();
         return services;
     }
 

@@ -1,10 +1,8 @@
 namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Services;
-using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Valuation;
 
 /// <summary>
@@ -37,9 +35,6 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
     {
         public ValuationCompsInputs? Inputs => Metrics.Comps;
     }
-
-    // The EV -> equity bridge, resolved once for the target (null = a piece is missing; the flags say which).
-    private sealed record Bridge(decimal? NetDebt, decimal? Shares, decimal? ToQuotedUnit);
 
     public async Task<CompsValuationResult> Handle(GetCompsValuationQuery query, CancellationToken ct)
     {
@@ -74,14 +69,14 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
         }
 
         var target = new Company(ticker, current);
-        var isFinancial = IsFinancial(current.Industry);
+        var isFinancial = ValuationSectors.IsFinancial(current.Industry);
         if (isFinancial)
         {
             flags.Add(CompsFlags.FinancialSector);
         }
 
         // Banks and insurers compare on P/E and P/B only, so they never need the EV -> equity bridge.
-        var bridge = isFinancial ? new Bridge(null, null, null) : ResolveBridge(current, flags);
+        var bridge = isFinancial ? ValuationBridge.Empty : ValuationBridge.Resolve(current, flags);
 
         var evToEbitda = isFinancial
             ? FinancialNotEvaluable()
@@ -162,12 +157,6 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
         => string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(peer)
             ? null
             : string.Equals(target.Trim(), peer.Trim(), StringComparison.OrdinalIgnoreCase);
-
-    // Banks and insurers: free cash flow and EV/EBITDA are not meaningful (the DCF refuses them for the same reason).
-    private static bool IsFinancial(string? industry)
-        => industry is not null
-            && (industry.StartsWith("Banks", StringComparison.OrdinalIgnoreCase)
-                || industry.StartsWith("Insurance -", StringComparison.OrdinalIgnoreCase));
 
     private static CompsMeasure FinancialNotEvaluable() => new(
         Target: null, NotEvaluable: true, CompsReasons.FinancialSector, UsableCount: 0,
@@ -313,7 +302,7 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
     // bridge Yahoo's EV is built from: (EV - (debt - cash)) / shares, in the reporting currency, converted once
     // to the quote currency (and its minor unit, so it sits beside the quoted price).
     private static Func<decimal, decimal?>? ImpliedFromEv(
-        ValuationCurrentMetrics target, Bridge bridge, Func<Company, decimal?> metric)
+        ValuationCurrentMetrics target, ValuationBridge bridge, Func<Company, decimal?> metric)
     {
         var amount = metric(new Company(target.Ticker, target));
         if (amount is not > 0m || bridge.NetDebt is not { } netDebt || bridge.Shares is not { } shares || bridge.ToQuotedUnit is not { } toQuoted)
@@ -322,44 +311,6 @@ public class GetCompsValuationQueryHandler(IValuationDataService valuation)
         }
 
         return multiple => CompsMath.PerShareFromEnterpriseValue(multiple * amount.Value, netDebt, shares) * toQuoted;
-    }
-
-    private static Bridge ResolveBridge(ValuationCurrentMetrics target, List<string> flags)
-    {
-        var inputs = target.Comps;
-        decimal? netDebt = inputs?.TotalDebt is { } debt && inputs.TotalCash is { } cash ? debt - cash : null;
-        if (netDebt is null)
-        {
-            flags.Add(CompsFlags.NetDebtUnavailable);
-        }
-
-        var (quoteCurrency, divisor) = MinorUnitCurrency.Normalize(target.Currency);
-
-        decimal? shares = inputs?.SharesOutstanding is > 0m ? inputs.SharesOutstanding : null;
-        if (shares is null && target.MarketCap is > 0m && target.Price is > 0m)
-        {
-            shares = target.MarketCap / (target.Price / divisor);
-            flags.Add(CompsFlags.SharesFromMarketCap);
-        }
-
-        decimal? toQuoted = divisor;
-        var reporting = inputs?.FinancialCurrency?.Trim();
-        if (!string.IsNullOrEmpty(reporting) && !string.IsNullOrEmpty(quoteCurrency)
-            && !string.Equals(reporting, quoteCurrency, StringComparison.OrdinalIgnoreCase))
-        {
-            if (CurrencyConverter.IsKnown(reporting) && CurrencyConverter.IsKnown(quoteCurrency))
-            {
-                toQuoted = divisor * CurrencyConverter.ToUsd(1m, reporting) / CurrencyConverter.ToUsd(1m, quoteCurrency);
-                flags.Add(CompsFlags.FxConverted);
-            }
-            else
-            {
-                toQuoted = null;
-                flags.Add(CompsFlags.FxUnknown);
-            }
-        }
-
-        return new Bridge(netDebt, shares, toQuoted);
     }
 
     // --- summary ---
