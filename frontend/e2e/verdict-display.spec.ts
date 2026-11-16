@@ -169,15 +169,17 @@ test.describe('Verdict display', () => {
   });
 
   // The verdict chip sits beside the ticker: it must not squeeze the symbol (it once truncated to
-  // nothing at 390px), so the chip wraps below the ticker first.
+  // nothing at 390px), so the chip wraps below the ticker first. STRONG BUY is the widest word, so the
+  // ticker + chip pair cannot fit on one line of a phone row without squeezing the ticker.
   for (const width of [375, 390]) {
     test(`a verdict chip never truncates the ticker at ${width}px`, async ({page}) => {
       await page.setViewportSize({width, height: 844});
       await page.route(`${API}/research/scorecards/verdicts**`, route =>
         route.fulfill({
           status: 200,
+          contentType: 'application/json',
           body: JSON.stringify([
-            {symbol: 'AAPL', word: 'Wait', firedRuleId: 'otherwise', turnsBuyWhen: null},
+            {symbol: 'AAPL', word: 'StrongBuy', firedRuleId: 'strong-buy', turnsBuyWhen: null},
           ]),
         })
       );
@@ -186,7 +188,7 @@ test.describe('Verdict display', () => {
       await broker.locator('button[aria-controls]').first().click();
 
       const row = broker.getByTestId('position-row').filter({hasText: 'AAPL'});
-      await expect(row.getByTestId('position-verdict')).toBeVisible();
+      await expect(row.getByTestId('position-verdict')).toContainText('STRONG BUY');
       const overflow = await row
         .getByTestId('position-ticker')
         .evaluate(ticker => ticker.scrollWidth - ticker.clientWidth);
