@@ -84,6 +84,12 @@ public sealed class CatalystOptions
     /// </summary>
     public int GdeltMinIntervalSeconds { get; set; } = 5;
 
+    /// <summary>Tries per phrase when GDELT throttles (429) or fails (5xx); 1 turns the retry off.</summary>
+    public int GdeltMaxAttempts { get; set; } = 3;
+
+    /// <summary>Seconds waited after the first throttled try (doubling each time) unless GDELT sends Retry-After.</summary>
+    public int GdeltRetryDelaySeconds { get; set; } = 30;
+
     /// <summary>Hour (UTC) the daily attention refresh runs, before the catalyst scan so a nominee's scorecard carries a fresh reading.</summary>
     public int AttentionHourUtc { get; set; }
 
