@@ -91,7 +91,7 @@ test.describe('Filing alerts', () => {
     await page.goto('/alerts');
 
     const popupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', {name: 'AAPL filed a 10-Q'}).click();
+    await page.getByRole('button', {name: 'AAPL filed a 10-Q', exact: true}).click();
     const popup = await popupPromise;
 
     expect(popup.url()).toBe(FILING_URL);
@@ -104,7 +104,7 @@ test.describe('Filing alerts', () => {
     let popups = 0;
     page.on('popup', () => popups++);
 
-    await page.getByRole('button', {name: 'Low balance on Revolut'}).click();
+    await page.getByRole('button', {name: 'Low balance on Revolut', exact: true}).click();
 
     await expect(page).toHaveURL(/\/accounts\/list$/);
     expect(popups).toBe(0);

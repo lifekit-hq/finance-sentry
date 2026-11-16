@@ -18,6 +18,7 @@ import {
   EmptyStateComponent,
   FormFieldComponent,
   InputComponent,
+  ListItemRowComponent,
   PageComponent,
   PageScrollComponent,
   SkeletonComponent,
@@ -32,6 +33,7 @@ import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {
   PENDING_ID_PREFIX,
+  REMOVE_SWIPE_ACTION,
   WATCHLIST_EMPTY_COPY,
 } from '../../constants/watchlist/watchlist.constants';
 import {type WatchlistRow} from '../../models/watchlist/watchlist.model';
@@ -55,6 +57,7 @@ const MAX_NOTE_LENGTH = 500;
     FormFieldComponent,
     InputComponent,
     InputHintsDirective,
+    ListItemRowComponent,
     PageComponent,
     PageScrollComponent,
     ReactiveFormsModule,
@@ -74,6 +77,7 @@ export class WatchlistComponent {
 
   public readonly store = inject(WatchlistStore);
   public readonly emptyCopy = WATCHLIST_EMPTY_COPY;
+  public readonly removeSwipe = REMOVE_SWIPE_ACTION;
   public readonly skeletonRowCount = SKELETON_ROWS;
   public readonly noteRows = NOTE_ROWS;
   public readonly maxTickerLength = MAX_TICKER_LENGTH;
@@ -102,6 +106,10 @@ export class WatchlistComponent {
 
   public isPending(row: WatchlistRow): boolean {
     return row.id.startsWith(PENDING_ID_PREFIX);
+  }
+
+  public canRemove(row: WatchlistRow): boolean {
+    return !this.isPending(row) && !this.store.isLoadLoading();
   }
 
   public submit(): void {

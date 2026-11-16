@@ -113,12 +113,14 @@
           @if (store.rows().length > 0) {
             <cmn-card padding="none" class="block" data-testid="watchlist-list">
               @for (row of store.rows(); track row.id) {
-                <div
-                  [class.opacity-60]="isPending(row)"
-                  class="flex items-start gap-cmn-3 border-b border-border-subtle p-cmn-4 last:border-b-0"
+                <cmn-list-item-row
+                  [label]="row.ticker"
+                  [dimmed]="isPending(row)"
+                  [swipeTrailing]="canRemove(row) ? removeSwipe : null"
+                  (swipeTrailingAction)="confirmRemove(row)"
                   data-testid="watchlist-row"
                 >
-                  <div class="min-w-0 flex-1 space-y-cmn-1">
+                  <div body class="min-w-0 space-y-cmn-1">
                     <div class="flex flex-wrap items-center gap-x-cmn-2 gap-y-cmn-1">
                       <a
                         [routerLink]="row.dossierRoute"
@@ -144,15 +146,16 @@
                     }
                   </div>
                   <cmn-button
-                    [disabled]="isPending(row) || store.isLoadLoading()"
+                    [disabled]="!canRemove(row)"
                     [aria-label]="'Remove ' + row.ticker"
                     (clicked)="confirmRemove(row)"
+                    actions
                     variant="secondary"
                     size="sm"
                     icon="Trash2"
                     data-testid="watchlist-remove"
                   />
-                </div>
+                </cmn-list-item-row>
               }
             </cmn-card>
           }
