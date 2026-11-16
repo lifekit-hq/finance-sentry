@@ -360,7 +360,7 @@ describe('TransactionLedgerComponent search box', () => {
 });
 
 describe('TransactionLedgerComponent rows', () => {
-  it('opens the drawer from a native button stretched over the row', () => {
+  it('opens the drawer from the native button of the row', () => {
     const {store, fixture, root} = setup(null);
     store.transactions.set([ROW] as never);
     store.isEmpty.set(false);
@@ -368,10 +368,10 @@ describe('TransactionLedgerComponent rows', () => {
     fixture.detectChanges();
 
     const row = root.querySelector('[data-testid="ledger-row"]');
-    const open = row?.querySelector<HTMLButtonElement>('button[data-testid="ledger-row-open"]');
+    const open = row?.querySelector<HTMLButtonElement>('[data-testid="ledger-row-open"] button');
     expect(row?.hasAttribute('role')).toBe(false);
     expect(open?.type).toBe('button');
-    expect(open?.getAttribute('aria-label')).toBe('Coffee');
+    expect(open?.textContent).toContain('Coffee');
 
     open?.click();
     expect(openDrawer).toHaveBeenCalledTimes(1);

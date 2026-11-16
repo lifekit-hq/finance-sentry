@@ -104,7 +104,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: ACCOUNTS_SCREEN.path,
     kind: 'list',
     note: 'Connected institutions and their accounts.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(ACCOUNTS_SCREEN),
   },
   {
@@ -112,7 +112,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: TRANSACTIONS_SCREEN.path,
     kind: 'list',
     note: 'The ledger of transactions with its filters.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(TRANSACTIONS_SCREEN),
   },
   {

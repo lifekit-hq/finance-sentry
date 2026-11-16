@@ -95,7 +95,7 @@
         @for (group of dayGroups(); track group.dayKey) {
           <cmn-list-section [heading]="group.label" class="mb-cmn-4">
             @for (t of group.items; track t.transactionId) {
-              <div class="relative" data-testid="ledger-row">
+              <div data-testid="ledger-row">
                 <cmn-list-item-row
                   [label]="t.description"
                   [sublabel]="
@@ -104,6 +104,9 @@
                     (t.isPending ? ' · Pending' : '')
                   "
                   [dimmed]="t.isPending"
+                  [action]="true"
+                  (activated)="openDrawer(t)"
+                  data-testid="ledger-row-open"
                 >
                   <cmn-institution-avatar
                     [name]="t.bankName"
@@ -119,14 +122,6 @@
                     {{ t | transactionAmount }}
                   </span>
                 </cmn-list-item-row>
-                <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
-                <button
-                  [attr.aria-label]="t.description"
-                  (click)="openDrawer(t)"
-                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                  type="button"
-                  data-testid="ledger-row-open"
-                ></button>
               </div>
             }
           </cmn-list-section>
