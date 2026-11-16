@@ -9,6 +9,8 @@
 #   to the gitignored docker/.env.deploy. The deploy workflow supplies them from repository
 #   variables; a run without them (manual re-run, break-glass) reuses the last-deployed file.
 #   The compose file requires every one, so a missing value fails loudly at interpolation.
+#   Optional values (SEC_EDGAR_CONTACT, the SEC source's email contact) are written beside them only
+#   when non-empty; an empty one is left out and the compose file passes it on as empty.
 # - Pulls the images Docker Build published for one commit (IMAGE_TAG = its full SHA) and
 #   starts the prod compose stack on them without building.
 # - Idempotent: safe to re-run; re-running with an older SHA is a rollback.
@@ -59,6 +61,8 @@ chmod 600 docker/.env
 
 DEPLOY_ENV_FILE=docker/.env.deploy
 DEPLOY_ENV_VARS=(JWT_ISSUER FRONTEND_BASE_URL TRUELAYER_FRONTEND_REDIRECT_BASE EDGE_SUBNET EDGE_IP_RANGE EDGE_BRIDGE_IP EDGE_GATEWAY_IP)
+# Written only when non-empty; never required and never counted toward the all-or-nothing check below.
+DEPLOY_ENV_OPTIONAL_VARS=(SEC_EDGAR_CONTACT)
 supplied=()
 unsupplied=()
 for name in "${DEPLOY_ENV_VARS[@]}"; do
@@ -66,7 +70,10 @@ for name in "${DEPLOY_ENV_VARS[@]}"; do
 done
 if [[ ${#supplied[@]} -eq ${#DEPLOY_ENV_VARS[@]} ]]; then
   echo "[deploy] persist hostname/edge values -> $DEPLOY_ENV_FILE"
-  ( umask 077; for name in "${DEPLOY_ENV_VARS[@]}"; do printf '%s=%s\n' "$name" "${!name}"; done > "$DEPLOY_ENV_FILE" )
+  ( umask 077
+    { for name in "${DEPLOY_ENV_VARS[@]}"; do printf '%s=%s\n' "$name" "${!name}"; done
+      for name in "${DEPLOY_ENV_OPTIONAL_VARS[@]}"; do [[ -z "${!name:-}" ]] || printf '%s=%s\n' "$name" "${!name}"; done
+    } > "$DEPLOY_ENV_FILE" )
 elif [[ ${#supplied[@]} -gt 0 ]]; then
   echo "error: hostname/edge values only partly supplied; missing: ${unsupplied[*]}" >&2
   exit 1
