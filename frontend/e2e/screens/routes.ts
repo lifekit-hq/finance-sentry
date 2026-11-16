@@ -184,7 +184,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: '/assets/AAPL',
     kind: 'overview',
     note: 'One holding: price, checks and the Ledger read. Needs the full frame width: the chip and tab rows clip in the detail column.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: {
       mocks: mockDossier,
       ready: async page => {

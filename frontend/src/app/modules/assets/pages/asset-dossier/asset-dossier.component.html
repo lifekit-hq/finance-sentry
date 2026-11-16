@@ -294,7 +294,7 @@
                 <div class="mt-cmn-3 space-y-cmn-2">
                   @for (lot of position.taxLots; track $index) {
                     <div
-                      class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
+                      class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 border-t border-border-default pt-cmn-2 text-cmn-sm"
                     >
                       <span class="tabular-nums text-text-primary">{{
                         lot.quantity | number: '1.0-8'
@@ -1470,10 +1470,7 @@
               class="scroll-mt-cmn-16 border-t border-border-default pt-cmn-4"
               data-testid="data-status"
             >
-              <h2
-                id="data-status-heading"
-                class="text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
-              >
+              <h2 id="data-status-heading" class="text-cmn-sm font-semibold text-text-secondary">
                 Data status
               </h2>
               <dl class="mt-cmn-2 space-y-cmn-1 text-cmn-xs">

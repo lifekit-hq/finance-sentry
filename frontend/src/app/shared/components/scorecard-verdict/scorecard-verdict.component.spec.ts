@@ -64,7 +64,7 @@ describe('ScorecardVerdictComponent', () => {
     const why = host.querySelector<HTMLDetailsElement>('[data-testid="verdict-why"]');
 
     expect(why?.open).toBe(false);
-    expect(why?.querySelector('summary')?.textContent).toContain('Why AVOID');
+    expect(why?.querySelector('summary')?.textContent).toContain('Why this verdict');
   });
 
   it('opens into the four axes, each with its headline and the facts behind it', () => {

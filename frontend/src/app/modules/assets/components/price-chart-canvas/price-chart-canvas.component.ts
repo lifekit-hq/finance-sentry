@@ -239,7 +239,9 @@ export class PriceChartCanvasComponent {
         background: {type: lib.ColorType.Solid, color: 'transparent'},
         textColor: text,
         fontFamily: this.token('--font-sans', 'system-ui, sans-serif'),
-        attributionLogo: true,
+        // The licence credit is a link, and a link inside the chart would nest a control in its one focus stop:
+        // it sits in the notes under the chart instead (price-chart.component.html).
+        attributionLogo: false,
       },
       grid: {
         vertLines: {color: this.token('--color-chart-grid', text)},
