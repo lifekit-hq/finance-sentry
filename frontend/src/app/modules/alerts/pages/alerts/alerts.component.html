@@ -82,8 +82,10 @@
                   [timestamp]="alert.createdAt"
                   [isRead]="alert.isRead || alert.isResolved"
                   [description]="alert | alertCaption"
+                  [swipeTrailing]="dismissSwipe"
                   (opened)="openAlert(alert)"
                   (dismissed)="dismiss(alert.id)"
+                  (swipeTrailingAction)="dismiss(alert.id)"
                   density="flat"
                   openable
                 />

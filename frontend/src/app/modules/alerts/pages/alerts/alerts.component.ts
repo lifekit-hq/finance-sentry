@@ -40,7 +40,7 @@ import {AlertDayUtils} from '../../utils/alert-day.utils';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertSeverityUtils} from '../../utils/alert-severity.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
-import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
+import {DISMISS_SWIPE_ACTION, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_SECTIONS = 2;
 const SKELETON_ROWS_PER_SECTION = 3;
@@ -75,6 +75,7 @@ export class AlertsComponent {
 
   public readonly store = inject(AlertsStore);
   public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
+  public readonly dismissSwipe = DISMISS_SWIPE_ACTION;
   public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
   public readonly skeletonRowsPerSection = SKELETON_ROWS_PER_SECTION;
   public readonly showDelay = ASYNC_STATE_SHOW_DELAY_MS;

@@ -141,21 +141,38 @@ test.describe('Alerts page', () => {
 
   test('routes each alert type to its own page', async ({page}) => {
     await page.goto('/alerts');
-    await page.getByRole('button', {name: 'Possible duplicate charge'}).click();
+    await page.getByRole('button', {name: 'Possible duplicate charge', exact: true}).click();
     await expect(page).toHaveURL(/\/transactions$/);
 
     await page.goto('/alerts');
-    await page.getByRole('button', {name: 'Groceries budget exceeded'}).click();
+    await page.getByRole('button', {name: 'Groceries budget exceeded', exact: true}).click();
     await expect(page).toHaveURL(/\/budgets$/);
 
     await page.goto('/alerts');
-    await page.getByRole('button', {name: 'AAPL reports earnings soon'}).click();
+    await page.getByRole('button', {name: 'AAPL reports earnings soon', exact: true}).click();
     await expect(page).toHaveURL(/\/assets\/AAPL$/);
   });
 
   test('an alert with no destination stays on /alerts', async ({page}) => {
     await page.goto('/alerts');
-    await page.getByRole('button', {name: 'A background job failed'}).click();
+    await page.getByRole('button', {name: 'A background job failed', exact: true}).click();
     await expect(page).toHaveURL(/\/alerts$/);
+  });
+
+  test('the swipe tray offers Dismiss as a button that keyboard users reach', async ({page}) => {
+    const dismissed: string[] = [];
+    await page.route(`${API}/alerts/job-1`, route => {
+      dismissed.push(route.request().url());
+      return route.fulfill({status: 204});
+    });
+    await page.goto('/alerts');
+
+    const tray = page.getByRole('button', {name: 'Dismiss A background job failed'});
+    await expect(tray).toHaveCount(1);
+    await tray.focus();
+    await tray.press('Enter');
+
+    await expect(page.getByText('A background job failed')).toHaveCount(0);
+    expect(dismissed).toHaveLength(1);
   });
 });
