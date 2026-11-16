@@ -368,7 +368,7 @@ describe('TransactionLedgerComponent rows', () => {
     fixture.detectChanges();
 
     const row = root.querySelector('[data-testid="ledger-row"]');
-    const open = row?.querySelector<HTMLButtonElement>('[data-testid="ledger-row-open"] button');
+    const open = row?.querySelector<HTMLButtonElement>('button');
     expect(row?.hasAttribute('role')).toBe(false);
     expect(open?.type).toBe('button');
     expect(open?.textContent).toContain('Coffee');

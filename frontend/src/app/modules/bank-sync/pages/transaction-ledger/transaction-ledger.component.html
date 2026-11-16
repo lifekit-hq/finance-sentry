@@ -95,34 +95,32 @@
         @for (group of dayGroups(); track group.dayKey) {
           <cmn-list-section [heading]="group.label" class="mb-cmn-4">
             @for (t of group.items; track t.transactionId) {
-              <div data-testid="ledger-row">
-                <cmn-list-item-row
-                  [label]="t.description"
-                  [sublabel]="
-                    t.bankName +
-                    (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
-                    (t.isPending ? ' · Pending' : '')
-                  "
-                  [dimmed]="t.isPending"
-                  [action]="true"
-                  (activated)="openDrawer(t)"
-                  data-testid="ledger-row-open"
+              <cmn-list-item-row
+                [label]="t.description"
+                [sublabel]="
+                  t.bankName +
+                  (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
+                  (t.isPending ? ' · Pending' : '')
+                "
+                [dimmed]="t.isPending"
+                [action]="true"
+                (activated)="openDrawer(t)"
+                data-testid="ledger-row"
+              >
+                <cmn-institution-avatar
+                  [name]="t.bankName"
+                  [logoUrl]="t.bankName | institutionLogo"
+                  size="sm"
+                  avatar
+                />
+                <span
+                  [class]="t | transactionAmountClass"
+                  class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
+                  amount
                 >
-                  <cmn-institution-avatar
-                    [name]="t.bankName"
-                    [logoUrl]="t.bankName | institutionLogo"
-                    size="sm"
-                    avatar
-                  />
-                  <span
-                    [class]="t | transactionAmountClass"
-                    class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
-                    amount
-                  >
-                    {{ t | transactionAmount }}
-                  </span>
-                </cmn-list-item-row>
-              </div>
+                  {{ t | transactionAmount }}
+                </span>
+              </cmn-list-item-row>
             }
           </cmn-list-section>
         }
