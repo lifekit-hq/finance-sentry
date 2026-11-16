@@ -1,7 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
 import {INSTITUTION_ROW} from './support/accounts-mocks';
-import {API, DOSSIER_AAPL, mockApis} from './support/dossier-mocks';
+import {API, BROKERAGE_HOLDINGS, DOSSIER_AAPL, mockApis} from './support/dossier-mocks';
 import {mockPreferences} from './support/preferences-mocks';
 
 const PHONE = {width: 375, height: 812};
@@ -174,6 +174,26 @@ test.describe('Verdict display', () => {
   for (const width of [375, 390]) {
     test(`a verdict chip never truncates the ticker at ${width}px`, async ({page}) => {
       await page.setViewportSize({width, height: 844});
+      // A large position: its value and P&L make the right-hand column wide, which is what squeezes the ticker.
+      await page.route(`${API}/brokerage/holdings`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...BROKERAGE_HOLDINGS,
+            positions: [
+              {
+                symbol: 'AAPL',
+                instrumentType: 'STK',
+                quantity: 12345.6789,
+                usdValue: 2345678.9,
+                costBasisUsd: 1234567.89,
+                averageCostUsd: 100.01,
+              },
+            ],
+          }),
+        })
+      );
       await page.route(`${API}/research/scorecards/verdicts**`, route =>
         route.fulfill({
           status: 200,
