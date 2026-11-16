@@ -51,6 +51,7 @@ describe('AppTitleStrategy', () => {
           useValue: {
             canUseAi: signal(false),
             sessionResolved: signal(true),
+            isAuthenticated: signal(true),
             permissions: signal([]),
             avatarInitials: signal('DT'),
             fullName: signal(''),

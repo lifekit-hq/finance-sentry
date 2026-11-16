@@ -1,7 +1,8 @@
-import {inject} from '@angular/core';
+import {computed, inject} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {pipe, switchMap, tap} from 'rxjs';
+import {filter, pipe, switchMap, tap} from 'rxjs';
 
+import {AuthStore} from '../../../modules/auth/store/auth.store';
 import {type PaletteEntities} from '../models/palette-entities.model';
 import {PaletteEntitiesService} from '../services/palette-entities.service';
 
@@ -12,8 +13,9 @@ interface StoreMethods {
 export function paletteEntitiesEffects(store: StoreMethods) {
   const service = inject(PaletteEntitiesService);
 
-  const load = rxMethod<void>(
+  const load = rxMethod<boolean>(
     pipe(
+      filter(Boolean),
       switchMap(() => service.load()),
       tap(entities => store.setEntities(entities))
     )
@@ -23,9 +25,10 @@ export function paletteEntitiesEffects(store: StoreMethods) {
 }
 
 export function paletteEntitiesHooks(store: ReturnType<typeof paletteEntitiesEffects>) {
+  const authStore = inject(AuthStore);
   return {
     onInit: () => {
-      store.load();
+      store.load(computed(() => authStore.sessionResolved() && authStore.isAuthenticated()));
     },
   };
 }

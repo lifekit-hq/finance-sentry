@@ -38,6 +38,8 @@ describe('AppShellComponent FAB clearance', () => {
   const refresh = vi.fn().mockResolvedValue(undefined);
   const refreshAvailable = signal(false);
   const sessionResolved = signal(true);
+  const isAuthenticated = signal(true);
+  const paletteLoad = vi.fn();
 
   beforeEach(() => {
     openWhatsNew.mockClear();
@@ -49,6 +51,8 @@ describe('AppShellComponent FAB clearance', () => {
     refresh.mockClear();
     refreshAvailable.set(false);
     sessionResolved.set(true);
+    isAuthenticated.set(true);
+    paletteLoad.mockClear();
   });
   const canUseAi = signal(true);
 
@@ -65,6 +69,7 @@ describe('AppShellComponent FAB clearance', () => {
           useValue: {
             canUseAi,
             sessionResolved,
+            isAuthenticated,
             permissions: signal([]),
             avatarInitials: signal('DT'),
             fullName: signal('Denys Tester'),
@@ -88,12 +93,14 @@ describe('AppShellComponent FAB clearance', () => {
         {
           provide: PaletteEntitiesService,
           useValue: {
-            load: () =>
-              of({
+            load: () => {
+              paletteLoad();
+              return of({
                 holdings: [{symbol: 'AAPL', assetClass: 'equity'}],
                 watchlist: [{ticker: 'NVDA'}],
                 accounts: [{accountId: 'a1', bankName: 'Monobank', accountNumberLast4: '1234'}],
-              }),
+              });
+            },
           },
         },
       ],
@@ -140,6 +147,15 @@ describe('AppShellComponent FAB clearance', () => {
     expect(ids).toEqual(
       expect.arrayContaining(['/assets/AAPL', '/assets/NVDA', '/transactions?account=a1'])
     );
+  });
+
+  it('loads no palette entities for a visitor without a session', async () => {
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const ids = fixture.componentInstance.paletteItems().map(item => item.id);
+
+    expect(paletteLoad).not.toHaveBeenCalled();
+    expect(ids).not.toContain('/assets/AAPL');
   });
 
   it('draws the shell while the session call is out and holds the routed content back', async () => {
