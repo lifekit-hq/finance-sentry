@@ -38,6 +38,10 @@ export class McpConnectComponent {
         return;
       }
 
+      if (!this.authStore.sessionResolved()) {
+        return;
+      }
+
       if (!this.authStore.isAuthenticated()) {
         const returnUrl = this.router
           .createUrlTree([AppRoute.McpConnect], {
