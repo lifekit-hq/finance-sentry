@@ -207,6 +207,39 @@ public sealed class CatalystFeedTests
     }
 
     [Fact]
+    public async Task GdeltClient_WaitsTheRetryAfterTheServerSent_InsteadOfItsOwnBackoff()
+    {
+        var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
+        var calls = 0;
+        var http = new ScriptedHttp(_ => ++calls < 2 ? (HttpStatusCode.TooManyRequests, "slow down") : (HttpStatusCode.OK, Timeline))
+        {
+            RetryAfter = TimeSpan.FromSeconds(10),
+        };
+        var client = Gdelt(http, clock, new CatalystOptions { GdeltRetryDelaySeconds = 60 });
+
+        await client.GetDailyVolumeAsync("HBM memory", 14);
+
+        http.Requested.Should().HaveCount(2);
+        clock.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(10)).And.BeLessThan(TimeSpan.FromSeconds(60), "the server's 10 s wins over the 60 s backoff");
+    }
+
+    [Fact]
+    public async Task GdeltClient_CapsARetryAfterAtTwoMinutes()
+    {
+        var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
+        var calls = 0;
+        var http = new ScriptedHttp(_ => ++calls < 2 ? (HttpStatusCode.TooManyRequests, "slow down") : (HttpStatusCode.OK, Timeline))
+        {
+            RetryAfter = TimeSpan.FromHours(1),
+        };
+        var client = Gdelt(http, clock);
+
+        await client.GetDailyVolumeAsync("HBM memory", 14);
+
+        clock.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(120)).And.BeLessThan(TimeSpan.FromMinutes(5));
+    }
+
+    [Fact]
     public async Task GdeltClient_GivesUpWhenEveryAttemptIsThrottled_NamingTheStatus()
     {
         var http = new ScriptedHttp(_ => (HttpStatusCode.TooManyRequests, "Please limit requests to one every 5 seconds"));

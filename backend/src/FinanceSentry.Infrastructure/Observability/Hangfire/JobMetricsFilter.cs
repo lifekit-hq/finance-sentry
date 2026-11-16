@@ -38,7 +38,7 @@ public sealed class JobMetricsFilter(JobMetrics metrics, ILogger<JobMetricsFilte
     }
 
     /// <summary>Names the job and its exception in the log when it fails for good, so the failure metric can be traced.</summary>
-    public void LogTerminalFailure(string job, string? jobId, Exception? exception)
+    private void LogTerminalFailure(string job, string? jobId, Exception? exception)
         => logger?.LogError(exception, "Background job {Job} failed after its retries (job id {JobId})", job, jobId);
 
     public void OnStateUnapplied(ApplyStateContext context, IWriteOnlyTransaction transaction)

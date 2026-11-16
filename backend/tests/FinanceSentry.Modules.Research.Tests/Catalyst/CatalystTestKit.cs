@@ -90,6 +90,9 @@ internal sealed class ScriptedHttp(Func<string, (HttpStatusCode Status, string B
 
     public List<string> Requested { get; } = [];
 
+    /// <summary>The Retry-After wait sent with every non-success answer, when set.</summary>
+    public TimeSpan? RetryAfter { get; init; }
+
     public HttpClient CreateClient(string name) => new(new Handler(this));
 
     private sealed class Handler(ScriptedHttp owner) : HttpMessageHandler
@@ -99,7 +102,13 @@ internal sealed class ScriptedHttp(Func<string, (HttpStatusCode Status, string B
             var url = request.RequestUri!.AbsoluteUri;
             owner.Requested.Add(url);
             var (status, body) = owner.Answer(url);
-            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
+            var response = new HttpResponseMessage(status) { Content = new StringContent(body) };
+            if (!response.IsSuccessStatusCode && owner.RetryAfter is { } retryAfter)
+            {
+                response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(retryAfter);
+            }
+
+            return Task.FromResult(response);
         }
     }
 }
