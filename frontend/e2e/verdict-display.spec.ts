@@ -168,8 +168,8 @@ test.describe('Verdict display', () => {
     await expect(chip).toHaveAttribute('title', new RegExp(GAP_LINES.unreadable));
   });
 
-  // The verdict chip sits beside the ticker and the value column is wide: neither may squeeze the
-  // symbol (it once truncated to nothing at 390px), so the chip or the column wraps first.
+  // The verdict chip sits beside the ticker: it must not squeeze the symbol (it once truncated to
+  // nothing at 390px), so the chip wraps below the ticker first.
   for (const width of [375, 390]) {
     test(`a verdict chip never truncates the ticker at ${width}px`, async ({page}) => {
       await page.setViewportSize({width, height: 844});

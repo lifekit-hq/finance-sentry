@@ -459,7 +459,7 @@
                   }
                 </span>
               </span>
-              <span class="flex min-w-0 flex-col items-end leading-tight">
+              <span class="flex shrink-0 flex-col items-end leading-tight">
                 @if (row.nativeCurrency && row.nativeValue !== null) {
                   <span
                     class="text-cmn-sm tabular-nums font-medium text-text-primary"
@@ -476,7 +476,7 @@
                     >{{ row.currentValue | money }}</span
                   >
                 }
-                <span class="flex flex-wrap justify-end gap-x-cmn-2 text-cmn-xs tabular-nums">
+                <span class="flex gap-x-cmn-2 text-cmn-xs tabular-nums">
                   @if (row.pnlPercent !== null) {
                     <span
                       [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
