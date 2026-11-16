@@ -104,7 +104,6 @@ import {
   RECONNECT_TARGET,
 } from './accounts-list.constants';
 
-const SKELETON_ROWS = 3;
 const SKELETON_SECTIONS = 2;
 /** The holdings feed values every position in USD. */
 const FEED_CURRENCY = 'USD';
@@ -170,8 +169,7 @@ export class AccountsListComponent implements OnInit {
   public readonly holdings = inject(HoldingsStore);
   /** The `?provider=` a link named: that institution's accordion opens and scrolls into view. */
   public readonly deepLinkProvider = this.route.snapshot.queryParamMap.get('provider');
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
-  public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
+  public readonly skeletonSections = SKELETON_SECTIONS;
   public readonly attentionInstitutions = computed(() =>
     this.store
       .categorySections()

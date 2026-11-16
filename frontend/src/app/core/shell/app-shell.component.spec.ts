@@ -37,6 +37,7 @@ describe('AppShellComponent FAB clearance', () => {
   const reload = vi.fn().mockResolvedValue(undefined);
   const refresh = vi.fn().mockResolvedValue(undefined);
   const refreshAvailable = signal(false);
+  const sessionResolved = signal(true);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
@@ -47,6 +48,7 @@ describe('AppShellComponent FAB clearance', () => {
     reload.mockClear();
     refresh.mockClear();
     refreshAvailable.set(false);
+    sessionResolved.set(true);
   });
   const canUseAi = signal(true);
 
@@ -62,6 +64,7 @@ describe('AppShellComponent FAB clearance', () => {
           provide: AuthStore,
           useValue: {
             canUseAi,
+            sessionResolved,
             permissions: signal([]),
             avatarInitials: signal('DT'),
             fullName: signal('Denys Tester'),
@@ -137,6 +140,20 @@ describe('AppShellComponent FAB clearance', () => {
     expect(ids).toEqual(
       expect.arrayContaining(['/assets/AAPL', '/assets/NVDA', '/transactions?account=a1'])
     );
+  });
+
+  it('draws the shell while the session call is out and holds the routed content back', async () => {
+    sessionResolved.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('cmn-app-layout')).not.toBeNull();
+    expect(host.querySelector('router-outlet')).toBeNull();
+
+    sessionResolved.set(true);
+    fixture.detectChanges();
+
+    expect(host.querySelector('router-outlet')).not.toBeNull();
   });
 
   it('shows the store avatar initials in the top bar', async () => {

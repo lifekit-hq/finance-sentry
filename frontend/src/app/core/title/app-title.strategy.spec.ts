@@ -50,6 +50,7 @@ describe('AppTitleStrategy', () => {
           provide: AuthStore,
           useValue: {
             canUseAi: signal(false),
+            sessionResolved: signal(true),
             permissions: signal([]),
             avatarInitials: signal('DT'),
             fullName: signal(''),

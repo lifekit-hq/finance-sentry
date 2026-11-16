@@ -57,29 +57,10 @@
     emptySubMessage="Connect a bank, exchange or broker, or add a value by hand."
     errorPlacement="above"
   >
+    <!-- The loaded page opens with the net-worth card, then its sections: the same blocks in the same order. -->
     <div skeleton data-testid="accounts-skeleton">
-      @for (_ of skeletonSections; track $index) {
-        <div class="mb-cmn-8">
-          <div class="mb-cmn-3 flex items-center justify-between">
-            <cmn-skeleton height="0.75rem" width="30%" />
-            <cmn-skeleton height="0.75rem" width="20%" />
-          </div>
-          <cmn-card padding="none">
-            @for (__ of skeletonRows; track $index) {
-              <div
-                class="flex items-center gap-cmn-3 border-t border-border-default p-cmn-4 first:border-t-0"
-              >
-                <cmn-skeleton className="rounded-full" height="2rem" width="2rem" />
-                <div class="min-w-0 flex-1 space-y-cmn-2">
-                  <cmn-skeleton height="0.875rem" width="55%" />
-                  <cmn-skeleton height="0.75rem" width="35%" />
-                </div>
-                <cmn-skeleton height="1rem" width="4.5rem" />
-              </div>
-            }
-          </cmn-card>
-        </div>
-      }
+      <cmn-skeleton class="mb-cmn-8 block" shape="stat" />
+      <cmn-skeleton [count]="skeletonSections" shape="section" />
     </div>
 
     <cmn-empty-state

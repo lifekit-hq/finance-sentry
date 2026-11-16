@@ -18,6 +18,10 @@ export interface AuthState {
   flashMessage: Nullable<FlashMessage>;
   /** Null until `auth/methods` answers; the login pages render their method choices only once it is set. */
   signInMethods: Nullable<SignInMethods>;
+  /** False until the first session call (`auth/me` at start) answers, whichever way; the shell draws before that. */
+  sessionResolved: boolean;
+  /** The protected URL a navigation reached while the session call was out; null once it settles. */
+  deferredAuthUrl: Nullable<string>;
 }
 
 export const initialAuthState: AuthState = {
@@ -30,4 +34,6 @@ export const initialAuthState: AuthState = {
   returnUrl: null,
   flashMessage: null,
   signInMethods: null,
+  sessionResolved: false,
+  deferredAuthUrl: null,
 };
