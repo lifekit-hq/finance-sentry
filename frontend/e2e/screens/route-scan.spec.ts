@@ -19,6 +19,8 @@ const exceptions = {
     {
       rule: 'clipped-overflow-container',
       routes: ['asset-dossier'],
+      // The judge reports this twice on the route; an exception covers one finding per scan by default.
+      max: 2,
       reason:
         'shell overflow containers flagged for a positioned child on this route only; tracked in lifekit-common: https://github.com/lifekit-hq/lifekit-common/issues/398',
     },

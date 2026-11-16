@@ -46,11 +46,14 @@ describe('PriceChartComponent', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [{provide: CmnShellService, useValue: {isPhone: signal(false)}}],
-    }).overrideComponent(PriceChartComponent, {
-      remove: {imports: [PriceChartCanvasComponent]},
-      add: {imports: [CanvasStubComponent]},
-      set: {providers: [{provide: PriceChartStore, useValue: storeStub}]},
-    });
+    })
+      .overrideComponent(PriceChartComponent, {
+        remove: {imports: [PriceChartCanvasComponent]},
+        add: {imports: [CanvasStubComponent]},
+      })
+      .overrideComponent(PriceChartComponent, {
+        set: {providers: [{provide: PriceChartStore, useValue: storeStub}]},
+      });
   });
 
   it('credits TradingView in the notes under the chart, outside the canvas, as a link to tradingview.com', () => {
