@@ -30,6 +30,12 @@ export function authMethods(store: WritableStateSource<AuthState>) {
     setProfileName(firstName: Nullable<string>, lastName: Nullable<string>): void {
       patchState(store, {firstName, lastName});
     },
+    resolveSession(): void {
+      patchState(store, {sessionResolved: true, deferredAuthUrl: null});
+    },
+    deferAuthUrl(deferredAuthUrl: string): void {
+      patchState(store, {deferredAuthUrl});
+    },
     setReturnUrl(returnUrl: Nullable<string>): void {
       patchState(store, {returnUrl});
     },

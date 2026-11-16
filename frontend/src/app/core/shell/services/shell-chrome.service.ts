@@ -1,4 +1,4 @@
-import {computed, inject, Injectable} from '@angular/core';
+import {computed, inject, Injectable, Injector} from '@angular/core';
 import {
   ACCOUNT_SIGN_OUT_ID,
   accountMenu,
@@ -28,13 +28,19 @@ import {NavUtils} from '../utils/nav.utils';
 @Injectable({providedIn: 'root'})
 export class ShellChromeService {
   private readonly authStore = inject(AuthStore);
-  private readonly alertsStore = inject(AlertsStore);
+  private readonly injector = inject(Injector);
   private readonly whatsNew = inject(CmnWhatsNewService);
   private readonly reportProblemPanel = inject(ReportProblemPanelService);
 
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
     (item.route as AppRoute) === AppRoute.Alerts
-      ? {...item, badge: (): number => this.alertsStore.unreadCount()}
+      ? {
+          ...item,
+          badge: (): number =>
+            this.authStore.sessionResolved() && this.authStore.isAuthenticated()
+              ? this.injector.get(AlertsStore).unreadCount()
+              : 0,
+        }
       : item
   );
 

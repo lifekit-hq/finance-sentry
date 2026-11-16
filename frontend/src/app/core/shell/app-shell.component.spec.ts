@@ -20,6 +20,7 @@ import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {ReportProblemPanelService} from '../report-problem/services/report-problem-panel.service';
 import {AppShellComponent} from './app-shell.component';
 import {PaletteEntitiesService} from './services/palette-entities.service';
+import {ShellChromeService} from './services/shell-chrome.service';
 
 @Component({
   selector: 'fns-chat-widget',
@@ -37,6 +38,10 @@ describe('AppShellComponent FAB clearance', () => {
   const reload = vi.fn().mockResolvedValue(undefined);
   const refresh = vi.fn().mockResolvedValue(undefined);
   const refreshAvailable = signal(false);
+  const sessionResolved = signal(true);
+  const isAuthenticated = signal(true);
+  const paletteLoad = vi.fn();
+  const unreadCount = vi.fn(() => 3);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
@@ -47,6 +52,10 @@ describe('AppShellComponent FAB clearance', () => {
     reload.mockClear();
     refresh.mockClear();
     refreshAvailable.set(false);
+    sessionResolved.set(true);
+    isAuthenticated.set(true);
+    paletteLoad.mockClear();
+    unreadCount.mockClear();
   });
   const canUseAi = signal(true);
 
@@ -62,6 +71,8 @@ describe('AppShellComponent FAB clearance', () => {
           provide: AuthStore,
           useValue: {
             canUseAi,
+            sessionResolved,
+            isAuthenticated,
             permissions: signal([]),
             avatarInitials: signal('DT'),
             fullName: signal('Denys Tester'),
@@ -81,16 +92,18 @@ describe('AppShellComponent FAB clearance', () => {
           },
         },
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
-        {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
+        {provide: AlertsStore, useValue: {unreadCount}},
         {
           provide: PaletteEntitiesService,
           useValue: {
-            load: () =>
-              of({
+            load: () => {
+              paletteLoad();
+              return of({
                 holdings: [{symbol: 'AAPL', assetClass: 'equity'}],
                 watchlist: [{ticker: 'NVDA'}],
                 accounts: [{accountId: 'a1', bankName: 'Monobank', accountNumberLast4: '1234'}],
-              }),
+              });
+            },
           },
         },
       ],
@@ -137,6 +150,55 @@ describe('AppShellComponent FAB clearance', () => {
     expect(ids).toEqual(
       expect.arrayContaining(['/assets/AAPL', '/assets/NVDA', '/transactions?account=a1'])
     );
+  });
+
+  it('loads no palette entities for a visitor without a session', async () => {
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const ids = fixture.componentInstance.paletteItems().map(item => item.id);
+
+    expect(paletteLoad).not.toHaveBeenCalled();
+    expect(ids).not.toContain('/assets/AAPL');
+  });
+
+  it('draws the shell while the session call is out and holds the routed content back', async () => {
+    sessionResolved.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('cmn-app-layout')).not.toBeNull();
+    expect(host.querySelector('router-outlet')).toBeNull();
+
+    sessionResolved.set(true);
+    fixture.detectChanges();
+
+    expect(host.querySelector('router-outlet')).not.toBeNull();
+  });
+
+  it('mounts no routed page for a visitor whose session call answered signed out', async () => {
+    sessionResolved.set(true);
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('cmn-app-layout')).not.toBeNull();
+    expect(host.querySelector('router-outlet')).toBeNull();
+  });
+
+  it('leaves the Alerts badge at zero without touching the store until a session is signed in', async () => {
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const alerts = TestBed.inject(ShellChromeService)
+      .navItems()
+      .find(item => (item.route as AppRoute) === AppRoute.Alerts);
+
+    expect(alerts?.badge?.()).toBe(0);
+    expect(unreadCount).not.toHaveBeenCalled();
+
+    isAuthenticated.set(true);
+    fixture.detectChanges();
+
+    expect(alerts?.badge?.()).toBe(3);
   });
 
   it('shows the store avatar initials in the top bar', async () => {

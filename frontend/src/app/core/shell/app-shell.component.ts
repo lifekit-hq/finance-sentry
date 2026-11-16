@@ -79,7 +79,8 @@ const REFRESH_PALETTE_ITEM: CommandPaletteItem = {
     <cmn-app-layout
       [navItems]="navItems()"
       [paletteItems]="paletteItems()"
-      [account]="account()"
+      [account]="sessionResolved() ? account() : undefined"
+      [accountPending]="!sessionResolved()"
       [versionLabel]="versionLabel"
       [versionDot]="hasUnreadNotes()"
       [tabRoutes]="tabRoutes"
@@ -98,7 +99,10 @@ const REFRESH_PALETTE_ITEM: CommandPaletteItem = {
         cmnAppLayoutNotice
       />
       <lk-install-hint cmnAppLayoutNotice />
-      <router-outlet />
+      <!-- Routed pages load their own data on mount: a signed-out visitor is on the way to sign-in, so none is mounted. -->
+      @if (sessionResolved() && isAuthenticated()) {
+        <router-outlet />
+      }
       @if (canUseAi()) {
         <fns-chat-widget cmnAppLayoutFab />
       }
@@ -112,10 +116,13 @@ export class AppShellComponent {
   private readonly paletteEntities = inject(PaletteEntitiesStore);
   private readonly pullRefresh = inject(CmnPullRefreshService);
   private readonly whatsNew = inject(CmnWhatsNewService);
+  private readonly authStore = inject(AuthStore);
 
   public readonly appUpdate = inject(AppUpdateService);
 
-  public readonly canUseAi = inject(AuthStore).canUseAi;
+  public readonly sessionResolved = this.authStore.sessionResolved;
+  public readonly isAuthenticated = this.authStore.isAuthenticated;
+  public readonly canUseAi = this.authStore.canUseAi;
   public readonly versionLabel = this.whatsNew.versionLabel;
   public readonly hasUnreadNotes = this.whatsNew.hasUnread;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
