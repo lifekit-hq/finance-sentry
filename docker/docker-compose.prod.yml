@@ -222,6 +222,7 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       DataProtection__CertificatePfxBase64: ${DATA_PROTECTION_CERT_PFX_BASE64:?see the api service}
       Mcp__ApiBaseUrl: http://api:5000/api/v1
+      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:-}
       Mcp__FrontendBaseUrl: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL to the frontend origin}
       Companion__PublicBaseUrl: ${FRONTEND_BASE_URL}
       # Streamable HTTP transport. OpenClaw can't spawn docker-exec from inside its
