@@ -20,6 +20,7 @@ import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {ReportProblemPanelService} from '../report-problem/services/report-problem-panel.service';
 import {AppShellComponent} from './app-shell.component';
 import {PaletteEntitiesService} from './services/palette-entities.service';
+import {ShellChromeService} from './services/shell-chrome.service';
 
 @Component({
   selector: 'fns-chat-widget',
@@ -40,6 +41,7 @@ describe('AppShellComponent FAB clearance', () => {
   const sessionResolved = signal(true);
   const isAuthenticated = signal(true);
   const paletteLoad = vi.fn();
+  const unreadCount = vi.fn(() => 3);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
@@ -53,6 +55,7 @@ describe('AppShellComponent FAB clearance', () => {
     sessionResolved.set(true);
     isAuthenticated.set(true);
     paletteLoad.mockClear();
+    unreadCount.mockClear();
   });
   const canUseAi = signal(true);
 
@@ -89,7 +92,7 @@ describe('AppShellComponent FAB clearance', () => {
           },
         },
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
-        {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
+        {provide: AlertsStore, useValue: {unreadCount}},
         {
           provide: PaletteEntitiesService,
           useValue: {
@@ -170,6 +173,22 @@ describe('AppShellComponent FAB clearance', () => {
     fixture.detectChanges();
 
     expect(host.querySelector('router-outlet')).not.toBeNull();
+  });
+
+  it('leaves the Alerts badge at zero without touching the store until a session is signed in', async () => {
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const alerts = TestBed.inject(ShellChromeService)
+      .navItems()
+      .find(item => (item.route as AppRoute) === AppRoute.Alerts);
+
+    expect(alerts?.badge?.()).toBe(0);
+    expect(unreadCount).not.toHaveBeenCalled();
+
+    isAuthenticated.set(true);
+    fixture.detectChanges();
+
+    expect(alerts?.badge?.()).toBe(3);
   });
 
   it('shows the store avatar initials in the top bar', async () => {

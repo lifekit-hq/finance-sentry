@@ -34,7 +34,13 @@ export class ShellChromeService {
 
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
     (item.route as AppRoute) === AppRoute.Alerts
-      ? {...item, badge: (): number => this.injector.get(AlertsStore).unreadCount()}
+      ? {
+          ...item,
+          badge: (): number =>
+            this.authStore.sessionResolved() && this.authStore.isAuthenticated()
+              ? this.injector.get(AlertsStore).unreadCount()
+              : 0,
+        }
       : item
   );
 
