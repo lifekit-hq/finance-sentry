@@ -1,8 +1,6 @@
 <cmn-card data-testid="goals-progress">
   <div class="space-y-cmn-3">
-    <span class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary">
-      Goals
-    </span>
+    <span class="font-label text-cmn-xs font-semibold text-text-secondary"> Goals </span>
 
     <!-- The host's own spacing lays out the children; the keep-content wrapper would put them in one box. -->
     <cmn-async-state
@@ -78,7 +76,10 @@
           >
         }
 
-        <p class="text-cmn-xs leading-relaxed text-text-secondary" data-testid="goals-assumptions">
+        <p
+          class="max-w-prose text-cmn-xs leading-relaxed text-text-secondary"
+          data-testid="goals-assumptions"
+        >
           {{ store.assumptions() }}
         </p>
       }

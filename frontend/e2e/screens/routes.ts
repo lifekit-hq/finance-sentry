@@ -96,7 +96,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: FLOW_BREAKDOWN_SCREEN.path,
     kind: 'overview',
     note: 'One month or window broken into its flows; reached from the dashboard. Needs the full frame width: the stat cards wrap amounts in the detail column.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: fixtureOf(FLOW_BREAKDOWN_SCREEN),
   },
   {
