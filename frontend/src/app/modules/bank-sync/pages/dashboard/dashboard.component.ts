@@ -104,6 +104,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
           [isEmpty]="showEmptyState()"
           [errorPlacement]="errorPlacement()"
           [keepContent]="false"
+          [crossfade]="false"
           class="flex flex-col gap-cmn-6"
           emptySubMessage="Connect an account to populate this dashboard."
         >
@@ -142,7 +143,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               <div class="flex items-center justify-between gap-cmn-2">
                 <a
                   [routerLink]="accountsRoute"
-                  class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+                  class="font-label text-cmn-xs font-semibold text-text-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
                   data-testid="net-worth-link"
                   aria-label="View accounts behind net worth"
                 >

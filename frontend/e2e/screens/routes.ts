@@ -82,7 +82,7 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: '/dashboard',
     kind: 'overview',
     note: 'Net worth hero, window tiles and the where-it-is rail.',
-    mode: 'report',
+    mode: 'enforce',
     fixture: {
       mocks: mockDashboard,
       ready: async page => {
