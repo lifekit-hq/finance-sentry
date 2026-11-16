@@ -224,6 +224,16 @@ public sealed class VerdictRulesTests
     }
 
     [Fact]
+    public void EveryWaitReasonCode_HasALabel_AndAnUnknownCodeHasNone()
+    {
+        string[] codes = [WaitReasons.StrongBusinessWeakTrend, WaitReasons.TrendWithoutBusiness, WaitReasons.NotEnoughData, WaitReasons.ShortOfBuyBar];
+
+        codes.Select(WaitReasons.Label).Should().OnlyContain(label => !string.IsNullOrEmpty(label));
+        WaitReasons.Label("nope").Should().BeNull();
+        WaitReasons.Label(null).Should().BeNull();
+    }
+
+    [Fact]
     public void WaitBoundaries_StrongBusinessNeedsSeventy_TrendWithoutBusinessNeedsFiftyOfStructure()
     {
         VerdictRules.Evaluate(Inputs(49, 70, CrowdingClass.Normal, false, null), Options).FiredRuleId
