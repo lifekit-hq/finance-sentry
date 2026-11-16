@@ -5,6 +5,7 @@ using FinanceSentry.Modules.Research.Application.Services.Catalyst;
 using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Infrastructure.Sources.Catalyst;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -24,6 +25,10 @@ public sealed class CatalystFeedTests
 
     private static EdgarFullTextSearch Search(ScriptedHttp http, CatalystOptions? options = null, AutoAdvanceClock? clock = null)
         => new(http, RequestPacer.PerSecond(5, clock ?? new AutoAdvanceClock(DateTimeOffset.UnixEpoch)), Options.Create(options ?? new CatalystOptions()));
+
+    private static GdeltTimelineClient Gdelt(ScriptedHttp http, AutoAdvanceClock clock, CatalystOptions? options = null)
+        => new(http, new RequestPacer(TimeSpan.FromSeconds(5), clock), Options.Create(options ?? new CatalystOptions()), clock,
+            NullLogger<GdeltTimelineClient>.Instance);
 
     [Fact]
     public void ParsePage_ReadsTickerItemsDateAndDocument_FromAFullTextHit()
@@ -156,7 +161,7 @@ public sealed class CatalystFeedTests
         var http = new ScriptedHttp(url => url.Contains("throttled")
             ? (HttpStatusCode.TooManyRequests, "Please limit requests to one every 5 seconds")
             : (HttpStatusCode.OK, """{"timeline":[{"series":"Article Count","data":[{"date":"20261112T000000Z","value":7}]}]}"""));
-        var client = new GdeltTimelineClient(http, new RequestPacer(TimeSpan.FromSeconds(5), new AutoAdvanceClock(DateTimeOffset.UnixEpoch)), Options.Create(new CatalystOptions()));
+        var client = Gdelt(http, new AutoAdvanceClock(DateTimeOffset.UnixEpoch));
 
         var days = await client.GetDailyVolumeAsync("HBM memory", 14);
 
@@ -172,7 +177,7 @@ public sealed class CatalystFeedTests
     {
         var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
         var http = new ScriptedHttp(_ => (HttpStatusCode.OK, "{}"));
-        var client = new GdeltTimelineClient(http, new RequestPacer(TimeSpan.FromSeconds(5), clock), Options.Create(new CatalystOptions()));
+        var client = Gdelt(http, clock);
 
         for (var i = 0; i < 4; i++)
         {
@@ -180,5 +185,48 @@ public sealed class CatalystFeedTests
         }
 
         clock.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(15), "four requests leave three 5-second gaps");
+    }
+
+    private const string Timeline = """{"timeline":[{"series":"Article Count","data":[{"date":"20261112T000000Z","value":7}]}]}""";
+
+    [Fact]
+    public async Task GdeltClient_RetriesAThrottleAfterAGrowingWait_AndReadsTheAnswerThatFollows()
+    {
+        var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
+        var calls = 0;
+        var http = new ScriptedHttp(_ => ++calls < 3
+            ? (HttpStatusCode.TooManyRequests, "Please limit requests to one every 5 seconds")
+            : (HttpStatusCode.OK, Timeline));
+        var client = Gdelt(http, clock, new CatalystOptions { GdeltRetryDelaySeconds = 30 });
+
+        var days = await client.GetDailyVolumeAsync("HBM memory", 14);
+
+        days.Should().ContainSingle().Which.Articles.Should().Be(7);
+        http.Requested.Should().HaveCount(3);
+        clock.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(30 + 60), "the waits are 30 s then 60 s");
+    }
+
+    [Fact]
+    public async Task GdeltClient_GivesUpWhenEveryAttemptIsThrottled_NamingTheStatus()
+    {
+        var http = new ScriptedHttp(_ => (HttpStatusCode.TooManyRequests, "Please limit requests to one every 5 seconds"));
+        var client = Gdelt(http, new AutoAdvanceClock(DateTimeOffset.UnixEpoch), new CatalystOptions { GdeltMaxAttempts = 3 });
+
+        var read = () => client.GetDailyVolumeAsync("HBM memory", 14);
+
+        await read.Should().ThrowAsync<CatalystFeedException>().WithMessage("*HTTP 429*HBM memory*");
+        http.Requested.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task GdeltClient_DoesNotRetryARejectedQuery()
+    {
+        var http = new ScriptedHttp(_ => (HttpStatusCode.BadRequest, "The specified phrase is too short."));
+        var client = Gdelt(http, new AutoAdvanceClock(DateTimeOffset.UnixEpoch));
+
+        var read = () => client.GetDailyVolumeAsync("hi", 14);
+
+        await read.Should().ThrowAsync<CatalystFeedException>().WithMessage("*HTTP 400*");
+        http.Requested.Should().ContainSingle();
     }
 }

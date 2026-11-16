@@ -217,7 +217,9 @@ app.MapHealthChecks("/api/v1/health/ready", new HealthCheckOptions
 
 // Record per-job outcome + duration metrics as jobs reach terminal states (FR-002).
 GlobalJobFilters.Filters.Add(
-    new DashboardObservability.JobMetricsFilter(app.Services.GetRequiredService<JobMetrics>()));
+    new DashboardObservability.JobMetricsFilter(
+        app.Services.GetRequiredService<JobMetrics>(),
+        app.Services.GetRequiredService<ILogger<DashboardObservability.JobMetricsFilter>>()));
 
 // Feed finance_job_consecutive_failures{job}; the Grafana rule finance-job-consecutive-failures alerts on it (#935).
 GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureGaugeFilter(
