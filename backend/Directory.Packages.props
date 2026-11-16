@@ -89,8 +89,8 @@
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
 
     <!-- Swagger -->
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.1" />
-    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.3.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="11.0.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="11.0.1" />
 
     <!-- Ed25519 request signing (Revolut X, #472) — the BCL has no Ed25519 -->
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
