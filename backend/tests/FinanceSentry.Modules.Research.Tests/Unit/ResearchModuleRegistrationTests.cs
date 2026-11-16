@@ -7,8 +7,10 @@ using FinanceSentry.Modules.Research.Infrastructure.Sources;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FinanceSentry.Core.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -113,65 +115,78 @@ public sealed class ResearchModuleRegistrationTests
     public void A_contact_without_an_email_is_rejected(string? contact)
         => SecEdgarOptions.IsEmailContact(contact).Should().BeFalse();
 
+    [Fact]
+    public async Task The_guard_forwards_a_request_when_the_contact_is_an_email()
+    {
+        var inner = new RecordingHandler();
+        using var client = GuardedClient("ops@example.org", inner);
+
+        using var response = await client.GetAsync("https://www.sec.gov/files/company_tickers.json");
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        inner.Requests.Should().ContainSingle();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData("   ")]
     [InlineData("https://github.com/lifekit-hq/finance-sentry")]
-    public void Production_refuses_to_start_without_an_email_contact(string? contact)
+    public async Task The_guard_sends_nothing_without_an_email_contact(string? contact)
     {
-        var result = new SecEdgarOptionsValidator(new FakeEnvironment(Environments.Production))
-            .Validate(null, new SecEdgarOptions { Contact = contact });
+        var inner = new RecordingHandler();
+        using var client = GuardedClient(contact, inner);
 
-        result.Failed.Should().BeTrue();
-        result.FailureMessage.Should().Contain("SEC_EDGAR_CONTACT");
+        var send = () => client.GetAsync("https://www.sec.gov/files/company_tickers.json");
+
+        (await send.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*SEC_EDGAR_CONTACT*email*");
+        inner.Requests.Should().BeEmpty("a request the SEC edge will answer with 403 must not be sent at all");
     }
 
     [Fact]
-    public void Production_starts_with_an_email_contact()
+    public async Task The_registered_sec_edgar_client_refuses_to_send_without_a_contact()
     {
-        var result = new SecEdgarOptionsValidator(new FakeEnvironment(Environments.Production))
-            .Validate(null, new SecEdgarOptions { Contact = "ops@example.org" });
+        using var provider = BuildServices([]).BuildServiceProvider();
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(SecEdgarService.HttpClientName);
 
-        result.Succeeded.Should().BeTrue();
+        var send = () => client.GetAsync("https://www.sec.gov/files/company_tickers.json");
+
+        (await send.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*SEC_EDGAR_CONTACT*");
     }
 
     [Fact]
-    public void A_non_production_host_starts_without_a_contact()
+    public async Task A_ticker_map_over_a_guarded_client_without_a_contact_reports_unavailable_naming_the_setting()
     {
-        var result = new SecEdgarOptionsValidator(new FakeEnvironment(Environments.Development))
-            .Validate(null, new SecEdgarOptions());
+        var inner = new RecordingHandler();
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(SecEdgarService.HttpClientName)).Returns(() => GuardedClient(null, inner));
+        var map = new EdgarTickerMap(
+            factory.Object,
+            new ManualTimeProvider(new DateTimeOffset(2026, 11, 16, 8, 0, 0, TimeSpan.Zero)),
+            NullLogger.Instance,
+            new EdgarTickerMapOptions { RetryDelays = [] });
 
-        result.Succeeded.Should().BeTrue();
+        var read = await map.GetAsync(SecEdgarService.HttpClientName, CancellationToken.None);
+
+        read.Map.Should().BeNull();
+        inner.Requests.Should().BeEmpty();
+        var health = map.Read();
+        health.State.Should().Be(DataSourceHealthState.Unavailable);
+        health.Detail.Should().Contain("SEC_EDGAR_CONTACT");
     }
 
-    [Fact]
-    public void A_production_host_without_a_contact_fails_when_the_options_are_first_read()
+    private static HttpClient GuardedClient(string? contact, HttpMessageHandler inner)
+        => new(new SecContactGuardHandler(Options.Create(new SecEdgarOptions { Contact = contact })) { InnerHandler = inner });
+
+    private sealed class RecordingHandler : HttpMessageHandler
     {
-        var services = BuildServices([]);
-        services.AddSingleton<IHostEnvironment>(new FakeEnvironment(Environments.Production));
-        using var provider = services.BuildServiceProvider();
+        public List<HttpRequestMessage> Requests { get; } = [];
 
-        var read = () => provider.GetRequiredService<IOptions<SecEdgarOptions>>().Value;
-
-        read.Should().Throw<OptionsValidationException>().WithMessage("*SEC_EDGAR_CONTACT*");
-    }
-
-    [Fact]
-    public void A_production_host_with_a_contact_reads_the_options()
-    {
-        var services = BuildServices(new Dictionary<string, string?> { ["SecEdgar:Contact"] = "ops@example.org" });
-        services.AddSingleton<IHostEnvironment>(new FakeEnvironment(Environments.Production));
-        using var provider = services.BuildServiceProvider();
-
-        provider.GetRequiredService<IOptions<SecEdgarOptions>>().Value.Contact.Should().Be("ops@example.org");
-    }
-
-    private sealed class FakeEnvironment(string name) : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = name;
-        public string ApplicationName { get; set; } = "test";
-        public string ContentRootPath { get; set; } = "/";
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        }
     }
 
     private static string? ContactIn(string userAgent)

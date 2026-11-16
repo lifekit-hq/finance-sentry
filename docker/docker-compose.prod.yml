@@ -98,7 +98,7 @@ services:
       TrueLayer__FrontendRedirectBase: ${TRUELAYER_FRONTEND_REDIRECT_BASE:?set TRUELAYER_FRONTEND_REDIRECT_BASE to the frontend origin}
       TrueLayer__CallbackPath: /api/v1/accounts/truelayer/callback
       AnalystSources__Finnhub__ApiKey: ${FINNHUB_API_KEY:-}
-      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:?set SEC_EDGAR_CONTACT to an email address: the SEC refuses requests without one (#1443)}
+      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:-}
       Regime__Fred__ApiKey: ${FRED_API_KEY:-}
       # In-app finance agent / browser Ledger (feature 040). Empty = agent disabled (keyless-graceful).
       Agent__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
@@ -222,7 +222,7 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       DataProtection__CertificatePfxBase64: ${DATA_PROTECTION_CERT_PFX_BASE64:?see the api service}
       Mcp__ApiBaseUrl: http://api:5000/api/v1
-      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:?set SEC_EDGAR_CONTACT to an email address: the SEC refuses requests without one (#1443)}
+      SecEdgar__Contact: ${SEC_EDGAR_CONTACT:-}
       Mcp__FrontendBaseUrl: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL to the frontend origin}
       Companion__PublicBaseUrl: ${FRONTEND_BASE_URL}
       # Streamable HTTP transport. OpenClaw can't spawn docker-exec from inside its

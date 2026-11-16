@@ -454,12 +454,10 @@ public static class ResearchModule
         // SEC EDGAR (filings + XBRL fundamentals). SEC policy REQUIRES a descriptive User-Agent
         // with contact info and permits gzip; a generic UA gets throttled/blocked.
         var secTimeout = TimeSpan.FromSeconds(15);
-        // The SEC edge answers 403 to a User-Agent with no email contact (#1443): the contact is required
-        // config, checked when the host starts (Production) rather than discovered as a blind map.
-        services.AddOptions<SecEdgarOptions>()
-            .Bind(config.GetSection(SecEdgarOptions.SectionName))
-            .ValidateOnStart();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<SecEdgarOptions>, SecEdgarOptionsValidator>());
+        // The SEC edge answers 403 to a User-Agent with no email contact (#1443): the guard handler (outermost,
+        // so resilience never retries it) refuses to send without one, and the ticker map reports it unhealthy.
+        services.AddOptions<SecEdgarOptions>().Bind(config.GetSection(SecEdgarOptions.SectionName));
+        services.AddTransient<SecContactGuardHandler>();
 
         services.AddHttpClient(SecEdgarService.HttpClientName, (sp, client) =>
         {
@@ -468,6 +466,7 @@ public static class ResearchModule
                 SecEdgarOptions.UserAgentFor(sp.GetRequiredService<IOptions<SecEdgarOptions>>().Value.Contact));
             client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate");
         })
+            .AddHttpMessageHandler<SecContactGuardHandler>()
             .AddProviderResilience(secTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
