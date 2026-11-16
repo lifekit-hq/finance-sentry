@@ -69,8 +69,6 @@ describe('PriceChartComponent', () => {
     const notes = host.querySelector('[data-testid="chart-notes"]') as HTMLElement;
     expect(canvas.contains(link)).toBe(false);
     expect(notes.contains(link)).toBe(true);
-    expect(
-      canvas.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(canvas.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
