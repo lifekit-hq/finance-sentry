@@ -85,7 +85,7 @@
                 class="border-t pt-cmn-2"
               >
                 <div class="flex flex-wrap items-center gap-cmn-2">
-                  @if (rule.word !== verdict.word) {
+                  @if (!rule.fired) {
                     <cmn-tag [variant]="rule.fired ? wordVariant[rule.word] : 'neutral'">
                       {{ wordLabel[rule.word] }}
                     </cmn-tag>

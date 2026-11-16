@@ -112,6 +112,17 @@ describe('ScorecardVerdictComponent', () => {
     expect(text(host, 'verdict-rule-weak_structure')).not.toContain('matched');
   });
 
+  it('shows the verdict word once as the badge, tagging only the rules that did not fire', () => {
+    const host = render(ScorecardFixtures.scorecard());
+
+    const tag = (ruleId: string): Element | null =>
+      host.querySelector(`[data-testid="verdict-rule-${ruleId}"] cmn-tag`);
+
+    expect(tag('extended_and_rich')).toBeNull();
+    expect(tag('weak_structure')?.textContent?.trim()).toBe('AVOID');
+    expect(tag('buy')).not.toBeNull();
+  });
+
   it('shows each condition with its threshold, the value it read and whether it was met', () => {
     const host = render(ScorecardFixtures.scorecard());
 
