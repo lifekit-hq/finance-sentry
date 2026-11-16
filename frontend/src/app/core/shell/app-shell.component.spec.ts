@@ -175,6 +175,16 @@ describe('AppShellComponent FAB clearance', () => {
     expect(host.querySelector('router-outlet')).not.toBeNull();
   });
 
+  it('mounts no routed page for a visitor whose session call answered signed out', async () => {
+    sessionResolved.set(true);
+    isAuthenticated.set(false);
+    const fixture = await setup(AppRoute.Settings);
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('cmn-app-layout')).not.toBeNull();
+    expect(host.querySelector('router-outlet')).toBeNull();
+  });
+
   it('leaves the Alerts badge at zero without touching the store until a session is signed in', async () => {
     isAuthenticated.set(false);
     const fixture = await setup(AppRoute.Settings);

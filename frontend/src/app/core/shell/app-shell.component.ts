@@ -99,7 +99,8 @@ const REFRESH_PALETTE_ITEM: CommandPaletteItem = {
         cmnAppLayoutNotice
       />
       <lk-install-hint cmnAppLayoutNotice />
-      @if (sessionResolved()) {
+      <!-- Routed pages load their own data on mount: a signed-out visitor is on the way to sign-in, so none is mounted. -->
+      @if (sessionResolved() && isAuthenticated()) {
         <router-outlet />
       }
       @if (canUseAi()) {
@@ -120,6 +121,7 @@ export class AppShellComponent {
   public readonly appUpdate = inject(AppUpdateService);
 
   public readonly sessionResolved = this.authStore.sessionResolved;
+  public readonly isAuthenticated = this.authStore.isAuthenticated;
   public readonly canUseAi = this.authStore.canUseAi;
   public readonly versionLabel = this.whatsNew.versionLabel;
   public readonly hasUnreadNotes = this.whatsNew.hasUnread;

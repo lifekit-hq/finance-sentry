@@ -1,16 +1,32 @@
+<!-- The skeleton draws at once (no show delay): a delayed one leaves the card a line tall, then drops it open under everything below. -->
 <cmn-card data-testid="net-worth-why-moved">
   <cmn-async-state
     [status]="store.status()"
     [errorMessage]="store.errorMessage()"
+    [showDelay]="0"
+    [minDisplay]="0"
     (retry)="store.retry()"
     emptySubMessage="Why net worth moved shows once your accounts have balance history for this range."
     retryable
   >
-    <div skeleton class="space-y-cmn-3">
-      <cmn-skeleton height="1rem" width="45%" />
-      @for (_ of skeletonLines; track $index) {
-        <cmn-skeleton height="0.875rem" width="100%" />
-      }
+    <!-- The loaded card: the title, a row per line (icon, label and value, one sentence), the change, the details link. -->
+    <div skeleton data-testid="net-worth-why-moved-skeleton">
+      <cmn-skeleton text="md" width="45%" />
+      <div class="mt-cmn-3 divide-y divide-border-default">
+        @for (_ of skeletonLines; track $index) {
+          <div class="flex items-start gap-cmn-3 py-cmn-3 first:pt-0">
+            <cmn-skeleton className="rounded-full" height="2rem" width="2rem" />
+            <div class="min-w-0 flex-1 space-y-cmn-1">
+              <cmn-skeleton text="sm" width="100%" />
+              <cmn-skeleton text="xs" width="80%" />
+            </div>
+          </div>
+        }
+        <div class="pt-cmn-3">
+          <cmn-skeleton text="sm" width="100%" />
+        </div>
+      </div>
+      <cmn-skeleton class="mt-cmn-3" text="xs" width="40%" />
     </div>
 
     <div>

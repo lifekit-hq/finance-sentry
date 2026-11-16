@@ -105,6 +105,8 @@ import {
 } from './accounts-list.constants';
 
 const SKELETON_SECTIONS = 2;
+/** The category rows under the net-worth total: a few accounts' worth, as a typical book has. */
+const SKELETON_BREAKDOWN_ROWS = 3;
 /** The holdings feed values every position in USD. */
 const FEED_CURRENCY = 'USD';
 
@@ -170,6 +172,7 @@ export class AccountsListComponent implements OnInit {
   /** The `?provider=` a link named: that institution's accordion opens and scrolls into view. */
   public readonly deepLinkProvider = this.route.snapshot.queryParamMap.get('provider');
   public readonly skeletonSections = SKELETON_SECTIONS;
+  public readonly skeletonBreakdownRows = Array.from({length: SKELETON_BREAKDOWN_ROWS});
   public readonly attentionInstitutions = computed(() =>
     this.store
       .categorySections()
