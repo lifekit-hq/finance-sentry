@@ -43,6 +43,8 @@ jobs:
       EDGE_IP_RANGE: ${{ vars.EDGE_IP_RANGE }}
       EDGE_BRIDGE_IP: ${{ vars.EDGE_BRIDGE_IP }}
       EDGE_GATEWAY_IP: ${{ vars.EDGE_GATEWAY_IP }}
+      # Optional: the SEC source's email contact. Unset or empty is fine (compose passes it as empty).
+      SEC_EDGAR_CONTACT: ${{ vars.SEC_EDGAR_CONTACT }}
     steps:
       # workflow_run: the commit Docker Build published. Dispatch: the `sha` input, else the
       # dispatched ref's head. Exported as IMAGE_TAG, which the prod compose file tags images with.
