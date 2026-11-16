@@ -95,39 +95,32 @@
         @for (group of dayGroups(); track group.dayKey) {
           <cmn-list-section [heading]="group.label" class="mb-cmn-4">
             @for (t of group.items; track t.transactionId) {
-              <div class="relative" data-testid="ledger-row">
-                <cmn-list-item-row
-                  [label]="t.description"
-                  [sublabel]="
-                    t.bankName +
-                    (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
-                    (t.isPending ? ' · Pending' : '')
-                  "
-                  [dimmed]="t.isPending"
+              <cmn-list-item-row
+                [label]="t.description"
+                [sublabel]="
+                  t.bankName +
+                  (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
+                  (t.isPending ? ' · Pending' : '')
+                "
+                [dimmed]="t.isPending"
+                [action]="true"
+                (activated)="openDrawer(t)"
+                data-testid="ledger-row"
+              >
+                <cmn-institution-avatar
+                  [name]="t.bankName"
+                  [logoUrl]="t.bankName | institutionLogo"
+                  size="sm"
+                  avatar
+                />
+                <span
+                  [class]="t | transactionAmountClass"
+                  class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
+                  amount
                 >
-                  <cmn-institution-avatar
-                    [name]="t.bankName"
-                    [logoUrl]="t.bankName | institutionLogo"
-                    size="sm"
-                    avatar
-                  />
-                  <span
-                    [class]="t | transactionAmountClass"
-                    class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
-                    amount
-                  >
-                    {{ t | transactionAmount }}
-                  </span>
-                </cmn-list-item-row>
-                <!-- eslint-disable-next-line lifekit/no-raw-controls -- a transparent hit area over cmn-list-item-row, which has no control of its own -->
-                <button
-                  [attr.aria-label]="t.description"
-                  (click)="openDrawer(t)"
-                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                  type="button"
-                  data-testid="ledger-row-open"
-                ></button>
-              </div>
+                  {{ t | transactionAmount }}
+                </span>
+              </cmn-list-item-row>
             }
           </cmn-list-section>
         }
