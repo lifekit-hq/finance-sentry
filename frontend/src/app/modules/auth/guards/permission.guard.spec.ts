@@ -1,7 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type PartialMatchRouteSnapshot, Router, type UrlSegment} from '@angular/router';
-import {firstValueFrom, type Observable} from 'rxjs';
+import {firstValueFrom, isObservable} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
@@ -19,7 +19,7 @@ describe('permissionGuard', () => {
     const result = TestBed.runInInjectionContext(() =>
       permissionGuard(Permission.AiUse)({}, [] as UrlSegment[], {} as PartialMatchRouteSnapshot)
     );
-    return firstValueFrom(result as Observable<unknown>);
+    return isObservable(result) ? firstValueFrom(result) : result;
   }
 
   beforeEach(() => {
