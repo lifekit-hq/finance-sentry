@@ -422,8 +422,10 @@
                   size="sm"
                 />
                 <span class="min-w-0">
-                  <span class="flex items-center gap-cmn-2">
-                    <span class="truncate" data-testid="position-ticker">{{ row.symbol }}</span>
+                  <span class="flex flex-wrap items-center gap-x-cmn-2">
+                    <span class="max-w-full truncate" data-testid="position-ticker">{{
+                      row.symbol
+                    }}</span>
                     @if (row.verdict || row.verdictGap) {
                       <fns-verdict-chip
                         [word]="row.verdict"
@@ -457,27 +459,28 @@
                   }
                 </span>
               </span>
-              <span class="flex shrink-0 flex-col items-end leading-tight">
+              <span class="flex min-w-0 flex-col items-end leading-tight">
                 @if (row.nativeCurrency && row.nativeValue !== null) {
                   <span
-                    class="text-cmn-sm tabular-nums font-medium text-text-primary"
+                    class="whitespace-nowrap text-cmn-sm tabular-nums font-medium text-text-primary"
                     data-testid="position-value"
                     >{{ row.nativeValue | money: row.nativeCurrency }}</span
                   >
-                  <span class="text-cmn-xs tabular-nums text-text-secondary"
+                  <span class="whitespace-nowrap text-cmn-xs tabular-nums text-text-secondary"
                     >~ {{ row.currentValue | money }}</span
                   >
                 } @else {
                   <span
-                    class="text-cmn-sm tabular-nums font-medium text-text-primary"
+                    class="whitespace-nowrap text-cmn-sm tabular-nums font-medium text-text-primary"
                     data-testid="position-value"
                     >{{ row.currentValue | money }}</span
                   >
                 }
-                <span class="text-cmn-xs tabular-nums">
+                <span class="flex flex-wrap justify-end gap-x-cmn-2 text-cmn-xs tabular-nums">
                   @if (row.pnlPercent !== null) {
                     <span
                       [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                      class="whitespace-nowrap"
                       data-testid="position-pnl"
                       >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
                         row.pnlPercent | number: '1.2-2'
@@ -488,7 +491,7 @@
                     <span
                       [class]="row.dayChangePct >= 0 ? pnlPositiveClass : pnlNegativeClass"
                       [title]="'Today: ' + (row.dayChangeUsd | money: 'USD' : {signed: true})"
-                      class="ml-cmn-2"
+                      class="whitespace-nowrap"
                       data-testid="position-day-change"
                       >{{ row.dayChangePct > 0 ? '+' : ''
                       }}{{ row.dayChangePct | number: '1.2-2' }}% today</span
