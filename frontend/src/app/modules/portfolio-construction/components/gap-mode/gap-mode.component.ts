@@ -48,6 +48,7 @@ import {GapModeUtils} from '../../utils/gap-mode.utils';
     TagComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {class: 'block'},
   templateUrl: './gap-mode.component.html',
 })
 export class GapModeComponent {

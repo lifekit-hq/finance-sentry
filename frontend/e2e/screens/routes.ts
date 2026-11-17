@@ -1,12 +1,12 @@
-import {expect, type Page} from '@playwright/test';
 import type {PageKind} from '@lifekit-hq/ui';
+import {expect, type Page} from '@playwright/test';
 
 import {mockDashboard} from '../support/dashboard-mocks';
 import {mockApis} from '../support/dossier-mocks';
-import {PLACEHOLDER_IMAGE, type VisualScreen} from '../support/visual-baseline';
 import {ACCOUNTS_SCREEN} from '../support/screens/accounts.screen';
 import {ALERTS_SCREEN} from '../support/screens/alerts.screen';
 import {BUDGETS_SCREEN} from '../support/screens/budgets.screen';
+import {CONSTRUCTION_SCREEN} from '../support/screens/construction.screen';
 import {DECISION_DETAIL_SCREEN, DECISIONS_SCREEN} from '../support/screens/decisions.screen';
 import {EVENTS_SCREEN} from '../support/screens/events.screen';
 import {FLOW_BREAKDOWN_SCREEN} from '../support/screens/flow-breakdown.screen';
@@ -17,6 +17,7 @@ import {SETTINGS_SCREEN} from '../support/screens/settings.screen';
 import {SUBSCRIPTIONS_SCREEN} from '../support/screens/subscriptions.screen';
 import {TRANSACTIONS_SCREEN} from '../support/screens/transactions.screen';
 import {WATCHLIST_SCREEN} from '../support/screens/watchlist.screen';
+import {PLACEHOLDER_IMAGE, type VisualScreen} from '../support/visual-baseline';
 
 /**
  * How a route answers the screen gates:
@@ -220,8 +221,9 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     name: 'construction',
     path: '/construction',
     kind: 'list',
-    note: 'The universe screen; needs fixtures for the AI-gated portfolio endpoints.',
-    mode: 'pending',
+    note: 'The universe screen: the book against the rules-built target, then each name in the universe.',
+    mode: 'enforce',
+    fixture: fixtureOf(CONSTRUCTION_SCREEN),
   },
   {
     name: 'login',

@@ -134,7 +134,7 @@
               <cmn-select
                 [options]="sortOptions"
                 [ngModel]="store.sortKey()"
-                [ariaLabel]="sortLabel"
+                [aria-label]="sortLabel"
                 (ngModelChange)="chooseSort($event)"
                 data-testid="universe-sort"
               />
@@ -162,11 +162,10 @@
                     class="flex cursor-pointer list-none flex-col gap-cmn-1 marker:hidden"
                   >
                     <span class="flex flex-wrap items-center gap-x-cmn-2 gap-y-cmn-1">
-                      <a
-                        [routerLink]="['/assets', row.symbol]"
-                        class="text-cmn-base font-semibold text-text-primary hover:underline"
+                      <span
+                        class="text-cmn-base font-semibold text-text-primary"
                         data-testid="universe-symbol"
-                        >{{ row.symbol }}</a
+                        >{{ row.symbol }}</span
                       >
                       @if (row.verdict; as verdict) {
                         <cmn-tag
@@ -250,6 +249,7 @@
                     <a
                       [routerLink]="['/assets', row.symbol]"
                       class="text-cmn-sm text-accent-default hover:underline"
+                      data-testid="universe-open-dossier"
                       >Open the full drill-down</a
                     >
                   </div>
