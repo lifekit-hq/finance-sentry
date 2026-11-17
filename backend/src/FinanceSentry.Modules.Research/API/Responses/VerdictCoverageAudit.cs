@@ -41,8 +41,12 @@ public sealed record VerdictCoverageRow(
     CoverageFund? Fund = null,
     CoverageSection? Dossier = null);
 
-/// <summary>What the holdings feed knows about the symbol; <see cref="Gap"/> is <see cref="VerdictCoverageGap.SourceMissing"/> when it has no brokerage row.</summary>
-public sealed record CoverageBookFacts(string? Provider, string? InstrumentType, string? AssetClass, VerdictCoverageGap? Gap);
+/// <summary>
+/// What the holdings feed knows about the symbol; <see cref="Gap"/> is <see cref="VerdictCoverageGap.SourceMissing"/> when it has no brokerage row.
+/// <see cref="ListingExchange"/> is the exchange the Flex feed reported (null when none has synced, or the symbol is not held).
+/// </summary>
+public sealed record CoverageBookFacts(
+    string? Provider, string? InstrumentType, string? AssetClass, VerdictCoverageGap? Gap, string? ListingExchange = null);
 
 /// <summary>One section's state: <see cref="Gap"/> null means read; <see cref="Detail"/> is a short fact (a lens, a count, an exception type).</summary>
 public sealed record CoverageSection(VerdictCoverageGap? Gap, string? Detail = null);

@@ -96,7 +96,8 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
             brokerageRow?.Provider ?? position?.Provider,
             instrumentType,
             position?.AssetClass,
-            brokerageRow is null ? VerdictCoverageGap.SourceMissing : null);
+            brokerageRow is null ? VerdictCoverageGap.SourceMissing : null,
+            brokerageRow?.ListingExchange);
 
         // The Radar universe takes a held name only when it is an equity; a name on a watchlist, thesis or coverage list is in.
         var onlyHeld = candidate.Origins.Count == 1 && candidate.Origins[0] == VerdictCoverageOrigins.Held;

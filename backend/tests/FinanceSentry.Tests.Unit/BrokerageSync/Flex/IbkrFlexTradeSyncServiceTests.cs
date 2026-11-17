@@ -31,6 +31,9 @@ public class IbkrFlexTradeSyncServiceTests
         public Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageInstrument>>(Store.Where(i => i.UserId == userId).ToList());
 
+        public Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<BrokerageInstrument>>(Store.Where(i => i.UserId == userId).ToList());
+
         public Task<IReadOnlyList<BrokerageInstrument>> GetBySymbolUnscopedAsync(
             Guid userId, string symbol, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageInstrument>>(
@@ -213,6 +216,60 @@ public class IbkrFlexTradeSyncServiceTests
 
         tradeRepo.Store.Should().ContainSingle();
         tradeRepo.Store[0].InstrumentId.Should().Be(instrument.Id);
+    }
+
+    [Fact]
+    public async Task SyncAsync_StoresTheListingExchange_PreferringTheFinancialInstrumentSectionOverTheTradeRow()
+    {
+        var (fetcher, instrumentRepo, _, _, service) = Wiring();
+        var trade = SyntheticTrade("0000abcd.00000001.01");
+        trade.ListingExchange = "TRADEROW";
+        var financialInstrument = SyntheticInstrument();
+        financialInstrument.ListingExchange = "NASDAQ";
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FlexStatementXml { AccountId = "U0000001", Trades = [trade], FinancialInstruments = [financialInstrument] });
+
+        await service.SyncAsync(UserId);
+
+        instrumentRepo.Store.Single().ListingExchange.Should().Be("NASDAQ");
+    }
+
+    [Fact]
+    public async Task SyncAsync_FallsBackToTheTradeRowExchange_WhenNoFinancialInstrumentRowCarriesIt()
+    {
+        var (fetcher, instrumentRepo, _, _, service) = Wiring();
+        var trade = SyntheticTrade("0000abcd.00000001.01");
+        trade.ListingExchange = "LSEETF";
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FlexStatementXml { AccountId = "U0000001", Trades = [trade], FinancialInstruments = [SyntheticInstrument()] });
+
+        await service.SyncAsync(UserId);
+
+        instrumentRepo.Store.Single().ListingExchange.Should().Be("LSEETF");
+    }
+
+    [Fact]
+    public async Task SyncAsync_FillsAnExchangeOnAnExistingInstrument_AndLaterStatementsWithoutOneKeepIt()
+    {
+        var (fetcher, instrumentRepo, _, _, service) = Wiring();
+        instrumentRepo.Store.Add(new BrokerageInstrument(UserId, "ibkr", 900000001, "ZZZQ", "STK", "US0000000001"));
+        var withExchange = SyntheticInstrument();
+        withExchange.ListingExchange = "NASDAQ";
+        fetcher.SetupSequence(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FlexStatementXml
+            {
+                AccountId = "U0000001", Trades = [SyntheticTrade("0000abcd.00000001.01")], FinancialInstruments = [withExchange],
+            })
+            .ReturnsAsync(new FlexStatementXml
+            {
+                AccountId = "U0000001", Trades = [SyntheticTrade("0000abcd.00000001.02")], FinancialInstruments = [SyntheticInstrument()],
+            });
+
+        await service.SyncAsync(UserId);
+        instrumentRepo.Store.Single().ListingExchange.Should().Be("NASDAQ");
+
+        await service.SyncAsync(UserId);
+        instrumentRepo.Store.Single().ListingExchange.Should().Be("NASDAQ", "a statement that omits the field must not blank it");
     }
 
     [Fact]

@@ -91,16 +91,17 @@ public sealed class IbkrFlexTradeSyncService(
             var symbol = financialInstrument?.Symbol ?? trade.Symbol ?? string.Empty;
             var instrumentType = financialInstrument?.AssetCategory ?? trade.AssetCategory ?? string.Empty;
             var isin = financialInstrument?.Isin ?? trade.Isin;
+            var listingExchange = financialInstrument?.ListingExchange ?? trade.ListingExchange;
 
             var instrument = await instrumentRepository.GetByConidUnscopedAsync(userId, Provider, conid, ct);
             if (instrument is null)
             {
-                instrument = new BrokerageInstrument(userId, Provider, conid, symbol, instrumentType, isin);
+                instrument = new BrokerageInstrument(userId, Provider, conid, symbol, instrumentType, isin, listingExchange);
                 await instrumentRepository.AddAsync(instrument, ct);
             }
             else
             {
-                instrument.RefreshIdentity(symbol, instrumentType, isin);
+                instrument.RefreshIdentity(symbol, instrumentType, isin, listingExchange);
                 instrumentRepository.Update(instrument);
             }
 

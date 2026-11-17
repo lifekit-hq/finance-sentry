@@ -82,6 +82,21 @@ public sealed class VerdictCoverageAuditTests
     }
 
     [Fact]
+    public async Task Book_CarriesTheListingExchangeTheFlexFeedReported_AndNullWhenNoneWasStoredOrTheNameIsNotHeld()
+    {
+        var harness = new Harness();
+        harness.Hold("AAA", "STK", listingExchange: "NASDAQ");
+        harness.Hold("BBB", "STK");
+        harness.Watched.Add("WWW");
+
+        var rows = (await harness.AuditAsync()).Rows.ToDictionary(r => r.Symbol);
+
+        rows["AAA"].Book.ListingExchange.Should().Be("NASDAQ");
+        rows["BBB"].Book.ListingExchange.Should().BeNull("no Flex statement carrying the exchange has synced for it");
+        rows["WWW"].Book.ListingExchange.Should().BeNull("a name the holdings feed does not know has no exchange");
+    }
+
+    [Fact]
     public async Task SourceMissing_AWatchedNameTheHoldingsFeedDoesNotKnow()
     {
         var harness = new Harness();
@@ -477,9 +492,11 @@ public sealed class VerdictCoverageAuditTests
 
         public IReadOnlyList<string> FundHoldingsAsked => fundAsked;
 
-        public void Hold(string symbol, string instrumentType, string assetClass = "Equity", string provider = "IBKR")
+        public void Hold(
+            string symbol, string instrumentType, string assetClass = "Equity", string provider = "IBKR", string? listingExchange = null)
         {
-            brokerage[symbol] = new BrokerageHoldingSummary(symbol, instrumentType, 1m, 100m, DateTime.UtcNow, provider);
+            brokerage[symbol] = new BrokerageHoldingSummary(
+                symbol, instrumentType, 1m, 100m, DateTime.UtcNow, provider, ListingExchange: listingExchange);
             positions.Add(new BookFigurePosition(symbol, assetClass, 1m, null, 100m, provider));
         }
 

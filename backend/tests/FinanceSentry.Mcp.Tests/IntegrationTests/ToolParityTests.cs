@@ -136,6 +136,7 @@ public sealed class ToolParityTests
         services.AddScoped<ICryptoHoldingRepository, CryptoHoldingRepository>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
         services.AddScoped<IBrokerageTradeRepository, BrokerageTradeRepository>();
+        services.AddScoped<IBrokerageInstrumentRepository, BrokerageInstrumentRepository>();
         services.AddSingleton<BrokerageCostBasisReconciler>();
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();

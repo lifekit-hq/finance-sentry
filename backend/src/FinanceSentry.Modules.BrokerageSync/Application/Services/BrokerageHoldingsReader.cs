@@ -8,15 +8,18 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
 {
     private readonly IBrokerageHoldingRepository _repository;
     private readonly IBrokerageTradeRepository _tradeRepository;
+    private readonly IBrokerageInstrumentRepository _instrumentRepository;
     private readonly BrokerageCostBasisReconciler _reconciler;
 
     public BrokerageHoldingsReader(
         IBrokerageHoldingRepository repository,
         IBrokerageTradeRepository tradeRepository,
+        IBrokerageInstrumentRepository instrumentRepository,
         BrokerageCostBasisReconciler reconciler)
     {
         _repository = repository;
         _tradeRepository = tradeRepository;
+        _instrumentRepository = instrumentRepository;
         _reconciler = reconciler;
     }
 
@@ -25,6 +28,9 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
     {
         var holdings = await _repository.GetByUserIdUnscopedAsync(userId, ct);
         var trades = await _tradeRepository.GetByUserIdUnscopedAsync(userId, ct);
+        var exchangeByInstrument = (await _instrumentRepository.GetByUserIdUnscopedAsync(userId, ct))
+            .Where(i => i.ListingExchange is not null)
+            .ToDictionary(i => i.Id, i => i.ListingExchange!);
 
         return holdings
             .Select(h =>
@@ -44,7 +50,8 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
                     h.FlexAsOfDate,
                     h.Currency,
                     h.NativeValue,
-                    CurrencyConverter.Convert(1m, h.Currency).Status);
+                    CurrencyConverter.Convert(1m, h.Currency).Status,
+                    h.InstrumentId is { } instrumentId && exchangeByInstrument.TryGetValue(instrumentId, out var exchange) ? exchange : null);
             })
             .ToList();
     }

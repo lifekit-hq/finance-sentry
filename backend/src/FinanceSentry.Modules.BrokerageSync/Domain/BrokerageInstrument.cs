@@ -42,6 +42,12 @@ public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
     public string Symbol { get; private set; } = string.Empty;
     public string InstrumentType { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// The listing exchange the Flex feed reports (IBKR's own code, e.g. <c>NASDAQ</c>, <c>LSEETF</c>); null until a Flex
+    /// statement carrying it has synced. The live OAuth feed does not report it, so that sync never writes or clears it.
+    /// </summary>
+    public string? ListingExchange { get; private set; }
+
     /// <summary>Null until a human sets it via the classification endpoint. Never written by sync.</summary>
     public InstrumentClassification? Classification { get; private set; }
 
@@ -56,7 +62,8 @@ public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
         long conid,
         string symbol,
         string instrumentType,
-        string? isin = null)
+        string? isin = null,
+        string? listingExchange = null)
     {
         Id = Guid.NewGuid();
         UserId = userId;
@@ -65,6 +72,7 @@ public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
         Symbol = symbol;
         InstrumentType = instrumentType;
         Isin = isin;
+        ListingExchange = Normalize(listingExchange);
         Classification = null;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = CreatedAt;
@@ -75,7 +83,7 @@ public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
     /// <see cref="Classification"/> — that field is human-set only, and a sync
     /// must never overwrite it, including back to null.
     /// </summary>
-    public void RefreshIdentity(string symbol, string instrumentType, string? isin)
+    public void RefreshIdentity(string symbol, string instrumentType, string? isin, string? listingExchange = null)
     {
         Symbol = symbol;
         InstrumentType = instrumentType;
@@ -83,7 +91,14 @@ public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
         // one (or never had one) must not blank out an ISIN captured earlier.
         if (!string.IsNullOrWhiteSpace(isin))
             Isin = isin;
+        // Same rule as the ISIN: a feed that omits the exchange (the OAuth sync, or a Flex query without the field)
+        // must not blank out one captured earlier.
+        if (Normalize(listingExchange) is { } exchange)
+            ListingExchange = exchange;
     }
+
+    private static string? Normalize(string? exchange) =>
+        string.IsNullOrWhiteSpace(exchange) ? null : exchange.Trim();
 
     /// <summary>The one and only human-set path. Null clears the classification.</summary>
     public void SetClassification(InstrumentClassification? classification)

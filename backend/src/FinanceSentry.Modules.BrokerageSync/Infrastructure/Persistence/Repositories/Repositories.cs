@@ -401,6 +401,13 @@ public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentReposito
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(i => i.UserId == userId)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<BrokerageInstrument>> GetBySymbolUnscopedAsync(
         Guid userId, string symbol, CancellationToken ct = default)
     {

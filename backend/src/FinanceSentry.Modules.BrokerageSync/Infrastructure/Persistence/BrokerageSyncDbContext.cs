@@ -110,6 +110,7 @@ public sealed class BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbConte
             entity.Property(e => e.Isin).HasMaxLength(12);
             entity.Property(e => e.Symbol).IsRequired().HasMaxLength(50);
             entity.Property(e => e.InstrumentType).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.ListingExchange).HasMaxLength(30);
             entity.Property(e => e.Classification).HasMaxLength(30);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
