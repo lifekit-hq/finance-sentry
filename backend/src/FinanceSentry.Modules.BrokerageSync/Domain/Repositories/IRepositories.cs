@@ -112,6 +112,9 @@ public interface IBrokerageInstrumentRepository
 
     Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>All of the user's instruments for the cross-module holdings reader, which has no person in scope. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>The user's instruments in one symbol for the cross-module reader, which has no person in scope. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<BrokerageInstrument>> GetBySymbolUnscopedAsync(Guid userId, string symbol, CancellationToken ct = default);
 

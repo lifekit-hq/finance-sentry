@@ -102,7 +102,7 @@ public sealed class IbkrFlexHoldingsSyncService(
 
         var brokerPositions = rows.GroupBy(r => r.Symbol, StringComparer.Ordinal).Select(Aggregate).ToList();
 
-        var instrumentByConid = await UpsertInstrumentsAsync(userId, brokerPositions, ct);
+        var instrumentByConid = await UpsertInstrumentsAsync(userId, brokerPositions, ExchangeByConid(statement), ct);
 
         var holdings = brokerPositions
             .Select(p => new BrokerageHolding(
@@ -156,6 +156,7 @@ public sealed class IbkrFlexHoldingsSyncService(
     private async Task<Dictionary<long, BrokerageInstrument>> UpsertInstrumentsAsync(
         Guid userId,
         IEnumerable<(string Symbol, string Type, decimal Qty, decimal Usd, decimal? AvgCostUsd, long? Conid, string? Isin)> positions,
+        IReadOnlyDictionary<long, string> exchangeByConid,
         CancellationToken ct)
     {
         var result = new Dictionary<long, BrokerageInstrument>();
@@ -164,15 +165,16 @@ public sealed class IbkrFlexHoldingsSyncService(
             if (p.Conid is not long conid || result.ContainsKey(conid))
                 continue;
 
+            exchangeByConid.TryGetValue(conid, out var listingExchange);
             var instrument = await instrumentRepository.GetByConidUnscopedAsync(userId, Provider, conid, ct);
             if (instrument is null)
             {
-                instrument = new BrokerageInstrument(userId, Provider, conid, p.Symbol, p.Type, p.Isin);
+                instrument = new BrokerageInstrument(userId, Provider, conid, p.Symbol, p.Type, p.Isin, listingExchange);
                 await instrumentRepository.AddAsync(instrument, ct);
             }
             else
             {
-                instrument.RefreshIdentity(p.Symbol, p.Type, p.Isin);
+                instrument.RefreshIdentity(p.Symbol, p.Type, p.Isin, listingExchange);
                 instrumentRepository.Update(instrument);
             }
 
@@ -181,6 +183,24 @@ public sealed class IbkrFlexHoldingsSyncService(
 
         if (result.Count > 0)
             await instrumentRepository.SaveChangesAsync(ct);
+        return result;
+    }
+
+    /// <summary>
+    /// The listing exchange per conid the statement reports: the Financial Instrument Information section (the more
+    /// authoritative one, as in the trade sync) first, then the open-position rows. A conid with no value is absent.
+    /// </summary>
+    private static Dictionary<long, string> ExchangeByConid(FlexStatementXml statement)
+    {
+        var result = new Dictionary<long, string>();
+        var rows = statement.FinancialInstruments.Select(fi => (fi.Conid, fi.ListingExchange))
+            .Concat((statement.OpenPositions ?? []).Select(p => (p.Conid, p.ListingExchange)));
+        foreach (var (rawConid, exchange) in rows)
+        {
+            if (IbkrFlexMapper.ParseConid(rawConid) is { } conid && !string.IsNullOrWhiteSpace(exchange))
+                result.TryAdd(conid, exchange.Trim());
+        }
+
         return result;
     }
 

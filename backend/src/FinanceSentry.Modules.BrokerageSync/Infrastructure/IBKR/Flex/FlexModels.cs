@@ -118,6 +118,7 @@ public sealed class FlexOpenPositionXml
     [XmlAttribute("description")] public string? Description { get; set; }
     [XmlAttribute("conid")] public string? Conid { get; set; }
     [XmlAttribute("isin")] public string? Isin { get; set; }
+    [XmlAttribute("listingExchange")] public string? ListingExchange { get; set; }
     [XmlAttribute("reportDate")] public string? ReportDate { get; set; }
     [XmlAttribute("position")] public string? Position { get; set; }
     [XmlAttribute("markPrice")] public string? MarkPrice { get; set; }

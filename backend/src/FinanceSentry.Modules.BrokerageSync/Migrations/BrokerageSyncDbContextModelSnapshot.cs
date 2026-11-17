@@ -193,6 +193,10 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)");
 
+                    b.Property<string>("ListingExchange")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(20)

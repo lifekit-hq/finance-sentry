@@ -75,6 +75,9 @@ public class SyncIBKRHoldingsInstrumentMasterTests
         public Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageInstrument>>(Store.Where(i => i.UserId == userId).ToList());
 
+        public Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<BrokerageInstrument>>(Store.Where(i => i.UserId == userId).ToList());
+
         public Task<IReadOnlyList<BrokerageInstrument>> GetBySymbolUnscopedAsync(
             Guid userId, string symbol, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageInstrument>>(

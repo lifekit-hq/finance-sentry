@@ -50,6 +50,7 @@ public class IbkrFlexHoldingsSyncServiceTests
     private sealed class Rig
     {
         public readonly List<BrokerageHolding> Persisted = [];
+        public readonly List<BrokerageInstrument> Instruments = [];
         public readonly Mock<IIBKRCredentialRepository> Oauth = new();
         public readonly IbkrFlexHoldingsSyncService Service;
 
@@ -65,6 +66,11 @@ public class IbkrFlexHoldingsSyncServiceTests
                 .Callback<IEnumerable<BrokerageHolding>>(rs => Persisted.RemoveAll(rs.Contains));
 
             var instruments = new Mock<IBrokerageInstrumentRepository>();
+            instruments.Setup(i => i.GetByConidUnscopedAsync(UserId, "ibkr", It.IsAny<long>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, string _, long conid, CancellationToken _) => Instruments.FirstOrDefault(i => i.Conid == conid));
+            instruments.Setup(i => i.AddAsync(It.IsAny<BrokerageInstrument>(), It.IsAny<CancellationToken>()))
+                .Callback<BrokerageInstrument, CancellationToken>((i, _) => Instruments.Add(i))
+                .Returns(Task.CompletedTask);
             Service = new IbkrFlexHoldingsSyncService(
                 Oauth.Object, holdings.Object, instruments.Object, NullLogger<IbkrFlexHoldingsSyncService>.Instance);
         }
@@ -221,5 +227,45 @@ public class IbkrFlexHoldingsSyncServiceTests
         var stock = rig.Persisted.Single(h => h.Symbol == "ZZZQ" && h.Quantity != 1m);
         stock.Quantity.Should().Be(10m);
         stock.UsdValue.Should().Be(500m);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_StoresTheListingExchange_PreferringTheFinancialInstrumentSectionOverTheOpenPositionRow()
+    {
+        var rig = new Rig();
+        var statement = Parse(Xml(Today()));
+        statement.OpenPositions![0].ListingExchange = "POSROW";
+        statement.FinancialInstruments.Add(new FlexFinancialInstrumentXml
+        {
+            AssetCategory = "STK", Symbol = "ZZZQ", Conid = "900000001", ListingExchange = "NASDAQ",
+        });
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Instruments.Single().ListingExchange.Should().Be("NASDAQ");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_StoresTheOpenPositionRowExchange_WhenNoFinancialInstrumentSectionCarriesIt()
+    {
+        var rig = new Rig();
+        var statement = Parse(Xml(Today()));
+        statement.OpenPositions![0].ListingExchange = "LSEETF";
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Instruments.Single().ListingExchange.Should().Be("LSEETF");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ARefreshWithoutAnExchange_KeepsTheOneAlreadyStored()
+    {
+        var rig = new Rig();
+        rig.Instruments.Add(new BrokerageInstrument(UserId, "ibkr", 900000001, "ZZZQ", "STK", listingExchange: "NASDAQ"));
+        var statement = Parse(Xml(Today()));
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Instruments.Single().ListingExchange.Should().Be("NASDAQ");
     }
 }
