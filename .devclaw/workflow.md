@@ -1,7 +1,7 @@
 # How work is planned, built and shipped in finance-sentry
 
-Read this first, then `AGENTS.md` (exact commands, layout, gotchas) and `CLAUDE.md`
-(conventions, current state). The constitution at `.specify/memory/constitution.md`
+Read this first, then `AGENTS.md` (exact commands, gotchas; `CLAUDE.md` just imports it)
+and `docs/claude/app-state.md` (layout, conventions, current state). The constitution at `.specify/memory/constitution.md`
 wins over both on architecture, testing and code-quality gates.
 
 ## Planning
