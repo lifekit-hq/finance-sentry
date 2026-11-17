@@ -58,6 +58,7 @@ public class GetAssetDossierSafeLoggingTests
         var dossier = await handler.Handle(new GetAssetDossierQuery(Guid.NewGuid(), "ABCD"), CancellationToken.None);
 
         dossier.Thesis.Should().BeNull();
+        dossier.FailedSections.Should().Contain("theses");
         logger.Verify(
             l => l.Log(
                 LogLevel.Warning,

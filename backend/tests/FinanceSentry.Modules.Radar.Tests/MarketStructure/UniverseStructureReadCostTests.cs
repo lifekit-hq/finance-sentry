@@ -69,6 +69,19 @@ public sealed class UniverseStructureReadCostTests
             .Which.Key.Should().Be("NOBARS");
     }
 
+    [Fact]
+    public async Task ASnapshotCarriesTheBarCountAndTheNewestBarDate()
+    {
+        await using var db = TestSupport.NewContext();
+        var fixture = await SeedAsync(db, memberCount: 1);
+
+        var snapshot = await fixture.Reader.GetStructureAsync("AAA0", CancellationToken.None);
+
+        snapshot.Should().NotBeNull();
+        snapshot!.BarCount.Should().BePositive();
+        snapshot.LastBarDate.Should().Be(SeriesStart.AddDays(SeriesLength - 1));
+    }
+
     private static async Task<UniverseRead> ReadUniverseAsync(int memberCount)
     {
         await using var db = TestSupport.NewContext();

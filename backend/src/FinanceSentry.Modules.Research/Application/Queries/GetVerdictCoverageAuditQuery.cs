@@ -4,6 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Etf;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
@@ -19,10 +20,14 @@ using Microsoft.Extensions.Options;
 /// nothing is stored, nothing leaves the app, and no word it reads is acted on. The owner's holdings are read at request
 /// time through <see cref="IBookFiguresService"/> and <see cref="IBrokerageHoldingsReader"/>, so the caller is the owner
 /// (the endpoint and the MCP tool need <c>ai.use</c>). Input is capped at <see cref="MaxSymbols"/>, held names first.
+/// The dossier-section pass runs the whole dossier handler per symbol, so it is off unless <see cref="IncludeDossier"/>
+/// asks for it and then reads only the first <see cref="MaxDossierSymbols"/> rows.
 /// </summary>
-public sealed record GetVerdictCoverageAuditQuery(Guid UserId) : IQuery<VerdictCoverageAudit>
+public sealed record GetVerdictCoverageAuditQuery(Guid UserId, bool IncludeDossier = false) : IQuery<VerdictCoverageAudit>
 {
     public const int MaxSymbols = 100;
+
+    public const int MaxDossierSymbols = 20;
 }
 
 public sealed class GetVerdictCoverageAuditQueryHandler(
@@ -35,6 +40,8 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
     IFundamentalsService fundamentals,
     ScorecardValuationReader valuationReader,
     ScorecardReader scorecards,
+    IFundHoldingsSource fundHoldings,
+    IQueryHandler<GetAssetDossierQuery, AssetDossierResult> dossier,
     IOptions<VerdictOptions> verdictOptions,
     ILogger<GetVerdictCoverageAuditQueryHandler> logger)
     : IQueryHandler<GetVerdictCoverageAuditQuery, VerdictCoverageAudit>
@@ -56,18 +63,30 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
 
         // One after another: the structure, fundamentals and valuation reads share this request's scoped DbContext.
         var rows = new List<VerdictCoverageRow>();
+        var dossierSkipped = 0;
         foreach (var candidate in candidates.Ordered.Take(GetVerdictCoverageAuditQuery.MaxSymbols))
         {
+            var readDossier = query.IncludeDossier && rows.Count < GetVerdictCoverageAuditQuery.MaxDossierSymbols;
+            if (query.IncludeDossier && !readDossier)
+            {
+                dossierSkipped++;
+            }
+
             var position = book.Positions.FirstOrDefault(p => p.Symbol.Equals(candidate.Symbol, StringComparison.OrdinalIgnoreCase));
             var brokerageRow = brokerageRows.FirstOrDefault(h => h.Symbol.Equals(candidate.Symbol, StringComparison.OrdinalIgnoreCase));
-            rows.Add(await AuditAsync(candidate, position, brokerageRow, ct));
+            rows.Add(await AuditAsync(userId, candidate, position, brokerageRow, readDossier, ct));
         }
 
-        return new VerdictCoverageAudit(DateTimeOffset.UtcNow, candidates.Ordered.Count, candidates.Ordered.Count > rows.Count, rows);
+        return new VerdictCoverageAudit(
+            DateTimeOffset.UtcNow, candidates.Ordered.Count, candidates.Ordered.Count > rows.Count, rows, dossierSkipped);
     }
 
     private async Task<VerdictCoverageRow> AuditAsync(
-        Candidate candidate, BookFigurePosition? position, BrokerageHoldingSummary? brokerageRow, CancellationToken ct)
+        Guid userId, Candidate candidate,
+        BookFigurePosition? position,
+        BrokerageHoldingSummary? brokerageRow,
+        bool readDossier,
+        CancellationToken ct)
     {
         var symbol = candidate.Symbol;
         var isCrypto = DossierTickers.IsCrypto(position?.AssetClass);
@@ -85,7 +104,7 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
             ? new CoverageSection(VerdictCoverageGap.OutsideUniverse, instrumentType ?? position?.AssetClass)
             : new CoverageSection(null);
 
-        var structure = await ReadStructureAsync(symbol, ct);
+        var (structure, bars) = await ReadStructureAsync(symbol, ct);
         var structureMissing = structure.Gap == VerdictCoverageGap.SymbolMapping;
 
         var (axis, sector, industry, peerPes, valuation, peers) = await ReadValuationAsync(symbol, isCrypto, structureMissing, ct);
@@ -93,6 +112,9 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
         var facts = fundamentalsSection.Facts;
 
         var verdict = await ReadVerdictAsync(symbol, axis, facts, sector, industry, peerPes, isCrypto, ct);
+
+        var fund = await ReadFundAsync(symbol, isCrypto, axis, ct);
+        var dossierSection = readDossier ? await ReadDossierAsync(symbol, userId, ct) : null;
 
         return new VerdictCoverageRow(
             symbol,
@@ -104,18 +126,22 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
             valuation,
             peers,
             LookThroughSection(isCrypto, axis, verdict.Card, verdict.Verdict),
-            verdict.Verdict);
+            verdict.Verdict,
+            bars,
+            fund,
+            dossierSection);
     }
 
-    private async Task<CoverageSection> ReadStructureAsync(string symbol, CancellationToken ct)
+    private async Task<(CoverageSection Section, CoverageBars? Bars)> ReadStructureAsync(string symbol, CancellationToken ct)
     {
         var read = await TryAsync(symbol, "structure", () => structureReader.GetStructureAsync(symbol, ct), ct);
         if (read.Failure is not null)
         {
-            return Threw(read.Failure);
+            return (Threw(read.Failure), null);
         }
 
-        return read.Value switch
+        var bars = read.Value is { } found ? new CoverageBars(found.BarCount, found.LastBarDate) : null;
+        var section = read.Value switch
         {
             null => new CoverageSection(VerdictCoverageGap.SymbolMapping, "no bars for the bare symbol"),
             { Stale: true } => new CoverageSection(VerdictCoverageGap.FeedLimit, "stale bars"),
@@ -124,6 +150,44 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
             { ExtensionFromMa50: null } => new CoverageSection(VerdictCoverageGap.FeedLimit, "no extension from the 50-day average"),
             _ => new CoverageSection(null),
         };
+        return (section, bars);
+    }
+
+    /// <summary>
+    /// The fund kind the holdings source reports, read only where the scorecard itself asks (a non-crypto name whose
+    /// valuation does not apply); null when it was not read. A source that fails reads as <c>Unknown</c>, which is what
+    /// the scorecard treats it as.
+    /// </summary>
+    private async Task<CoverageFund?> ReadFundAsync(string symbol, bool isCrypto, ScorecardValuationAxis axis, CancellationToken ct)
+    {
+        if (isCrypto || !axis.NotApplicable)
+        {
+            return null;
+        }
+
+        var read = await TryAsync(symbol, "fund holdings", () => fundHoldings.GetTopHoldingsAsync(symbol, ct), ct);
+        return read.Failure is not null
+            ? new CoverageFund(nameof(FundKind.Unknown), null, 0)
+            : new CoverageFund(read.Value.Kind.ToString(), read.Value.Source, read.Value.Holdings.Count);
+    }
+
+    /// <summary>
+    /// Which sections of the symbol's dossier came back empty because their read threw (the dossier hides that behind a
+    /// null section). The scorecard is left to the verdict row, so it is not read twice.
+    /// </summary>
+    private async Task<CoverageSection> ReadDossierAsync(string symbol, Guid userId, CancellationToken ct)
+    {
+        var read = await TryAsync(
+            symbol, "dossier", () => dossier.Handle(new GetAssetDossierQuery(userId, symbol, IncludeVerdicts: false), ct), ct);
+        if (read.Failure is not null)
+        {
+            return Threw(read.Failure);
+        }
+
+        var failed = read.Value?.FailedSections ?? [];
+        return failed.Count == 0
+            ? new CoverageSection(null)
+            : new CoverageSection(VerdictCoverageGap.SectionThrew, string.Join(", ", failed));
     }
 
     private async Task<(
