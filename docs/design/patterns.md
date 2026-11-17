@@ -23,7 +23,7 @@ Money calculation lives elsewhere: [money-semantics.md](../money-semantics.md) i
 truth for what a number means, and [finance-framework.md](../finance-framework.md) for how any
 number is derived. This page is display only. The frontend gates that apply to every amount
 (`MoneyUtils` / `money` pipe, `inputmode` on numeric fields) are in
-[frontend-rules.md](../claude/frontend-rules.md).
+[ui-library-first rule](../../.claude/rules/ui-library-first.md).
 
 ## Contents
 
@@ -194,7 +194,7 @@ it, **review-only** a rule no check can decide.
 
 `lifekit/no-local-currency-format` flags `Intl.NumberFormat` and `toLocaleString` with
 `style: 'currency'`, and the Angular `currency` pipe. In this repo the matching gate is
-`MoneyUtils` / the `money` pipe, per [frontend-rules.md](../claude/frontend-rules.md).
+`MoneyUtils` / the `money` pipe, per [ui-library-first rule](../../.claude/rules/ui-library-first.md).
 
 ## Reference registry
 
@@ -481,7 +481,7 @@ this change.
   code for every other currency (`CHF 950.00`), where the rule shows an ISO code only when two
   currencies sharing a symbol are on one screen. The app's frontend ESLint config is the library
   preset (`createEslintConfig`); the `MoneyUtils` / `money` pipe rule in
-  [frontend-rules.md](../claude/frontend-rules.md) is the gate this repo relies on.
+  [ui-library-first rule](../../.claude/rules/ui-library-first.md) is the gate this repo relies on.
 - **Empty value.** The formatter renders a missing amount as `—` (an em dash), where rule T2 names
   "-" for an empty table cell.
 - **Signed amounts.** `MoneyUtils.format` takes `signed: true` for a leading `+` and never prints

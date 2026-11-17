@@ -10,7 +10,7 @@
   reusing that window is what guarantees FR-007's "never the in-progress month" for free.
 - **Selected rate is store state (`projectionReturnRate`), not component-local.** Precedent:
   `historyRange` and `netWorthStacked` both sit in `DashboardState`. Components on this repo
-  hold no state (frontend-rules: "no local `isLoading`/`errorMessage` fields"), and the rate has
+  hold no state (`.claude/rules/signal-store.md`: "no local `isLoading`/`errorMessage` fields"), and the rate has
   to be readable from `dashboard.computed.ts` to feed the projection.
 - **Rate is deliberately NOT synced to the URL.** `historyRange` is, because it changes what is
   fetched and a deep link should reproduce the data. The rate changes only an assumption

@@ -103,5 +103,5 @@
 - Backend: `dotnet build` (0 warnings) and `dotnet test` in `mcr.microsoft.com/dotnet/sdk:10.0`
   (no local SDK in this lane), integration suites under Testcontainers where they already are.
 - Frontend: cannot lint/test locally (no registry credential for `@lifekit-hq/*`); every `.ts`
-  is written to the ESLint rules in `docs/claude/frontend-rules.md` and the real gate runs in CI.
+  is written to the ESLint rules in `frontend/eslint.config.mjs` and the real gate runs in CI.
   The done line states this explicitly.

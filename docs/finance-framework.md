@@ -608,7 +608,7 @@ public interface IWealthSource
   injection). Adding an economy means adding a module and a registration, not a schema change.
 - **Owner scoping.** The daily snapshot job calls `ReadAsync` with no principal, so implementations use the
   `…Unscoped…` repository reads, each with its own `UserId` predicate
-  ([backend-rules.md](claude/backend-rules.md), owner query filter).
+  ([owner-query-filter rule](../.claude/rules/owner-query-filter.md)).
 - **`SourceEvent` fields.** `OccurredAtUtc` is a UTC instant, not a date: the 24 h transfer-match window and
   in-transit detection need the time of day (a date-only provider reports midnight UTC). `TxRef` is the raw
   hash as reported and is normalized only at match time, never stored normalized. `Network`, `Fee` and

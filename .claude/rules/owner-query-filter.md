@@ -1,31 +1,16 @@
-# Backend Rules (mandatory gates)
-
-## Backend Build Gate — mandatory
-
-After writing or modifying **any** `.cs` file, run `dotnet build backend/FinanceSentry.sln` and fix **all warnings** before moving on. Where `dotnet` is not on the PATH (the fleet box), run it inside `mcr.microsoft.com/dotnet/sdk:10.0` the way the `test` command in `.no-mistakes.yaml` does - never skip it. Non-negotiable:
-- Remove unused `using` directives (`IDE0005`)
-- Apply primary constructor where suggested (`IDE0290`)
-- Resolve nullable reference warnings (`CS8618`, `CS8600`–`CS8604`) — do not suppress with `!` without a comment
-- Apply safe IDE suggestions (`IDE0161`, `IDE0028`, `IDE0059`) that do not change runtime behaviour
-- Zero warnings before the task is marked complete — same standard as the ESLint gate
-
-Use `/csharp-quality` for a batch cleanup sweep across multiple files.
-
+---
+paths:
+  - "backend/src/**/Infrastructure/**/*DbContext.cs"
+  - "backend/src/**/Infrastructure/Persistence/**/*.cs"
+  - "backend/src/**/Infrastructure/Jobs/**/*.cs"
+  - "backend/src/**/Domain/Repositories/**/*.cs"
+  - "backend/src/**/Application/Jobs/**/*.cs"
 ---
 
-## Currency / Money Aggregation Rule — mandatory
+# Owner Query Filter - per-user DbContexts
 
-Accounts span currencies (Monobank=UAH, Revolut/AIB=EUR, IBKR/Binance=USD, …). **Never sum a native `Amount`/`Balance` across accounts** — a raw `.Sum(x => x.Amount)` adds hryvnia to euros as if both were dollars (this caused the "$28k monthly outflow" and "Government $71k top spending" bugs).
-
-The convention, enforced structurally:
-- **Convert once at the reader/query boundary**, where the account currency is in scope, via `FinanceSentry.Core.Utils.CurrencyConverter.ToUsd(amount, currency)` (the single conversion primitive; the FX refresh job feeds its rate table).
-- **Every DTO that crosses an aggregation boundary carries a `…Usd` / `…InBaseCurrency` field** (e.g. `BankingTransactionSummary.AmountUsd`, `BankingAccountSummary.BalanceUsd`, `CryptoHoldingSummary.UsdValue`). Aggregations sum **only** that field, never the native one.
-- When you add a new totals/summary path over transaction-level data, thread the account currency in and expose a converted field — do not sum native amounts and "fix it later".
-- Unknown currency: `CurrencyConverter.ToUsd` falls back to 1:1. Use `CurrencyConverter.IsKnown(currency)` if you need to flag a total as approximate rather than trust a silent fallback.
-
----
-
-## Owner Query Filter - per-user DbContexts
+**Why it exists:** per-user data is isolated by a named EF query filter, not by every query remembering a `UserId` predicate. Rollout history: #947, #1045, #1047 (shared `OwnerScopedDbContext`, `AuthDbContext` conventions); #1086 (account closure reads across people). A sync upsert or dedup read without the opt-out finds nothing under no principal and re-inserts duplicates.
+**Retire when:** an analyzer or architecture test fails the build on an unfiltered per-user entity, or a cross-user read without `IgnoreQueryFilters([OwnerQueryFilter.Name])`; then this file shrinks to a pointer to that check.
 
 A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and carries the named filter on every per-user entity: declared by hand as `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`, or - in a context derived from `OwnerScopedDbContext` (`WealthDbContext`, `BudgetsDbContext`, `EventsDbContext`, `RiskDbContext`, `AgentDbContext`, `AlertsDbContext`, `AnalyticsDbContext`, `BankSyncDbContext`, `BrokerageSyncDbContext`, `CryptoSyncDbContext`, `CompanionDbContext`, `ResearchDbContext` so far) - applied by the base to every entity that implements `IUserOwned`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
 
