@@ -182,12 +182,9 @@ From the cross-artifact analysis of `specs/001-bank-account-sync/`:
 
 # Moved from AGENTS.md (issue #1467)
 
-> AGENTS.md is now a table of contents; its current-state prose lives here. Wording is unchanged; headings are demoted one level.
+> AGENTS.md is now a table of contents; its current-state prose lives here. Wording is unchanged apart from relative links, repointed to resolve from this directory; headings are demoted one level.
 
 ## Frontend commit hook and CI load gate
-
-npx playwright test --reporter=json
-```
 
 Commit hook rule: `.husky/pre-commit` (wired by `frontend`'s `prepare` script) runs lint-staged
 (eslint --fix + prettier on staged frontend files) only when `frontend/src/**` or `frontend/projects/**` is staged;
@@ -257,7 +254,7 @@ cd frontend && npm start
 
 ### QA — Test Account
 
-`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production has password sign-in off; the live checks sign in through Logto as a dedicated Logto smoke user whose credentials live only in the CI secrets `E2E_LIVE_LOGTO_EMAIL` / `E2E_LIVE_LOGTO_PASSWORD` (its email is also the seeded, passwordless smoke account's email). Full scenarios: [QA guide](docs/claude/qa.md).
+`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production has password sign-in off; the live checks sign in through Logto as a dedicated Logto smoke user whose credentials live only in the CI secrets `E2E_LIVE_LOGTO_EMAIL` / `E2E_LIVE_LOGTO_PASSWORD` (its email is also the seeded, passwordless smoke account's email). Full scenarios: [QA guide](qa.md).
 
 ---
 
@@ -381,7 +378,11 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 - `dotnet build --no-restore` fails on a fresh clone — always restore first.
 - In-memory DB per test class: each `WebApplicationFactory` subclass uses a unique GUID database name to avoid cross-test state bleed.
 - `MockBehavior.Loose` is used in factory mocks; setup only what the specific test path needs.
+- `[Trait("Category","Integration")]` is the convention for skipping DB-live tests — don't change it.
+- A bare `.dockerignore` pattern (`obj`, `node_modules`, `dist`) matches only at the context root in this BuildKit version, so every nested build output is listed as `**/<name>` (`**/bin`, `**/obj`, `**/node_modules`, `**/dist`, `**/.angular`, `**/coverage`, ...). A dirty build context is not only a local worktree problem: Frontend CI builds `docker/Dockerfile.frontend.prod` for the LCP gate in the same job as `npm ci`, the build and the test runs. A missing pattern shows up as a stray `obj/` copied over a freshly-restored one (a confusing NETSDK1064 "package not found" error unrelated to the restore) or as the runner's `frontend/node_modules` entering the image, where `npm install` then reconciles a foreign-platform tree instead of installing fresh.
+- `docker/Dockerfile`, `Dockerfile.mcp` and `Dockerfile.gateway` set `ENV NUGET_PACKAGES=/src/.nuget/packages` and restore straight into the build layer (csproj-first, then `build --no-restore` + `publish --no-build`) instead of a `--mount=type=cache` — a cache mount's contents aren't guaranteed to persist across the image's later `RUN` steps under BuildKit GC/concurrent-build pressure, which was silently dropping packages between restore and publish.
+- `dotnet tool restore` (used for `reportgenerator` in Backend CI) needs its manifest at `.config/dotnet-tools.json` at the **repo root**, not under `backend/` — CI steps run from repo root and `dotnet tool restore` only walks up from CWD.
 
 ### MCP tools
 
-Canonical list: `AgreedToolSurface` in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; catalogue (parameters, return schemas, real/stub): [`docs/mcp.md`](docs/mcp.md). Per-project test counts are not kept here - CI's test report is the record.
+Canonical list: `AgreedToolSurface` in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; catalogue (parameters, return schemas, real/stub): [`docs/mcp.md`](../mcp.md). Per-project test counts are not kept here - CI's test report is the record.

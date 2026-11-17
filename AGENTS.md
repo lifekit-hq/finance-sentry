@@ -50,7 +50,7 @@ Commit hook (`.husky/pre-commit`, lint-staged on staged frontend files) assumes 
 - `dotnet build --no-restore` fails on a fresh clone — always restore first.
 - Never change `Host=postgres` to `localhost`, or edit connection strings/env config, to work around Docker — fix the root cause.
 - Do not create markdown files at the repo root; only `README.md`, `AGENTS.md`, `CLAUDE.md`.
-- A bare `.dockerignore` pattern matches only at the context root in this BuildKit version, so nested outputs are `**/<name>` (`**/bin`, `**/obj`, `**/node_modules`, ...). A miss shows up as a stray `obj/` over a fresh restore (a confusing NETSDK1064 "package not found") or the runner's `frontend/node_modules` entering the image (Frontend CI builds `Dockerfile.frontend.prod` in the same job as `npm ci`).
+- A bare `.dockerignore` pattern matches only at the context root in this BuildKit version, so nested outputs are `**/<name>` (`**/bin`, `**/obj`, `**/node_modules`, ...; full list and symptoms in [app-state](docs/claude/app-state.md)). A miss shows up as a stray `obj/` over a fresh restore (a confusing NETSDK1064 "package not found") or the runner's `frontend/node_modules` entering the image (Frontend CI builds `Dockerfile.frontend.prod` in the same job as `npm ci`).
 - `docker/Dockerfile`, `Dockerfile.mcp`, `Dockerfile.gateway` set `NUGET_PACKAGES=/src/.nuget/packages` and restore into the build layer instead of a `--mount=type=cache` mount, which silently dropped packages between restore and publish under BuildKit GC.
 - `dotnet tool restore` needs its manifest at the repo root `.config/dotnet-tools.json`, not under `backend/`.
 - The frontend `initial` bundle budget in `frontend/angular.json` is a ratchet: raise it deliberately, never to silence a warning. Changes to `docker/nginx.frontend.conf` / `Dockerfile.frontend.prod` trigger the Frontend CI LCP gate.
@@ -60,4 +60,4 @@ Commit hook (`.husky/pre-commit`, lint-staged on staged frontend files) assumes 
 
 ## Memory (vault)
 
-Durable project knowledge lives in the vault: `~/memory/projects/finance-sentry/` (`plan.md` facts, `STATUS.md` in-flight, `log.md` events). Read `plan.md` + `STATUS.md` when starting; write durable decisions back there (contract: `~/memory/README.md`). Claude Code auto-memory is disabled by policy.
+Durable knowledge about this project lives in the vault, not in provider memory: `~/memory/projects/finance-sentry/` - `plan.md` (facts), `STATUS.md` (in-flight, only while parked), `log.md` (dated events). Read `plan.md` + `STATUS.md` when starting work here; verify live state live (`gh`, `docker ps`). Write durable decisions and gotchas back to those pages in the same session (contract: `~/memory/README.md`). Claude Code auto-memory is disabled by policy (`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`); Codex/other agents follow the same pointer via this file.
