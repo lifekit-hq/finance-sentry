@@ -249,6 +249,22 @@ public class IbkrFlexTradeSyncServiceTests
     }
 
     [Fact]
+    public async Task SyncAsync_FallsBackToTheTradeRowExchange_WhenTheFinancialInstrumentExchangeIsEmpty()
+    {
+        var (fetcher, instrumentRepo, _, _, service) = Wiring();
+        var trade = SyntheticTrade("0000abcd.00000001.01");
+        trade.ListingExchange = "LSEETF";
+        var financialInstrument = SyntheticInstrument();
+        financialInstrument.ListingExchange = "";
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FlexStatementXml { AccountId = "U0000001", Trades = [trade], FinancialInstruments = [financialInstrument] });
+
+        await service.SyncAsync(UserId);
+
+        instrumentRepo.Store.Single().ListingExchange.Should().Be("LSEETF");
+    }
+
+    [Fact]
     public async Task SyncAsync_FillsAnExchangeOnAnExistingInstrument_AndLaterStatementsWithoutOneKeepIt()
     {
         var (fetcher, instrumentRepo, _, _, service) = Wiring();

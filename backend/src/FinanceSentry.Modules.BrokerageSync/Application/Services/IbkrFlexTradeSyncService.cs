@@ -91,7 +91,9 @@ public sealed class IbkrFlexTradeSyncService(
             var symbol = financialInstrument?.Symbol ?? trade.Symbol ?? string.Empty;
             var instrumentType = financialInstrument?.AssetCategory ?? trade.AssetCategory ?? string.Empty;
             var isin = financialInstrument?.Isin ?? trade.Isin;
-            var listingExchange = financialInstrument?.ListingExchange ?? trade.ListingExchange;
+            var listingExchange = string.IsNullOrWhiteSpace(financialInstrument?.ListingExchange)
+                ? trade.ListingExchange
+                : financialInstrument.ListingExchange;
 
             var instrument = await instrumentRepository.GetByConidUnscopedAsync(userId, Provider, conid, ct);
             if (instrument is null)
