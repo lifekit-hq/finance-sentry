@@ -22,11 +22,19 @@ export const LOGIN_SCREEN: VisualScreen = {
   path: '/login',
   mocks: async page => {
     await signedOut(page);
-    // Methods that offer a way in but no automatic forward, so the page rests on its button.
+    // A sign-out message holds the automatic forward to the identity provider, so the page rests on
+    // its Sign in button instead of leaving. The route is shared with the screen gates, so the
+    // query is added before the app starts rather than put on the route's path.
+    await page.addInitScript(() => {
+      if (window.location.pathname === '/login') {
+        window.history.replaceState(null, '', '/login?info=signed_out');
+      }
+    });
     await page.route(`${API}/auth/sign-in-methods`, route => route.fulfill(json({oidc: true})));
     await page.route(`${API}/auth/oidc/start**`, route => route.fulfill({status: 204}));
   },
   ready: async page => {
+    await expect(page.getByText('You have been signed out.')).toBeVisible();
     await expect(page.getByRole('button', {name: 'Sign in'})).toBeVisible();
   },
 };
