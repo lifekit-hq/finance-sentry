@@ -64,7 +64,7 @@ describe('ScorecardVerdictComponent', () => {
     const why = host.querySelector<HTMLDetailsElement>('[data-testid="verdict-why"]');
 
     expect(why?.open).toBe(false);
-    expect(why?.querySelector('summary')?.textContent).toContain('Why AVOID');
+    expect(why?.querySelector('summary')?.textContent).toContain('Why this verdict');
   });
 
   it('opens into the four axes, each with its headline and the facts behind it', () => {
@@ -110,6 +110,17 @@ describe('ScorecardVerdictComponent', () => {
     expect(text(host, 'verdict-rule-extended_and_rich')).toContain('Fired');
     expect(text(host, 'verdict-rule-buy')).toContain('Also matched');
     expect(text(host, 'verdict-rule-weak_structure')).not.toContain('matched');
+  });
+
+  it('shows the verdict word once as the badge, tagging only the rules that did not fire', () => {
+    const host = render(ScorecardFixtures.scorecard());
+
+    const tag = (ruleId: string): Element | null =>
+      host.querySelector(`[data-testid="verdict-rule-${ruleId}"] cmn-tag`);
+
+    expect(tag('extended_and_rich')).toBeNull();
+    expect(tag('weak_structure')?.textContent?.trim()).toBe('AVOID');
+    expect(tag('buy')).not.toBeNull();
   });
 
   it('shows each condition with its threshold, the value it read and whether it was met', () => {

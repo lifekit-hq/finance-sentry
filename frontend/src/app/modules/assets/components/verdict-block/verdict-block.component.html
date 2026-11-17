@@ -19,7 +19,7 @@
 
     @if (held()) {
       <p
-        class="rounded-cmn-md bg-surface-card px-cmn-3 py-cmn-2 text-cmn-sm text-text-primary"
+        class="border-t border-border-default pt-cmn-3 text-cmn-sm text-text-primary"
         data-testid="verdict-held-line"
       >
         {{ heldLine }}
@@ -60,9 +60,7 @@
     class="flex min-w-0 flex-col gap-cmn-2 sm:border-l sm:border-border-default sm:pl-cmn-4"
     data-testid="verdict-thesis"
   >
-    <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
-      Thesis and kill-switch
-    </h3>
+    <h3 class="text-cmn-sm font-semibold text-text-secondary">Thesis and kill-switch</h3>
     <div class="flex flex-wrap items-center gap-cmn-2">
       <cmn-tag [variant]="thesisVariant[thesisStatus.state]" data-testid="verdict-thesis-state">
         {{ thesisStatus.thesisLabel }}

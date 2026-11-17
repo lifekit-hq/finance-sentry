@@ -21,7 +21,7 @@
     <summary
       class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"
     >
-      Why {{ wordLabel[verdict.word] }}
+      Why this verdict
       <span class="text-text-secondary group-open:hidden">· show</span>
       <span class="hidden text-text-secondary group-open:inline">· hide</span>
     </summary>
@@ -76,18 +76,20 @@
           <p class="text-cmn-xs text-text-secondary" data-testid="verdict-structure-basis">
             {{ basisNote[verdict.structureBasis] }}
           </p>
-          <ol class="flex flex-col gap-cmn-2">
+          <ol class="flex flex-col gap-cmn-3">
             @for (rule of rules(); track rule.id) {
               <li
                 [attr.data-testid]="'verdict-rule-' + rule.id"
                 [attr.data-fired]="rule.fired"
                 [class]="rule.fired ? 'border-accent-default' : 'border-border-default'"
-                class="rounded-cmn-md border px-cmn-3 py-cmn-2"
+                class="border-t pt-cmn-2"
               >
                 <div class="flex flex-wrap items-center gap-cmn-2">
-                  <cmn-tag [variant]="rule.fired ? wordVariant[rule.word] : 'neutral'">
-                    {{ wordLabel[rule.word] }}
-                  </cmn-tag>
+                  @if (!rule.fired) {
+                    <cmn-tag [variant]="rule.fired ? wordVariant[rule.word] : 'neutral'">
+                      {{ wordLabel[rule.word] }}
+                    </cmn-tag>
+                  }
                   @if (rule.fired) {
                     <span class="text-cmn-xs font-semibold text-text-primary">Fired</span>
                   } @else if (rule.matched) {
