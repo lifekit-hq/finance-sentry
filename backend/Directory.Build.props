@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- 1463: the "zero warnings" gate is the build itself, not prose - every compiler and analyzer warning fails the build. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591;CS1573;CS1574;CS1570;CS1572</NoWarn>
     <!-- 510: fail restore on known-vulnerable packages (direct + transitive), high severity and up. -->
