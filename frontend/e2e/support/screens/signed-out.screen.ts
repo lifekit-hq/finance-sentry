@@ -30,7 +30,7 @@ export const LOGIN_SCREEN: VisualScreen = {
         window.history.replaceState(null, '', '/login?info=signed_out');
       }
     });
-    await page.route(`${API}/auth/sign-in-methods`, route => route.fulfill(json({oidc: true})));
+    await page.route(`${API}/auth/methods`, route => route.fulfill(json({oidc: true})));
     await page.route(`${API}/auth/oidc/start**`, route => route.fulfill({status: 204}));
   },
   ready: async page => {
