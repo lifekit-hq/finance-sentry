@@ -8,19 +8,23 @@ using FinanceSentry.Modules.Research.Domain.Scoring;
 /// <see cref="VerdictCoverageGap"/>. Computed at request time from the owner's own readers and persisted nowhere. It is
 /// a read of what the verdict could see, not a recommendation: nothing here acts on a price or a word.
 /// <see cref="SymbolCount"/> is the universe size before the cap; <see cref="Truncated"/> says rows were left out.
+/// <see cref="DossierSkipped"/> is how many rows had no dossier read because the opt-in pass is bounded
+/// (<see cref="Application.Queries.GetVerdictCoverageAuditQuery.MaxDossierSymbols"/>); 0 when the pass is off or nothing was skipped.
 /// </summary>
 public sealed record VerdictCoverageAudit(
     DateTimeOffset GeneratedAt,
     int SymbolCount,
     bool Truncated,
-    IReadOnlyList<VerdictCoverageRow> Rows);
+    IReadOnlyList<VerdictCoverageRow> Rows,
+    int DossierSkipped = 0);
 
 /// <summary>
 /// One symbol of the audit. <see cref="Origins"/> are the lists it came from (<see cref="VerdictCoverageOrigins"/>).
 /// <see cref="Universe"/> is whether the Radar universe takes it. Each other section is a <see cref="CoverageSection"/>.
 /// <see cref="Bars"/> is what the price history holds (null when it holds none), <see cref="Fund"/> what the holdings source
 /// says about a name whose valuation does not apply (null when it was not asked), and <see cref="Dossier"/> the dossier
-/// sections that came back empty because their read threw (<see cref="VerdictCoverageGap.SectionThrew"/>, the names in the detail).
+/// sections that came back empty because their read threw (<see cref="VerdictCoverageGap.SectionThrew"/>, the names in the detail;
+/// null unless the request opted in and the row was within the bound).
 /// </summary>
 public sealed record VerdictCoverageRow(
     string Symbol,

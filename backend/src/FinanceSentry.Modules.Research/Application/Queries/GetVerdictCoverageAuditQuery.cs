@@ -20,10 +20,14 @@ using Microsoft.Extensions.Options;
 /// nothing is stored, nothing leaves the app, and no word it reads is acted on. The owner's holdings are read at request
 /// time through <see cref="IBookFiguresService"/> and <see cref="IBrokerageHoldingsReader"/>, so the caller is the owner
 /// (the endpoint and the MCP tool need <c>ai.use</c>). Input is capped at <see cref="MaxSymbols"/>, held names first.
+/// The dossier-section pass runs the whole dossier handler per symbol, so it is off unless <see cref="IncludeDossier"/>
+/// asks for it and then reads only the first <see cref="MaxDossierSymbols"/> rows.
 /// </summary>
-public sealed record GetVerdictCoverageAuditQuery(Guid UserId) : IQuery<VerdictCoverageAudit>
+public sealed record GetVerdictCoverageAuditQuery(Guid UserId, bool IncludeDossier = false) : IQuery<VerdictCoverageAudit>
 {
     public const int MaxSymbols = 100;
+
+    public const int MaxDossierSymbols = 20;
 }
 
 public sealed class GetVerdictCoverageAuditQueryHandler(
@@ -59,18 +63,30 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
 
         // One after another: the structure, fundamentals and valuation reads share this request's scoped DbContext.
         var rows = new List<VerdictCoverageRow>();
+        var dossierSkipped = 0;
         foreach (var candidate in candidates.Ordered.Take(GetVerdictCoverageAuditQuery.MaxSymbols))
         {
+            var readDossier = query.IncludeDossier && rows.Count < GetVerdictCoverageAuditQuery.MaxDossierSymbols;
+            if (query.IncludeDossier && !readDossier)
+            {
+                dossierSkipped++;
+            }
+
             var position = book.Positions.FirstOrDefault(p => p.Symbol.Equals(candidate.Symbol, StringComparison.OrdinalIgnoreCase));
             var brokerageRow = brokerageRows.FirstOrDefault(h => h.Symbol.Equals(candidate.Symbol, StringComparison.OrdinalIgnoreCase));
-            rows.Add(await AuditAsync(userId, candidate, position, brokerageRow, ct));
+            rows.Add(await AuditAsync(userId, candidate, position, brokerageRow, readDossier, ct));
         }
 
-        return new VerdictCoverageAudit(DateTimeOffset.UtcNow, candidates.Ordered.Count, candidates.Ordered.Count > rows.Count, rows);
+        return new VerdictCoverageAudit(
+            DateTimeOffset.UtcNow, candidates.Ordered.Count, candidates.Ordered.Count > rows.Count, rows, dossierSkipped);
     }
 
     private async Task<VerdictCoverageRow> AuditAsync(
-        Guid userId, Candidate candidate, BookFigurePosition? position, BrokerageHoldingSummary? brokerageRow, CancellationToken ct)
+        Guid userId, Candidate candidate,
+        BookFigurePosition? position,
+        BrokerageHoldingSummary? brokerageRow,
+        bool readDossier,
+        CancellationToken ct)
     {
         var symbol = candidate.Symbol;
         var isCrypto = DossierTickers.IsCrypto(position?.AssetClass);
@@ -98,7 +114,7 @@ public sealed class GetVerdictCoverageAuditQueryHandler(
         var verdict = await ReadVerdictAsync(symbol, axis, facts, sector, industry, peerPes, isCrypto, ct);
 
         var fund = await ReadFundAsync(symbol, isCrypto, axis, ct);
-        var dossierSection = await ReadDossierAsync(symbol, userId, ct);
+        var dossierSection = readDossier ? await ReadDossierAsync(symbol, userId, ct) : null;
 
         return new VerdictCoverageRow(
             symbol,

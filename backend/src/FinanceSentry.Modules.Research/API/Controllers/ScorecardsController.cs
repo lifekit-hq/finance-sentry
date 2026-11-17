@@ -23,11 +23,12 @@ public class ScorecardsController(
     /// <summary>
     /// The verdict-coverage audit (#1413): every held, thesis, watched and coverage symbol of the caller with the state of
     /// each axis and section a verdict reads and a typed gap reason where one has no data. Read-only; the caller's own
-    /// holdings are read at request time. Same <c>ai.use</c> gate as the verdicts it audits.
+    /// holdings are read at request time. Same <c>ai.use</c> gate as the verdicts it audits. <c>includeDossier</c> (default
+    /// off) adds the dossier-section pass for the first 20 rows.
     /// </summary>
     [HttpGet("coverage-audit")]
-    public async Task<IActionResult> GetCoverageAudit(CancellationToken ct) =>
-        Ok(await coverageAuditHandler.Handle(new GetVerdictCoverageAuditQuery(User.RequireUserId()), ct));
+    public async Task<IActionResult> GetCoverageAudit([FromQuery] bool includeDossier, CancellationToken ct) =>
+        Ok(await coverageAuditHandler.Handle(new GetVerdictCoverageAuditQuery(User.RequireUserId(), includeDossier), ct));
 
     /// <summary>
     /// The verdict word of a comma-separated list of symbols in one call (the Accounts position chips). Same

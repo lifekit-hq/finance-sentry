@@ -290,7 +290,7 @@ public sealed class VerdictCoverageAuditTests
         harness.Hold("OK", "STK");
         harness.DossierFailures["AAA"] = ["news", "price history"];
 
-        var rows = (await harness.AuditAsync()).Rows;
+        var rows = (await harness.AuditAsync(includeDossier: true)).Rows;
 
         rows[0].Dossier.Should().Be(new CoverageSection(VerdictCoverageGap.SectionThrew, "news, price history"));
         rows[1].Dossier.Should().Be(new CoverageSection(null));
@@ -305,10 +305,44 @@ public sealed class VerdictCoverageAuditTests
         harness.Hold("GOOD", "STK");
         harness.DossierThrows.Add("BAD");
 
-        var rows = (await harness.AuditAsync()).Rows;
+        var rows = (await harness.AuditAsync(includeDossier: true)).Rows;
 
         rows[0].Dossier.Should().Be(new CoverageSection(VerdictCoverageGap.SectionThrew, nameof(InvalidOperationException)));
         rows[1].Dossier!.Gap.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Dossier_IsNotReadByDefault_SoTheDossierHandlerIsNeverCalledAndTheFieldIsNull()
+    {
+        var harness = new Harness();
+        harness.Hold("AAA", "STK");
+        harness.DossierFailures["AAA"] = ["news"];
+
+        var audit = await harness.AuditAsync();
+
+        audit.Rows.Single().Dossier.Should().BeNull();
+        audit.DossierSkipped.Should().Be(0);
+        harness.DossierAsked.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Dossier_WhenOptedIn_ReadsOnlyTheFirstTwentyRows_AndReportsHowManyWereSkipped()
+    {
+        var harness = new Harness();
+        const int total = GetVerdictCoverageAuditQuery.MaxDossierSymbols + 3;
+        for (var i = 0; i < total; i++)
+        {
+            harness.Hold($"S{i:D2}", "STK");
+        }
+
+        var audit = await harness.AuditAsync(includeDossier: true);
+
+        audit.Rows.Should().HaveCount(total);
+        audit.Rows.Take(GetVerdictCoverageAuditQuery.MaxDossierSymbols).Should().OnlyContain(r => r.Dossier != null);
+        audit.Rows.Skip(GetVerdictCoverageAuditQuery.MaxDossierSymbols).Should().OnlyContain(r => r.Dossier == null);
+        audit.DossierSkipped.Should().Be(3);
+        harness.DossierAsked.Select(q => q.Symbol).Should().Equal(
+            audit.Rows.Take(GetVerdictCoverageAuditQuery.MaxDossierSymbols).Select(r => r.Symbol));
     }
 
     [Fact]
@@ -372,7 +406,7 @@ public sealed class VerdictCoverageAuditTests
         await cts.CancelAsync();
         harness.StructureCancels = true;
 
-        var act = () => harness.AuditAsync(cts.Token);
+        var act = () => harness.AuditAsync(ct: cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
@@ -471,7 +505,7 @@ public sealed class VerdictCoverageAuditTests
             }
         }
 
-        public Task<VerdictCoverageAudit> AuditAsync(CancellationToken ct = default)
+        public Task<VerdictCoverageAudit> AuditAsync(bool includeDossier = false, CancellationToken ct = default)
         {
             var book = new Mock<IBookFiguresService>();
             book.Setup(b => b.ReadAsync(User, It.IsAny<CancellationToken>()))
@@ -543,7 +577,7 @@ public sealed class VerdictCoverageAuditTests
                 book.Object, holdings.Object, watch.Object, thesis.Object, coverage.Object, structure, fundamentals,
                 valuationReader, scorecards, source.Object, dossier.Object, verdictOptions,
                 NullLogger<GetVerdictCoverageAuditQueryHandler>.Instance);
-            return handler.Handle(new GetVerdictCoverageAuditQuery(User), ct);
+            return handler.Handle(new GetVerdictCoverageAuditQuery(User, includeDossier), ct);
         }
 
         private ValuationCurrentMetrics? MetricsFor(string symbol)
