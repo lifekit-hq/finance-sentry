@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {ButtonComponent} from '@lifekit-hq/ui';
+import {ButtonComponent, PageComponent} from '@lifekit-hq/ui';
 
 import {AuthStore} from '../../store/auth.store';
 
@@ -9,9 +9,9 @@ import {AuthStore} from '../../store/auth.store';
  */
 @Component({
   selector: 'fns-access-denied',
-  imports: [ButtonComponent],
+  imports: [ButtonComponent, PageComponent],
   templateUrl: './access-denied.component.html',
-  host: {class: 'block h-full'},
+  host: {class: 'block'},
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccessDeniedComponent {

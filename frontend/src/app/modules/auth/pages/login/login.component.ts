@@ -1,15 +1,15 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {RouterLink} from '@angular/router';
-import {AlertComponent, ButtonComponent, SkeletonComponent} from '@lifekit-hq/ui';
+import {AlertComponent, ButtonComponent, PageComponent, SkeletonComponent} from '@lifekit-hq/ui';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../store/auth.store';
 
 @Component({
   selector: 'fns-login',
-  imports: [AlertComponent, ButtonComponent, RouterLink, SkeletonComponent],
+  imports: [AlertComponent, ButtonComponent, PageComponent, RouterLink, SkeletonComponent],
   templateUrl: './login.component.html',
-  host: {class: 'block h-full'},
+  host: {class: 'block'},
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent {

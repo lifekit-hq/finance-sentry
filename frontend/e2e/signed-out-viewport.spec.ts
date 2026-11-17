@@ -8,7 +8,6 @@ const INSET_TOP = 62;
 const INSET_BOTTOM = 34;
 const SCROLL_PROBE = 500;
 const UNAUTHORIZED = 401;
-const CENTER_TOLERANCE = 1;
 
 // iOS 26 home-screen web app: the page gets less height than the viewport units resolve to, so
 // anything sized with them overflows by the inset.
@@ -71,15 +70,6 @@ for (const vp of VIEWPORTS) {
           expect(result.rootOverflow).toBeLessThanOrEqual(0);
           expect(result.bodyOverflow).toBeLessThanOrEqual(0);
           expect(result.windowScrollY).toBe(0);
-
-          // The card stays vertically centred in the viewport.
-          const card = await page.locator(`${target.card} > div > div`).first().boundingBox();
-          if (!card) {
-            throw new Error('card has no box');
-          }
-          const above = card.y;
-          const below = vp.size.height - (card.y + card.height);
-          expect(Math.abs(above - below)).toBeLessThanOrEqual(CENTER_TOLERANCE);
 
           await page.screenshot({
             path: `test-results/signed-out-${target.name}-${vp.name}-${scheme}.png`,

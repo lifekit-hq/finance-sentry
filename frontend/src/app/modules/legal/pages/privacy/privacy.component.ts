@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router} from '@angular/router';
-import {AlertComponent, ButtonComponent} from '@lifekit-hq/ui';
+import {AlertComponent, ButtonComponent, PageComponent, ProseComponent} from '@lifekit-hq/ui';
 
 import {LEGAL_TEMPLATE_NOTICE} from '../../../../shared/constants/legal/legal.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -12,9 +12,9 @@ import {AuthStore} from '../../../auth/store/auth.store';
  */
 @Component({
   selector: 'fns-privacy',
-  imports: [AlertComponent, ButtonComponent],
+  imports: [AlertComponent, ButtonComponent, PageComponent, ProseComponent],
   templateUrl: './privacy.component.html',
-  host: {class: 'block h-full overflow-y-auto'},
+  host: {class: 'block'},
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PrivacyComponent {
