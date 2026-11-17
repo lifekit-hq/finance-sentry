@@ -57,21 +57,22 @@ public sealed class GetAssetDossierQueryHandler(
         var symbol = request.Symbol.Trim().ToUpperInvariant();
         var userId = request.UserId;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var failed = new List<string>();
 
         // Read the sources one after another: the theses, valuation, analyst and news handlers share this
         // request's one scoped ResearchDbContext, which allows a single operation at a time. Each read is wrapped
         // so one failure cannot 500 the rest.
-        var book = await Safe("book figures", () => bookFigures.ReadAsync(userId, ct));
-        var allTheses = await Safe("theses", () => theses.Handle(new GetThesesQuery(userId), ct));
-        var valuationResult = await Safe("valuation", () => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
-        var newsResult = await Safe("news", () => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
-        var earningsResult = await Safe("earnings calendar", () => earnings.Handle(
+        var book = await Safe(failed, "book figures", () => bookFigures.ReadAsync(userId, ct));
+        var allTheses = await Safe(failed, "theses", () => theses.Handle(new GetThesesQuery(userId), ct));
+        var valuationResult = await Safe(failed, "valuation", () => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
+        var newsResult = await Safe(failed, "news", () => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
+        var earningsResult = await Safe(failed, "earnings calendar", () => earnings.Handle(
             new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), EarningsEventType.Earnings), ct));
-        var signalResult = await Safe("signals", () => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
-        var capFraction = await Safe("position cap", () => positionCap.GetMaxPositionWeightAsync(userId, ct));
-        var userTarget = await Safe("price target", () => priceTargets.GetAsync(userId, symbol, ct));
+        var signalResult = await Safe(failed, "signals", () => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
+        var capFraction = await Safe(failed, "position cap", () => positionCap.GetMaxPositionWeightAsync(userId, ct));
+        var userTarget = await Safe(failed, "price target", () => priceTargets.GetAsync(userId, symbol, ct));
         var pending = request.IncludeVerdicts
-            ? await Safe("pending recommendation", () => recommendations.FindPendingAsync(userId, symbol, ct))
+            ? await Safe(failed, "pending recommendation", () => recommendations.FindPendingAsync(userId, symbol, ct))
             : null;
 
         var bookPosition = book?.Positions.FirstOrDefault(
@@ -89,23 +90,23 @@ public sealed class GetAssetDossierQueryHandler(
 
         var analystResult = isCrypto
             ? null
-            : await Safe("analyst actions", () => analystActions.Handle(
+            : await Safe(failed, "analyst actions", () => analystActions.Handle(
                 new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
 
-        var yearHistory = await Safe("price history", () => priceHistory.GetAsync(
+        var yearHistory = await Safe(failed, "price history", () => priceHistory.GetAsync(
             DossierTickers.ToChartTicker(symbol, bookPosition?.AssetClass), ChartRange.OneYear, ct)) ?? PriceHistory.Empty;
-        var benchmarkHistory = await Safe("benchmark history", () => priceHistory.GetAsync(DossierTickers.Benchmark, ChartRange.OneYear, ct))
+        var benchmarkHistory = await Safe(failed, "benchmark history", () => priceHistory.GetAsync(DossierTickers.Benchmark, ChartRange.OneYear, ct))
             ?? PriceHistory.Empty;
         var facts = isCrypto
             ? null
-            : (await Safe("fundamentals", () => fundamentals.GetFundamentalsAsync(symbol, FundamentalFactsPerConcept, ct)))?.Facts;
+            : (await Safe(failed, "fundamentals", () => fundamentals.GetFundamentalsAsync(symbol, FundamentalFactsPerConcept, ct)))?.Facts;
 
         // The verdict reads the valuation and fundamentals already fetched above (spec 726 US2).
         var scorecardValuation = isCrypto
             ? ScorecardValuationAxis.NotApplicableAxis
             : ScorecardValuationAxis.From(valuationResult);
         var scorecard = request.IncludeVerdicts
-            ? await Safe("scorecard", () => scorecards.ReadAsync(
+            ? await Safe(failed, "scorecard", () => scorecards.ReadAsync(
                 symbol, scorecardValuation, facts, ct, valuationResult?.Sector, valuationResult?.Industry,
                 valuationResult?.PeerSet?.Peers.Select(p => p.ForwardPe).ToList(),
                 lookThrough: !DossierTickers.IsCrypto(bookPosition?.AssetClass)))
@@ -115,7 +116,7 @@ public sealed class GetAssetDossierQueryHandler(
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 
         // Position section: find symbol in the book, then fetch tax lots and the return decomposition.
-        var position = await BuildPositionSectionAsync(userId, symbol, book, bookPosition, capPercent, ct);
+        var position = await BuildPositionSectionAsync(userId, symbol, book, bookPosition, capPercent, failed, ct);
 
         // Thesis: first matching ticker (user-scoped, case-insensitive).
         var thesis = allTheses?
@@ -133,7 +134,7 @@ public sealed class GetAssetDossierQueryHandler(
             benchmarkHistory.Closes.Select(c => c.Close).ToList(),
             yearHistory.Currency);
 
-        var notableMoves = await BuildNotableMovesAsync(symbol, yearHistory, today, ct);
+        var notableMoves = await BuildNotableMovesAsync(symbol, yearHistory, today, failed, ct);
 
         var checks = DossierChecksBuilder.Build(BuildCheckInputs(
             isCrypto, analysts, valuationResult, facts, yearHistory, performance, position, capPercent, thesis));
@@ -159,7 +160,8 @@ public sealed class GetAssetDossierQueryHandler(
             PendingRecommendation: pending is null ? null : RecommendationDto.From(pending),
             Scorecard: scorecard,
             NotableMoves: notableMoves,
-            ScorecardGap: scorecardGap);
+            ScorecardGap: scorecardGap,
+            FailedSections: failed.Distinct().ToList());
     }
 
     /// <summary>
@@ -189,7 +191,7 @@ public sealed class GetAssetDossierQueryHandler(
     /// Null when there is no price history to measure; News and Radar are readable by every caller, so this is not gated.
     /// </summary>
     private async Task<DossierNotableMoves?> BuildNotableMovesAsync(
-        string symbol, PriceHistory history, DateOnly today, CancellationToken ct)
+        string symbol, PriceHistory history, DateOnly today, List<string> failed, CancellationToken ct)
     {
         if (history.Closes.Count == 0)
         {
@@ -206,7 +208,7 @@ public sealed class GetAssetDossierQueryHandler(
         }
 
         var signalsSince = windowStart.AddDays(-options.WindowDays);
-        var windowSignals = await Safe("move signals", () => signalReader.GetSinceAsync(symbol, signalsSince, MoveSignalLimit, ct)) ?? [];
+        var windowSignals = await Safe(failed, "move signals", () => signalReader.GetSinceAsync(symbol, signalsSince, MoveSignalLimit, ct)) ?? [];
 
         // One bounded read per move, so a heavily covered ticker's newest articles cannot crowd out an older move's.
         var windowNews = new List<NewsArticleDto>();
@@ -215,7 +217,7 @@ public sealed class GetAssetDossierQueryHandler(
             var rangeStart = new DateTimeOffset(day.AddDays(-options.WindowDays).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             var rangeEnd = new DateTimeOffset(day.AddDays(options.WindowDays + 1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             windowNews.AddRange(
-                await Safe("move news", () => news.Handle(new GetNewsForTickerQuery(symbol, rangeStart, MoveNewsLimit, rangeEnd), ct)) ?? []);
+                await Safe(failed, "move news", () => news.Handle(new GetNewsForTickerQuery(symbol, rangeStart, MoveNewsLimit, rangeEnd), ct)) ?? []);
         }
 
         return NotableMoveLinker.Build(
@@ -224,7 +226,8 @@ public sealed class GetAssetDossierQueryHandler(
     }
 
     private async Task<DossierPositionSection?> BuildPositionSectionAsync(
-        Guid userId, string symbol, BookFigures? book, BookFigurePosition? pos, decimal? capPercent, CancellationToken ct)
+        Guid userId, string symbol, BookFigures? book, BookFigurePosition? pos, decimal? capPercent, List<string> failed,
+        CancellationToken ct)
     {
         if (book is null || pos is null)
         {
@@ -248,16 +251,18 @@ public sealed class GetAssetDossierQueryHandler(
             {
                 taxLots = await taxLotsReader.GetForSymbolAsync(userId, symbol, ct) ?? [];
             }
-            catch
+            catch (Exception ex)
             {
                 // degrade gracefully — tax lot detail is best-effort
+                logger.LogWarning(ex, "Asset dossier section {Section} failed and was left empty", "tax lots");
+                failed.Add("tax lots");
             }
         }
 
-        var reading = await Safe("position returns", () => returnsReader.ReadAsync(userId, pos, ct));
+        var reading = await Safe(failed, "position returns", () => returnsReader.ReadAsync(userId, pos, ct));
         var disposal = reading is null
             ? null
-            : await Safe("disposal tax", () => disposalTax.ReadAsync(userId, pos, reading, ct));
+            : await Safe(failed, "disposal tax", () => disposalTax.ReadAsync(userId, pos, reading, ct));
 
         return new DossierPositionSection(
             Provider: pos.Provider,
@@ -385,9 +390,10 @@ public sealed class GetAssetDossierQueryHandler(
 
     /// <summary>
     /// Executes <paramref name="fn"/>, returning null on any exception after logging a warning that names the
-    /// failed <paramref name="section"/>: a section that comes back empty must be traceable to its cause.
+    /// failed <paramref name="section"/> and adding it to <paramref name="failed"/>: a section that comes back empty must be
+    /// traceable to its cause, and the verdict-coverage audit (#1273) reads that list.
     /// </summary>
-    private async Task<T?> Safe<T>(string section, Func<Task<T>> fn)
+    private async Task<T?> Safe<T>(List<string> failed, string section, Func<Task<T>> fn)
     {
         try
         {
@@ -396,6 +402,7 @@ public sealed class GetAssetDossierQueryHandler(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Asset dossier section {Section} failed and was left empty", section);
+            failed.Add(section);
             return default;
         }
     }

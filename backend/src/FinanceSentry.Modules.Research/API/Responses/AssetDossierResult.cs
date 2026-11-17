@@ -16,6 +16,7 @@ using FinanceSentry.Modules.Research.Domain.Tax;
 /// NotableMoves: days whose return reached the threshold, each with the news and signals near it (#1218); null = no price history.
 /// Scorecard: the four-axis scorecard and its verdict word (spec 726 US2), null = no verdict, and <c>ScorecardGap</c> says why
 /// (<c>no_role</c> or <c>unreadable</c>, see <c>ScorecardGapReason</c>; issue #1414; a name the verdict does not score still carries a NotScored scorecard); null whenever a scorecard is present.
+/// FailedSections: the names of the sections whose read threw and came back empty (null or empty = none failed); lets the verdict-coverage audit tell a failed read from a source with nothing to show.
 /// </summary>
 public sealed record AssetDossierResult(
     string Symbol,
@@ -33,7 +34,8 @@ public sealed record AssetDossierResult(
     RecommendationDto? PendingRecommendation = null,
     ScorecardResult? Scorecard = null,
     DossierNotableMoves? NotableMoves = null,
-    string? ScorecardGap = null);
+    string? ScorecardGap = null,
+    IReadOnlyList<string>? FailedSections = null);
 
 /// <summary>The user's own fair-value target, in <see cref="Currency"/> (the quote currency it was set in).</summary>
 public sealed record DossierUserTarget(decimal TargetPrice, string? Currency, DateTimeOffset UpdatedAt);

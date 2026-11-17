@@ -129,7 +129,9 @@ public sealed class MarketStructureReader(
             structure.Stale,
             sectorRank,
             sectorRankDelta,
-            DistanceFrom63dHigh(series));
+            DistanceFrom63dHigh(series),
+            series.Count,
+            series.Count > 0 ? series[^1].Date : null);
     }
 
     /// <summary>

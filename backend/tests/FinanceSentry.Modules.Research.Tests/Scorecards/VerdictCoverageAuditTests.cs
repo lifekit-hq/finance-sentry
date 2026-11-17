@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Tests.Scorecards;
 
+using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
@@ -237,6 +238,80 @@ public sealed class VerdictCoverageAuditTests
     }
 
     [Fact]
+    public async Task Bars_AreReportedWithTheirCountAndNewestDate_AndAreAbsentWhenTheSymbolHasNone()
+    {
+        var harness = new Harness();
+        harness.Hold("AAA", "STK");
+        harness.Hold("NONE", "STK");
+        harness.Structures["AAA"] = Snapshot("AAA") with { BarCount = 126, LastBarDate = new DateOnly(2026, 11, 14) };
+        harness.Structures["NONE"] = null;
+
+        var rows = (await harness.AuditAsync()).Rows;
+
+        rows[0].Bars.Should().Be(new CoverageBars(126, new DateOnly(2026, 11, 14)));
+        rows[1].Bars.Should().BeNull();
+        rows[1].Structure.Gap.Should().Be(VerdictCoverageGap.SymbolMapping);
+    }
+
+    [Fact]
+    public async Task FundKind_IsReadOnlyWhereTheScorecardAsksIt_AndNamesTheHoldingsSource()
+    {
+        var harness = new Harness();
+        harness.Hold("ETFX", "STK");
+        harness.Hold("AAA", "STK");
+        harness.Fund("ETFX", new FundHolding("H1", "Holding 1", 60m), new FundHolding("H2", "Holding 2", 40m));
+
+        var rows = (await harness.AuditAsync()).Rows;
+
+        rows[0].Fund.Should().Be(new CoverageFund("Fund", FundHoldingsSources.Yahoo, 2));
+        rows[1].Fund.Should().BeNull("a name with a valuation is never asked whether it is a fund");
+        harness.FundHoldingsAsked.Should().Contain("ETFX").And.NotContain("AAA");
+    }
+
+    [Theory]
+    [InlineData(FundKind.NotAFund, "NotAFund")]
+    [InlineData(FundKind.Unknown, "Unknown")]
+    public async Task FundKind_SeparatesANonFundFromASourceThatCouldNotTell(FundKind kind, string expected)
+    {
+        var harness = new Harness();
+        harness.Hold("ODDX", "STK");
+        harness.FundKindIs("ODDX", new FundHoldingsLookup(kind, [], null, null));
+
+        var row = (await harness.AuditAsync()).Rows.Single();
+
+        row.Fund.Should().Be(new CoverageFund(expected, null, 0));
+    }
+
+    [Fact]
+    public async Task Dossier_NamesTheSectionsWhoseReadThrew_AsSectionThrew()
+    {
+        var harness = new Harness();
+        harness.Hold("AAA", "STK");
+        harness.Hold("OK", "STK");
+        harness.DossierFailures["AAA"] = ["news", "price history"];
+
+        var rows = (await harness.AuditAsync()).Rows;
+
+        rows[0].Dossier.Should().Be(new CoverageSection(VerdictCoverageGap.SectionThrew, "news, price history"));
+        rows[1].Dossier.Should().Be(new CoverageSection(null));
+        harness.DossierAsked.Should().OnlyContain(q => !q.IncludeVerdicts, "the verdict row already carries the scorecard");
+    }
+
+    [Fact]
+    public async Task Dossier_ARead_ThatThrowsOutright_IsSectionThrewWithTheExceptionType_AndIsolated()
+    {
+        var harness = new Harness();
+        harness.Hold("BAD", "STK");
+        harness.Hold("GOOD", "STK");
+        harness.DossierThrows.Add("BAD");
+
+        var rows = (await harness.AuditAsync()).Rows;
+
+        rows[0].Dossier.Should().Be(new CoverageSection(VerdictCoverageGap.SectionThrew, nameof(InvalidOperationException)));
+        rows[1].Dossier!.Gap.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ScorecardThrew_WhenTheVerdictItselfCannotBeComputed_NamesOnlyTheExceptionType()
     {
         var harness = new Harness { RegimeThrows = true };
@@ -354,6 +429,12 @@ public sealed class VerdictCoverageAuditTests
 
         public HashSet<string> FundamentalsThrow { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public Dictionary<string, string[]> DossierFailures { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public HashSet<string> DossierThrows { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public List<GetAssetDossierQuery> DossierAsked { get; } = [];
+
         public bool RegimeThrows { get; init; }
 
         public bool WatchlistThrows { get; set; }
@@ -369,6 +450,15 @@ public sealed class VerdictCoverageAuditTests
         }
 
         public void NoValuation(string symbol) => metrics[symbol] = null;
+
+        public void NotApplicableValuation(string symbol) =>
+            metrics[symbol] = new ValuationCurrentMetrics(symbol, 100m, 22m, 20m, null, null, null, false, true, null, null);
+
+        public void FundKindIs(string symbol, FundHoldingsLookup lookup)
+        {
+            NotApplicableValuation(symbol);
+            funds[symbol] = lookup;
+        }
 
         public void Fund(string symbol, params FundHolding[] holdings)
         {
@@ -422,6 +512,21 @@ public sealed class VerdictCoverageAuditTests
                     return funds.TryGetValue(symbol, out var lookup) ? lookup : FundHoldingsLookup.NotAFund;
                 });
 
+            var dossier = new Mock<IQueryHandler<GetAssetDossierQuery, AssetDossierResult>>();
+            dossier.Setup(d => d.Handle(It.IsAny<GetAssetDossierQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((GetAssetDossierQuery query, CancellationToken _) =>
+                {
+                    DossierAsked.Add(query);
+                    if (DossierThrows.Contains(query.Symbol))
+                    {
+                        throw new InvalidOperationException("dossier down");
+                    }
+
+                    return new AssetDossierResult(
+                        query.Symbol, null, null, null, null, [], null, [], DateTimeOffset.UtcNow,
+                        FailedSections: DossierFailures.TryGetValue(query.Symbol, out var failed) ? failed : []);
+                });
+
             var structure = new StructureReader(this);
             var fundamentals = new FundamentalsReader(this);
             var valuationReader = new ScorecardValuationReader(valuation.Object, history.Object, new PeerForwardPeReader(valuation.Object));
@@ -436,7 +541,7 @@ public sealed class VerdictCoverageAuditTests
 
             var handler = new GetVerdictCoverageAuditQueryHandler(
                 book.Object, holdings.Object, watch.Object, thesis.Object, coverage.Object, structure, fundamentals,
-                valuationReader, scorecards, verdictOptions,
+                valuationReader, scorecards, source.Object, dossier.Object, verdictOptions,
                 NullLogger<GetVerdictCoverageAuditQueryHandler>.Instance);
             return handler.Handle(new GetVerdictCoverageAuditQuery(User), ct);
         }
