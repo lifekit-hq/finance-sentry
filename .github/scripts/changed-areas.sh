@@ -48,6 +48,8 @@ while IFS= read -r f; do
     .github/workflows/"$own_workflow") backend=true frontend=true docker=true docker_frontend=true ;;
     .github/scripts/*) backend=true frontend=true docker=true docker_frontend=true ;;
     .github/actions/build-image/*) docker=true docker_frontend=true ;;
+    # The harness hook tests run in the frontend job (frontend-ci.yml).
+    .claude/hooks/*|.claude/settings.json|tests/harness/*) frontend=true ;;
     # Files that no CI area builds or tests.
     docs/*|specs/*|.specify/*|.claude/*|.qwen/*|.devclaw/*|.vscode/*|.husky/*|.github/*|*.md|LICENSE) ;;
     *) echo "unclassified path '$f': running everything"; backend=true frontend=true docker=true docker_frontend=true ;;

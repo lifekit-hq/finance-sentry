@@ -127,3 +127,7 @@ frontend/.qa-tmp.mjs
 # scratch home for containerized dotnet runs (fs-689 proof)
 .dotnet-home/
 .ci-scratch/
+
+# Claude Code hook decision log
+.claude/hooks.log.jsonl
+__pycache__/
