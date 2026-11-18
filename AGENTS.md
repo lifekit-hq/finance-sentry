@@ -17,6 +17,10 @@ dotnet build FinanceSentry.sln --no-restore -c Release
 dotnet test FinanceSentry.sln --no-build -c Release
 ```
 
+### Claude Code hooks (`.claude/hooks/`, plain Python, no model call)
+
+`tests/harness/run.sh` proves each hook in both directions (blocked + allowed case); it runs in CI inside `frontend-checks` (`lint-build-test`). PreToolUse blocks `Edit`/`Write` on `Migrations/`, lint/format/style configs and screen baselines (exit 2; open an issue or state the reason in the plan); PostToolUse runs `eslint --fix` / `dotnet format` on the touched file. Decisions log to gitignored `.claude/hooks.log.jsonl`.
+
 ### Frontend (lint, build, e2e — required when touching app-surface UI)
 
 ```bash
