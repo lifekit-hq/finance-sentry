@@ -2,6 +2,7 @@ import {createEslintConfig} from '@lifekit-hq/config/eslint';
 
 import {structurePlugin} from './eslint-rules/file-per-concept.mjs';
 import {keyboardsPlugin} from './eslint-rules/money-inputmode.mjs';
+import {moneyPipePlugin} from './eslint-rules/money-pipe-location.mjs';
 import {utilsPlugin} from './eslint-rules/utils-class.mjs';
 
 export default createEslintConfig({
@@ -35,6 +36,18 @@ export default createEslintConfig({
       files: ['src/app/**/*.utils.ts'],
       plugins: {utils: utilsPlugin},
       rules: {'utils/utils-class': 'error'},
+    },
+    {
+      // Every displayed amount goes through `MoneyUtils.format` and the one `money` pipe in
+      // `shared/pipes/` (replaces the ui-library-first "Money display" prose). The library rule was
+      // `warn`; the local rule rejects a money/currency pipe anywhere else.
+      files: ['src/app/**/*.ts', 'src/app/**/*.html'],
+      rules: {'lifekit/no-local-currency-format': 'error'},
+    },
+    {
+      files: ['src/app/**/*.pipe.ts'],
+      plugins: {money: moneyPipePlugin},
+      rules: {'money/money-pipe-location': 'error'},
     },
     {
       files: ['**/*.html'],

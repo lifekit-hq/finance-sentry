@@ -20,7 +20,7 @@ paths:
 
 ## Money display
 
-Every displayed amount goes through `MoneyUtils.format` (`shared/utils/money.utils.ts`; templates use the thin `money` pipe in `shared/pipes/`) - never `DecimalPipe` + a hand-appended currency code, and no per-module money pipes. Symbol-first (`$18,981.48`, `-€1,200.00`); ISO code prefix only where the symbol is ambiguous (`CHF 950.00`); `—` for null/NaN. A base-currency equivalent is shown muted on its own second line via `MoneyUtils.formatEquivalent` (`~ $1,235`). Display only - conversion and aggregation stay in [`docs/money-semantics.md`](../../docs/money-semantics.md).
+Amounts are symbol-first (`$18,981.48`), with an ISO code prefix only where the symbol is ambiguous, `—` for null/NaN, and a base-currency equivalent muted on its own second line; conversion and aggregation stay in [`docs/money-semantics.md`](../../docs/money-semantics.md) (lint enforces the single `money` pipe).
 
 ## Error message resolution
 
