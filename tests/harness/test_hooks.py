@@ -86,16 +86,44 @@ class PostToolUseTests(HookCase):
         with open(stub + ".args") as fh:
             self.assertEqual(fh.read().split(), ["--fix", "src/app/app.ts"])
 
+    def test_eslint_crash_is_a_tool_failure_not_violations(self):
+        stub = self.stub("eslint", 'echo "Oops! Something went wrong"; exit 2')
+        r = self.run_hook("post_tool_use.py", "Edit", "frontend/src/app/app.ts", FS_HOOK_ESLINT=stub)
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        self.assertIn("warning", r.stderr)
+        self.assertEqual(self.last_log()["decision"], "warn:tool-failed")
+
     def test_dotnet_format_scoped_to_project_and_file(self):
-        stub = self.stub("dotnet", 'echo "$@" > "$0.args"')
+        stub = self.stub("dotnet", 'echo "$@" >> "$0.args"')
+        p = "backend/src/FinanceSentry.Core/Utils/AppUrl.cs"
+        r = self.run_hook("post_tool_use.py", "Edit", p, FS_HOOK_DOTNET=stub)
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        with open(stub + ".args") as fh:
+            calls = [line.split() for line in fh.read().splitlines()]
+        self.assertEqual(len(calls), 2)
+        for args in calls:
+            self.assertEqual(args[0], "format")
+            self.assertTrue(args[1].endswith("FinanceSentry.Core.csproj"))
+            self.assertEqual(args[-2:], ["--include", os.path.join(REPO, p)])
+        self.assertNotIn("--verify-no-changes", calls[0])
+        self.assertIn("--verify-no-changes", calls[1])
+        self.assertEqual(self.last_log()["decision"], "fixed-clean")
+
+    def test_dotnet_remaining_violations_returned_to_model(self):
+        stub = self.stub("dotnet", 'case "$*" in *--verify-no-changes*) echo "IDE0005 unnecessary using"; exit 2;; esac')
         p = "backend/src/FinanceSentry.Core/Utils/AppUrl.cs"
         r = self.run_hook("post_tool_use.py", "Edit", p, FS_HOOK_DOTNET=stub)
         self.assertEqual(r.returncode, 0)
-        with open(stub + ".args") as fh:
-            args = fh.read().split()
-        self.assertEqual(args[0], "format")
-        self.assertTrue(args[1].endswith("FinanceSentry.Core.csproj"))
-        self.assertEqual(args[2:], ["--include", os.path.join(REPO, p)])
+        ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("IDE0005", ctx)
+        self.assertEqual(self.last_log()["decision"], "violations")
+
+    def test_dotnet_load_failure_is_a_tool_failure_not_violations(self):
+        stub = self.stub("dotnet", 'echo "could not load workspace"; exit 4')
+        p = "backend/src/FinanceSentry.Core/Utils/AppUrl.cs"
+        r = self.run_hook("post_tool_use.py", "Edit", p, FS_HOOK_DOTNET=stub)
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        self.assertEqual(self.last_log()["decision"], "warn:tool-failed")
 
     def test_missing_tool_fails_open_with_warning(self):
         r = self.run_hook("post_tool_use.py", "Edit", "frontend/src/app/app.ts", FS_HOOK_ESLINT="/nonexistent/eslint")

@@ -25,20 +25,22 @@ def nearest_project(path):
     return None
 
 
-def build_command(path):
+def build_steps(path):
+    """Return ([(argv, violation_exit_codes), ...], cwd). Any other non-zero exit means the tool itself failed."""
     full = os.path.join(hooklib.ROOT, path)
     if path.startswith("frontend/") and path.endswith(".ts"):
+        frontend = os.path.join(hooklib.ROOT, "frontend")
         override = os.environ.get("FS_HOOK_ESLINT")
-        argv = shlex.split(override) if override else ["npx", "--no-install", "eslint"]
-        return argv + ["--fix", os.path.relpath(full, os.path.join(hooklib.ROOT, "frontend"))], \
-            os.path.join(hooklib.ROOT, "frontend")
+        argv = shlex.split(override) if override else [os.path.join(frontend, "node_modules", ".bin", "eslint")]
+        return [(argv + ["--fix", os.path.relpath(full, frontend)], (1,))], frontend
     if path.endswith(".cs"):
         override = os.environ.get("FS_HOOK_DOTNET")
         argv = shlex.split(override) if override else ["dotnet"]
         proj = nearest_project(path)
         if proj is None:
             return None, None
-        return argv + ["format", proj, "--include", full], hooklib.ROOT
+        return [(argv + ["format", proj, "--include", full], ()),
+                (argv + ["format", proj, "--verify-no-changes", "--include", full], (2,))], hooklib.ROOT
     return None, None
 
 
@@ -49,27 +51,34 @@ def main():
     path = hooklib.target_path(event)
     if path is None:
         return 0
-    argv, cwd = build_command(path)
-    if argv is None:
+    steps, cwd = build_steps(path)
+    if steps is None:
         hooklib.log("PostToolUse", path, "skip")
         return 0
-    if shutil.which(argv[0]) is None:
-        hooklib.log("PostToolUse", path, "warn:tool-missing:" + argv[0])
-        print(f"harness warning: {argv[0]} not found; skipped auto-fix of {path}", file=sys.stderr)
+    tool = steps[0][0][0]
+    if shutil.which(tool) is None:
+        hooklib.log("PostToolUse", path, "warn:tool-missing:" + tool)
+        print(f"harness warning: {tool} not found; skipped auto-fix of {path}", file=sys.stderr)
         return 0
-    try:
-        proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=240)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    for argv, violation_codes in steps:
+        try:
+            proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=240)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            hooklib.log("PostToolUse", path, "warn:tool-failed")
+            print(f"harness warning: auto-fix of {path} did not run: {exc}", file=sys.stderr)
+            return 0
+        output = (proc.stdout + proc.stderr).strip()
+        if proc.returncode == 0:
+            continue
+        if proc.returncode in violation_codes:
+            hooklib.log("PostToolUse", path, "violations")
+            context = f"Auto-fix ran on {path} but violations remain; fix them:\n{output[-4000:]}"
+            json.dump({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": context}}, sys.stdout)
+            return 0
         hooklib.log("PostToolUse", path, "warn:tool-failed")
-        print(f"harness warning: auto-fix of {path} did not run: {exc}", file=sys.stderr)
+        print(f"harness warning: {tool} exited {proc.returncode} on {path}; auto-fix skipped: {output[-300:]}", file=sys.stderr)
         return 0
-    output = (proc.stdout + proc.stderr).strip()
-    if proc.returncode == 0:
-        hooklib.log("PostToolUse", path, "fixed-clean")
-        return 0
-    hooklib.log("PostToolUse", path, "violations")
-    context = f"Auto-fix ran on {path} but violations remain; fix them:\n{output[-4000:]}"
-    json.dump({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": context}}, sys.stdout)
+    hooklib.log("PostToolUse", path, "fixed-clean")
     return 0
 
 
