@@ -20,9 +20,9 @@ The file-per-concept layout (interfaces and types in `models/`, constants in `co
 
 The `*.utils.ts` shape (a class of `public static` methods, no bare exported functions or arrow constants, a sibling `*.utils.spec.ts`) is enforced by the `utils/utils-class` ESLint rule. What a linter cannot check: helpers live under `shared/utils/` (cross-module) or `modules/<feature>/utils/` (feature-local), one domain per file, no `inject()` (needs DI → a service). **Template-bound helpers need a thin pipe wrapper** (`shared/pipes/<name>.pipe.ts` or `modules/<feature>/pipes/`) whose `transform()` delegates to the static method; components don't expose the function via `public readonly fooFn = fooFn`. The `frontend-utils-creation` skill covers the mechanics.
 
-## Custom providers - always extract
+## Custom providers
 
-Any provider beyond Angular's built-in `provideX()` helpers (`ErrorHandler`, custom tokens, `APP_INITIALIZER`, class-based `HTTP_INTERCEPTORS`) is extracted to `frontend/src/app/core/providers/<name>.provider.ts` as `export function provideX(): EnvironmentProviders { return makeEnvironmentProviders([...]); }`. `app.config.ts` lists `provideX()` calls only; one concern per file; feature-scoped providers live under `modules/<feature>/providers/`. The `angular-provider-extraction` skill enforces this.
+`app.config.ts` lists `provideX()` calls only, and each custom provider is a `provideX(): EnvironmentProviders` in `core/providers/<name>.provider.ts`; both are enforced by the `providers/provider-extraction` ESLint rule. What a linter cannot check: one concern per file, and feature-scoped providers live under `modules/<feature>/providers/`. The `angular-provider-extraction` skill covers the mechanics.
 
 ## Type unification
 

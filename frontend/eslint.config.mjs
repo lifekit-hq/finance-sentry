@@ -3,6 +3,7 @@ import {createEslintConfig} from '@lifekit-hq/config/eslint';
 import {structurePlugin} from './eslint-rules/file-per-concept.mjs';
 import {keyboardsPlugin} from './eslint-rules/money-inputmode.mjs';
 import {moneyPipePlugin} from './eslint-rules/money-pipe-location.mjs';
+import {providerPlugin} from './eslint-rules/provider-extraction.mjs';
 import {utilsPlugin} from './eslint-rules/utils-class.mjs';
 
 export default createEslintConfig({
@@ -48,6 +49,13 @@ export default createEslintConfig({
       files: ['src/app/**/*.pipe.ts'],
       plugins: {money: moneyPipePlugin},
       rules: {'money/money-pipe-location': 'error'},
+    },
+    {
+      // Custom providers live in `core/providers/*.provider.ts` as `provideX(): EnvironmentProviders`, and
+      // `app.config.ts` lists `provide*()` calls only (replaces the frontend-structure "Custom providers" prose).
+      files: ['src/app/app.config.ts', 'src/app/core/providers/*.provider.ts'],
+      plugins: {providers: providerPlugin},
+      rules: {'providers/provider-extraction': 'error'},
     },
     {
       files: ['**/*.html'],
