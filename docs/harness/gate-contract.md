@@ -6,11 +6,11 @@ What the no-mistakes gate runs, frozen so the 20-run attribution compares like w
 
 - Frozen: 2026-11-18
 - no-mistakes version: v1.106.1
-- Source: `no-mistakes --version`, `~/.no-mistakes/config.yaml` (`agent`, `agent_config`, `review_agents`) and this repo's `.no-mistakes.yaml`, which sets no per-step model; read 2026-11-18.
+- Source: `no-mistakes --version`, `~/.no-mistakes/config.yaml` (`agent: auto`, `agent_config`, `review_agents`) and this repo's `.no-mistakes.yaml`, which sets no per-step model; read 2026-11-18.
 
 ## Models per step
 
-Every step uses the global default agent `claude`, `agent_config.claude`: model `sonnet`, effort `high`. No step has a per-step override.
+The global default is `agent: auto`, which resolves at run time to the first available native agent; on this host that is `claude`, and the table assumes that resolution. A different resolution changes the models without any edit here, so it counts as a change under the freeze rule. `agent_config.claude`: model `sonnet`, effort `high`. No step has a per-step override.
 
 | Step | Model line |
 | --- | --- |
