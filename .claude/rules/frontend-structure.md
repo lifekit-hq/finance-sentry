@@ -6,7 +6,7 @@ paths:
 # Frontend file organisation, helpers and providers
 
 **Why it exists:** merged from four concerns that share one reason - each is a structural convention a linter *could* check but does not yet (see the PR's ESLint follow-up candidates), and each applies to the same files. Hard gate: constitution Principle VI.5 (inline interfaces and cross-module code outside `shared/` block PR merge).
-**Retire when:** each section is replaced by its own ESLint rule (`*.utils.ts` class shape, provider extraction, shared-boundary); delete the section as its rule lands, the file when empty.
+**Retire when:** each section is replaced by its own ESLint rule (provider extraction, shared-boundary, the utils pipe-wrapper convention); delete the section as its rule lands, the file when empty.
 
 ## Decorators
 
