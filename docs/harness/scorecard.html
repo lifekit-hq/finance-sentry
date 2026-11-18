@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harness Scorecard</title>
+<style>
+  :root { --bg:#fafaf7; --fg:#1d1f21; --muted:#6b6f76; --line:#dcdcd4; --card:#fff; --warn:#b45309; --ok:#15803d; --bad:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#16181b; --fg:#e8e8e3; --muted:#9aa0a8; --line:#33373d; --card:#1e2125; --warn:#f59e0b; --ok:#4ade80; --bad:#f87171; } }
+  :root[data-theme="dark"] { --bg:#16181b; --fg:#e8e8e3; --muted:#9aa0a8; --line:#33373d; --card:#1e2125; --warn:#f59e0b; --ok:#4ade80; --bad:#f87171; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { margin:0 0 4px; font-size:24px; } h2 { margin:32px 0 8px; font-size:17px; }
+  p.sub, .note { color:var(--muted); margin:0 0 12px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .tile b { display:block; font-size:22px; } .tile span { color:var(--muted); font-size:12px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); font-size:13px; }
+  th, td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; } td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .warn { color:var(--warn); } .ok { color:var(--ok); } .bad { color:var(--bad); }
+  code { font:12px ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Harness scorecard</h1>
+  <p class="sub">Rendered from <code>scripts/harness/attribution.py</code> output (embedded below) next to the 95-run baseline of 2026-11-16. Refresh: <code>python3 scripts/harness/attribution.py --since-ts EPOCH --window 20 --hooks-log .claude/hooks.log.jsonl --embed-into docs/harness/scorecard.html</code>. The metric is recurrence per class and rounds per run, never the raw findings count. Owner classes are a mechanical first cut for a human to read; every mechanism needs Denys's approval.</p>
+
+  <section id="window"></section>
+
+  <h2>Findings by owner class</h2>
+  <p class="note">Disposition: worker or fixer own the defect. Gate error: reviewer no-op, declined, or shipped unfixed. Decomposition: the brief or spec left the choice open. Harness load: the rule lives in a doc that is linked, not auto-loaded.</p>
+  <div class="scroll"><table id="owners"></table></div>
+
+  <h2>Recurrence per defect class</h2>
+  <p class="note">Recurring = seen in at least two runs of the window; those are the candidates for a mechanism. Baseline column is findings over 95 runs (not comparable as a rate until the window is 20 runs).</p>
+  <div class="scroll"><table id="classes"></table></div>
+
+  <h2>Review rounds per run</h2>
+  <div class="scroll"><table id="rounds"></table></div>
+
+  <h2>Mechanisms in force</h2>
+  <p class="note">Fires and blocks come from <code>.claude/hooks.log.jsonl</code> in the window. A mechanism with zero fires for two consecutive cycles meets its retire condition and is a prune candidate. Incident and retire text is maintained here by hand each cycle.</p>
+  <div class="scroll"><table id="mechs"></table></div>
+
+  <h2>Prunes</h2>
+  <div class="scroll"><table id="prunes"></table></div>
+
+  <h2>Rebase conflicts and warnings</h2>
+  <div id="misc"></div>
+</main>
+
+<script type="application/json" id="summary">
+{
+  "findings_by_owner": {
+    "decomposition": 0,
+    "disposition": 4,
+    "gate_error": 3,
+    "harness_load": 4
+  },
+  "findings_total": 11,
+  "hooks": {
+    "corrupt_lines": 0,
+    "per_hook": {
+      "PostToolUse": {
+        "blocks": 0,
+        "decisions": {
+          "skip": 4
+        },
+        "fires": 4
+      },
+      "PreToolUse": {
+        "blocks": 0,
+        "decisions": {
+          "allow": 4
+        },
+        "fires": 4
+      },
+      "Stop": {
+        "blocks": 4,
+        "decisions": {
+          "block": 4,
+          "skip": 4
+        },
+        "fires": 8
+      }
+    },
+    "total_blocks": 4,
+    "total_fires": 16
+  },
+  "owner_by_class": {
+    "decomposition": {},
+    "disposition": {
+      "correctness": 1,
+      "missing-test": 1,
+      "perf": 1,
+      "scope": 1
+    },
+    "gate_error": {
+      "correctness": 2,
+      "rule-violation": 1
+    },
+    "harness_load": {
+      "docs": 2,
+      "rule-violation": 2
+    }
+  },
+  "pushes": 4,
+  "rebase_conflicts": 0,
+  "recurrence_by_class": {
+    "correctness": {
+      "findings": 3,
+      "recurring": true,
+      "runs": 2
+    },
+    "docs": {
+      "findings": 2,
+      "recurring": true,
+      "runs": 2
+    },
+    "missing-test": {
+      "findings": 1,
+      "recurring": false,
+      "runs": 1
+    },
+    "perf": {
+      "findings": 1,
+      "recurring": false,
+      "runs": 1
+    },
+    "rule-violation": {
+      "findings": 3,
+      "recurring": true,
+      "runs": 2
+    },
+    "scope": {
+      "findings": 1,
+      "recurring": false,
+      "runs": 1
+    },
+    "style": {
+      "findings": 0,
+      "recurring": false,
+      "runs": 0
+    }
+  },
+  "review_rounds": {
+    "max": 2,
+    "mean": 2.0,
+    "per_run": {
+      "01M7NWGNBZHYF3A67JNRZZMR73": 2,
+      "01M7NYXZY39HJ8DBBJC3Y2V4N1": 2,
+      "01M7P16752PXYWPQ1D21NVNTXC": 2,
+      "01M7PK56ZS2RMT16DA510PCMSX": 2
+    }
+  },
+  "runs": [
+    {
+      "branch": "fm/iss-fs-h1467",
+      "created_at": 1794957137,
+      "findings": 3,
+      "fix_rounds": 1,
+      "pushes": 1,
+      "rebase_conflicts": 0,
+      "review_rounds": 2,
+      "run": "01M7NWGNBZHYF3A67JNRZZMR73",
+      "status": "completed"
+    },
+    {
+      "branch": "fm/iss-fs-h1468",
+      "created_at": 1794959671,
+      "findings": 1,
+      "fix_rounds": 1,
+      "pushes": 1,
+      "rebase_conflicts": 0,
+      "review_rounds": 2,
+      "run": "01M7NYXZY39HJ8DBBJC3Y2V4N1",
+      "status": "completed"
+    },
+    {
+      "branch": "fm/iss-fs-h1469",
+      "created_at": 1794962037,
+      "findings": 3,
+      "fix_rounds": 1,
+      "pushes": 1,
+      "rebase_conflicts": 0,
+      "review_rounds": 2,
+      "run": "01M7P16752PXYWPQ1D21NVNTXC",
+      "status": "completed"
+    },
+    {
+      "branch": "fm/iss-fs-h1471",
+      "created_at": 1794980879,
+      "findings": 4,
+      "fix_rounds": 1,
+      "pushes": 1,
+      "rebase_conflicts": 0,
+      "review_rounds": 2,
+      "run": "01M7PK56ZS2RMT16DA510PCMSX",
+      "status": "completed"
+    }
+  ],
+  "schema": 1,
+  "warnings": [],
+  "window": {
+    "first_run": "01M7NWGNBZHYF3A67JNRZZMR73",
+    "last_run": "01M7PK56ZS2RMT16DA510PCMSX",
+    "requested": 20,
+    "runs": 4,
+    "since_ts": 1794957137
+  }
+}
+</script>
+<script>
+"use strict";
+/* 95-run baseline: vault source 2026-11-16-finance-sentry-review-attribution (PC home, runs through 2026-11-16). */
+const BASELINE = {
+  runs: 95, reachedReview: 87, runsWithFindings: 53, findings: 144,
+  owners: { disposition: 68, gate_error: 60, decomposition: 14, harness_load: 1, unknown: 1 },
+  classes: { correctness: 63, scope: 26, docs: 25, style: 11, "missing-test": 10, perf: 5, "rule-violation": 4 },
+  rebaseConflicts: 44
+};
+/* Mechanisms merged under the harness plan (locked 2026-11-17). hook = key in summary.hooks.per_hook. */
+const MECHANISMS = [
+  { name: "PreToolUse block (migrations, lint and format configs, screen baselines)", pr: "#1475", hook: "PreToolUse",
+    incident: "pattern 5: baselines regenerated over a data-loss diff or without explanation (8 findings)",
+    retire: "no block fires for two consecutive cycles" },
+  { name: "PostToolUse eslint --fix / dotnet format on the touched file", pr: "#1475", hook: "PostToolUse",
+    incident: "style and file-organisation findings (style 11, rule-violation 4)",
+    retire: "no violations returned for two consecutive cycles" },
+  { name: "Stop hook: diff-scoped build and tests refuse the turn on red", pr: "#1476", hook: "Stop",
+    incident: "rebase and gate failures reached the gate red (tests failed 15, lint red 5, CI red 13)",
+    retire: "no block:red for two consecutive cycles" },
+  { name: "AGENTS.md cut to a table of contents", pr: "#1473", hook: null,
+    incident: "harness-load: prose loaded on every run, linked-only rules unread",
+    retire: "harness_load stays 0 for two cycles and rounds per run does not rise" },
+  { name: "Path-scoped .claude/rules files", pr: "#1474", hook: null,
+    incident: "pattern 4: money and currency semantics (6 findings)",
+    retire: "money-class recurrence 0 for two cycles" },
+  { name: "Warnings-as-errors backend build", pr: "#1465 (open at the time of writing)", hook: null,
+    incident: "analyzer warnings shipped to review as findings",
+    retire: "no warning-class finding for two cycles" }
+];
+const PRUNES = []; /* none yet: no mechanism has run for two cycles */
+
+const S = JSON.parse(document.getElementById("summary").textContent || "{}");
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const row = (cells, head) => "<tr>" + cells.map((c, i) => {
+  const t = head ? "th" : "td", n = typeof c === "number" || (c && c.n) ? ' class="n"' : "";
+  return "<" + t + n + ">" + esc(c && c.v !== undefined ? c.v : c) + "</" + t + ">";
+}).join("") + "</tr>";
+const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "-");
+
+function render() {
+  if (!S.window) { $("window").innerHTML = '<p class="warn">No summary embedded yet. Run the script with --embed-into.</p>'; return; }
+  const w = S.window, hooks = S.hooks || { per_hook: {} };
+  $("window").innerHTML = '<div class="grid">' + [
+    [w.runs + " of " + w.requested, "runs in window"], [S.findings_total, "findings (not the metric)"],
+    [S.review_rounds.mean, "review rounds per run (mean)"], [S.rebase_conflicts, "rebase conflicts"],
+    [hooks.total_fires, "hook fires"], [hooks.total_blocks, "hook blocks"]
+  ].map((t) => '<div class="tile"><b>' + esc(t[0]) + "</b><span>" + esc(t[1]) + "</span></div>").join("") + "</div>" +
+    (w.runs < w.requested ? '<p class="warn note">Window incomplete: ' + esc(w.runs) + " of " + esc(w.requested) + " runs exist, so rates are not yet comparable to the baseline.</p>" : "");
+
+  let h = row(["owner class", "window", "window %", "baseline (95 runs)", "baseline %"], true);
+  for (const o of ["disposition", "gate_error", "decomposition", "harness_load"])
+    h += row([o, S.findings_by_owner[o], pct(S.findings_by_owner[o], S.findings_total), BASELINE.owners[o], pct(BASELINE.owners[o], BASELINE.findings)]);
+  $("owners").innerHTML = h;
+
+  h = row(["defect class", "window findings", "window runs", "recurring", "baseline findings"], true);
+  for (const c of Object.keys(BASELINE.classes)) {
+    const r = S.recurrence_by_class[c] || { findings: 0, runs: 0, recurring: false };
+    h += row([c, r.findings, r.runs, { v: r.recurring ? "yes" : "no" }, BASELINE.classes[c]]);
+  }
+  $("classes").innerHTML = h;
+
+  h = row(["run", "branch", "status", "review rounds", "fix rounds", "findings", "rebase conflicts"], true);
+  for (const r of S.runs) h += row([r.run, r.branch, r.status, r.review_rounds, r.fix_rounds, r.findings, r.rebase_conflicts]);
+  $("rounds").innerHTML = h;
+
+  h = row(["mechanism", "PR", "incident", "retire condition", "fires", "blocks"], true);
+  for (const m of MECHANISMS) {
+    const x = m.hook ? hooks.per_hook[m.hook] : null;
+    h += row([m.name, m.pr, m.incident, m.retire, x ? x.fires : { v: "n/a (not a hook)" }, x ? x.blocks : { v: "n/a" }]);
+  }
+  $("mechs").innerHTML = h;
+
+  $("prunes").innerHTML = row(["mechanism", "removed in", "why"], true) +
+    (PRUNES.length ? PRUNES.map((p) => row([p.name, p.pr, p.why])).join("") : row([{ v: "none yet" }, "", ""]));
+
+  $("misc").innerHTML = '<p class="note">Rebase conflicts in window: <b>' + esc(S.rebase_conflicts) + "</b> (baseline " + BASELINE.rebaseConflicts + " over 95 runs). Corrupt hook-log lines: <b>" +
+    esc(hooks.corrupt_lines || 0) + "</b>. Warnings: <b>" + esc(S.warnings.length) + "</b>" +
+    (S.warnings.length ? "<br>" + S.warnings.map((x) => esc(JSON.stringify(x))).join("<br>") : "") + "</p>";
+}
+render();
+</script>
+</body>
+</html>
