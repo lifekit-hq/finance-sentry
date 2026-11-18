@@ -59,27 +59,27 @@ public sealed class ConverterCasesTests
     }
 
     [Fact]
-    public void Case_05_AFigureSumming100Eur_And100Pln_CarriesTheWorstStatus_Unknown1To1()
+    public async Task Case_05_AFigureSumming100Eur_And100Pln_CarriesTheWorstStatus_Unknown1To1()
     {
         using var _ = FxTableScope.Seed();
+        var reader = ScenarioS.BankingReader(ScenarioS.Bank("checking", "EUR", 100m), ScenarioS.Bank("checking", "PLN", 100m));
 
-        var statuses = new[] { CurrencyConverter.Convert(100m, "EUR").Status, CurrencyConverter.Convert(100m, "PLN").Status };
-        var worst = statuses.Aggregate(FxStatus.Exact, (a, b) => a.Worst(b));
+        var book = await ScenarioS.BookAsync(reader, [], []);
 
-        worst.Should().Be(FxStatus.Unknown1To1);
-        worst.ToReason().Should().Be("FX_UNKNOWN_1TO1");
+        book.FxStatus.Should().Be(FxStatus.Unknown1To1);
+        book.FxReasonCodes.Should().Equal("FX_UNKNOWN_1TO1");
     }
 
     [Fact]
-    public void Case_06_AFigureSumming100Eur_And100Usd_OnTheSeedTable_CarriesSeedTable_AndTheTodayRateReason()
+    public async Task Case_06_AFigureSumming100Eur_And100Usd_OnTheSeedTable_CarriesSeedTable_AndTheTodayRateReason()
     {
         using var _ = FxTableScope.Seed();
+        var reader = ScenarioS.BankingReader(ScenarioS.Bank("checking", "EUR", 100m), ScenarioS.Bank("checking", "USD", 100m));
 
-        var statuses = new[] { CurrencyConverter.Convert(100m, "EUR").Status, CurrencyConverter.Convert(100m, "USD").Status };
-        var worst = statuses.Aggregate(FxStatus.Exact, (a, b) => a.Worst(b));
+        var book = await ScenarioS.BookAsync(reader, [], []);
 
-        worst.Should().Be(FxStatus.SeedTable);
-        worst.ToReason().Should().Be("FX_TODAY_RATE");
+        book.FxStatus.Should().Be(FxStatus.SeedTable);
+        book.FxReasonCodes.Should().Equal("FX_TODAY_RATE");
     }
 
     [Fact]

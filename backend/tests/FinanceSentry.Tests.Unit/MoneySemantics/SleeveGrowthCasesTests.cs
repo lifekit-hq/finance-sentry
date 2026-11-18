@@ -1,12 +1,19 @@
 namespace FinanceSentry.Tests.Unit.MoneySemantics;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Infrastructure.Fx;
+using FinanceSentry.Modules.BrokerageSync.Application.Services;
+using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
+using FinanceSentry.Tests.Unit.Fx;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain.Ports;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
 
@@ -72,12 +79,33 @@ public sealed class SleeveGrowthCasesTests
     [Fact]
     public async Task Case_27_EurDeposit1000_AtItsOwnDatesRate1_05_Contributed1050_End11080_Growth30_NotReConvertedAt1_08()
     {
-        // The flow arrives as 1,050 USD (1,000 EUR at that day's 1.05); the sleeve is valued at today's 1.08.
-        var result = await GrowthAsync(
-            [Value(0, 10_000m), Value(1, 11_050m), Value(10, 11_080m)],
-            [new FlowSourceCoverage("ibkr", Day(-30), true)],
-            Deposit(1, 1_050m));
+        using var _ = FxTableScope.Seed();
+        var depositDay = Day(1);
+        var userId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<BrokerageSyncDbContext>()
+            .UseInMemoryDatabase($"case-27-{Guid.NewGuid()}").Options;
+        await using (var seed = new BrokerageSyncDbContext(options, NoCurrentUser.Instance))
+        {
+            var link = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
+            seed.IBKRFlexCredentials.Add(link);
+            seed.Entry(link).Property(c => c.FirstLinkedAt).CurrentValue = Day(-30).ToDateTime(TimeOnly.MinValue);
+            seed.BrokerageCashTransactions.Add(new BrokerageCashTransaction(
+                userId, "ibkr", "case-27", null, null, null, depositDay.ToDateTime(TimeOnly.MinValue), 1_000m,
+                "Deposits/Withdrawals", null, null, "EUR", null));
+            await seed.SaveChangesAsync();
+        }
 
+        // The feed published EUR at 1.05 on the deposit's own date; today's (seed) rate is 1.08.
+        var feed = new Mock<IHistoricalExchangeRateService>();
+        feed.Setup(f => f.GetPublishedSeriesAsync("EUR", It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<DateOnly, decimal> { [depositDay] = 1.05m });
+
+        await using var db = new BrokerageSyncDbContext(options, NoCurrentUser.Instance);
+        var reading = await new BrokerageFlowReader(db, feed.Object).ReadAsync(userId, Day(0));
+        var result = await GrowthAsync(
+            [Value(0, 10_000m), Value(1, 11_050m), Value(10, 11_080m)], [.. reading.Sources], [.. reading.Flows]);
+
+        reading.Flows.Should().ContainSingle().Which.Flow.AmountUsd.Should().Be(1_050m);
         result.Contributed.Should().Be(1_050m);
         result.EndValue.Should().Be(11_080m);
         result.Growth.Should().Be(30m);
