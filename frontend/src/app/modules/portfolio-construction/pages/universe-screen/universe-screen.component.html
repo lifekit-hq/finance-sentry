@@ -231,8 +231,8 @@
                     <p class="text-text-primary" data-testid="universe-reason">{{ row.reason }}</p>
                     @if (row.verdict; as verdict) {
                       <p class="text-text-secondary" data-testid="universe-rule">
-                        Verdict rule <span class="font-medium">{{ verdict.firedRuleId }}</span
-                        >, rules v{{ verdict.rulesVersion }}: {{ view.verdictRuleText }}
+                        Verdict rule <span class="font-medium">{{ verdict.firedRuleId }}</span>,
+                        rules v{{ verdict.rulesVersion }}: {{ view.verdictRuleText }}
                       </p>
                     }
                     @for (reason of view.notEvaluableTexts; track $index) {
