@@ -1,0 +1,50 @@
+name: Baselines note
+
+# A pull request that changes a screen baseline PNG must say why in a `## Baselines` section of its
+# body (docs/claude/qa.md). Code-owner review cannot ask this of the author, who cannot review his
+# own pull request. Reports only: it never edits files, labels or the PR. The requirement is on the
+# PR body, so the Update screen baselines workflow's own commits need nothing special. `edited`
+# re-runs it when the body gains the section.
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  baselines-note:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Require a Baselines section when a baseline PNG changed
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_BODY: ${{ github.event.pull_request.body }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        changed=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' \
+          | grep -E '^frontend/e2e/screens/baselines\.spec\.ts-snapshots/' || true)
+        if [ -z "$changed" ]; then
+          echo "No screen baseline changed; no ## Baselines section needed."
+          exit 0
+        fi
+        echo "Changed screen baselines:"
+        echo "$changed"
+        # Lines after a `## Baselines` heading, up to the next heading; one non-blank line is enough.
+        section=$(printf '%s\n' "$PR_BODY" | tr -d '\r' | awk '
+          /^##[[:space:]]+Baselines[[:space:]]*$/ { in_s = 1; next }
+          /^#{1,6}[[:space:]]/ { in_s = 0 }
+          in_s && $0 ~ /[^[:space:]]/ { print }')
+        if [ -z "$section" ]; then
+          echo "::error title=Baselines section missing::This PR changes screen baseline PNGs. Add a '## Baselines' section to the PR body with at least one line saying why they changed (docs/claude/qa.md)."
+          exit 1
+        fi
+        echo "## Baselines section present."
