@@ -5,8 +5,7 @@ paths:
 
 # Backend Build Gate
 
-**Why it exists:** `Directory.Build.props` turns only NU190x advisories into errors, so analyzer and nullable warnings do not fail CI by themselves; this gate is what keeps them at zero.
-**Retire when:** `TreatWarningsAsErrors` (or an equivalent CI gate) covers IDE0005/IDE0290/CS86xx, making the build itself the check.
+The build fails on any warning: `TreatWarningsAsErrors` is on in `backend/Directory.Build.props`, so local builds, the Stop hook and CI all enforce zero warnings.
 
 After writing or modifying **any** `.cs` file, run `dotnet build backend/FinanceSentry.sln` and fix **all warnings** before moving on. Where `dotnet` is not on the PATH (the fleet box), run it inside `mcr.microsoft.com/dotnet/sdk:10.0` the way the `test` command in `.no-mistakes.yaml` does - never skip it.
 

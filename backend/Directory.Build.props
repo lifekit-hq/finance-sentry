@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The zero-warnings gate: any compiler or analyzer warning fails the build (local, hook and CI alike). -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CS1591;CS1573;CS1574;CS1570;CS1572</NoWarn>
     <!-- 510: fail restore on known-vulnerable packages (direct + transitive), high severity and up. -->
     <NuGetAuditMode>all</NuGetAuditMode>
