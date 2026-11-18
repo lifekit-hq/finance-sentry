@@ -71,8 +71,8 @@ task is marked complete. Key analyzer codes and their required fixes:
   with `!` without an explanatory comment
 - `IDE0028`, `IDE0059`, `CS0168`, `CS0219` — unnecessary code → remove
 
-Warnings-as-errors is the CI target state. Any PR that introduces new `dotnet build`
-warnings is blocked. Use the `csharp-quality` skill for batch cleanup.
+`TreatWarningsAsErrors` is on in `backend/Directory.Build.props`, so any `dotnet build`
+warning fails the build and blocks the PR. Use the `csharp-quality` skill for batch cleanup.
 
 **Workflow**: after writing each C# file, run `dotnet build backend/` and fix all
 warnings before proceeding.
