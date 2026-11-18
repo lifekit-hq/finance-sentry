@@ -263,7 +263,7 @@ function render() {
     [S.review_rounds.mean, "review rounds per run (mean)"], [S.rebase_conflicts, "rebase conflicts"],
     [hooks.total_fires, "hook fires"], [hooks.total_blocks, "hook blocks"]
   ].map((t) => '<div class="tile"><b>' + esc(t[0]) + "</b><span>" + esc(t[1]) + "</span></div>").join("") + "</div>" +
-    (w.runs < w.requested ? '<p class="warn note">Window incomplete: ' + w.runs + " of " + w.requested + " runs exist, so rates are not yet comparable to the baseline.</p>" : "");
+    (w.runs < w.requested ? '<p class="warn note">Window incomplete: ' + esc(w.runs) + " of " + esc(w.requested) + " runs exist, so rates are not yet comparable to the baseline.</p>" : "");
 
   let h = row(["owner class", "window", "window %", "baseline (95 runs)", "baseline %"], true);
   for (const o of ["disposition", "gate_error", "decomposition", "harness_load"])
@@ -291,8 +291,8 @@ function render() {
   $("prunes").innerHTML = row(["mechanism", "removed in", "why"], true) +
     (PRUNES.length ? PRUNES.map((p) => row([p.name, p.pr, p.why])).join("") : row([{ v: "none yet" }, "", ""]));
 
-  $("misc").innerHTML = '<p class="note">Rebase conflicts in window: <b>' + S.rebase_conflicts + "</b> (baseline " + BASELINE.rebaseConflicts + " over 95 runs). Corrupt hook-log lines: <b>" +
-    (hooks.corrupt_lines || 0) + "</b>. Warnings: <b>" + S.warnings.length + "</b>" +
+  $("misc").innerHTML = '<p class="note">Rebase conflicts in window: <b>' + esc(S.rebase_conflicts) + "</b> (baseline " + BASELINE.rebaseConflicts + " over 95 runs). Corrupt hook-log lines: <b>" +
+    esc(hooks.corrupt_lines || 0) + "</b>. Warnings: <b>" + esc(S.warnings.length) + "</b>" +
     (S.warnings.length ? "<br>" + S.warnings.map((x) => esc(JSON.stringify(x))).join("<br>") : "") + "</p>";
 }
 render();
