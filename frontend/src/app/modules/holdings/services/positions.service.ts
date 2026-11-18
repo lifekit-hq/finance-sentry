@@ -4,7 +4,6 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {forkJoin, map, type Observable, of} from 'rxjs';
 import {catchError} from 'rxjs/operators';
 
-import {type Headline} from '../../../shared/models/headline/headline.model';
 import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {UnitPriceUtils} from '../../../shared/utils/unit-price.utils';
 import {BROKERAGE_ASSET_CLASS} from '../constants/position/position.constants';
@@ -13,6 +12,7 @@ import {
   type BrokeragePositionDto,
   type CryptoHoldingDto,
   type CryptoHoldingsDto,
+  type HoldingsResult,
   type Position,
 } from '../models/position/position.model';
 
@@ -22,13 +22,6 @@ const PERCENT_SCALE = 100;
 const BROKERAGE_SOURCE = 'brokerage';
 const CRYPTO_SOURCE = 'crypto';
 const HOLDINGS_CURRENCY = 'USD';
-
-/** Every position across the feeds, and the quality of the total they add up to. */
-export interface HoldingsResult {
-  positions: Position[];
-  /** The total's typed record; null when both feeds read cleanly and the API sent none. */
-  headline: Nullable<Headline>;
-}
 
 // P&L % from the provider's own cost basis. Returns null when no usable cost
 // basis is available, so callers render "no data" rather than a fabricated number.

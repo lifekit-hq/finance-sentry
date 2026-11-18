@@ -3,14 +3,8 @@ import {SelectableCardComponent, TagComponent} from '@lifekit-hq/ui';
 
 import {type Provider} from '../../../../shared/models/provider/provider.model';
 import {type InstitutionType} from '../../../../shared/models/provider/provider.model';
+import {type TypeTile} from '../../models/connect/connect.model';
 import {ConnectStore} from '../../store/connect/connect.store';
-
-interface TypeTile {
-  readonly id: InstitutionType;
-  readonly label: string;
-  readonly description: string;
-  readonly badge: string;
-}
 
 const TILES: readonly TypeTile[] = [
   {id: 'bank', label: 'Banking', description: 'Direct bank connections', badge: 'bank'},

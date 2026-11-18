@@ -10,14 +10,9 @@ import {
 import {
   type HeadlineReason,
   type HeadlineReasonSheetData,
+  type ReasonRow,
 } from '../../models/headline/headline.model';
 import {HeadlineUtils} from '../../utils/headline.utils';
-
-interface ReasonRow {
-  code: string;
-  text: string;
-  sourceLabel: Nullable<string>;
-}
 
 /**
  * The body of the reason sheet a quality badge opens: each typed reason in plain words from the

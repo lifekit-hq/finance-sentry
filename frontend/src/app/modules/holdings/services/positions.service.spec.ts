@@ -9,9 +9,10 @@ import {type Headline} from '../../../shared/models/headline/headline.model';
 import {
   type BrokerageHoldingsDto,
   type CryptoHoldingsDto,
+  type HoldingsResult,
   type Position,
 } from '../models/position/position.model';
-import {type HoldingsResult, PositionsService} from './positions.service';
+import {PositionsService} from './positions.service';
 
 const BASE = 'http://api.test';
 

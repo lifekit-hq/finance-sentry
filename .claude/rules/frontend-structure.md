@@ -6,23 +6,15 @@ paths:
 # Frontend file organisation, helpers and providers
 
 **Why it exists:** merged from four concerns that share one reason - each is a structural convention a linter *could* check but does not yet (see the PR's ESLint follow-up candidates), and each applies to the same files. Hard gate: constitution Principle VI.5 (inline interfaces and cross-module code outside `shared/` block PR merge).
-**Retire when:** each section is replaced by its own ESLint rule (file-per-concept, `*.utils.ts` class shape, provider extraction, shared-boundary); delete the section as its rule lands, the file when empty.
+**Retire when:** each section is replaced by its own ESLint rule (`*.utils.ts` class shape, provider extraction, shared-boundary); delete the section as its rule lands, the file when empty.
 
 ## Decorators
 
 Do **not** add `standalone: true` to `@Component` / `@Pipe` / `@Directive`: it is the default and dead boilerplate (`prefer-standalone` only flags `standalone: false`, so this is not linted).
 
-## File organisation
+## Cross-module code
 
-Each concept lives in its own file:
-- **Interfaces / types** → `models/<entity>/<entity>.model.ts` (or `*.types.ts` for type-alias-only files)
-- **Domain constants** → `constants/<entity>/<entity>.constants.ts`; page-only UI constants → `<page>.constants.ts` next to the page
-- **Component class** → `*.component.ts` (no inline interface or constant definitions)
-- **Service class** → `*.service.ts` (HTTP-only; no state, no inline interfaces)
-- **State** → `<feature>/store/*` (see `signal-store.md`)
-- **Validators** → `<feature>/validators/*.validator.ts`
-
-**Shared rule**: any type, constant, utility, or enum used by more than one feature module MUST live in `frontend/src/app/shared/`. If code is imported by two or more modules, move it to `shared/` in the same PR. Use `/frontend-code-quality` for an audit sweep.
+The file-per-concept layout (interfaces and types in `models/`, constants in `constants/`, no inline interface, enum or exported constant in a `*.component.ts` / `*.service.ts`) is enforced by the `structure/file-per-concept` ESLint rule. What a linter cannot check: any type, constant, utility, or enum used by more than one feature module MUST live in `frontend/src/app/shared/`. If code is imported by two or more modules, move it to `shared/` in the same PR. Use `/frontend-code-quality` for an audit sweep.
 
 ## Utility helpers - always a `*.utils.ts` class
 

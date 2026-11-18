@@ -126,3 +126,9 @@ export interface PriceChartOptionsStore {
 export interface PriceChartOptionsSheetData {
   store: PriceChartOptionsStore;
 }
+
+/** A horizontal span of the chart canvas, in CSS pixels from its left edge. */
+export interface Rect {
+  left: number;
+  width: number;
+}
