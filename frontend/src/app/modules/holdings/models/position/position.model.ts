@@ -1,6 +1,6 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
+import {type Headline, type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {type HiddenReason} from '../../../../shared/models/wealth/wealth.model';
 
 export interface BrokeragePositionDto {
@@ -90,4 +90,11 @@ export interface Position {
   nativeValue?: Nullable<number>;
   /** The API's verdict that the list tucks this row away; the page groups by it and never re-decides. */
   hiddenReason?: Nullable<HiddenReason>;
+}
+
+/** Every position across the feeds, and the quality of the total they add up to. */
+export interface HoldingsResult {
+  positions: Position[];
+  /** The total's typed record; null when both feeds read cleanly and the API sent none. */
+  headline: Nullable<Headline>;
 }

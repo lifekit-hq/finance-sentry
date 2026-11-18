@@ -41,17 +41,13 @@ import {
   type MovingAverageId,
   type MovingAverageLine,
   type PriceChartKind,
+  type Rect,
   type TimeSpan,
 } from '../../models/price-chart/price-chart.model';
 import {PriceChartDataUtils} from '../../utils/price-chart-data.utils';
 import {type AxisTickKind, PriceChartViewUtils} from '../../utils/price-chart-view.utils';
 
 type ChartLib = typeof import('lightweight-charts');
-
-interface Rect {
-  left: number;
-  width: number;
-}
 
 const PRICE_PANE = 0;
 const VOLUME_PANE = 1;

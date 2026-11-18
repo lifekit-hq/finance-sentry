@@ -61,3 +61,10 @@ export interface HeadlineReasonSheetData {
 
 /** A headline as read off the wire: absent from an older API build, null when withheld. */
 export type MaybeHeadline = Headline | null | undefined;
+
+/** One reason line in the reason sheet: the code, its plain-words text and the source it names. */
+export interface ReasonRow {
+  code: string;
+  text: string;
+  sourceLabel: Nullable<string>;
+}
