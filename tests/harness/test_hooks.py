@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -159,13 +160,13 @@ class StopHookTests(HookCase):
         with open(path, "w") as fh:
             fh.write(text)
 
-    def run_stop(self, event=None, backend="exit 0", frontend="exit 0"):
+    def run_stop(self, event=None, backend="exit 0", frontend="exit 0", **extra_env):
         marks = os.path.join(self.tmp.name, "ran")
         if os.path.exists(marks):
             os.remove(marks)
         env = dict(os.environ, FS_HOOK_LOG=self.logfile, FS_STOP_ROOT=self.repo,
                    FS_STOP_BACKEND_CMD=f'echo backend >> "{marks}"; {backend}',
-                   FS_STOP_FRONTEND_CMD=f'echo frontend >> "{marks}"; {frontend}')
+                   FS_STOP_FRONTEND_CMD=f'echo frontend >> "{marks}"; {frontend}', **extra_env)
         r = subprocess.run([sys.executable, os.path.join(HOOKS, "stop_check.py")], input=json.dumps(event or {}),
                            capture_output=True, text=True, env=env)
         ran = open(marks).read().split() if os.path.exists(marks) else []
@@ -217,6 +218,35 @@ class StopHookTests(HookCase):
         self.run_stop(backend="exit 1")
         after = subprocess.run(["git", "-C", self.repo, "status", "--porcelain"], capture_output=True, text=True).stdout
         self.assertEqual(before, after)
+
+    def test_missing_node_modules_skips_frontend_with_one_log_line(self):
+        self.write("frontend/src/a.ts", "x")
+        env = dict(os.environ, FS_HOOK_LOG=self.logfile, FS_STOP_ROOT=self.repo)
+        env.pop("FS_STOP_FRONTEND_CMD", None)
+        r = subprocess.run([sys.executable, os.path.join(HOOKS, "stop_check.py")], input="{}",
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("node_modules missing", r.stderr)
+        with open(self.logfile) as fh:
+            lines = [json.loads(l) for l in fh.read().splitlines()]
+        self.assertEqual([l["decision"] for l in lines], ["warn:no-node-modules"])
+
+    def test_timeout_refuses_and_kills_the_whole_process_group(self):
+        self.write("backend/src/A.cs", "x")
+        pidfile = os.path.join(self.tmp.name, "grandchild.pid")
+        r, _ = self.run_stop(backend=f'sleep 60 & echo $! > "{pidfile}"; wait', FS_STOP_HALF_TIMEOUT="1")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("timed out", r.stderr)
+        pid = int(open(pidfile).read())
+        for _ in range(50):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        else:
+            os.kill(pid, 9)
+            self.fail("grandchild survived the timeout")
 
     def test_one_log_line_per_fire(self):
         self.write("backend/src/A.cs", "x")
