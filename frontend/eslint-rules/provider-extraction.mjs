@@ -10,12 +10,20 @@ const MESSAGES = {
 };
 
 function isProvideCall(element) {
-  return element?.type === 'CallExpression' && element.callee.type === 'Identifier' && element.callee.name.startsWith('provide');
+  return (
+    element?.type === 'CallExpression' &&
+    element.callee.type === 'Identifier' &&
+    element.callee.name.startsWith('provide')
+  );
 }
 
 function returnsEnvironmentProviders(fn) {
   const annotation = fn.returnType?.typeAnnotation;
-  return annotation?.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' && annotation.typeName.name === 'EnvironmentProviders';
+  return (
+    annotation?.type === 'TSTypeReference' &&
+    annotation.typeName.type === 'Identifier' &&
+    annotation.typeName.name === 'EnvironmentProviders'
+  );
 }
 
 export const providerExtractionRule = {
@@ -28,22 +36,28 @@ export const providerExtractionRule = {
 
     const listeners = {};
     if (isAppConfig) {
-      listeners['Property[key.name="providers"] > ArrayExpression'] = (node) => {
+      listeners['Property[key.name="providers"] > ArrayExpression'] = node => {
         for (const element of node.elements) {
-          if (!isProvideCall(element)) context.report({node: element ?? node, messageId: 'inlineProvider'});
+          if (!isProvideCall(element))
+            context.report({node: element ?? node, messageId: 'inlineProvider'});
         }
       };
     }
     if (isProviderFile) {
-      listeners['ExportNamedDeclaration > FunctionDeclaration'] = (node) => {
+      listeners['ExportNamedDeclaration > FunctionDeclaration'] = node => {
         if (node.id?.name.startsWith('provide')) provideFunctions.push(node);
       };
-      listeners['Program:exit'] = (program) => {
+      listeners['Program:exit'] = program => {
         if (provideFunctions.length === 0) {
-          context.report({node: program, loc: {line: 1, column: 0}, messageId: 'missingProvideFunction'});
+          context.report({
+            node: program,
+            loc: {line: 1, column: 0},
+            messageId: 'missingProvideFunction',
+          });
         }
         for (const fn of provideFunctions) {
-          if (!returnsEnvironmentProviders(fn)) context.report({node: fn, messageId: 'wrongReturnType', data: {name: fn.id.name}});
+          if (!returnsEnvironmentProviders(fn))
+            context.report({node: fn, messageId: 'wrongReturnType', data: {name: fn.id.name}});
         }
       };
     }
