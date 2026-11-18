@@ -28,8 +28,8 @@ def target_path(event):
     return rel.replace(os.sep, "/")
 
 
-def log(hook, file, decision):
-    """Append one JSON line {ts, hook, file, decision}; never raises."""
+def log(hook, file, decision, **extra):
+    """Append one JSON line {ts, hook, file, decision, ...extra}; never raises."""
     path = os.environ.get("FS_HOOK_LOG") or os.path.join(ROOT, ".claude", "hooks.log.jsonl")
     line = {
         "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -37,6 +37,7 @@ def log(hook, file, decision):
         "file": file,
         "decision": decision,
     }
+    line.update(extra)
     try:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(line) + "\n")
