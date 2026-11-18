@@ -1,0 +1,8 @@
+#!/bin/sh
+# Backend tests live here, not in the Stop hook (the Stop hook only builds: tests took 12 min on the PC).
+set -e
+base=$(git merge-base HEAD origin/main 2>/dev/null) || exit 0
+if git diff --name-only "$base" | grep -qE '^(backend/|Directory\..*\.props$)'; then
+  echo "🧪 Running backend tests before push (scripts/backend-tests.sh)..."
+  scripts/backend-tests.sh
+fi

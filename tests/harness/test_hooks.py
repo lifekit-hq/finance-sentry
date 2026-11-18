@@ -137,5 +137,94 @@ class PostToolUseTests(HookCase):
         self.assertEqual(self.last_log()["decision"], "skip")
 
 
+class StopHookTests(HookCase):
+    """Stop hook against a throwaway git repo whose origin/main is the first commit."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo = os.path.join(self.tmp.name, "repo")
+        os.makedirs(self.repo)
+        self.git("init", "-q", "-b", "main")
+        self.write("README.md", "x")
+        self.git("add", "-A")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base")
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def git(self, *args):
+        subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)
+
+    def write(self, rel, text):
+        path = os.path.join(self.repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def run_stop(self, event=None, backend="exit 0", frontend="exit 0"):
+        marks = os.path.join(self.tmp.name, "ran")
+        if os.path.exists(marks):
+            os.remove(marks)
+        env = dict(os.environ, FS_HOOK_LOG=self.logfile, FS_STOP_ROOT=self.repo,
+                   FS_STOP_BACKEND_CMD=f'echo backend >> "{marks}"; {backend}',
+                   FS_STOP_FRONTEND_CMD=f'echo frontend >> "{marks}"; {frontend}')
+        r = subprocess.run([sys.executable, os.path.join(HOOKS, "stop_check.py")], input=json.dumps(event or {}),
+                           capture_output=True, text=True, env=env)
+        ran = open(marks).read().split() if os.path.exists(marks) else []
+        return r, ran
+
+    def test_blocked_red_backend_refuses_with_error_lines(self):
+        self.write("backend/src/A.cs", "broken")
+        out = "\n".join(f"noise {i}" for i in range(50)) + "\nA.cs(1,1): error CS1002: ; expected"
+        r, ran = self.run_stop(backend=f'cat <<EOF\n{out}\nEOF\nexit 1')
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("error CS1002", r.stderr)
+        self.assertLessEqual(len(r.stderr.splitlines()), 22)
+        self.assertEqual(ran, ["backend"])
+        entry = self.last_log()
+        self.assertEqual((entry["hook"], entry["file"], entry["decision"]), ("Stop", "backend", "block:red"))
+
+    def test_allowed_green_exits_zero(self):
+        self.write("backend/src/A.cs", "ok")
+        r, ran = self.run_stop()
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertEqual(ran, ["backend"])
+        self.assertEqual(self.last_log()["decision"], "allow:green")
+
+    def test_stop_hook_active_cannot_loop(self):
+        self.write("backend/src/A.cs", "broken")
+        r, ran = self.run_stop(event={"stop_hook_active": True}, backend="exit 1")
+        self.assertEqual((r.returncode, ran), (0, []))
+        self.assertEqual(self.last_log()["decision"], "skip:stop-hook-active")
+
+    def test_split_matches_no_mistakes_test_command(self):
+        cases = [("backend/x.cs", ["backend"]), ("Directory.Build.props", ["backend"]),
+                 ("frontend/src/a.ts", ["frontend"]), ("scripts/x.sh", ["backend", "frontend"]),
+                 ("docs/a.md", []), ("notes.md", [])]
+        for path, expected in cases:
+            with self.subTest(path):
+                self.git("clean", "-fdq")
+                self.write(path, "x")
+                r, ran = self.run_stop()
+                self.assertEqual((r.returncode, ran), (0, expected))
+
+    def test_empty_diff_runs_nothing(self):
+        r, ran = self.run_stop()
+        self.assertEqual((r.returncode, ran), (0, []))
+        self.assertEqual(self.last_log()["decision"], "skip:no-code-change")
+
+    def test_hook_never_modifies_files(self):
+        self.write("backend/src/A.cs", "x")
+        before = subprocess.run(["git", "-C", self.repo, "status", "--porcelain"], capture_output=True, text=True).stdout
+        self.run_stop(backend="exit 1")
+        after = subprocess.run(["git", "-C", self.repo, "status", "--porcelain"], capture_output=True, text=True).stdout
+        self.assertEqual(before, after)
+
+    def test_one_log_line_per_fire(self):
+        self.write("backend/src/A.cs", "x")
+        self.run_stop()
+        self.run_stop()
+        with open(self.logfile) as fh:
+            self.assertEqual(len(fh.read().splitlines()), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
