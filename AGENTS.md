@@ -33,11 +33,6 @@ Commit hook (`.husky/pre-commit`, lint-staged on staged frontend files) assumes 
 
 > **Source of truth split**: architecture principles, testing requirements, code quality gates and branching rules live in the constitution, [`.specify/memory/constitution.md`](.specify/memory/constitution.md) — it wins. This file is the pointer and gotcha list; [`docs/`](docs/claude/app-state.md) holds current state.
 
-## Mandatory Rules (auto-loaded)
-
-@docs/claude/frontend-rules.md
-@docs/claude/backend-rules.md
-
 ## Reference Docs (open when relevant)
 
 - [Money semantics](docs/money-semantics.md) — source of truth for every money calculation; a PR changing money math updates it and [the finance framework](docs/finance-framework.md) in the same diff
