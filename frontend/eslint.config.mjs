@@ -2,6 +2,7 @@ import {createEslintConfig} from '@lifekit-hq/config/eslint';
 
 import {structurePlugin} from './eslint-rules/file-per-concept.mjs';
 import {keyboardsPlugin} from './eslint-rules/money-inputmode.mjs';
+import {utilsPlugin} from './eslint-rules/utils-class.mjs';
 
 export default createEslintConfig({
   selectorPrefix: 'fns',
@@ -27,6 +28,13 @@ export default createEslintConfig({
       files: ['src/app/**/*.component.ts', 'src/app/**/*.service.ts'],
       plugins: {structure: structurePlugin},
       rules: {'structure/file-per-concept': 'error'},
+    },
+    {
+      // Pure helpers live in a `*.utils.ts` class with `public static` methods and a sibling spec
+      // (replaces the frontend-structure "Utility helpers" prose).
+      files: ['src/app/**/*.utils.ts'],
+      plugins: {utils: utilsPlugin},
+      rules: {'utils/utils-class': 'error'},
     },
     {
       files: ['**/*.html'],

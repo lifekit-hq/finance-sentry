@@ -6,7 +6,7 @@ paths:
 # Frontend file organisation, helpers and providers
 
 **Why it exists:** merged from four concerns that share one reason - each is a structural convention a linter *could* check but does not yet (see the PR's ESLint follow-up candidates), and each applies to the same files. Hard gate: constitution Principle VI.5 (inline interfaces and cross-module code outside `shared/` block PR merge).
-**Retire when:** each section is replaced by its own ESLint rule (`*.utils.ts` class shape, provider extraction, shared-boundary); delete the section as its rule lands, the file when empty.
+**Retire when:** each section is replaced by its own ESLint rule (provider extraction, shared-boundary, the utils pipe-wrapper convention); delete the section as its rule lands, the file when empty.
 
 ## Decorators
 
@@ -16,12 +16,9 @@ Do **not** add `standalone: true` to `@Component` / `@Pipe` / `@Directive`: it i
 
 The file-per-concept layout (interfaces and types in `models/`, constants in `constants/`, no inline interface, enum or exported constant in a `*.component.ts` / `*.service.ts`) is enforced by the `structure/file-per-concept` ESLint rule. What a linter cannot check: any type, constant, utility, or enum used by more than one feature module MUST live in `frontend/src/app/shared/`. If code is imported by two or more modules, move it to `shared/` in the same PR. Use `/frontend-code-quality` for an audit sweep.
 
-## Utility helpers - always a `*.utils.ts` class
+## Utility helpers
 
-Pure helpers are NEVER bare `export function`s. Each lives in `<domain>.utils.ts` under `shared/utils/` (cross-module) or `modules/<feature>/utils/` (feature-local), as a class with `public static` methods (`ErrorUtils.extractMessage(err)`).
-- One domain per file; no instance state, no DI, no `inject()` (needs DI → a service).
-- **Template-bound helpers need a thin pipe wrapper** (`shared/pipes/<name>.pipe.ts` or `modules/<feature>/pipes/`) whose `transform()` delegates to the static method; components don't expose the function via `public readonly fooFn = fooFn`.
-- Every `*.utils.ts` ships a `<domain>.utils.spec.ts` (Vitest): one branch per `it`, null/undefined/empty edge cases, `vi.useFakeTimers()` for time-dependent helpers; 100% coverage on the util. The `frontend-utils-creation` skill covers the mechanics.
+The `*.utils.ts` shape (a class of `public static` methods, no bare exported functions or arrow constants, a sibling `*.utils.spec.ts`) is enforced by the `utils/utils-class` ESLint rule. What a linter cannot check: helpers live under `shared/utils/` (cross-module) or `modules/<feature>/utils/` (feature-local), one domain per file, no `inject()` (needs DI → a service). **Template-bound helpers need a thin pipe wrapper** (`shared/pipes/<name>.pipe.ts` or `modules/<feature>/pipes/`) whose `transform()` delegates to the static method; components don't expose the function via `public readonly fooFn = fooFn`. The `frontend-utils-creation` skill covers the mechanics.
 
 ## Custom providers - always extract
 
