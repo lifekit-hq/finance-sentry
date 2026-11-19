@@ -153,6 +153,17 @@ describe('BookPerformanceStore', () => {
     expect(store.shortComparison()).toBeNull();
   });
 
+  it('has no 3M figure when SPY was not measured over the same dates as the book', () => {
+    const store = create(
+      performance([
+        period({period: 2, bookTwr: -0.164, spyTwr: -0.023, delta: null}),
+        period({period: 3}),
+      ])
+    );
+
+    expect(store.shortComparison()).toBeNull();
+  });
+
   it('flags the sleeve the stored record marks as sustained underperformance in the rule window', () => {
     const store = create(performance([period()]), {
       ...EMPTY_TRACK_RECORD,

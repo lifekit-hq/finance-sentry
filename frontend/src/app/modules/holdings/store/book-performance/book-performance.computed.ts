@@ -70,7 +70,12 @@ export function bookPerformanceComputed(store: StateSignals) {
       const period = store
         .performance()
         ?.periods.find(p => p.period === BOOK_PERFORMANCE_THREE_MONTHS);
-      if (period?.bookTwr == null || period.spyTwr == null) {
+      if (
+        period?.bookTwr == null ||
+        period.spyTwr == null ||
+        period.delta == null ||
+        !period.bookTwrFrom
+      ) {
         return null;
       }
       return {
