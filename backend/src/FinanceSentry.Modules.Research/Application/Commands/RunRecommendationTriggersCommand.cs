@@ -84,7 +84,7 @@ public sealed class RunRecommendationTriggersCommandHandler(
             }
 
             var tickerTheses = userTheses.Where(t => t.Ticker.Equals(ticker, StringComparison.OrdinalIgnoreCase)).ToList();
-            var broken = tickerTheses.Where(t => t.BrokenAt is not null && !IsPriceBreak(t)).OrderByDescending(t => t.BrokenAt).FirstOrDefault();
+            var broken = tickerTheses.Where(t => t.BrokenAt is not null && !ThesisMetric.IsNonBreakingReason(t.BrokenReason)).OrderByDescending(t => t.BrokenAt).FirstOrDefault();
             if (broken is not null)
             {
                 if (await TryProposeExitAsync(userId, book, ticker, broken, ct))
@@ -114,15 +114,6 @@ public sealed class RunRecommendationTriggersCommandHandler(
 
         return created;
     }
-
-    /// <summary>
-    /// A break stored before a price breach stopped breaking theses names a price metric in its reason. It must not
-    /// become an Exit: only a fundamental or narrative break may.
-    /// </summary>
-    private static bool IsPriceBreak(InvestmentThesis thesis)
-        => thesis.BrokenReason is { } reason
-            && ThesisMetric.All.Where(m => !ThesisMetric.CanBreakThesis(m))
-                .Any(m => reason.StartsWith(m, StringComparison.OrdinalIgnoreCase));
 
     private async Task<bool> TryProposeExitAsync(
         Guid userId, BookFigures book, string ticker, InvestmentThesis broken, CancellationToken ct)

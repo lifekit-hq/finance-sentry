@@ -504,6 +504,34 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenReason.Should().Contain(ThesisMetric.GrossMargin).And.NotContain(ThesisMetric.PriceDrawdown);
     }
 
+    [Fact]
+    public async Task LegacyPriceBreak_DoesNotHideALaterFundamentalsBreak()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var closes = new List<DailyClose> { new(today.AddDays(-2), 100m), new(today.AddDays(-1), 60m), new(today, 55m) };
+        var facts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 30m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var thesis = Thesis(
+        [
+            new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 2),
+            new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1),
+        ]);
+        thesis.BrokenAt = DateTimeOffset.UtcNow.AddDays(-10);
+        thesis.BrokenReason = "price_drawdown greaterThan 0.3 — observed [0.4, 0.45] over [a, b]";
+        var alerts = new FakeAlertGeneratorService();
+        var marketData = new FakeMarketDataService(new Dictionary<string, IReadOnlyList<DailyClose>> { ["MU"] = closes });
+
+        var summary = await BuildHandler(new FakeThesisRepository([thesis]), new StubFundamentalsService(facts), alerts, marketData)
+            .Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.BreaksRaised.Should().Be(1);
+        thesis.BrokenReason.Should().Contain(ThesisMetric.GrossMargin).And.NotContain(ThesisMetric.PriceDrawdown);
+        alerts.GenerateCalls.Should().Be(1);
+    }
+
 
     // ── #1375: infra-blind marking, post-run meta-check, coverage-degradation diff ───────────────
 

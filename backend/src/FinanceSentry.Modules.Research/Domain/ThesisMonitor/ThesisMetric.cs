@@ -63,5 +63,14 @@ public static class ThesisMetric
     /// </summary>
     public static bool CanBreakThesis(string metric) => !IsPriceMetric(metric) && !IsRelativeMetric(metric);
 
+    /// <summary>
+    /// Whether a stored break reason names a metric that cannot break a thesis: a break stored before price and
+    /// relative-return breaches stopped breaking theses. Such a break is a review, not a real break.
+    /// </summary>
+    public static bool IsNonBreakingReason(string? reason)
+        => reason is not null
+            && AllMetrics.Where(m => !CanBreakThesis(m))
+                .Any(m => reason.StartsWith(m, StringComparison.OrdinalIgnoreCase));
+
     public static bool IsRelativeMetric(string metric) => RelativeMetrics.Contains(metric);
 }

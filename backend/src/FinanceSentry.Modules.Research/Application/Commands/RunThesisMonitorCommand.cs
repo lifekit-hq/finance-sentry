@@ -114,7 +114,9 @@ public class RunThesisMonitorCommandHandler(
                 var firstBreach = breaches.FirstOrDefault(b => ThesisMetric.CanBreakThesis(b.Metric));
                 var allNonEvaluable = verdicts.Count > 0 && verdicts.All(v => v is TriggerVerdict.NonEvaluable);
 
-                if (firstBreach is not null && thesis.BrokenAt is null)
+                var alreadyBroken = thesis.BrokenAt is not null && !ThesisMetric.IsNonBreakingReason(thesis.BrokenReason);
+
+                if (firstBreach is not null && !alreadyBroken)
                 {
                     thesis.BrokenAt = DateTimeOffset.UtcNow;
                     thesis.BrokenReason = ComposeReason(firstBreach);
