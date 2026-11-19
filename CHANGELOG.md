@@ -5,6 +5,47 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.21.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.20.0...v1.21.0) (2026-11-19)
+
+
+### Features
+
+* **brokerage-sync:** persist Flex listing exchange and report it in verdict coverage audit ([#1457](https://github.com/lifekit-hq/finance-sentry/issues/1457)) ([5ad3df4](https://github.com/lifekit-hq/finance-sentry/commit/5ad3df4cee57b14c3d917621c0adb93db912a50e))
+* **docker:** persist SEC_EDGAR_CONTACT from a repository variable into .env.deploy ([#1447](https://github.com/lifekit-hq/finance-sentry/issues/1447)) ([ac4b177](https://github.com/lifekit-hq/finance-sentry/commit/ac4b177d00fec8185b149e000258f09f325f4fe2))
+* **frontend:** adopt swipe actions on alert and watchlist rows ([#1421](https://github.com/lifekit-hq/finance-sentry/issues/1421)) ([f9f58a8](https://github.com/lifekit-hq/finance-sentry/commit/f9f58a87c2fd317582626a529a02bc5652acce40))
+* **frontend:** enforce the screen gates on accounts and transactions ([#1442](https://github.com/lifekit-hq/finance-sentry/issues/1442)) ([f77a5fe](https://github.com/lifekit-hq/finance-sentry/commit/f77a5fe37b0ebeb15097454e4adcbcb19c7eb93a))
+* **frontend:** enforce the screen gates on flow-breakdown ([#1440](https://github.com/lifekit-hq/finance-sentry/issues/1440)) ([674095a](https://github.com/lifekit-hq/finance-sentry/commit/674095a01de8521cce41206b7dcef19f597b02a2))
+* **frontend:** enforce the screen gates on the asset dossier route ([#1452](https://github.com/lifekit-hq/finance-sentry/issues/1452)) ([4ae14ff](https://github.com/lifekit-hq/finance-sentry/commit/4ae14ffbd4a596f53bac9c312b7ead05a61a88a7))
+* **frontend:** enforce the screen gates on the construction route ([#1462](https://github.com/lifekit-hq/finance-sentry/issues/1462)) ([456462b](https://github.com/lifekit-hq/finance-sentry/commit/456462b3556c79ee69e788d24e2d8b6763430fb9))
+* **frontend:** enforce the screen gates on the dashboard ([#1448](https://github.com/lifekit-hq/finance-sentry/issues/1448)) ([5c1b703](https://github.com/lifekit-hq/finance-sentry/commit/5c1b703f33f2985d2c8d10887abaa8ccec1557f1))
+* **harness:** add PreToolUse/PostToolUse hooks with both-direction tests ([#1475](https://github.com/lifekit-hq/finance-sentry/issues/1475)) ([c99c393](https://github.com/lifekit-hq/finance-sentry/commit/c99c393947d310754959602d818d37105343b836))
+* **harness:** CI check requires a Baselines section when a screen baseline PNG changes ([#1500](https://github.com/lifekit-hq/finance-sentry/issues/1500)) ([e1b2241](https://github.com/lifekit-hq/finance-sentry/commit/e1b22413e863fea7cbcc962c6e92354e31b45e40))
+* **harness:** enforce single shared money pipe with ESLint ([#1498](https://github.com/lifekit-hq/finance-sentry/issues/1498)) ([16c96a7](https://github.com/lifekit-hq/finance-sentry/commit/16c96a7c8150250031f9b45fd265c393d029cf52))
+* **harness:** ESLint rule keeps *.utils.ts as static classes with a sibling spec ([#1497](https://github.com/lifekit-hq/finance-sentry/issues/1497)) ([aaeafcf](https://github.com/lifekit-hq/finance-sentry/commit/aaeafcf2b55faade56a94c61ad37d2dbc3c06b72))
+* **harness:** ESLint rule keeps custom providers extracted into core/providers ([#1499](https://github.com/lifekit-hq/finance-sentry/issues/1499)) ([ba96b88](https://github.com/lifekit-hq/finance-sentry/commit/ba96b885a005ca8022d656a28fa00b15492945db))
+* **harness:** ESLint rule keeps interfaces, enums and exported consts out of component and service files ([#1496](https://github.com/lifekit-hq/finance-sentry/issues/1496)) ([481cfde](https://github.com/lifekit-hq/finance-sentry/commit/481cfde73ed7195229f21ca26f28c4b9c9b598a0))
+* **harness:** freeze no-mistakes version and per-step models in gate contract ([#1502](https://github.com/lifekit-hq/finance-sentry/issues/1502)) ([7068807](https://github.com/lifekit-hq/finance-sentry/commit/7068807d1f18ce1c13a40a0d55b0ba2c8214de97))
+* **harness:** Stop hook refuses the turn on a red diff-scoped build ([#1476](https://github.com/lifekit-hq/finance-sentry/issues/1476)) ([aef82f7](https://github.com/lifekit-hq/finance-sentry/commit/aef82f7ba56f15628f7428a3b559c6aae8ba5413))
+* **research:** per-symbol audit bars, fund kind and failed dossier sections ([#1455](https://github.com/lifekit-hq/finance-sentry/issues/1455)) ([d3ff54a](https://github.com/lifekit-hq/finance-sentry/commit/d3ff54a130cd113602ce5eca8d5bf565685f1d4b))
+
+
+### Bug Fixes
+
+* **research:** price breach opens a thesis review, never an Exit ([#1510](https://github.com/lifekit-hq/finance-sentry/issues/1510)) ([3bcd938](https://github.com/lifekit-hq/finance-sentry/commit/3bcd938992617fafd8f656951060d5b206a05426))
+* **research:** require an email contact for the SEC EDGAR User-Agent ([#1444](https://github.com/lifekit-hq/finance-sentry/issues/1444)) ([6204aa9](https://github.com/lifekit-hq/finance-sentry/commit/6204aa91d1150714ca0dc34f471eec2d3c842d8e))
+* **research:** retry GDELT throttles and log terminal job failures ([#1449](https://github.com/lifekit-hq/finance-sentry/issues/1449)) ([a9ad1aa](https://github.com/lifekit-hq/finance-sentry/commit/a9ad1aaf281d1af27274fd6598111e1020fb6c34))
+
+
+### Documentation
+
+* **harness:** cut AGENTS.md to a table of contents ([#1473](https://github.com/lifekit-hq/finance-sentry/issues/1473)) ([769cdc8](https://github.com/lifekit-hq/finance-sentry/commit/769cdc854c035378bed1b3db88e7b10be68b1ca9))
+* **harness:** declare gate rigor lanes by stake and test the lane table ([#1504](https://github.com/lifekit-hq/finance-sentry/issues/1504)) ([63aa61a](https://github.com/lifekit-hq/finance-sentry/commit/63aa61a054aa1f89479ae71ff5ee97beda3afaaa))
+* **harness:** state the scoped test rerun rule in the gate contract ([#1503](https://github.com/lifekit-hq/finance-sentry/issues/1503)) ([f0c1a93](https://github.com/lifekit-hq/finance-sentry/commit/f0c1a931d1cc9f0876bd25ad8b1f42e7d1eb2a8e))
+* **harness:** turn constitution "automatic block" rules into checks or guidance ([#1509](https://github.com/lifekit-hq/finance-sentry/issues/1509)) ([4c16d6f](https://github.com/lifekit-hq/finance-sentry/commit/4c16d6f81979bb5beb8a5707728d12e66572476b))
+* **ledger:** point the A2A envelope at the shared persona block ([#1459](https://github.com/lifekit-hq/finance-sentry/issues/1459)) ([#1461](https://github.com/lifekit-hq/finance-sentry/issues/1461)) ([f80e958](https://github.com/lifekit-hq/finance-sentry/commit/f80e95845d2877404439ae8b42f16764509692f5))
+* **ledger:** route dev-class problems through the shared intake door ([#1451](https://github.com/lifekit-hq/finance-sentry/issues/1451)) ([151aff3](https://github.com/lifekit-hq/finance-sentry/commit/151aff3f7fbbba46c59c8f517d1a3badaf8900a2))
+* split harness backend/frontend rules into path-scoped .claude/rules files ([#1474](https://github.com/lifekit-hq/finance-sentry/issues/1474)) ([29a8a7b](https://github.com/lifekit-hq/finance-sentry/commit/29a8a7ba4442d2a4eb331c3bd46962c4c3eda347))
+
 ## [1.20.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.19.0...v1.20.0) (2026-11-16)
 
 
