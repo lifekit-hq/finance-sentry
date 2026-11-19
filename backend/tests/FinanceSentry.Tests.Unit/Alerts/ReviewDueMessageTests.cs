@@ -90,7 +90,7 @@ public sealed class ReviewDueMessageTests
         ReviewDueSource.All.Where(ReviewDueSource.IsRealtime).Should().BeEquivalentTo(
             [ReviewDueSource.Filing, ReviewDueSource.Break, ReviewDueSource.Unbreak]);
         ReviewDueSource.All.Where(s => !ReviewDueSource.IsRealtime(s)).Should().BeEquivalentTo(
-            [ReviewDueSource.News, ReviewDueSource.Earnings, ReviewDueSource.Catalyst]);
+            [ReviewDueSource.News, ReviewDueSource.Earnings, ReviewDueSource.Catalyst, ReviewDueSource.PriceBreach]);
         ReviewDueSource.IsRealtime(null).Should().BeFalse();
     }
 }

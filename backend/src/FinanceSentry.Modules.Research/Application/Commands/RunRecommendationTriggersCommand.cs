@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -83,7 +84,7 @@ public sealed class RunRecommendationTriggersCommandHandler(
             }
 
             var tickerTheses = userTheses.Where(t => t.Ticker.Equals(ticker, StringComparison.OrdinalIgnoreCase)).ToList();
-            var broken = tickerTheses.Where(t => t.BrokenAt is not null).OrderByDescending(t => t.BrokenAt).FirstOrDefault();
+            var broken = tickerTheses.Where(t => t.BrokenAt is not null && !ThesisMetric.IsNonBreakingReason(t.BrokenReason)).OrderByDescending(t => t.BrokenAt).FirstOrDefault();
             if (broken is not null)
             {
                 if (await TryProposeExitAsync(userId, book, ticker, broken, ct))

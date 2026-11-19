@@ -5,8 +5,9 @@ using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 
 /// <summary>
 /// Pure, deterministic proposal of invalidation triggers from a scorecard, offered at promotion
-/// time (US3/T021). Always proposes a price-drawdown trigger; proposes revenue/margin triggers only
-/// when the underlying fundamentals were evaluable — never invents a threshold from missing data.
+/// time (US3/T021). Proposes revenue/margin triggers only when the underlying fundamentals were
+/// evaluable — never invents a threshold from missing data. It never proposes a price trigger: a price breach opens a
+/// review and cannot break a thesis, so a price drawdown is not offered as an exit condition.
 /// </summary>
 public static class TriggerPrefill
 {
@@ -15,23 +16,13 @@ public static class TriggerPrefill
     // Spec 019 FR-011: fundamentals triggers require 2 consecutive quarters — one soft print
     // must never kill a thesis.
     private const int FundamentalsConsecutiveQuarters = 2;
-    private const string PriceDrawdownRationale = "Standard downside guard: exit if price draws down beyond the configured threshold over the configured window.";
     private const string RevenueYoyRationale = "Thesis assumes continued revenue growth; break if YoY growth turns negative.";
     private const string GrossMarginRationale = "Break if gross margin compresses below the latest observed level, minus a buffer.";
 
     public static IReadOnlyList<ProposedTrigger> Propose(
         FundamentalsScoreDetail fundamentals, OpportunityOptions options)
     {
-        var triggers = new List<ProposedTrigger>
-        {
-            new(
-                ThesisMetric.PriceDrawdown,
-                "greaterThan",
-                Math.Round(options.DefaultDrawdownPrefill, DrawdownRoundingDecimals),
-                ProxyTicker: null,
-                ConsecutivePeriods: options.DefaultDrawdownConsecutiveDays,
-                PriceDrawdownRationale),
-        };
+        var triggers = new List<ProposedTrigger>();
 
         if (fundamentals.RevenueYoy is { } revenueYoy && revenueYoy > 0)
         {

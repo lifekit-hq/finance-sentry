@@ -11,14 +11,13 @@ public sealed class TriggerPrefillTests
     private static readonly OpportunityOptions Options = new();
 
     [Fact]
-    public void Propose_AlwaysIncludesPriceDrawdownTrigger()
+    public void Propose_NeverOffersAPriceTrigger_ASpotOrRelativeBreachCannotBreakAThesis()
     {
-        var triggers = TriggerPrefill.Propose(new FundamentalsScoreDetail(null, null), Options);
+        var triggers = TriggerPrefill.Propose(new FundamentalsScoreDetail(0.15m, 0.40m), Options);
 
-        var drawdown = triggers.Should().ContainSingle(t => t.Metric == ThesisMetric.PriceDrawdown).Subject;
-        drawdown.Threshold.Should().Be(Options.DefaultDrawdownPrefill);
-        drawdown.ConsecutivePeriods.Should().Be(Options.DefaultDrawdownConsecutiveDays);
-        drawdown.Direction.Should().Be("greaterThan");
+        triggers.Should().NotBeEmpty();
+        triggers.Should().OnlyContain(t => ThesisMetric.CanBreakThesis(t.Metric));
+        TriggerPrefill.Propose(new FundamentalsScoreDetail(null, null), Options).Should().BeEmpty();
     }
 
     [Fact]

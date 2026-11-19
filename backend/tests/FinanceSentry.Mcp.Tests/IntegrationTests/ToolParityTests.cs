@@ -1067,7 +1067,7 @@ public sealed class ToolParityTests
     }
 
     [Fact]
-    public async Task RunThesisMonitor_RelativeReturnTrigger_SavedViaTool_BreaksOnSustainedUnderperformance()
+    public async Task RunThesisMonitor_RelativeReturnTrigger_SavedViaTool_SustainedUnderperformanceNeverBreaksTheThesis()
     {
         var userId = Guid.NewGuid();
 
@@ -1117,17 +1117,14 @@ public sealed class ToolParityTests
         var result = await runTool.ExecuteAsync();
 
         result.Should().NotBeNull();
-        result!.Summary.BreaksRaised.Should().Be(1);
-        result.Breaks.Should().ContainSingle(b => b.Ticker == "GRAB");
+        // A relative-return breach opens a review; it never breaks the thesis, so it cannot become a rules Exit.
+        result!.Summary.BreaksRaised.Should().Be(0);
+        result.Breaks.Should().BeEmpty();
 
         var listTool = svc.GetRequiredService<ListThesisBreaksTool>();
         var breaks = await listTool.ExecuteAsync();
 
-        breaks.Should().ContainSingle();
-        var thesisBreak = breaks.Single();
-        thesisBreak.Ticker.Should().Be("GRAB");
-        thesisBreak.Metric.Should().Be(FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMetric.RelativeReturn);
-        thesisBreak.Reason.Should().NotBeNullOrEmpty();
+        breaks.Should().BeEmpty();
     }
 
     [Fact]
