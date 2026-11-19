@@ -1538,6 +1538,13 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   `bookTwr` vs `spyTwr` (the TWR is computed on USD values; the line shows no money amount, so nothing is
   converted to the base currency). Each period carries `bookTwrQuality`, the worst quality its `bookTwrReasons`
   imply (`HeadlineQualityMapper`), so the line's badge reads the same reasons the brief's "(est.)" does.
+  The Home dashboard shows the same component as a "Book vs S&P 500" card: the since-inception row above, a
+  second row for the `3M` period (only when it has both TWRs, `delta` and `bookTwrFrom`, so both returns cover the
+  same dates), and a one-line basis note naming the cash-inclusive time-weighted return against SPY's adjusted-close
+  return over the same dates. The card also flags a book or sleeve row of the track-record rule window
+  (`GET /api/v1/research/theses/track-record`) whose stored `sustainedUnderperformance` is set; the flag is read as
+  stored, never recomputed, and is left off if the record cannot be read. No new calculation: every figure is the
+  one above.
 
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the
