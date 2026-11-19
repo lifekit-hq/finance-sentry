@@ -31,7 +31,7 @@ RUN dotnet build FinanceSentry.sln -c Release --no-restore
 RUN dotnet publish src/FinanceSentry.API/FinanceSentry.API.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine AS runtime
 WORKDIR /app
 
 # curl/tzdata for health + timezones; postgresql16-client (pg_dump/pg_restore/createdb/dropdb) + age
