@@ -16,6 +16,7 @@ import {
 import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokeragePnlService} from '../../services/brokerage-pnl.service';
+import {TrackRecordService} from '../../services/track-record.service';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {BrokerageGrowthComponent} from './brokerage-growth.component';
 
@@ -101,6 +102,7 @@ describe('BrokerageGrowthComponent', () => {
       imports: [BrokerageGrowthComponent],
       providers: [
         {provide: BookPerformanceService, useValue: {getPerformance: () => NEVER}},
+        {provide: TrackRecordService, useValue: {getTrackRecord: () => NEVER}},
         {provide: BrokeragePnlService, useValue: {getPnl: () => NEVER}},
       ],
     })

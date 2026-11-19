@@ -10,24 +10,60 @@
   <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="1rem" width="70%" />
 
   @if (store.comparison(); as comparison) {
-    <cmn-list-item-row
-      [label]="'Book vs SPY'"
-      [sublabel]="'since ' + (comparison.from | date: 'd MMM y')"
-      data-testid="book-vs-spy"
-    >
-      <span amount class="flex items-baseline gap-cmn-2 text-cmn-sm">
-        @if (comparison.headline; as headline) {
-          <fns-headline-badge [headline]="headline" label="Book return" />
-        }
-        <span class="tabular-nums text-text-primary" data-testid="book-vs-spy-returns">
-          {{ comparison.bookReturn }} vs {{ comparison.benchmarkReturn }}
+    @if (card()) {
+      <cmn-card data-testid="book-vs-spy-card">
+        <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+          Book vs S&amp;P 500
+        </h2>
+        <ng-container *ngTemplateOutlet="figures; context: {$implicit: comparison}" />
+      </cmn-card>
+    } @else {
+      <ng-container *ngTemplateOutlet="figures; context: {$implicit: comparison}" />
+    }
+  }
+</cmn-async-state>
+
+<ng-template #figures let-comparison>
+  <cmn-list-item-row
+    [label]="'Book vs SPY'"
+    [sublabel]="'since ' + (comparison.from | date: 'd MMM y')"
+    data-testid="book-vs-spy"
+  >
+    <span amount class="flex items-baseline gap-cmn-2 text-cmn-sm">
+      @if (comparison.headline; as headline) {
+        <fns-headline-badge [headline]="headline" label="Book return" />
+      }
+      <span class="tabular-nums text-text-primary" data-testid="book-vs-spy-returns">
+        {{ comparison.bookReturn }} vs {{ comparison.benchmarkReturn }}
+      </span>
+      @if (comparison.qqqReturn; as qqqReturn) {
+        <span class="tabular-nums text-text-secondary" data-testid="book-vs-qqq-returns">
+          QQQ {{ qqqReturn }}
         </span>
-        @if (comparison.qqqReturn; as qqqReturn) {
-          <span class="tabular-nums text-text-secondary" data-testid="book-vs-qqq-returns">
-            QQQ {{ qqqReturn }}
-          </span>
-        }
+      }
+    </span>
+  </cmn-list-item-row>
+  @if (store.shortComparison(); as short) {
+    <cmn-list-item-row [label]="'Book vs SPY'" [sublabel]="'3 months'" data-testid="book-vs-spy-3m">
+      <span
+        amount
+        class="tabular-nums text-cmn-sm text-text-primary"
+        data-testid="book-vs-spy-3m-returns"
+      >
+        {{ short.bookReturn }} vs {{ short.benchmarkReturn }}
       </span>
     </cmn-list-item-row>
   }
-</cmn-async-state>
+  @if (store.sustained(); as sustained) {
+    <p
+      class="flex items-center gap-cmn-2 px-cmn-4 py-cmn-2 text-cmn-sm font-medium text-status-warning"
+      data-testid="book-vs-spy-sustained"
+    >
+      <cmn-icon name="TriangleAlert" size="sm" />
+      {{ sustained.label }}: sustained underperformance against SPY.
+    </p>
+  }
+  <p class="px-cmn-4 py-cmn-2 text-cmn-xs text-text-secondary" data-testid="book-vs-spy-basis">
+    {{ basisNote }}
+  </p>
+</ng-template>
