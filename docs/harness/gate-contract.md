@@ -10,7 +10,7 @@ What the no-mistakes gate runs, frozen so the 20-run attribution compares like w
 
 ## Scoped test rerun
 
-**Rule:** the diff-scoped `commands.test` in `.no-mistakes.yaml` runs after every review fix round, because the Test step is ordered after Review (intent, rebase, review, test, document, lint, push, pr, ci), so it sees the branch as the last review fix left it; no extra configuration is needed or set.
+**Rule:** the diff-scoped `commands.test` in `.no-mistakes.yaml` runs once after the review step ends, on the branch as the last review fix round left it (the Test step is ordered after Review: intent, rebase, review, test, document, lint, push, pr, ci); a rerun after each individual review fix round is not available by configuration alone, since the pipeline has no setting for it, so that is the missing capability, and this change sets no config.
 
 Not covered: fixes the document and lint steps make run after Test and are not retested by the gate (GitHub CI is the check for those). Proof runs, both on the default-branch `.no-mistakes.yaml` since this change adds no config: run `01M7R4K520HG8N2TFJQ7DJVPWS` (PR #1502; review fix round 2 at 1795033370, Test started 1795034528) and run `01M7PY6X3Y8TEPVFG1GD04HAEN` (PR #1478; no fix round, Test ran once).
 
