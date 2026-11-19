@@ -12,6 +12,8 @@ import {
  * USD fractions; dates are ISO.
  */
 export interface BookPerformancePeriod {
+  /** The server's `BookPerformancePeriod` enum: 0 = 1W, 1 = 1M, 2 = 3M, 3 = 1Y. */
+  period?: number;
   bookTwr: Nullable<number>;
   spyTwr: Nullable<number>;
   /** Book minus SPY; null unless SPY was measured over the book's own window. */
@@ -40,4 +42,15 @@ export interface BookVsSpy {
   qqqReturn: Nullable<string>;
   /** The book TWR's quality, for its badge. */
   headline: Nullable<Headline>;
+}
+
+/** The book against SPY over the 3M period (P2), read on the same basis as `BookVsSpy`. */
+export interface BookVsSpyShort {
+  bookReturn: string;
+  benchmarkReturn: string;
+}
+
+/** A book or sleeve the stored track record flags for sustained underperformance (money-semantics §10). */
+export interface SustainedUnderperformance {
+  label: string;
 }

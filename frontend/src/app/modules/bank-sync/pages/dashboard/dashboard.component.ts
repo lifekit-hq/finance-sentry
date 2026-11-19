@@ -32,6 +32,7 @@ import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {TopAlertComponent} from '../../../alerts/components/top-alert/top-alert.component';
+import {BookVsSpyComponent} from '../../../holdings/components/book-vs-spy/book-vs-spy.component';
 import {NetWorthWhyMovedComponent} from '../../components/net-worth-why-moved/net-worth-why-moved.component';
 import {
   HISTORY_RANGE_LABELS,
@@ -68,6 +69,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
     AllocationBarComponent,
     AreaChartComponent,
     AsyncStateComponent,
+    BookVsSpyComponent,
     ButtonComponent,
     CardComponent,
     HeadlineBadgeComponent,
@@ -334,6 +336,9 @@ const HISTORY_RANGES: ChipRowOption[] = [
               }
             </cmn-card>
           }
+
+          <!-- G1, "am I beating the S&P 500?": the book against SPY since the start and over three months. -->
+          <fns-book-vs-spy [card]="true" class="block" />
 
           <!--
             Spending first, against the usual pace of the closed months, then income with the share of

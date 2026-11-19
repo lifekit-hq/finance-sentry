@@ -250,6 +250,25 @@ export const BOOK_PERFORMANCE = {
   asOf: '2026-09-14',
 };
 
+// The stored benchmark-relative record (money-semantics §10): the equities sleeve flagged for sustained underperformance.
+const TRACK_RECORD = {
+  asOf: '2026-09-14T00:00:00Z',
+  benchmarkTicker: 'SPY',
+  rule: {thresholdPct: 5, sustainedRuns: 4, window: 'ThreeMonths', cadence: 'weekly'},
+  rows: [
+    {
+      scope: 'Sleeve',
+      scopeKey: 'Equities',
+      label: 'Equities',
+      window: 'ThreeMonths',
+      covered: true,
+      excessReturnPct: -6.2,
+      underperformingRuns: 5,
+      sustainedUnderperformance: true,
+    },
+  ],
+};
+
 /**
  * The accounts page reads the wealth summary and both holdings feeds; its brokerage and crypto sections
  * also read both growth splits, the brokerage P&L split and the book against SPY and QQQ. */
@@ -261,5 +280,6 @@ export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/crypto/growth', CRYPTO_GROWTH);
   await mockGet(page, 'wealth/brokerage/pnl', BROKERAGE_PNL);
   await mockGet(page, 'radar/book-performance', BOOK_PERFORMANCE);
+  await mockGet(page, 'research/theses/track-record', TRACK_RECORD);
   await mockGet(page, 'wealth/manual-holdings', []);
 }
