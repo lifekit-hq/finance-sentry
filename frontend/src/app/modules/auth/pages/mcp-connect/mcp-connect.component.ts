@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, effect, inject} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
-import {CardComponent, PageHeaderComponent} from '@lifekit-hq/ui';
+import {PageComponent} from '@lifekit-hq/ui';
 
 import {environment} from '../../../../../environments/environment';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -8,17 +8,12 @@ import {AuthStore} from '../../store/auth.store';
 
 @Component({
   selector: 'fns-mcp-connect',
-  imports: [CardComponent, PageHeaderComponent],
-  host: {class: 'block h-full'},
+  imports: [PageComponent],
+  host: {class: 'block'},
   template: `
-    <div class="flex min-h-full items-center justify-center p-cmn-4 sm:p-cmn-6">
-      <div class="w-full max-w-[36rem] space-y-cmn-8">
-        <cmn-page-header title="Connecting MCP" />
-        <cmn-card class="block">
-          <p class="text-cmn-sm text-text-secondary leading-relaxed">{{ message }}</p>
-        </cmn-card>
-      </div>
-    </div>
+    <cmn-page kind="detail" title="Connecting MCP">
+      <p class="text-cmn-sm text-text-secondary leading-relaxed">{{ message }}</p>
+    </cmn-page>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

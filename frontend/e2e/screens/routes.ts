@@ -14,6 +14,13 @@ import {LEDGER_SCREEN} from '../support/screens/ledger.screen';
 import {MORE_SCREEN} from '../support/screens/more.screen';
 import {PEOPLE_SCREEN} from '../support/screens/people.screen';
 import {SETTINGS_SCREEN} from '../support/screens/settings.screen';
+import {
+  ACCESS_DENIED_SCREEN,
+  LOGIN_SCREEN,
+  MCP_CONNECT_SCREEN,
+  PRIVACY_SCREEN,
+  TERMS_SCREEN,
+} from '../support/screens/signed-out.screen';
 import {SUBSCRIPTIONS_SCREEN} from '../support/screens/subscriptions.screen';
 import {TRANSACTIONS_SCREEN} from '../support/screens/transactions.screen';
 import {WATCHLIST_SCREEN} from '../support/screens/watchlist.screen';
@@ -230,35 +237,40 @@ export const SCREEN_ROUTES: readonly ScreenRoute[] = [
     path: '/login',
     kind: 'form',
     note: 'Signed-out screen outside the shell; needs a signed-out fixture.',
-    mode: 'pending',
+    mode: 'enforce',
+    fixture: fixtureOf(LOGIN_SCREEN),
   },
   {
     name: 'access-denied',
     path: '/access-denied',
     kind: 'detail',
     note: 'Signed-out notice outside the shell; needs a signed-out fixture.',
-    mode: 'pending',
+    mode: 'enforce',
+    fixture: fixtureOf(ACCESS_DENIED_SCREEN),
   },
   {
     name: 'mcp-connect',
     path: '/mcp/connect',
     kind: 'form',
     note: 'Consent step of the MCP connection; needs a pending-authorization fixture.',
-    mode: 'pending',
+    mode: 'enforce',
+    fixture: fixtureOf(MCP_CONNECT_SCREEN),
   },
   {
     name: 'privacy',
     path: '/privacy',
     kind: 'detail',
     note: 'A reading page, public.',
-    mode: 'pending',
+    mode: 'enforce',
+    fixture: fixtureOf(PRIVACY_SCREEN),
   },
   {
     name: 'terms',
     path: '/terms',
     kind: 'detail',
     note: 'A reading page, public.',
-    mode: 'pending',
+    mode: 'enforce',
+    fixture: fixtureOf(TERMS_SCREEN),
   },
 ];
 

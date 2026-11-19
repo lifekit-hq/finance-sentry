@@ -12,15 +12,12 @@ export default createEslintConfig({
     {
       // Routed surfaces that are not shell pages, so `cmn-page` (title, gutter, column) does not
       // describe them: the chat canvas fills the shell (routes.ts kind `null`), the accounts list
-      // renders inside accounts-shell's `cmn-page`, and sign-in, access-denied, MCP consent and the
-      // legal reading pages are centred cards outside the shell. Moving the signed-out screens onto
-      // `cmn-page` (kind form/detail in routes.ts) is a visual change for its own PR.
+      // renders inside accounts-shell's `cmn-page`. The signed-out screens (sign-in, access-denied,
+      // MCP consent, privacy, terms) are `cmn-page` roots and are linted like any other page.
       files: [
         'src/app/modules/agent/pages/ledger-chat/**',
         'src/app/modules/agent/pages/ledger-shell/**',
-        'src/app/modules/auth/pages/**',
         'src/app/modules/bank-sync/pages/accounts-list/**',
-        'src/app/modules/legal/pages/**',
       ],
       rules: {'lifekit/page-root': 'off'},
     },
