@@ -127,6 +127,23 @@ public sealed class RunRecommendationTriggersCommandTests
     }
 
     [Fact]
+    public async Task A_thesis_broken_by_a_price_trigger_is_never_queued_as_an_exit()
+    {
+        _userTheses =
+        [
+            new InvestmentThesis
+            {
+                UserId = User, Ticker = "VWCE", BrokenAt = DateTimeOffset.UtcNow.AddHours(-2),
+                BrokenReason = "price_drawdown greaterThan 0.3 — observed [0.31] over [2026-11-17]",
+            },
+        ];
+
+        await Handler().Handle(new RunRecommendationTriggersCommand(), CancellationToken.None);
+
+        _repo.Rows.Should().NotContain(r => r.Action == RecommendationAction.Exit);
+    }
+
+    [Fact]
     public async Task A_name_over_the_cap_with_a_thesis_cites_the_thesis_instead()
     {
         var thesis = new InvestmentThesis { UserId = User, Ticker = "DRAM" };

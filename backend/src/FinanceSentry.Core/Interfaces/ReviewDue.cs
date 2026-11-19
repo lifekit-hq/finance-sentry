@@ -8,7 +8,7 @@ public enum ReviewSubjectKind
 }
 
 /// <summary>
-/// The six things that make a thesis or candidate worth a fresh look, as the strings carried on the alert and the
+/// The things that make a thesis or candidate worth a fresh look, as the strings carried on the alert and the
 /// companion event. A hit is deterministic (a filing landed, a date passed, a trigger broke); what to conclude from it is
 /// Ledger's job, never this repo's.
 /// </summary>
@@ -32,11 +32,14 @@ public static class ReviewDueSource
     /// <summary>The thesis monitor cleared a break.</summary>
     public const string Unbreak = "unbreak";
 
-    public static readonly IReadOnlyList<string> All = [Filing, Earnings, News, Catalyst, Break, Unbreak];
+    /// <summary>A price or relative-return trigger fired. A review, never a break: price alone does not exit a position.</summary>
+    public const string PriceBreach = "price_breach";
+
+    public static readonly IReadOnlyList<string> All = [Filing, Earnings, News, Catalyst, Break, Unbreak, PriceBreach];
 
     /// <summary>
     /// True for the sources that go out at once (subject to the mode, quiet hours and the hourly cap): a filing, a break
-    /// and an unbreak. News, earnings and catalyst ride the digest lane, which the three-times-a-day pulse reads.
+    /// and an unbreak. News, earnings, catalyst and price breach ride the digest lane, which the three-times-a-day pulse reads.
     /// </summary>
     public static bool IsRealtime(string? source)
         => string.Equals(source, Filing, StringComparison.Ordinal)

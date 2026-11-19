@@ -57,5 +57,11 @@ public static class ThesisMetric
 
     public static bool IsPriceMetric(string metric) => PriceMetrics.Contains(metric);
 
+    /// <summary>
+    /// Whether a breach of this metric may mark a thesis broken (and so lead to a rules Exit). Price and relative-return
+    /// breaches only open a review: exits follow a broken thesis, a risk breach or a better use of capital, never P&amp;L.
+    /// </summary>
+    public static bool CanBreakThesis(string metric) => !IsPriceMetric(metric) && !IsRelativeMetric(metric);
+
     public static bool IsRelativeMetric(string metric) => RelativeMetrics.Contains(metric);
 }

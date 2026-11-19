@@ -107,7 +107,11 @@ public class RunThesisMonitorCommandHandler(
                 }
 
                 var verdicts = evaluations.Select(e => e.Verdict).ToList();
-                var firstBreach = verdicts.OfType<TriggerVerdict.Breached>().FirstOrDefault();
+                var breaches = verdicts.OfType<TriggerVerdict.Breached>().ToList();
+
+                // A price or relative-return breach opens a review; it never breaks the thesis, so it can never become
+                // a rules Exit. Only a fundamentals trigger breach marks the thesis broken.
+                var firstBreach = breaches.FirstOrDefault(b => ThesisMetric.CanBreakThesis(b.Metric));
                 var allNonEvaluable = verdicts.Count > 0 && verdicts.All(v => v is TriggerVerdict.NonEvaluable);
 
                 if (firstBreach is not null && thesis.BrokenAt is null)
@@ -140,6 +144,11 @@ public class RunThesisMonitorCommandHandler(
                     await TryRecordEventAsync(thesis, ThesisEventType.Unbroken, decisionNote: null, ct);
                     await TryRaiseReviewAsync(thesis, ReviewDueSource.Unbreak, brokenAt, "its break cleared", ct);
                     breaksCleared++;
+                }
+
+                foreach (var priceBreach in breaches.Where(b => !ThesisMetric.CanBreakThesis(b.Metric)))
+                {
+                    await TryRaisePriceReviewAsync(thesis, priceBreach, ct);
                 }
 
                 // firstBreach is not null && thesis already broken: still-broken, no-op (dedup lives
@@ -275,6 +284,23 @@ public class RunThesisMonitorCommandHandler(
                     thesis.NarrativeFalsifiers),
                 ct),
             thesis.UserId, $"review-due-{source}", ct);
+
+    /// <summary>
+    /// A price or relative-return trigger fired: ask for a re-check of the thesis. Raised once per trigger definition
+    /// (metric, direction, threshold), so a breach that persists across runs does not re-notify.
+    /// </summary>
+    private Task TryRaisePriceReviewAsync(InvestmentThesis thesis, TriggerVerdict.Breached breach, CancellationToken ct)
+        => TryAlertAsync(
+            () => alertGenerator.GenerateReviewDueAlertAsync(
+                thesis.UserId,
+                new ReviewDue(
+                    ReviewSubjectKind.Thesis, thesis.Id, thesis.Ticker, ReviewDueSource.PriceBreach,
+                    string.Create(CultureInfo.InvariantCulture, $"{breach.Metric}:{breach.Direction}:{breach.Threshold:0.####}"),
+                    [$"thesis:{thesis.Id}", $"trigger:{breach.Metric}"],
+                    Truncate($"{thesis.Ticker}: re-check the thesis - {ComposeReason(breach)}", MaxAlertSummaryLength),
+                    thesis.NarrativeFalsifiers),
+                ct),
+            thesis.UserId, $"review-due-{ReviewDueSource.PriceBreach}", ct);
 
     private static string DescribeBlindSpots(IReadOnlyList<UnmonitorableThesis> unmonitorable)
         => string.Join(
