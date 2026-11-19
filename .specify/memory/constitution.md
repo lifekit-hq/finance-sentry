@@ -1,4 +1,12 @@
-<!-- SYNC IMPACT REPORT - Constitution 1.4.0
+<!-- SYNC IMPACT REPORT - Constitution 1.4.1
+Version: 1.4.0 → 1.4.1
+Bump Type: PATCH (wording only; no principle changed, none removed)
+Sections Modified (1.4.1):
+  - Code Review & Compliance: the twelve "automatic block" rules are tagged CC1–CC12; each
+    names the check that enforces it or is marked Guidance. Audit table:
+    docs/harness/constitution-checks.md (#1487).
+  - Governance, Version & Tagging Enforcement: reworded to match release-please.
+Prior report (1.4.0):
 Version: 1.3.1 → 1.4.0
 Bump Type: MINOR (new principle; no existing principle changed)
 Principles Added:
@@ -229,25 +237,39 @@ All work MUST follow per-task feature branching discipline:
 
 ### Code Review & Compliance
 
-Every PR MUST verify compliance with Core Principles I–VII. Violations block merge:
+Every PR MUST verify compliance with Core Principles I–VII. Each rule below is tagged
+`CC1`–`CC12`; `docs/harness/constitution-checks.md` holds one row per tag with the check that
+enforces it today. A rule that names a check is enforced by that check: a failing check blocks
+merge. A rule marked **Guidance** has no check: the author confirms it before opening the PR and
+the reviewer confirms it during review, and a violation found there is fixed before merge.
 
-- Failing linter checks → automatic block
-- Missing or incomplete tests → automatic block
-- Non-encrypted data handling → automatic block
-- Coupling between modules → automatic block
-- External integration accessed without a domain interface (Principle I) → automatic block
-- Frontend feature state held in a component, `setInterval` polling, inline error-code
-  ladders, or custom providers not extracted under `core/providers/` (Principle VI) →
-  automatic block
-- Interface or constant defined inline inside a component or service file (Principle VI.5) →
-  automatic block
-- Cross-module type, utility, or enum not in `shared/` (Principle VI.5) → automatic block
-- Backend `dotnet build` warnings not resolved (Principle II) → automatic block
-- Ledger given a tool surface other than MCP, a hook payload carrying more than ids, or
-  an endpoint/tool/field named after Ledger (Principle VII) → automatic block
-- Version NOT bumped on frontend/API changes → automatic block (see Versioning & Tagging
-  Policy)
-- Tag NOT created for version bump → automatic block (see Versioning & Tagging Policy)
+- CC1 Linters: frontend ESLint and format (`Lint code`, `Format check` in the `frontend-checks`
+  job, Frontend CI) and backend analyzers (`dotnet build`, Backend CI) must pass. Enforced.
+- CC2 Tests: business logic ships with tests (Testing Discipline). Guidance. Only a coverage
+  floor is automatic (`Enforce coverage ratchet floor` in Backend CI, `test:ci` in Frontend CI),
+  and it does not detect a missing or incomplete test for a given change.
+- CC3 Data handling: personal and financial data is encrypted per Principle V. Guidance.
+- CC4 Module coupling: a module depends on Core and Infrastructure, never on another module.
+  Enforced by `ModuleBoundaryTests` and `NamespaceBoundaryTests`.
+- CC5 External integrations are reached through a domain interface (Principle I). Guidance.
+- CC6 Frontend state and composition (Principle VI): custom providers live under
+  `core/providers/`, enforced by the `providers/provider-extraction` ESLint rule (#1499).
+  Feature state held in a component, `setInterval` polling and inline error-code ladders are
+  Guidance.
+- CC7 Interfaces and constants stay out of component and service files (Principle VI.5).
+  Enforced by the `structure/file-per-concept` ESLint rule (#1496).
+- CC8 A type, utility or enum used across modules lives in `shared/` (Principle VI.5).
+  Guidance. A lint rule for it is proposed in `docs/harness/constitution-checks.md`.
+- CC9 Backend `dotnet build` warnings are resolved (Principle II). Enforced by
+  `TreatWarningsAsErrors` in `backend/Directory.Build.props` (#1478), built in Backend CI.
+- CC10 Ledger gets no tool surface other than MCP, a hook payload carries only ids, and no
+  endpoint, tool or field is named after Ledger (Principle VII). Guidance.
+- CC11 Version bumps: `release-please` owns them through the release PR (Weekly Release workflow
+  and the `lifekit-release-bot` token); never hand-bump. The author's part is a conventional
+  commit type that carries the highest-ranked type of the branch. Guidance (see Versioning &
+  Tagging Policy).
+- CC12 Tags: created by the release automation after the release PR merges; never tag by hand.
+  Guidance (see Versioning & Tagging Policy).
 
 Code review checklist includes security, testability, adherence to modular boundaries,
 and version/tagging compliance.
@@ -365,8 +387,9 @@ wins. Exceptions are documented and tracked.
 **Branch Discipline**: Per-task branching is MANDATORY. Mixed multi-task branches
 require explicit team lead approval (rare exception for coordinated refactors).
 
-**Version & Tagging Enforcement**: Automatic CI/CD checks MUST validate version bumps
-and tag creation. Missing version bump or tag blocks PR merge.
+**Version & Tagging Enforcement**: Version bumps and tags come from release automation
+(`release-please`), not from a per-PR check; Code Review & Compliance rules CC11 and CC12
+say what the author and reviewer confirm.
 
 **Version Policy**:
 - MAJOR bump for principle additions/removals or backward-incompatible API changes
@@ -375,4 +398,4 @@ and tag creation. Missing version bump or tag blocks PR merge.
 - Each version change increments **Last Amended** date (ISO format)
 - Applies to both constitution versioning and feature versioning (frontend/backend)
 
-**Version**: 1.4.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-09-17
+**Version**: 1.4.1 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-11-19
