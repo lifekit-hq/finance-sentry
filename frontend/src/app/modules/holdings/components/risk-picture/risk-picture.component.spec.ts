@@ -124,10 +124,10 @@ describe('RiskPictureComponent', () => {
   it('states the position flag it used beside the top-1 weight and marks a breach', () => {
     const el = render(PICTURE);
 
-    const top1 = el.querySelector('[data-testid="risk-figure-top-1"]');
+    const top1 = el.querySelector('[data-testid="risk-figure-largest-position"]');
     expect(top1?.textContent).toContain('37.8% (DRAM)');
     expect(top1?.textContent).toContain('Position flag used: 30.0%');
-    expect(el.querySelector('[data-testid="risk-value-top-1"]')?.className).toContain(
+    expect(el.querySelector('[data-testid="risk-value-largest-position"]')?.className).toContain(
       'text-status-warning'
     );
   });
@@ -135,7 +135,7 @@ describe('RiskPictureComponent', () => {
   it('says no flag is stored rather than inventing one', () => {
     const el = render({...PICTURE, positionFlag: null, top1OverFlag: null});
 
-    expect(el.querySelector('[data-testid="risk-figure-top-1"]')?.textContent).toContain(
+    expect(el.querySelector('[data-testid="risk-figure-largest-position"]')?.textContent).toContain(
       'Position flag: none stored.'
     );
   });
@@ -143,7 +143,9 @@ describe('RiskPictureComponent', () => {
   it('shows top-3 weight, crypto share and beta', () => {
     const el = render(PICTURE);
 
-    expect(el.querySelector('[data-testid="risk-value-top-3"]')?.textContent).toContain('71.0%');
+    expect(el.querySelector('[data-testid="risk-value-top-three"]')?.textContent).toContain(
+      '71.0%'
+    );
     expect(el.querySelector('[data-testid="risk-value-crypto"]')?.textContent).toContain('19.0%');
     expect(el.querySelector('[data-testid="risk-value-beta"]')?.textContent).toContain('1.31');
   });

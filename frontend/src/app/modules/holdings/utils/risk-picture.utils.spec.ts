@@ -33,7 +33,7 @@ describe('RiskPictureUtils.rows', () => {
     const rows = new Map(RiskPictureUtils.rows(PICTURE).map(r => [r.key, r]));
 
     expect(rows.get('max-drawdown')?.warning).toBe(true);
-    expect(rows.get('top-1')?.warning).toBe(true);
+    expect(rows.get('largest-position')?.warning).toBe(true);
     expect(rows.get('volatility')?.warning).toBe(false);
   });
 

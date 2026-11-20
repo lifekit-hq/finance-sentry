@@ -47,7 +47,7 @@ export class RiskPictureUtils {
         warning: false,
       },
       {
-        key: 'top-1',
+        key: 'largest-position',
         label: 'Largest position',
         value: RiskPictureUtils.weight(picture.top1Weight, picture.top1Symbol),
         explanation: RISK_EXPLANATIONS.top1,
@@ -55,7 +55,7 @@ export class RiskPictureUtils {
         warning: picture.top1OverFlag === true,
       },
       {
-        key: 'top-3',
+        key: 'top-three',
         label: 'Top three positions',
         value: RiskPictureUtils.weight(picture.top3Weight, picture.top3Symbols.join(', ')),
         explanation: RISK_EXPLANATIONS.top3,
