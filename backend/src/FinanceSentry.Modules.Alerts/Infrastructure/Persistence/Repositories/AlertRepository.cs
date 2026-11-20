@@ -18,12 +18,13 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     private IQueryable<Alert> AllUsers => _db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-        Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default)
+        Guid userId, string filter, int page, int pageSize, string? search = null,
+        bool includeDigestOnly = false, CancellationToken ct = default)
     {
         var baseQuery = _db.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && !a.IsDismissed);
-        // The in-app feed leaves out the digest-only types; their rows stay stored and captured to the digest.
-        baseQuery = baseQuery.Where(a => !AlertType.DigestOnly.Contains(a.Type));
+        if (!includeDigestOnly)
+            baseQuery = baseQuery.Where(a => !AlertType.DigestOnly.Contains(a.Type));
 
         var filtered = filter?.ToLowerInvariant() switch
         {

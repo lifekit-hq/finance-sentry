@@ -5,10 +5,12 @@ public interface IAlertRepository
     /// <summary>
     /// One page of the user's open (non-dismissed) alerts, newest first. <paramref name="search"/>, when set,
     /// keeps the alerts whose title, message or reference label contains it, ignoring case; the unread count
-    /// ignores both the filter and the search.
+    /// ignores both the filter and the search. The <see cref="AlertType.DigestOnly"/> types are left out unless
+    /// <paramref name="includeDigestOnly"/> is set (the in-app feed leaves them out; Ledger's alert read keeps them).
     /// </summary>
     Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-        Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default);
+        Guid userId, string filter, int page, int pageSize, string? search = null,
+        bool includeDigestOnly = false, CancellationToken ct = default);
 
     /// <summary>The unread count of the in-app feed, which leaves out <see cref="AlertType.DigestOnly"/> types.</summary>
     Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default);

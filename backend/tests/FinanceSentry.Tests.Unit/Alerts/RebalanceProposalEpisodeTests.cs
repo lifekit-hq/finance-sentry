@@ -451,7 +451,8 @@ public class RebalanceProposalEpisodeTests
         }
 
         public Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-            Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default)
+            Guid userId, string filter, int page, int pageSize, string? search = null,
+            bool includeDigestOnly = false, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();

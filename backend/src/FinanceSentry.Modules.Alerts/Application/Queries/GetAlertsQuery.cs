@@ -10,7 +10,8 @@ public record GetAlertsQuery(
     string Filter,
     int Page,
     int PageSize,
-    string? Search = null) : IQuery<AlertsPageResponse>;
+    string? Search = null,
+    bool IncludeDigestOnly = false) : IQuery<AlertsPageResponse>;
 
 public class GetAlertsQueryHandler(IAlertRepository alerts) : IQueryHandler<GetAlertsQuery, AlertsPageResponse>
 {
@@ -23,7 +24,7 @@ public class GetAlertsQueryHandler(IAlertRepository alerts) : IQueryHandler<GetA
         var filter = string.IsNullOrWhiteSpace(request.Filter) ? "all" : request.Filter;
 
         var (items, totalCount, unreadCount) = await _alerts.GetPagedAsync(
-            request.UserId, filter, page, pageSize, request.Search, cancellationToken);
+            request.UserId, filter, page, pageSize, request.Search, request.IncludeDigestOnly, cancellationToken);
 
         var dtos = items.Select(a => new AlertDto(
             a.Id, a.Type, a.Severity, a.Title, a.Message,

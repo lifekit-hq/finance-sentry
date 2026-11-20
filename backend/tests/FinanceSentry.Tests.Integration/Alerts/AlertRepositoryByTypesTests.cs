@@ -87,6 +87,23 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
     }
 
     [Fact]
+    public async Task Ledger_alert_read_can_include_the_digest_only_types()
+    {
+        Add(AlertType.MarketStructure, 5);
+        Add(AlertType.NewsCluster, 4);
+        Add(AlertType.PolicyViolation, 3);
+        await _db.SaveChangesAsync();
+
+        var (items, total, unread) = await _repo.GetPagedAsync(
+            User, filter: "unread", page: 1, pageSize: 10, includeDigestOnly: true);
+
+        items.Select(a => a.Type).Should().BeEquivalentTo(
+            [AlertType.MarketStructure, AlertType.NewsCluster, AlertType.PolicyViolation]);
+        total.Should().Be(3);
+        unread.Should().Be(3);
+    }
+
+    [Fact]
     public async Task GetUnreadCountAsync_excludes_resolved_alerts()
     {
         Add(AlertType.LowBalance, 10, isRead: false, isResolved: false);
