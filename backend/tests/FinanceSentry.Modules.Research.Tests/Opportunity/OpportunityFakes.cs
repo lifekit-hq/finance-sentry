@@ -307,7 +307,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateCategorySpikeAlertAsync(Guid userId, string category, decimal currentMonthSpend, decimal baselineSpend, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFxSpreadAlertAsync(Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency, decimal impliedRate, decimal marketRate, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, string policyBasis, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePolicyReviewAlertAsync(Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePolicyReviewMissedAlertAsync(Guid userId, DateTimeOffset dueAt, int daysOverdue, string cadence, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateEarningsAheadAlertAsync(Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate, CancellationToken ct = default) => Task.CompletedTask;

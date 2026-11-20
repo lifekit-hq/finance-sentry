@@ -97,7 +97,8 @@ public class GetAllocationDriftQueryHandler(
             sleeves.OrderByDescending(s => s.ActualValueUsd).ToList(),
             ips.ReviewCadence,
             book.IsStale,
-            totalHeadline);
+            totalHeadline,
+            ips.Version);
     }
 
     private static decimal Percent(decimal value, decimal total)
