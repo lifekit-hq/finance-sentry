@@ -19,7 +19,7 @@ public class PortfolioAdviceEngineTests
     [Fact]
     public void Blocked_DegenerateBuffer_IsReportedNotSet_AndNeverDeploys()
     {
-        // 2026-10-31: $2,432 idle, buffer stored 0.0006 of the book (a fraction read as a percent gave "$9").
+        // A stored fraction below the 1% floor (0.0006 = 0.06% of the book, about $8) is a unit slip, not a policy.
         var drift = Drift(cashUsd: 2_432m);
         var rules = Rules(minCashBufferFraction: 0.0006m);
 
@@ -50,13 +50,37 @@ public class PortfolioAdviceEngineTests
     }
 
     [Fact]
+    public void Allowed_Cash1031Input_StoredFractionIsReadAsAFraction_NotAsAPercent()
+    {
+        // 2026-10-31: $2,432 idle on a ~$14k book, stored fraction 0.07 (7%). Read as a percent (0.07 / 100) the buffer
+        // was about $9.80, the "$9 minimum buffer" of the audit; read as the fraction it is, it is 7% = $980.
+        var advice = PortfolioAdviceEngine.Advise(Drift(cashUsd: 2_432m), Rules(0.07m));
+
+        Assert.Equal(980m, advice.Basis.BufferUsd);
+        Assert.Equal(CashAdviceStatus.Deploy, advice.Cash.Status);
+        Assert.Equal(1_452m, advice.Cash.DeployableUsd);
+    }
+
+    [Fact]
+    public void Allowed_PolicyCashFloor_WinsOverASmallerRuleBuffer()
+    {
+        // Rule buffer 1% of 14,000 = 140 is valid but below the IPS cash sleeve minimum (3% = 420): the floor is 420.
+        var advice = PortfolioAdviceEngine.Advise(Drift(cashUsd: 1_000m), Rules(0.01m));
+
+        Assert.Equal(420m, advice.Basis.BufferUsd);
+        Assert.Equal(CashAdviceStatus.Deploy, advice.Cash.Status);
+        Assert.Equal(580m, advice.Cash.DeployableUsd);
+    }
+
+    [Fact]
     public void Allowed_Rebalance1104Input_BuysCash_AndHoldsInsteadOfDeploying()
     {
         // 2026-11-04: cash $100 of 14,000 is under the 3% band, so the policy says buy cash; the cash path must
         // not say deploy at the same time.
         var advice = PortfolioAdviceEngine.Advise(Drift(cashUsd: 100m), Rules(0.05m));
 
-        Assert.Contains(advice.Orders, o => o.AssetClass == "Cash" && o.Direction == OrderDirection.Buy);
+        // Cash target 5% of 14,000 = 700, held 100: buy 600.
+        Assert.Contains(advice.Orders, o => o.AssetClass == "Cash" && o.Direction == OrderDirection.Buy && o.NotionalUsd == 600m);
         Assert.Equal(CashAdviceStatus.Hold, advice.Cash.Status);
         Assert.Equal(0m, advice.Cash.DeployableUsd);
     }
