@@ -65,4 +65,3 @@ describe('RiskPictureUtils.rows failure reasons', () => {
     expect(row(picture, 'max-drawdown')?.value).not.toContain('benchmark');
   });
 });
-

@@ -79,7 +79,7 @@ export class RiskPictureUtils {
 
   private static reason(
     figure: RiskFigure,
-    labels: ReadonlyMap<string, string> = RISK_REASON_LABELS,
+    labels: ReadonlyMap<string, string> = RISK_REASON_LABELS
   ): string {
     return labels.get(figure.reason ?? '') ?? RISK_REASON_FALLBACK;
   }
