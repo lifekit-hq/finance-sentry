@@ -1360,6 +1360,28 @@ returns and is "not enough history" until then; a series too short for any figur
 value, a missing month or an invalid input yields a typed reason, never `0`. Not yet shown on any surface. The
 holdings-based current drawdown of section 5b is a separate measurement of the invested book and keeps its rules.
 
+## 8b. Rebalance and cash-deployment advice (one engine, #1492)
+
+`PortfolioAdviceEngine` (Research module) answers "what to trade" and "what to do with idle cash" in one pass from
+one stored investment policy (the IPS version carried by the allocation-drift read) and the stored risk rule set. The
+rebalance proposal and the cash-sweep proposal both come from it (`ActionTicketsGeneratorJob`), so they cannot point
+opposite ways for the same inputs. It holds no policy values: sleeve targets and bands are whatever the stored IPS says.
+No new money math: the same percent-of-book to USD conversion and sleeve arithmetic as before, in one place.
+
+- **Cash floor.** The in-book floor is the larger of the risk rule's `MinCashBufferPct` and the IPS cash sleeve's
+  minimum weight, each times the book total. `MinCashBufferPct` is stored as a **fraction of the book (0 to 1)**, not a
+  percentage; reading it as a percentage is what produced the "$9 buffer" of 2026-10-31.
+- **Off-book buffer.** The 3-month emergency buffer is held off-book by the ruling of 2026-10-29. It is not in the
+  book's cash and is not added to the floor; the floor above is the in-book policy cash only.
+- **Deployable cash** is the book's cash above the floor, and zero while the same pass orders "buy Cash". With the cash
+  sleeve under its band the floor exceeds the cash held, so deploy and buy-cash cannot both be advised.
+- **Degenerate buffer.** A stored buffer below 1% of the book (`PortfolioAdviceEngine.MinPlausibleBufferFraction`), or
+  no risk rule set, is reported as "cash buffer not set". It is never used to recommend deployment, and a standing
+  cash-sweep proposal is withdrawn.
+- **Stated basis.** Both proposals name the IPS version, the risk rule set version and the buffer used ("IPS v4, risk
+  rules v3, cash buffer $700").
+- Stale book reads still produce no advice either way (unchanged, #1266).
+
 ## 9. Known approximations (accepted)
 
 - Everything is UTC; no user-timezone normalization of transaction dates or month edges. The one exception is

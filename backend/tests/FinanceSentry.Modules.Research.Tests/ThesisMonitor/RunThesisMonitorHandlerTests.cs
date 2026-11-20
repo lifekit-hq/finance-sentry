@@ -1048,7 +1048,7 @@ public class RunThesisMonitorHandlerTests
         public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, string driftSignature, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
+        public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, string policyBasis, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GeneratePolicyReviewAlertAsync(Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default)

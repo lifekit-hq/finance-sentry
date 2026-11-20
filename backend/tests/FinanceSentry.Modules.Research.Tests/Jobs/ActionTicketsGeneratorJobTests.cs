@@ -263,18 +263,18 @@ public class ActionTicketsGeneratorJobTests
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
-            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.10m));
 
         decimal? capturedExcess = null;
         _alerts.Setup(a => a.GenerateCashSweepProposalAlertAsync(
-                _userId, It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default))
-            .Callback<Guid, decimal, decimal, decimal, CancellationToken>((_, _, _, excess, _) => capturedExcess = excess)
+                _userId, It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default))
+            .Callback<Guid, decimal, decimal, decimal, string, CancellationToken>((_, _, _, excess, _, _) => capturedExcess = excess)
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
-            _userId, 20_000m, 10_000m, 10_000m, default), Times.Once);
+            _userId, 20_000m, 10_000m, 10_000m, It.IsAny<string>(), default), Times.Once);
         Assert.Equal(10_000m, capturedExcess);
     }
 
@@ -286,12 +286,12 @@ public class ActionTicketsGeneratorJobTests
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 5_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
-            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.10m));
 
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -301,7 +301,7 @@ public class ActionTicketsGeneratorJobTests
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 5_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
-            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.10m));
 
         await _job.ExecuteAsync();
 
@@ -315,9 +315,9 @@ public class ActionTicketsGeneratorJobTests
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
-            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.10m));
         _alerts.Setup(a => a.GenerateCashSweepProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default))
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default))
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
@@ -337,7 +337,7 @@ public class ActionTicketsGeneratorJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -352,7 +352,7 @@ public class ActionTicketsGeneratorJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -367,19 +367,19 @@ public class ActionTicketsGeneratorJobTests
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves, cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
-            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.10m));
 
         _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
             It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
         _alerts.Setup(a => a.GenerateCashSweepProposalAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default)).Returns(Task.CompletedTask);
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateRebalanceProposalAlertAsync(
             _userId, It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Once);
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
-            _userId, 20_000m, 10_000m, 10_000m, default), Times.Once);
+            _userId, 20_000m, 10_000m, 10_000m, It.IsAny<string>(), default), Times.Once);
     }
 
     // ── #1266: one proposal per drift episode ────────────────────────────────
@@ -469,6 +469,23 @@ public class ActionTicketsGeneratorJobTests
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_DegenerateBuffer_NeverProposesDeploymentAndResolvesStandingProposal()
+    {
+        // A stored fraction of 0.0006 of a $100k book is $60: not a buffer. It is reported as not set.
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
+            .ReturnsAsync(BuildRules(minCashBufferPct: 0.0006m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<string>(), default), Times.Never);
+        _alerts.Verify(a => a.ResolveCashSweepProposalAlertAsync(_userId, default), Times.Once);
+    }
 
     private static AllocationDriftDto BuildDrift(
         bool needsRebalance,

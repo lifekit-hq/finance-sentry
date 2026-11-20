@@ -544,12 +544,12 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             ct);
 
     public Task GenerateCashSweepProposalAlertAsync(
-        Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
+        Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, string policyBasis, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
             AlertType.CashSweepProposal, AlertSeverity.Warning,
             CashSweepReferenceId(userId), "cash",
             $"Idle cash exceeds buffer: deploy ≈ ${excessUsd:N0}",
-            $"Idle cash ${idleCashUsd:N0} exceeds your minimum buffer ${minBufferUsd:N0}. Consider deploying the ≈ ${excessUsd:N0} excess into your IPS sleeves."),
+            $"Idle cash ${idleCashUsd:N0} exceeds your minimum buffer ${minBufferUsd:N0}. Consider deploying the ≈ ${excessUsd:N0} excess into your IPS sleeves. Basis: {policyBasis}."),
             ct);
 
     public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default)
