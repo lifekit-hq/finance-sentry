@@ -30,8 +30,13 @@ export const RISK_BASIS = {
 export const RISK_REASON_LABELS: ReadonlyMap<string, string> = new Map([
   ['NotEnoughHistory', 'not enough history yet'],
   ['InsufficientData', 'not enough history yet'],
-  ['InvalidInput', 'the benchmark did not move'],
   ['MissingValue', 'a month of value is missing'],
+]);
+
+/** Beta alone is measured against a benchmark; the book figures never fail for that reason. */
+export const RISK_BETA_REASON_LABELS: ReadonlyMap<string, string> = new Map([
+  ...RISK_REASON_LABELS,
+  ['InvalidInput', 'the benchmark did not move'],
 ]);
 
 export const RISK_REASON_FALLBACK = 'not measured';

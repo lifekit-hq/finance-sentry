@@ -50,3 +50,19 @@ describe('RiskPictureUtils.rows', () => {
     expect(beta?.basis).toContain('7 months');
   });
 });
+
+describe('RiskPictureUtils.rows failure reasons', () => {
+  const row = (picture: RiskPicture, key: string) =>
+    RiskPictureUtils.rows(picture).find(r => r.key === key);
+
+  it('blames the benchmark only on beta, never on a book figure that fails on invalid input', () => {
+    const invalid = {value: null, reason: 'InvalidInput'};
+    const picture = {...PICTURE, volatility: invalid, maxDrawdown: invalid, beta: invalid};
+
+    expect(row(picture, 'beta')?.value).toBe('the benchmark did not move');
+    expect(row(picture, 'volatility')?.value).toBe('not measured');
+    expect(row(picture, 'max-drawdown')?.value).toContain('not measured');
+    expect(row(picture, 'max-drawdown')?.value).not.toContain('benchmark');
+  });
+});
+

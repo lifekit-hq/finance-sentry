@@ -3,6 +3,7 @@ import {type Nullable} from '@lifekit-hq/ui';
 import {
   RISK_BASIS,
   RISK_BETA_DIGITS,
+  RISK_BETA_REASON_LABELS,
   RISK_EXPLANATIONS,
   RISK_PERCENT_DIGITS,
   RISK_PERCENT_POINTS,
@@ -76,8 +77,11 @@ export class RiskPictureUtils {
     return `${(fraction * RISK_PERCENT_POINTS).toFixed(RISK_PERCENT_DIGITS)}%`;
   }
 
-  private static reason(figure: RiskFigure): string {
-    return RISK_REASON_LABELS.get(figure.reason ?? '') ?? RISK_REASON_FALLBACK;
+  private static reason(
+    figure: RiskFigure,
+    labels: ReadonlyMap<string, string> = RISK_REASON_LABELS,
+  ): string {
+    return labels.get(figure.reason ?? '') ?? RISK_REASON_FALLBACK;
   }
 
   private static rate(figure: RiskFigure): string {
@@ -88,7 +92,7 @@ export class RiskPictureUtils {
 
   private static beta(figure: RiskFigure): string {
     return figure.value == null
-      ? RiskPictureUtils.reason(figure)
+      ? RiskPictureUtils.reason(figure, RISK_BETA_REASON_LABELS)
       : figure.value.toFixed(RISK_BETA_DIGITS);
   }
 
