@@ -10,6 +10,7 @@ public interface IAlertRepository
     Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
         Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default);
 
+    /// <summary>The unread count of the in-app feed, which leaves out <see cref="AlertType.DigestOnly"/> types.</summary>
     Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default);
 
     Task<Alert?> FindActiveAsync(

@@ -65,6 +65,28 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
     }
 
     [Fact]
+    public async Task Feed_blocks_a_MarketStructure_alert_but_keeps_the_stored_row_and_still_shows_a_PolicyViolation()
+    {
+        var blocked = Add(AlertType.MarketStructure, 5);
+        var news = Add(AlertType.NewsCluster, 4);
+        var allowed = Add(AlertType.PolicyViolation, 3);
+        await _db.SaveChangesAsync();
+
+        var (items, total, unread) = await _repo.GetPagedAsync(User, filter: "all", page: 1, pageSize: 10);
+        var unreadCount = await _repo.GetUnreadCountAsync(User);
+
+        items.Select(a => a.Id).Should().Equal(allowed.Id);
+        total.Should().Be(1);
+        unread.Should().Be(1);
+        unreadCount.Should().Be(1);
+        // Not deleted or rewritten: the rows are still stored (and still reach the digest through capture).
+        var stored = await _db.Alerts.ToListAsync();
+        stored.Select(a => a.Id).Should().BeEquivalentTo([blocked.Id, news.Id, allowed.Id]);
+        stored.Should().OnlyContain(a => !a.IsRead && !a.IsDismissed);
+        (await _repo.GetByTypesPagedAsync(User, AlertType.DigestOnly, 1, 10)).TotalCount.Should().Be(2);
+    }
+
+    [Fact]
     public async Task GetUnreadCountAsync_excludes_resolved_alerts()
     {
         Add(AlertType.LowBalance, 10, isRead: false, isResolved: false);
@@ -112,7 +134,7 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
         byMessage.Message = "Monthly RENT payment failed";
         var byLabel = Add(AlertType.BudgetBreach, 3);
         byLabel.ReferenceLabel = "Rent budget";
-        Add(AlertType.NewsCluster, 1);
+        Add(AlertType.EarningsAhead, 1);
         await _db.SaveChangesAsync();
 
         var (items, total, unread) = await _repo.GetPagedAsync(User, filter: "all", page: 1, pageSize: 10, search: "  rent ");

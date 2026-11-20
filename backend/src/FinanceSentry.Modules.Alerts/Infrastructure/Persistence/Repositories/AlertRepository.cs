@@ -22,6 +22,8 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     {
         var baseQuery = _db.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && !a.IsDismissed);
+        // The in-app feed leaves out the digest-only types; their rows stay stored and captured to the digest.
+        baseQuery = baseQuery.Where(a => !AlertType.DigestOnly.Contains(a.Type));
 
         var filtered = filter?.ToLowerInvariant() switch
         {
@@ -57,7 +59,8 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
     {
         return _db.Alerts.AsNoTracking()
-            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead && !a.IsResolved, ct);
+            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead && !a.IsResolved
+                     && !AlertType.DigestOnly.Contains(a.Type), ct);
     }
 
     public Task<Alert?> FindActiveAsync(
