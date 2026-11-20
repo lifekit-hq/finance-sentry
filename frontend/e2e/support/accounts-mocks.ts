@@ -222,6 +222,24 @@ export const CRYPTO_GROWTH = {
 };
 
 /** The brokerage book against SPY over the four lookback windows (P2 reads the longest measured). */
+export const RISK_PICTURE = {
+  from: '2026-01-31',
+  to: '2026-09-30',
+  monthsObserved: 8,
+  betaMonths: 8,
+  volatility: {value: 0.182, reason: null},
+  maxDrawdown: {value: 0.214, reason: null},
+  beta: {value: 1.31, reason: null},
+  drawdownTolerance: null,
+  top1Symbol: 'DRAM',
+  top1Weight: 0.378,
+  top3Symbols: ['DRAM', 'BTC', 'VWCE'],
+  top3Weight: 0.71,
+  cryptoShare: 0.19,
+  positionFlag: 0.3,
+  top1OverFlag: true,
+};
+
 export const BOOK_PERFORMANCE = {
   periods: [
     {
@@ -280,6 +298,7 @@ export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/crypto/growth', CRYPTO_GROWTH);
   await mockGet(page, 'wealth/brokerage/pnl', BROKERAGE_PNL);
   await mockGet(page, 'radar/book-performance', BOOK_PERFORMANCE);
+  await mockGet(page, 'radar/risk-picture', RISK_PICTURE);
   await mockGet(page, 'research/theses/track-record', TRACK_RECORD);
   await mockGet(page, 'wealth/manual-holdings', []);
 }

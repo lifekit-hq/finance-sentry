@@ -21,3 +21,17 @@ public class BookPerformanceController(IBookPerformanceService performance) : Co
     public async Task<IActionResult> Get(CancellationToken ct)
         => Ok(await performance.GetAsync(User.RequireUserId(), AllPeriods, ct));
 }
+
+/// <summary>
+/// The risk picture shown beside the book's performance: volatility, maximum drawdown and beta (M8), the largest
+/// positions' weights against the stored position flag, the crypto share and the drawdown tolerance.
+/// </summary>
+[ApiController]
+[Authorize]
+[Route("radar/risk-picture")]
+public class RiskPictureController(IRiskPictureService riskPicture) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> Get(CancellationToken ct)
+        => Ok(await riskPicture.GetAsync(User.RequireUserId(), ct));
+}

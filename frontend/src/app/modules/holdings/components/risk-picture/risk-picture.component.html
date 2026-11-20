@@ -1,0 +1,37 @@
+<cmn-async-state
+  [status]="store.status()"
+  [errorMessage]="store.errorMessage()"
+  [keepContent]="false"
+  [crossfade]="false"
+  (retry)="store.load()"
+  emptySubMessage="The risk picture shows once the book has value history."
+  retryable
+>
+  <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="1rem" width="70%" />
+
+  @for (row of store.rows(); track row.key) {
+    <div [attr.data-testid]="'risk-figure-' + row.key" data-risk-figure>
+      <cmn-list-item-row [label]="row.label">
+        <span
+          [class.text-status-warning]="row.warning"
+          [class.text-text-primary]="!row.warning"
+          [attr.data-testid]="'risk-value-' + row.key"
+          amount
+          class="tabular-nums text-cmn-sm"
+        >
+          {{ row.value }}
+        </span>
+      </cmn-list-item-row>
+      @if (row.explanation) {
+        <p class="px-cmn-4 text-cmn-xs text-text-primary" data-risk-explanation>
+          {{ row.explanation }}
+        </p>
+      }
+      @if (row.basis) {
+        <p class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary" data-risk-basis>
+          {{ row.basis }}
+        </p>
+      }
+    </div>
+  }
+</cmn-async-state>
