@@ -12,6 +12,7 @@ import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {BookVsSpyComponent} from '../book-vs-spy/book-vs-spy.component';
 import {BrokeragePnlComponent} from '../brokerage-pnl/brokerage-pnl.component';
+import {RiskPictureComponent} from '../risk-picture/risk-picture.component';
 
 /**
  * One performance panel per sleeve, as plain rows like the account rows above it: value now, contributed,
@@ -25,6 +26,7 @@ import {BrokeragePnlComponent} from '../brokerage-pnl/brokerage-pnl.component';
   imports: [
     AsyncStateComponent,
     BookVsSpyComponent,
+    RiskPictureComponent,
     BrokeragePnlComponent,
     DatePipe,
     DisclosureRowComponent,

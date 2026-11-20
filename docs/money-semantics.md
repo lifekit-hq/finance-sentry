@@ -1357,8 +1357,21 @@ balances: a deposit or withdrawal is not a gain, a loss or a swing. Monthly obse
 √12; volatility is the sample (n − 1) standard deviation; downside deviation averages the squared shortfall below
 0 over all observations (empyrical's definition, not below-target-only). The three-year figure needs 36 monthly
 returns and is "not enough history" until then; a series too short for any figure, a zero or negative opening
-value, a missing month or an invalid input yields a typed reason, never `0`. Not yet shown on any surface. The
+value, a missing month or an invalid input yields a typed reason, never `0`. The
 holdings-based current drawdown of section 5b is a separate measurement of the invested book and keeps its rules.
+
+**Risk panel (#1493).** The brokerage panel on Accounts shows volatility, maximum drawdown, beta against SPY, the
+top-1 and top-3 position weights and the crypto share (`GET /radar/risk-picture`), each with a one-line explanation
+and its basis. Volatility and maximum drawdown are `RiskStatistics` over the same bridged, flow-neutral brokerage
+series the book-vs-SPY return uses (section 10). Beta (`MarketBeta`) is the sample covariance (n - 1) of the book's
+monthly M8 returns with SPY's monthly adjusted-close returns (the same M8 month-end rules), over the months both
+have, divided by SPY's sample variance; fewer than two shared months, or a SPY that did not move, is a typed reason,
+never `0`. The panel states the months behind each figure. Weights are the invested positions at current value over
+the whole book including cash, a symbol on several venues counted once: the denominator the stored position cap is
+compared against. The panel states the stored position flag (`MaxPositionWeightPct` of the current risk rule set; none
+stored is said so) beside the top-1 weight and marks a weight above it. Maximum drawdown is shown beside the IPS
+`MaxDrawdownTolerancePct` when set, and as "tolerance not set" when it is NULL (this surface never sets it). Nothing is
+stored, and an ETF is one symbol (no look-through).
 
 ## 8b. Rebalance and cash-deployment advice (one engine, #1492)
 
