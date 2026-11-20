@@ -34,7 +34,7 @@ public class AlertsContractTests(AlertsApiFactory factory) : IClassFixture<Alert
     public async Task GetAlerts_Empty_ReturnsPageShape()
     {
         _factory.AlertRepoMock
-            .Setup(r => r.GetPagedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetPagedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Array.Empty<Alert>(), 0, 0));
 
         var response = await _client.GetAsync("/api/v1/alerts");
@@ -53,14 +53,14 @@ public class AlertsContractTests(AlertsApiFactory factory) : IClassFixture<Alert
     public async Task GetAlerts_WithSearch_PassesTheSearchToTheRepository()
     {
         _factory.AlertRepoMock
-            .Setup(r => r.GetPagedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetPagedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Array.Empty<Alert>(), 0, 0));
 
         var response = await _client.GetAsync("/api/v1/alerts?filter=unread&search=rent");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         _factory.AlertRepoMock.Verify(r => r.GetPagedAsync(
-            It.IsAny<Guid>(), "unread", 1, 20, "rent", It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Guid>(), "unread", 1, 20, "rent", false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

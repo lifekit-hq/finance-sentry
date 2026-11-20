@@ -18,10 +18,13 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     private IQueryable<Alert> AllUsers => _db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-        Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default)
+        Guid userId, string filter, int page, int pageSize, string? search = null,
+        bool includeDigestOnly = false, CancellationToken ct = default)
     {
         var baseQuery = _db.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && !a.IsDismissed);
+        if (!includeDigestOnly)
+            baseQuery = baseQuery.Where(a => !AlertType.DigestOnly.Contains(a.Type));
 
         var filtered = filter?.ToLowerInvariant() switch
         {
@@ -57,7 +60,8 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
     {
         return _db.Alerts.AsNoTracking()
-            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead && !a.IsResolved, ct);
+            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead && !a.IsResolved
+                     && !AlertType.DigestOnly.Contains(a.Type), ct);
     }
 
     public Task<Alert?> FindActiveAsync(

@@ -33,7 +33,7 @@ The current runtime surface contains 95 tools. The canonical list is the `Agreed
 | `get_account_summary` | Read | Portfolio | — | Consolidated banking, crypto, and brokerage balances |
 | `list_transactions` | Read | Banking | `accountId?`, `fromDate?`, `toDate?`, `category?`, `page`, `pageSize` | Paginated transaction listing |
 | `get_budget_status` | Read | Budgets | `year?`, `month?` | Monthly estimates per line (suggested or hand-set), spend, and expected month end for a period |
-| `list_active_alerts` | Read | Alerts | — | Only unread unresolved alerts |
+| `list_active_alerts` | Read | Alerts | — | Only unread unresolved alerts, including the digest-only types (`MarketStructure`, `NewsCluster`) the in-app feed leaves out |
 | `get_portfolio_snapshot` | Read | Portfolio | — | Unified brokerage + crypto holdings; cash split into banking / brokerage / crypto-venue fiat. `headlines` types the totals (`totalValue`, `investedValue`, `cash`, `unrealizedPnl`) as headline records (see below). Each position carries `basisState` (`Verified` / `Unverified` / `Unknown`); the top-level `totalUnrealizedPnlUsd` / `totalUnrealizedPnlPct` / `totalCostBasisUsd` are filled only when `headlines.unrealizedPnl.basisStatus` is `COMPLETE` and are null otherwise, the fill-verified subset then sitting in `verifiedUnrealizedPnl` with its `basisStatus`, `coverage`, `measuredValueUsd` and `totalValueUsd` (#982) |
 | `list_subscriptions` | Read | Subscriptions | — | Detected recurring charges |
 | `committed_merchants` | Read + Write | Cashflow | `action` (`list`\|`pin`\|`unpin`), `merchant?` | The merchants the user declared committed — rule (d) of the committed-outflow policy |

@@ -36,6 +36,21 @@ public sealed class MaterialityPolicyTests
     public void Known_alert_types_map_to_kinds(string alertType, CompanionEventKind expected)
         => _policy.ClassifyAlert(alertType).Should().Be(expected);
 
+    [Theory]
+    [InlineData("MarketStructure", NotificationMode.Realtime)]
+    [InlineData("NewsCluster", NotificationMode.Realtime)]
+    [InlineData("MarketStructure", NotificationMode.Scan)]
+    public void Digest_only_alert_types_reach_the_digest_not_a_wake_in_every_live_mode(string alertType, NotificationMode mode)
+        => _policy.DispositionFor(mode, _policy.ClassifyAlert(alertType)!.Value).Should().Be(EventDisposition.HeldForDigest);
+
+    [Fact]
+    public void Decision_grade_alert_types_stay_off_the_digest_lane()
+    {
+        foreach (var type in new[] { "PolicyViolation", "ThesisBroken", "RelativeUnderperformance", "RebalanceProposal", "CashShortfall" })
+            _policy.DispositionFor(NotificationMode.Realtime, _policy.ClassifyAlert(type)!.Value)
+                .Should().Be(EventDisposition.Pending, type);
+    }
+
     [Fact]
     public void Unknown_alert_type_is_not_surfaced()
         => _policy.ClassifyAlert("SomethingElse").Should().BeNull();

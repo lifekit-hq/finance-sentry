@@ -2,6 +2,13 @@ namespace FinanceSentry.Modules.Alerts.Domain;
 
 public static class AlertType
 {
+    /// <summary>
+    /// Market-wide notices that ride Ledger's digest (the Companion pulse) and stay out of the in-app alert feed
+    /// (alert diet round 2, #1494): 54 percent of all alerts and almost none read. Their rows are still stored and
+    /// still captured to the digest; only the feed read leaves them out. Revert: empty this list.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DigestOnly = [MarketStructure, NewsCluster];
+
     public const string LowBalance = "LowBalance";
     public const string SyncFailure = "SyncFailure";
     /// <summary>

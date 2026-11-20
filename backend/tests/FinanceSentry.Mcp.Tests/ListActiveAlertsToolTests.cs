@@ -42,6 +42,21 @@ public sealed class ListActiveAlertsToolTests
         new(items, items.Length, 0, 1, 100, 1);
 
     [Fact]
+    public async Task ExecuteAsync_AsksForTheDigestOnlyTypesToo()
+    {
+        GetAlertsQuery? seen = null;
+        _handler
+            .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
+            .Callback<GetAlertsQuery, CancellationToken>((q, _) => seen = q)
+            .ReturnsAsync(PageOf());
+
+        await CreateSut().ExecuteAsync();
+
+        seen.Should().NotBeNull();
+        seen!.IncludeDigestOnly.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenHandlerThrows()
     {
         _handler

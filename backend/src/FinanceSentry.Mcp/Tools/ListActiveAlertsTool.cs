@@ -31,7 +31,7 @@ public sealed class ListActiveAlertsTool(
         try
         {
             response = await _alertsHandler.Handle(
-                new GetAlertsQuery(userIdVal, "unread", 1, 100),
+                new GetAlertsQuery(userIdVal, "unread", 1, 100, IncludeDigestOnly: true),
                 cancellationToken);
         }
         catch (Exception ex)
