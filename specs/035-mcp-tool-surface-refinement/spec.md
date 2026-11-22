@@ -7,7 +7,7 @@
 
 ## Overview
 
-The MCP server exposes ~57 tools. The felt problem is "too many," but the real problem is **shape and discoverability, not count**. The runtime lazy-loads tool schemas on demand, so the context cost of a large catalog is largely already paid, and feature 033 (`run_analytics_query`) already relieves read-side sprawl pressure — novel structured reads no longer need a bespoke tool each.
+The MCP server exposes ~57 tools. The felt problem is "too many," but the real problem is **shape and discoverability, not count**. The runtime lazy-loads tool schemas on demand, so the context cost of a large catalog is largely already paid, and feature 033's `run_analytics_query` once relieved read-side sprawl pressure (033 is superseded: the tool was removed in #1508, so each new read needs a curated tool).
 
 This feature improves how the agent *selects and sequences* tools, fixes any tool that fails when invoked, and makes a small number of surgical merges — **without** collapsing the catalog into fat union-parameter tools (a "resource/action" mega-switch is harder to call correctly than many narrow, well-named tools and produces silent wrong-enum errors). Success is measured by the agent picking and ordering the right tool, not by a smaller number.
 
@@ -107,7 +107,7 @@ A small number of tools that are *always called together*, or that are homogeneo
 
 - **The consuming agent is capable**: it selects tools from names + descriptions, so description quality is the primary lever for correctness — not count.
 - **Lazy schema loading**: the MCP runtime loads tool schemas on demand, so a large catalog does not impose a large fixed context cost; this justifies optimizing for shape over count.
-- **033 relieves read-side pressure**: `run_analytics_query` absorbs novel one-off structured reads, so the catalog will not need a new read tool per question going forward.
+- **033 (superseded, #1508)** — the following no longer holds, `run_analytics_query` was removed: it absorbed novel one-off structured reads, so the catalog will not need a new read tool per question going forward.
 - **Renames are breaking**: merged/renamed tool names change the tool contract; agent-side references and the contract test are updated in the same change; there are no unknown external consumers beyond the project's own agents.
 - **Backend-only**: this is entirely within the MCP server + its module wiring; no frontend or data-model changes.
 - **Companion fix already merged**: the DI-registration fix shipped in 033/PR #297; this feature verifies rather than re-implements it.

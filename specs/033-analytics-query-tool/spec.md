@@ -2,7 +2,7 @@
 
 **Feature Branch**: `033-analytics-query-tool`
 **Created**: 2026-07-22
-**Status**: Implemented
+**Status**: Superseded (2026-11-22, issue #1508) — `run_analytics_query`, `describe_query_schema` and the Analytics module were removed. A free-form query path can produce money figures that skip docs/money-semantics.md; Ledger's money answers come only from curated tools. The `analytics.query_audit` table is archived as `retention.analytics_query_audit_archive` (Retention M002). Kept below as a historical record only.
 **Input**: User description: "Give the agent one guarded read-only query tool so it can answer novel structured questions by querying curated per-user views directly, instead of needing a bespoke tool per question — without ever being able to write, read another user's data, or run away with an expensive query."
 
 ## Overview

@@ -62,7 +62,7 @@ backend/src/FinanceSentry.Mcp/Tools/
 ├── GetSectorRotationTool.cs         # DESC — ditto
 ├── PromoteCandidateTool.cs          # DESC — "calls check_risk_rules first (019 gate)"
 ├── …                                # DESC — audit the rest for entry/follow-up ordering
-└── (RunAnalyticsQueryTool/DescribeQuerySchemaTool already cross-reference — 033)
+└── (the 033 analytics tools were removed in #1508)
 
 backend/src/FinanceSentry.Mcp/API/Responses/   (or Tools/ local)
 └── WatchlistToolResult.cs           # NEW — union-shaped result for the 3 actions

@@ -42,7 +42,6 @@
     <ProjectReference Include="..\FinanceSentry.Modules.Radar\FinanceSentry.Modules.Radar.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Companion\FinanceSentry.Modules.Companion.csproj" />
-    <ProjectReference Include="..\FinanceSentry.Modules.Analytics\FinanceSentry.Modules.Analytics.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Retention\FinanceSentry.Modules.Retention.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Agent\FinanceSentry.Modules.Agent.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Liquidity\FinanceSentry.Modules.Liquidity.csproj" />

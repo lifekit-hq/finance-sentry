@@ -2,50 +2,77 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FinanceSentry.Modules.Analytics.Migrations
+namespace FinanceSentry.Modules.Retention.Migrations
 {
-    /// <inheritdoc />
-    public partial class M001_InitialSchema : Migration
+    /// <summary>
+    /// Retires the removed Analytics module's database objects (the ad-hoc <c>run_analytics_query</c> tool is gone).
+    /// <para>
+    /// <c>analytics.query_audit</c> is kept, not dropped: it moves to <c>retention.analytics_query_audit_archive</c>
+    /// with its rows, and nothing purges it. The five curated <c>analytics.v_*</c> views, the cluster-wide
+    /// <c>fs_readonly</c> role and the <c>analytics</c> schema are dropped. Every statement is guarded, so a
+    /// database that never had the Analytics objects (a fresh one) passes through unchanged.
+    /// </para>
+    /// <para>
+    /// <c>Down</c> recreates the schema, role, views and grants and moves the archive back to
+    /// <c>analytics.query_audit</c> (an empty table if there is no archive). The earlier restriction of
+    /// <c>pg_catalog.set_config</c> EXECUTE to the app login stays in place; it is a privilege tightening only.
+    /// Retention is migrated after every schema the views read, so both directions find them.
+    /// </para>
+    /// </summary>
+    public partial class M002_ArchiveAnalyticsQueryAudit : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.EnsureSchema(
-                name: "analytics");
-
-            migrationBuilder.CreateTable(
-                name: "query_audit",
-                schema: "analytics",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Sql = table.Column<string>(type: "character varying(8000)", maxLength: 8000, nullable: false),
-                    Outcome = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    RejectReason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    RowCount = table.Column<int>(type: "integer", nullable: true),
-                    DurationMs = table.Column<int>(type: "integer", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_query_audit", x => x.Id);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_query_audit_UserId_CreatedAt",
-                schema: "analytics",
-                table: "query_audit",
-                columns: new[] { "UserId", "CreatedAt" });
-
-            // --- fs_readonly role (feature 033, FR-002) -------------------------------------------
-            // SELECT-only, NOLOGIN. The read-only executor connects as the app login and drops into
-            // this role via SET LOCAL ROLE, so even a validator bypass has no write path and cannot
-            // reach base tables (no USAGE on their schemas). Granted to the current app login so the
-            // role switch is permitted.
             migrationBuilder.Sql(@"
+DROP VIEW IF EXISTS analytics.v_budgets;
+DROP VIEW IF EXISTS analytics.v_net_worth_daily;
+DROP VIEW IF EXISTS analytics.v_analyst_actions;
+DROP VIEW IF EXISTS analytics.v_holdings;
+DROP VIEW IF EXISTS analytics.v_transactions;
 DO $$
 BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fs_readonly') THEN
+        EXECUTE 'REVOKE fs_readonly FROM ' || quote_ident(CURRENT_USER);
+        IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'analytics') THEN
+            REVOKE ALL ON SCHEMA analytics FROM fs_readonly;
+        END IF;
+        DROP ROLE fs_readonly;
+    END IF;
+    IF to_regclass('analytics.query_audit') IS NOT NULL AND to_regclass('retention.analytics_query_audit_archive') IS NULL THEN
+        ALTER TABLE analytics.query_audit SET SCHEMA retention;
+        ALTER TABLE retention.query_audit RENAME TO analytics_query_audit_archive;
+    END IF;
+END
+$$;
+DROP SCHEMA IF EXISTS analytics;
+");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql(@"
+CREATE SCHEMA IF NOT EXISTS analytics;
+DO $$
+BEGIN
+    IF to_regclass('retention.analytics_query_audit_archive') IS NOT NULL THEN
+        ALTER TABLE retention.analytics_query_audit_archive RENAME TO query_audit;
+        ALTER TABLE retention.query_audit SET SCHEMA analytics;
+    ELSE
+        CREATE TABLE analytics.query_audit (
+            ""Id"" uuid NOT NULL,
+            ""UserId"" uuid NOT NULL,
+            ""Sql"" character varying(8000) NOT NULL,
+            ""Outcome"" character varying(16) NOT NULL,
+            ""RejectReason"" character varying(500),
+            ""RowCount"" integer,
+            ""DurationMs"" integer,
+            ""CreatedAt"" timestamp with time zone NOT NULL,
+            CONSTRAINT ""PK_query_audit"" PRIMARY KEY (""Id"")
+        );
+        CREATE INDEX ""IX_query_audit_UserId_CreatedAt"" ON analytics.query_audit (""UserId"", ""CreatedAt"");
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fs_readonly') THEN
         CREATE ROLE fs_readonly NOLOGIN;
     END IF;
@@ -54,11 +81,6 @@ $$;
 GRANT USAGE ON SCHEMA analytics TO fs_readonly;
 GRANT fs_readonly TO CURRENT_USER;
 ");
-
-            // --- Curated per-user views (FR-003/FR-004) -------------------------------------------
-            // Each is a security_barrier view whose WHERE filters on the transaction-local
-            // app.current_user_id GUC; the agent's outer SQL cannot widen it and a missing value
-            // fails closed to zero rows. v_analyst_actions is intentionally market-wide (no filter).
 
             migrationBuilder.Sql(@"
 CREATE VIEW analytics.v_transactions WITH (security_barrier = true) AS
@@ -147,7 +169,6 @@ LEFT JOIN LATERAL (
 WHERE b.""UserId"" = current_setting('app.current_user_id', true)::uuid;
 ");
 
-            // --- Grant SELECT on the curated views ONLY (no base-table grants) --------------------
             migrationBuilder.Sql(@"
 GRANT SELECT ON
     analytics.v_transactions,
@@ -157,31 +178,6 @@ GRANT SELECT ON
     analytics.v_budgets
 TO fs_readonly;
 ");
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.Sql(@"
-DROP VIEW IF EXISTS analytics.v_budgets;
-DROP VIEW IF EXISTS analytics.v_net_worth_daily;
-DROP VIEW IF EXISTS analytics.v_analyst_actions;
-DROP VIEW IF EXISTS analytics.v_holdings;
-DROP VIEW IF EXISTS analytics.v_transactions;
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fs_readonly') THEN
-        EXECUTE 'REVOKE fs_readonly FROM ' || quote_ident(CURRENT_USER);
-        REVOKE ALL ON SCHEMA analytics FROM fs_readonly;
-        DROP ROLE fs_readonly;
-    END IF;
-END
-$$;
-");
-
-            migrationBuilder.DropTable(
-                name: "query_audit",
-                schema: "analytics");
         }
     }
 }

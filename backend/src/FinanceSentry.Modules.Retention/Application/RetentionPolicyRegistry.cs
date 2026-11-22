@@ -18,7 +18,6 @@ public static class RetentionPolicyRegistry
     private const string Radar = "radar";
     private const string Risk = "risk";
     private const string Alerts = "alerts";
-    private const string Analytics = "analytics";
     private const string Companion = "companion";
     private const string CryptoSync = "crypto_sync";
     private const string BrokerageSync = "brokerage_sync";
@@ -39,7 +38,7 @@ public static class RetentionPolicyRegistry
         "AuthDbContext", "BankSyncDbContext", "CryptoSyncDbContext", "BrokerageSyncDbContext",
         "AlertsDbContext", "BudgetsDbContext", "SubscriptionsDbContext", "WealthDbContext",
         "ResearchDbContext", "RadarDbContext", "RiskDbContext", "CompanionDbContext",
-        "AnalyticsDbContext", "RetentionDbContext", "AgentDbContext", "EventsDbContext",
+        "RetentionDbContext", "AgentDbContext", "EventsDbContext",
     };
 
     /// <summary>All retention decisions — exactly one per persistent table.</summary>
@@ -47,7 +46,6 @@ public static class RetentionPolicyRegistry
     [
         // ── Generic purge: derived/observational rows the engine deletes on a schedule ───────────
         Purge(BankSync, "SyncJobs", "CreatedAt", 90, "Per-sync run history; grows fast, low long-term value."),
-        Purge(Analytics, "query_audit", "CreatedAt", 180, "Analytics query audit (feature 033)."),
         Purge(Companion, "companion_events", "CapturedAt", 90, "Dispatched outbox rows; watermark in companion_capture_state survives."),
         Purge(Companion, "push_deliveries", "CreatedAt", 90, "Push delivery ledger; matches the 90d companion_events it points at."),
         Purge(Companion, "problem_reports", "CreatedAt", 90, "Problem reports; forwarded to the fleet inbox within minutes, the saved copy is only the retry ledger."),
