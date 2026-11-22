@@ -1,7 +1,7 @@
 import {signalState} from '@ngrx/signals';
+import {type Alert} from '@shared/models/alert/alert.model';
 import {describe, expect, it} from 'vitest';
 
-import {type Alert} from '../../models/alert/alert.model';
 import {alertsMethods} from './alerts.methods';
 import {initialAlertsState} from './alerts.state';
 

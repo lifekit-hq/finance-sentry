@@ -1,10 +1,10 @@
 import {type Nullable} from '@lifekit-hq/ui';
+import {type Alert} from '@shared/models/alert/alert.model';
+import {type AlertNavigation} from '@shared/models/alert-destination/alert-destination.model';
+import {AlertMessageUtils} from '@shared/utils/alert-message.utils';
+import {AlertTypeUtils} from '@shared/utils/alert-type.utils';
 
-import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
-import {type Alert} from '../models/alert/alert.model';
-import {type AlertNavigation} from '../models/alert/alert-destination.model';
-import {AlertMessageUtils} from './alert-message.utils';
-import {AlertTypeUtils} from './alert-type.utils';
+import {AppRoute} from '../enums/app-route/app-route.enum';
 
 // Dossier alerts carry the ticker as their reference label; a non-ticker label (the radar
 // feed-freshness alert says "freshness") has no dossier to open.

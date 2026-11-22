@@ -1,7 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
+import {type UserProfile} from '@shared/models/settings/settings.model';
 
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
-import {type UserProfile} from '../../models/settings/settings.model';
 
 export interface SettingsState {
   profile: Nullable<UserProfile>;

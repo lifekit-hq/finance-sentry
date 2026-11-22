@@ -1,7 +1,7 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
+import {type UserProfile} from '@shared/models/settings/settings.model';
 
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
-import {type UserProfile} from '../../models/settings/settings.model';
 import {type SettingsState} from './settings.state';
 
 export function settingsMethods(store: WritableStateSource<SettingsState>) {

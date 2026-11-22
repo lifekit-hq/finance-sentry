@@ -1,6 +1,5 @@
 import {type Nullable} from '@lifekit-hq/ui';
-
-import {type Alert} from '../../models/alert/alert.model';
+import {type Alert} from '@shared/models/alert/alert.model';
 
 export interface TopAlertState {
   /** The newest unread alert; null when everything is read. */

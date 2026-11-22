@@ -1,5 +1,10 @@
 import {computed, type Signal} from '@angular/core';
 import {type Nullable} from '@lifekit-hq/ui';
+import {
+  type BrokerageGrowth,
+  type BrokerageGrowthView,
+  type GrowthTimingGap,
+} from '@shared/models/brokerage-growth/brokerage-growth.model';
 
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {ProviderUtils} from '../../../../shared/utils/provider.utils';
@@ -8,11 +13,6 @@ import {
   PERCENT_POINTS,
   RETURN_PERCENT_DIGITS,
 } from '../../constants/brokerage-growth/brokerage-growth.constants';
-import {
-  type BrokerageGrowth,
-  type BrokerageGrowthView,
-  type GrowthTimingGap,
-} from '../../models/brokerage-growth/brokerage-growth.model';
 
 interface StateSignals {
   growth: Signal<Nullable<BrokerageGrowth>>;

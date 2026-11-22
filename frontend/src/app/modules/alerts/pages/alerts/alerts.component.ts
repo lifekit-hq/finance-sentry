@@ -26,20 +26,20 @@ import {
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
+import {type Alert, type AlertSeverity, type AlertType} from '@shared/models/alert/alert.model';
+import {AlertDestinationUtils} from '@shared/utils/alert-destination.utils';
+import {AlertTypeUtils} from '@shared/utils/alert-type.utils';
 
 import {ALERTS_MARK_ALL_READ_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
 import {ALERT_FILTER_LABELS} from '../../constants/alert/alert-filter.constants';
-import {type Alert, type AlertSeverity, type AlertType} from '../../models/alert/alert.model';
 import {AlertCaptionPipe} from '../../pipes/alert-caption.pipe';
 import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDayUtils} from '../../utils/alert-day.utils';
-import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertSeverityUtils} from '../../utils/alert-severity.utils';
-import {AlertTypeUtils} from '../../utils/alert-type.utils';
 import {DISMISS_SWIPE_ACTION, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_SECTIONS = 2;

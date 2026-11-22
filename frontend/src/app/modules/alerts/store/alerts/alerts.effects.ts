@@ -2,6 +2,7 @@ import {inject, type Signal} from '@angular/core';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 import {
   catchError,
   debounceTime,
@@ -15,7 +16,6 @@ import {
   tap,
 } from 'rxjs';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
 import {ALERTS_PAGE_SIZE} from './alerts.state';

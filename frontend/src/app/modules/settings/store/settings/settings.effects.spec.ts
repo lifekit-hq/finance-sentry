@@ -2,13 +2,13 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type Nullable, ToastService} from '@lifekit-hq/ui';
+import {type UserProfile} from '@shared/models/settings/settings.model';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {DownloadUtils} from '../../../../shared/utils/download.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
-import {type UserProfile} from '../../models/settings/settings.model';
 import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
 import {settingsEffects, settingsHooks} from './settings.effects';

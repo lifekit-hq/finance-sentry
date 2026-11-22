@@ -1,11 +1,11 @@
 import {ChangeDetectionStrategy, Component, input, linkedSignal, output} from '@angular/core';
 import {ButtonComponent, ChipComponent} from '@lifekit-hq/ui';
+import {type AlertFilter} from '@shared/models/alert/alert.model';
 
 import {
   ALERT_READ_STATE_FILTERS,
   ALERT_SEVERITY_FILTERS,
 } from '../../constants/alert/alert-filter.constants';
-import {type AlertFilter} from '../../models/alert/alert.model';
 
 /**
  * Body of the alerts filter sheet (read state / severity), rendered by `cmn-filter-bar`. The page

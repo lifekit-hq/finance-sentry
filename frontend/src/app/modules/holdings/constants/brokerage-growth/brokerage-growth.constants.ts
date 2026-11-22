@@ -1,7 +1,7 @@
 import {
   type GrowthSleeve,
   type GrowthSleeveCopy,
-} from '../../models/brokerage-growth/brokerage-growth.model';
+} from '@shared/models/brokerage-growth/brokerage-growth.model';
 
 /** IBKR reports deposits only once the Flex Query includes them, so its missing-flows note says how. */
 export const IBKR_PROVIDER = 'ibkr';

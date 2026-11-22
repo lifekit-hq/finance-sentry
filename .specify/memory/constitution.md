@@ -259,7 +259,8 @@ the reviewer confirms it during review, and a violation found there is fixed bef
 - CC7 Interfaces and constants stay out of component and service files (Principle VI.5).
   Enforced by the `structure/file-per-concept` ESLint rule (#1496).
 - CC8 A type, utility or enum used across modules lives in `shared/` (Principle VI.5).
-  Guidance. A lint rule for it is proposed in `docs/harness/constitution-checks.md`.
+  Enforced by the `boundary/shared-boundary` ESLint rule (#1505): a module never imports a
+  model, type, enum or utility file from another module.
 - CC9 Backend `dotnet build` warnings are resolved (Principle II). Enforced by
   `TreatWarningsAsErrors` in `backend/Directory.Build.props` (#1478), built in Backend CI.
 - CC10 Ledger gets no tool surface other than MCP, a hook payload carries only ids, and no

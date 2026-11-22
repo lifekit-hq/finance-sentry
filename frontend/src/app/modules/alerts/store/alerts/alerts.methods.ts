@@ -1,6 +1,6 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsState} from './alerts.state';
 
 /** The unread badge counts only open, unread alerts — a resolved or already-read row weighs nothing. */

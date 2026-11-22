@@ -1,7 +1,7 @@
 import {signal} from '@angular/core';
+import {type Alert} from '@shared/models/alert/alert.model';
 import {describe, expect, it} from 'vitest';
 
-import {type Alert} from '../../models/alert/alert.model';
 import {alertsComputed} from './alerts.computed';
 
 const BASE: Alert = {

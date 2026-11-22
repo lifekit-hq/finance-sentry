@@ -1,8 +1,8 @@
 import {TestBed} from '@angular/core/testing';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 import {of} from 'rxjs';
 import {beforeEach, describe, expect, it} from 'vitest';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {AlertsService} from '../../services/alerts.service';
 import {ALERTS_PAGE_SIZE} from './alerts.state';
 import {AlertsStore} from './alerts.store';

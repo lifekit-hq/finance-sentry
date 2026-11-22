@@ -1,9 +1,9 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
+import {type BrokerageGrowth} from '@shared/models/brokerage-growth/brokerage-growth.model';
 import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {type BrokerageGrowth} from '../../models/brokerage-growth/brokerage-growth.model';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokerageGrowthStore} from './brokerage-growth.store';
 

@@ -1,5 +1,6 @@
+import {type Alert, type AlertDayGroup} from '@shared/models/alert/alert.model';
+
 import {DateUtils} from '../../../shared/utils/date.utils';
-import {type Alert, type AlertDayGroup} from '../models/alert/alert.model';
 
 export class AlertDayUtils {
   /**

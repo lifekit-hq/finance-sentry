@@ -5,8 +5,8 @@ paths:
 
 # Frontend file organisation, helpers and providers
 
-**Why it exists:** merged from four concerns that share one reason - each is a structural convention a linter *could* check but does not yet (see the PR's ESLint follow-up candidates), and each applies to the same files. Constitution Principle VI.5: inline interfaces are blocked by the `structure/file-per-concept` lint rule; cross-module code outside `shared/` has no check (rule CC8 in `docs/harness/constitution-checks.md`), so the author and reviewer confirm it.
-**Retire when:** each section is replaced by its own ESLint rule (provider extraction, shared-boundary, the utils pipe-wrapper convention); delete the section as its rule lands, the file when empty.
+**Why it exists:** merged from four concerns that share one reason - each is a structural convention a linter *could* check but does not yet (see the PR's ESLint follow-up candidates), and each applies to the same files. Constitution Principle VI.5: inline interfaces are blocked by the `structure/file-per-concept` lint rule; a module importing a model, type, enum or utility file from another module is blocked by the `boundary/shared-boundary` lint rule (rule CC8 in `docs/harness/constitution-checks.md`).
+**Retire when:** each section is replaced by its own ESLint rule (the utils pipe-wrapper convention; provider extraction and shared-boundary now have theirs); delete the section as its rule lands, the file when empty.
 
 ## Decorators
 
@@ -14,7 +14,7 @@ Do **not** add `standalone: true` to `@Component` / `@Pipe` / `@Directive`: it i
 
 ## Cross-module code
 
-The file-per-concept layout (interfaces and types in `models/`, constants in `constants/`, no inline interface, enum or exported constant in a `*.component.ts` / `*.service.ts`) is enforced by the `structure/file-per-concept` ESLint rule. What a linter cannot check: any type, constant, utility, or enum used by more than one feature module MUST live in `frontend/src/app/shared/`. If code is imported by two or more modules, move it to `shared/` in the same PR. Use `/frontend-code-quality` for an audit sweep.
+The file-per-concept layout (interfaces and types in `models/`, constants in `constants/`, no inline interface, enum or exported constant in a `*.component.ts` / `*.service.ts`) is enforced by the `structure/file-per-concept` ESLint rule. Cross-module imports of model, type, enum and utility files are blocked by the `boundary/shared-boundary` ESLint rule. What a linter cannot check: constants, services, stores and components. Any type, constant, utility, or enum used by more than one feature module MUST live in `frontend/src/app/shared/`. If code is imported by two or more modules, move it to `shared/` in the same PR. Use `/frontend-code-quality` for an audit sweep.
 
 ## Utility helpers
 

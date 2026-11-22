@@ -1,11 +1,10 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
-import {type Observable} from 'rxjs';
-
 import {
   type BrokerageGrowth,
   type GrowthSleeve,
-} from '../models/brokerage-growth/brokerage-growth.model';
+} from '@shared/models/brokerage-growth/brokerage-growth.model';
+import {type Observable} from 'rxjs';
 
 @Injectable({providedIn: 'root'})
 export class BrokerageGrowthService extends ApiService {

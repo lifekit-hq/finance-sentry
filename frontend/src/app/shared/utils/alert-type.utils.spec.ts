@@ -1,10 +1,10 @@
-import {describe, expect, it} from 'vitest';
-
 import {
   ALERT_TYPE_META_REGISTRY,
   DEFAULT_ALERT_TYPE_META,
-} from '../constants/alert-type-meta.constants';
-import {type AlertType} from '../models/alert/alert.model';
+} from '@shared/constants/alert-type/alert-type-meta.constants';
+import {type AlertType} from '@shared/models/alert/alert.model';
+import {describe, expect, it} from 'vitest';
+
 import {AlertTypeUtils} from './alert-type.utils';
 
 describe('AlertTypeUtils.meta', () => {

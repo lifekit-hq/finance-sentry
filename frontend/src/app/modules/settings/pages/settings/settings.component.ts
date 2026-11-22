@@ -24,6 +24,7 @@ import {
   TagComponent,
   ToggleComponent,
 } from '@lifekit-hq/ui';
+import {type BaseCurrency} from '@shared/models/settings/settings.model';
 import {take} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
@@ -42,7 +43,6 @@ import {
   SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
 } from '../../constants/fire/fire-assumptions.constants';
 import {type CloseAccountDialogData} from '../../models/account-closure/account-closure.model';
-import {type BaseCurrency} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {percentRange} from '../../validators/percent-range.validator';

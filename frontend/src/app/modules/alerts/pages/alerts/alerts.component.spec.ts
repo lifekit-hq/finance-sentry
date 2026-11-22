@@ -7,11 +7,11 @@ import {
   type FilterBarSheetContext,
   type Nullable,
 } from '@lifekit-hq/ui';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 import {Subject} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
 import {type AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertsComponent} from './alerts.component';
 import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';

@@ -1,9 +1,9 @@
 import {inject} from '@angular/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
+import {type Alert} from '@shared/models/alert/alert.model';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
-import {type Alert} from '../../models/alert/alert.model';
 import {AlertsService} from '../../services/alerts.service';
 
 interface EffectsStore {

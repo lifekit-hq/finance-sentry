@@ -2,12 +2,12 @@ import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {type Nullable, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
+import {type UpdateProfileRequest, type UserProfile} from '@shared/models/settings/settings.model';
 import {catchError, concatMap, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
 import {DownloadUtils} from '../../../../shared/utils/download.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
-import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
 import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
 import {ProfileUtils} from '../../utils/profile.utils';

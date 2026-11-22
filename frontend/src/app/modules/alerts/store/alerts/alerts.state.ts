@@ -1,4 +1,4 @@
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 
 /** Alerts per page; the list asks for the next page as its end comes into reach. */
 export const ALERTS_PAGE_SIZE = 20;

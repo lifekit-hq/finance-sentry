@@ -1,16 +1,16 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {AlertItemComponent} from '@lifekit-hq/ui';
+import {type Alert} from '@shared/models/alert/alert.model';
+import {AlertDestinationUtils} from '@shared/utils/alert-destination.utils';
+import {AlertTypeUtils} from '@shared/utils/alert-type.utils';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
-import {type Alert} from '../../models/alert/alert.model';
 import {AlertCaptionPipe} from '../../pipes/alert-caption.pipe';
 import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {TopAlertStore} from '../../store/top-alert/top-alert.store';
-import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertSeverityUtils} from '../../utils/alert-severity.utils';
-import {AlertTypeUtils} from '../../utils/alert-type.utils';
 
 /**
  * Home's insight: the newest unread alert, opened the way the Alerts page opens it, and a link to the

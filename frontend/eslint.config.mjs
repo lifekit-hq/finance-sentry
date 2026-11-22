@@ -4,6 +4,7 @@ import {structurePlugin} from './eslint-rules/file-per-concept.mjs';
 import {keyboardsPlugin} from './eslint-rules/money-inputmode.mjs';
 import {moneyPipePlugin} from './eslint-rules/money-pipe-location.mjs';
 import {providerPlugin} from './eslint-rules/provider-extraction.mjs';
+import {sharedBoundaryPlugin} from './eslint-rules/shared-boundary.mjs';
 import {utilsPlugin} from './eslint-rules/utils-class.mjs';
 
 export default createEslintConfig({
@@ -53,6 +54,13 @@ export default createEslintConfig({
       files: ['src/app/app.config.ts', 'src/app/core/providers/*.provider.ts'],
       plugins: {providers: providerPlugin},
       rules: {'providers/provider-extraction': 'error'},
+    },
+    {
+      // A type, utility or enum used across feature modules lives in `shared/`, so a module never
+      // imports from another module (constitution CC8, Principle VI.5).
+      files: ['src/app/modules/**/*.ts'],
+      plugins: {boundary: sharedBoundaryPlugin},
+      rules: {'boundary/shared-boundary': 'error'},
     },
     {
       files: ['**/*.html'],

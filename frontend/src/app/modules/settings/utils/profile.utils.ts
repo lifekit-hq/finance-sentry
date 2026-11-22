@@ -1,4 +1,4 @@
-import {type UpdateProfileRequest, type UserProfile} from '../models/settings/settings.model';
+import {type UpdateProfileRequest, type UserProfile} from '@shared/models/settings/settings.model';
 
 export class ProfileUtils {
   /** The writable part of a profile: what `PUT /profile` takes, without email and two-factor. */

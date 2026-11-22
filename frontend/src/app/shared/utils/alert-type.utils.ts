@@ -2,8 +2,8 @@ import {
   ALERT_TYPE_META_REGISTRY,
   type AlertTypeMeta,
   DEFAULT_ALERT_TYPE_META,
-} from '../constants/alert-type-meta.constants';
-import {type AlertType} from '../models/alert/alert.model';
+} from '@shared/constants/alert-type/alert-type-meta.constants';
+import {type AlertType} from '@shared/models/alert/alert.model';
 
 export class AlertTypeUtils {
   /**

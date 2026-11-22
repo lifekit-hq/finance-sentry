@@ -1,6 +1,6 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
-import {type Headline} from '../../../../shared/models/headline/headline.model';
+import {type Headline} from '../headline/headline.model';
 
 /** The sleeves with a contributions-vs-growth split: `GET /wealth/<sleeve>/growth`. */
 export type GrowthSleeve = 'brokerage' | 'crypto';
