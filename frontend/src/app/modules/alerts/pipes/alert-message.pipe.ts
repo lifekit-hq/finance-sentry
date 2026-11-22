@@ -1,7 +1,6 @@
 import {Pipe, type PipeTransform} from '@angular/core';
 import {type Nullable} from '@lifekit-hq/ui';
-
-import {AlertMessageUtils} from '../utils/alert-message.utils';
+import {AlertMessageUtils} from '@shared/utils/alert-message.utils';
 
 @Pipe({name: 'alertMessage'})
 export class AlertMessagePipe implements PipeTransform {

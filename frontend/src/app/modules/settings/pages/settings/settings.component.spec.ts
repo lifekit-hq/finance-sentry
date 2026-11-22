@@ -2,6 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {CmnDialogService, ToastService} from '@lifekit-hq/ui';
+import {type UserProfile} from '@shared/models/settings/settings.model';
 import {NEVER, of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
@@ -9,7 +10,6 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
-import {type UserProfile} from '../../models/settings/settings.model';
 import {CareerEventsService} from '../../services/career-events.service';
 import {IncomeSourcesService} from '../../services/income-sources.service';
 import {PushStore} from '../../store/push/push.store';

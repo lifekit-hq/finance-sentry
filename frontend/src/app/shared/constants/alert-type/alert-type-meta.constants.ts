@@ -1,8 +1,8 @@
 import {type LucideIconName} from '@lifekit-hq/ui';
+import {type AlertType} from '@shared/models/alert/alert.model';
+import {type AlertDestination} from '@shared/models/alert-destination/alert-destination.model';
 
-import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
-import {type AlertType} from '../models/alert/alert.model';
-import {type AlertDestination} from '../models/alert/alert-destination.model';
+import {AppRoute} from '../../enums/app-route/app-route.enum';
 
 export interface AlertTypeMeta {
   icon: LucideIconName;

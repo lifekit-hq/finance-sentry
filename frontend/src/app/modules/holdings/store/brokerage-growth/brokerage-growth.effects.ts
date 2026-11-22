@@ -1,13 +1,13 @@
 import {inject} from '@angular/core';
 import {type Nullable} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {pipe, switchMap, tap} from 'rxjs';
-
-import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {
   type BrokerageGrowth,
   type GrowthSleeve,
-} from '../../models/brokerage-growth/brokerage-growth.model';
+} from '@shared/models/brokerage-growth/brokerage-growth.model';
+import {pipe, switchMap, tap} from 'rxjs';
+
+import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 
 interface StoreMethods {

@@ -1,8 +1,7 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
+import {type UpdateProfileRequest, type UserProfile} from '@shared/models/settings/settings.model';
 import {type Observable} from 'rxjs';
-
-import {type UpdateProfileRequest, type UserProfile} from '../models/settings/settings.model';
 
 @Injectable({providedIn: 'root'})
 export class SettingsService extends ApiService {

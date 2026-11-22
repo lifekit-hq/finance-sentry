@@ -1,9 +1,9 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
+import {type Alert, type AlertsPageResponse} from '@shared/models/alert/alert.model';
 import {of, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
-import {type Alert, type AlertsPageResponse} from '../../models/alert/alert.model';
 import {AlertsService} from '../../services/alerts.service';
 import {TopAlertStore} from './top-alert.store';
 

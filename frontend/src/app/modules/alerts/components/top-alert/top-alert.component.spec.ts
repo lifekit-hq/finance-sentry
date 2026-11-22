@@ -1,9 +1,9 @@
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {type Alert, type AlertsPageResponse} from '@shared/models/alert/alert.model';
 import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
-import {type Alert, type AlertsPageResponse} from '../../models/alert/alert.model';
 import {AlertsService} from '../../services/alerts.service';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {TopAlertComponent} from './top-alert.component';

@@ -1,10 +1,10 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
 import {ALERT_SEARCH_DEBOUNCE_MS, alertsEffects, alertsHooks} from './alerts.effects';

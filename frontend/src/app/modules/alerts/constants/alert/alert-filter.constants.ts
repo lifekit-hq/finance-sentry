@@ -1,4 +1,4 @@
-import {type AlertFilter} from '../../models/alert/alert.model';
+import {type AlertFilter} from '@shared/models/alert/alert.model';
 
 export interface AlertFilterOption {
   value: AlertFilter;

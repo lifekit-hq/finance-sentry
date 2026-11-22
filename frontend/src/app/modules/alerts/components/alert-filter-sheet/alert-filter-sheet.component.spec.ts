@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
+import {type AlertFilter} from '@shared/models/alert/alert.model';
 import {describe, expect, it} from 'vitest';
 
-import {type AlertFilter} from '../../models/alert/alert.model';
 import {AlertFilterSheetComponent} from './alert-filter-sheet.component';
 
 function setup(initial: AlertFilter) {

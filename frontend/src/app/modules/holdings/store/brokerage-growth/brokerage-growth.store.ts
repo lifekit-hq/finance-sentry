@@ -8,12 +8,12 @@ import {
   withProps,
   withState,
 } from '@ngrx/signals';
+import {type GrowthSleeve} from '@shared/models/brokerage-growth/brokerage-growth.model';
 
 import {
   DEFAULT_GROWTH_SLEEVE,
   GROWTH_SLEEVE_COPY,
 } from '../../constants/brokerage-growth/brokerage-growth.constants';
-import {type GrowthSleeve} from '../../models/brokerage-growth/brokerage-growth.model';
 import {brokerageGrowthComputed} from './brokerage-growth.computed';
 import {brokerageGrowthEffects, brokerageGrowthHooks} from './brokerage-growth.effects';
 import {brokerageGrowthMethods} from './brokerage-growth.methods';

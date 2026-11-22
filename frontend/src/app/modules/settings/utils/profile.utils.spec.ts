@@ -1,6 +1,6 @@
+import {type UserProfile} from '@shared/models/settings/settings.model';
 import {describe, expect, it} from 'vitest';
 
-import {type UserProfile} from '../models/settings/settings.model';
 import {ProfileUtils} from './profile.utils';
 
 const PROFILE: UserProfile = {

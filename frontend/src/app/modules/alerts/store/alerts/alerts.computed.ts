@@ -1,6 +1,6 @@
 import {computed, type Signal} from '@angular/core';
+import {type Alert, type AlertFilter} from '@shared/models/alert/alert.model';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 
 interface StateSignals {

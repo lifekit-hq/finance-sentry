@@ -21,9 +21,9 @@ import {
   TabGroupComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
+import {AlertNavigation} from '@shared/models/alert-destination/alert-destination.model';
 
 import {NOT_ADVICE_SHORT} from '../../../../shared/constants/legal/legal.constants';
-import {AlertNavigation} from '../../../alerts/models/alert/alert-destination.model';
 import {
   EVENT_HORIZON_DAYS,
   EVENT_KIND_META_REGISTRY,

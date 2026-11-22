@@ -1,12 +1,11 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
-import {type Observable} from 'rxjs';
-
 import {
   type AlertFilter,
   type AlertsPageResponse,
   type UnreadCountResponse,
-} from '../models/alert/alert.model';
+} from '@shared/models/alert/alert.model';
+import {type Observable} from 'rxjs';
 
 @Injectable({providedIn: 'root'})
 export class AlertsService extends ApiService {

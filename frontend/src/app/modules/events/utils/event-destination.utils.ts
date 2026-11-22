@@ -1,7 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
+import {type AlertNavigation} from '@shared/models/alert-destination/alert-destination.model';
+import {AlertDestinationUtils} from '@shared/utils/alert-destination.utils';
 
-import {type AlertNavigation} from '../../alerts/models/alert/alert-destination.model';
-import {AlertDestinationUtils} from '../../alerts/utils/alert-destination.utils';
 import {type FiredEvent, type UpcomingEvent} from '../models/event/event.model';
 
 export class EventDestinationUtils {

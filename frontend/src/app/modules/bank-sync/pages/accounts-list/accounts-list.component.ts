@@ -30,6 +30,7 @@ import {
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
+import {type GrowthSleeve} from '@shared/models/brokerage-growth/brokerage-growth.model';
 import {filter, map, pairwise, take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
@@ -58,7 +59,6 @@ import {DialogUtils} from '../../../../shared/utils/dialog.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {BrokerageGrowthComponent} from '../../../holdings/components/brokerage-growth/brokerage-growth.component';
 import {GROWTH_SLEEVE_COPY} from '../../../holdings/constants/brokerage-growth/brokerage-growth.constants';
-import {type GrowthSleeve} from '../../../holdings/models/brokerage-growth/brokerage-growth.model';
 import {type PositionRow} from '../../../holdings/store/holdings.computed';
 import {HoldingsStore} from '../../../holdings/store/holdings.store';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';

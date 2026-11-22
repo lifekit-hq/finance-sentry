@@ -2,9 +2,9 @@ import {provideHttpClient, withXhr} from '@angular/common/http';
 import {HttpTestingController, provideHttpClientTesting} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
 import {API_BASE_URL} from '@lifekit-hq/core';
+import {type BrokerageGrowth} from '@shared/models/brokerage-growth/brokerage-growth.model';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
-import {type BrokerageGrowth} from '../models/brokerage-growth/brokerage-growth.model';
 import {BrokerageGrowthService} from './brokerage-growth.service';
 
 const BASE = 'http://api.test';

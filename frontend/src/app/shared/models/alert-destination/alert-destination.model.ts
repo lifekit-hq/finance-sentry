@@ -1,4 +1,4 @@
-import {type AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {type AppRoute} from '../../enums/app-route/app-route.enum';
 
 /** Where tapping an alert goes: an app page, the asset dossier of the alert's ticker, or nowhere. */
 export type AlertDestination = AppRoute | 'dossier' | 'none';

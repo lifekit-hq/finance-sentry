@@ -1,4 +1,5 @@
-import {type Alert} from '../models/alert/alert.model';
+import {type Alert} from '@shared/models/alert/alert.model';
+
 import {AlertDayUtils} from './alert-day.utils';
 
 const NOW = new Date(2026, 9, 15, 12, 0, 0);

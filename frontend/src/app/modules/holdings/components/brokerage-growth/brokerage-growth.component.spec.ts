@@ -2,17 +2,17 @@ import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {type Nullable} from '@lifekit-hq/ui';
-import {NEVER, of} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
-
-import {GROWTH_SLEEVE_COPY} from '../../constants/brokerage-growth/brokerage-growth.constants';
 import {
   type BrokerageGrowth,
   type BrokerageGrowthView,
   type GrowthSleeve,
   type GrowthSleeveCopy,
   type GrowthTimingGap,
-} from '../../models/brokerage-growth/brokerage-growth.model';
+} from '@shared/models/brokerage-growth/brokerage-growth.model';
+import {NEVER, of} from 'rxjs';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
+
+import {GROWTH_SLEEVE_COPY} from '../../constants/brokerage-growth/brokerage-growth.constants';
 import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokeragePnlService} from '../../services/brokerage-pnl.service';

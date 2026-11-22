@@ -1,8 +1,8 @@
+import {ALERT_TYPE_META_REGISTRY} from '@shared/constants/alert-type/alert-type-meta.constants';
+import {type Alert, type AlertType} from '@shared/models/alert/alert.model';
 import {describe, expect, it} from 'vitest';
 
-import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
-import {ALERT_TYPE_META_REGISTRY} from '../constants/alert-type-meta.constants';
-import {type Alert, type AlertType} from '../models/alert/alert.model';
+import {AppRoute} from '../enums/app-route/app-route.enum';
 import {AlertDestinationUtils} from './alert-destination.utils';
 
 function makeAlert(overrides: Partial<Alert> = {}): Alert {

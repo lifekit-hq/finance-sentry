@@ -1,4 +1,4 @@
-import {type UserProfile} from '../../../settings/models/settings/settings.model';
+import {type UserProfile} from '@shared/models/settings/settings.model';
 
 /** Which sign-in methods the API offers (`GET auth/methods`). */
 export interface SignInMethods {

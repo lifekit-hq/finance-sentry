@@ -2,12 +2,12 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {ToastService} from '@lifekit-hq/ui';
+import {type UpdateProfileRequest, type UserProfile} from '@shared/models/settings/settings.model';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {AuthStore} from '../../../auth/store/auth.store';
-import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
 import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
 import {SettingsStore} from './settings.store';

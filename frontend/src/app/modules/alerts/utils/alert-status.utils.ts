@@ -1,6 +1,5 @@
 import {type Nullable} from '@lifekit-hq/ui';
-
-import {type Alert} from '../models/alert/alert.model';
+import {type Alert} from '@shared/models/alert/alert.model';
 
 export class AlertStatusUtils {
   /** Small caption under an alert's title: "Resolved", "×4", or "Resolved · ×4"; null when neither applies. */
