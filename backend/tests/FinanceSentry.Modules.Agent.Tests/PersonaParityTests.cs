@@ -53,6 +53,19 @@ public sealed class PersonaParityTests
     }
 
     [Fact]
+    public void BothComposes_InstructRecordingEveryCallAndReadingTheTrackRecord()
+    {
+        // Ledger gave calls in Telegram but never routed them through the queue, so there was no hit rate.
+        foreach (var prompt in new[] { BrowserPrompt(), OpenClawPrompt() })
+        {
+            prompt.Should().Contain("Record each call you make to Denys")
+                .And.Contain("through `propose_recommendation`")
+                .And.Contain("never relabel one to force a proposal through")
+                .And.Contain("Asked how you are doing → `get_track_record`");
+        }
+    }
+
+    [Fact]
     public void BothComposes_CarryTheEventLinkRule()
     {
         BrowserPrompt().Should().Contain("`appUrl`").And.Contain("never invent a link");
