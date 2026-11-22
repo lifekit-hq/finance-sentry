@@ -28,7 +28,6 @@ public sealed class ToolResolutionTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Default"] = "Host=localhost;Port=5432;Database=x;Username=y;Password=z",
-                ["ConnectionStrings:ReadOnly"] = "Host=localhost;Port=5432;Database=x;Username=y;Password=z",
                 // Minimal config the module registrars validate at registration time.
                 ["Deduplication:MasterKeyBase64"] = "MDEyMzQ1Njc4OUFCQ0RFRg==",
             })

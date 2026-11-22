@@ -18,7 +18,7 @@ using Testcontainers.PostgreSql;
 /// <para>
 /// Isolation is by database, which Postgres enforces: schemas, tables, rows, sequences, function grants, EF
 /// migration history and Hangfire storage all live inside one database and are dropped with it. Roles are the
-/// one cluster-wide object the app's migrations create (Analytics' <c>fs_readonly</c>); the classes that run
+/// one cluster-wide object the app's migrations create (<c>fs_readonly</c>, recreated by the Retention M002 archive migration's Down); the classes that run
 /// those migrations share <see cref="PostgresClusterStateCollection"/>, and their databases also drop every
 /// role created since the server started.
 /// </para>

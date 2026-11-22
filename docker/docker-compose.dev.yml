@@ -35,10 +35,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5000
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password;"
-      # Read-only path for the analytics query tool (033). The app login is granted the SELECT-only
-      # fs_readonly role by migration M001 and drops into it per query (SET LOCAL ROLE), so the same
-      # DSN is safe here; a dedicated fs_readonly LOGIN can replace it in production for defense in depth.
-      ConnectionStrings__ReadOnly: "Host=postgres;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password;"
       TrueLayer__AuthBaseUrl: https://auth.truelayer.com
       TrueLayer__ApiBaseUrl: https://api.truelayer.com
       TrueLayer__ClientId: ${TRUELAYER_CLIENT_ID:-}
@@ -108,8 +104,6 @@ services:
       MCP_HTTP_PORT: ${MCP_HTTP_PORT:-5100}
       MCP_CONNECTION_STRING: ${MCP_CONNECTION_STRING:-Host=postgres;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password}
       ConnectionStrings__Default: ${MCP_CONNECTION_STRING:-Host=postgres;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password}
-      # Read-only path for run_analytics_query (033) — see the api service note above.
-      ConnectionStrings__ReadOnly: ${MCP_READONLY_CONNECTION_STRING:-${MCP_CONNECTION_STRING:-Host=postgres;Port=5432;Database=finance_sentry;Username=finance_user;Password=finance_password}}
       Deduplication__MasterKeyBase64: dGVzdC1kZWR1cGxpY2F0aW9uLWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbg==
       Jwt__Secret: ${JWT_SECRET:-your-secret-key-change-in-production}
       Mcp__ApiBaseUrl: http://api:5000/api/v1

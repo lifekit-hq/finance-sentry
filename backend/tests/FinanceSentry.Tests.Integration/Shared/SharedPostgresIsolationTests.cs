@@ -73,7 +73,7 @@ public sealed class SharedPostgresIsolationTests : IAsyncLifetime
         (await ScalarAsync("SELECT count(*) FROM pg_roles WHERE rolname = @role", ("role", ProbeRole)))
             .Should().Be(0L, "a role an earlier test created is dropped when that test ends");
 
-        // The shape Analytics' migration leaves: a table, rows, and a role holding privileges on it.
+        // The shape a module's migration leaves (once Analytics'): a table, rows, and a role holding privileges on it.
         await ScalarAsync("CREATE TABLE leak_probe (id int PRIMARY KEY)");
         await ScalarAsync("INSERT INTO leak_probe VALUES (1)");
         await ScalarAsync($"CREATE ROLE {ProbeRole} NOLOGIN");

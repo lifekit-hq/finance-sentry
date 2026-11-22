@@ -49,7 +49,6 @@ public sealed class McpHttpHostFixture : IAsyncLifetime
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Default"] = UnreachableConnectionString,
-            ["ConnectionStrings:ReadOnly"] = UnreachableConnectionString,
             ["Deduplication:MasterKeyBase64"] = "MDEyMzQ1Njc4OUFCQ0RFRg==",
             ["Jwt:Secret"] = JwtSecret,
         });

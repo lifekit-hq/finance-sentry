@@ -327,7 +327,7 @@ backend/
     FinanceSentry.Modules.Alerts/    # Alert rules + Hangfire delivery
     FinanceSentry.Modules.Budgets/   # Budget tracking
     FinanceSentry.Modules.Subscriptions/ # Detected recurring subscriptions
-    # also: FinanceSentry.Gateway, FinanceSentry.Integration, Modules.{Agent, Analytics, Companion,
+    # also: FinanceSentry.Gateway, FinanceSentry.Integration, Modules.{Agent, Companion,
     #       Events, Liquidity, Radar, Research, Retention, Risk} — `ls backend/src` is canonical
   tests/
     FinanceSentry.Tests.Unit/        # Pure unit tests (no DB)

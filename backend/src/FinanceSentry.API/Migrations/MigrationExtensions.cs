@@ -16,7 +16,6 @@ using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.Retention.Infrastructure.Persistence;
 using FinanceSentry.Modules.Agent.Infrastructure;
 using FinanceSentry.Modules.Events.Infrastructure.Persistence;
@@ -61,7 +60,6 @@ public static class MigrationExtensions
         MigrateContext<ResearchDbContext>(sp, app.Logger, status, ref anyContextMigrated);
         MigrateContext<RadarDbContext>(sp, app.Logger, status, ref anyContextMigrated);
         MigrateContext<CompanionDbContext>(sp, app.Logger, status, ref anyContextMigrated);
-        MigrateContext<AnalyticsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
         MigrateContext<RetentionDbContext>(sp, app.Logger, status, ref anyContextMigrated);
         MigrateContext<AgentDbContext>(sp, app.Logger, status, ref anyContextMigrated);
         MigrateContext<EventsDbContext>(sp, app.Logger, status, ref anyContextMigrated);

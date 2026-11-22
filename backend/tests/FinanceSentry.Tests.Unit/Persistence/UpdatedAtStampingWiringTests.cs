@@ -10,8 +10,6 @@ using FinanceSentry.Modules.Agent;
 using FinanceSentry.Modules.Agent.Infrastructure;
 using FinanceSentry.Modules.Alerts;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
-using FinanceSentry.Modules.Analytics;
-using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.Auth;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.BankSync;
@@ -65,7 +63,6 @@ public sealed class UpdatedAtStampingWiringTests
     {
         ["Agent"] = ((s, c) => s.AddAgentModule(c), typeof(AgentDbContext)),
         ["Alerts"] = ((s, c) => s.AddAlertsModule(c), typeof(AlertsDbContext)),
-        ["Analytics"] = ((s, c) => s.AddAnalyticsModule(c), typeof(AnalyticsDbContext)),
         ["Auth"] = ((s, c) => s.AddAuthModule(c), typeof(AuthDbContext)),
         ["BankSync"] = ((s, c) => s.AddBankSyncModule(c), typeof(BankSyncDbContext)),
         ["BrokerageSync"] = ((s, c) => s.AddBrokerageSyncModule(c), typeof(BrokerageSyncDbContext)),

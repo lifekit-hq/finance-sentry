@@ -331,7 +331,6 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
 
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Default", connectionString);
-            builder.UseSetting("ConnectionStrings:ReadOnly", connectionString);
             builder.UseSetting("Deduplication:MasterKeyBase64",
                 "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
             builder.UseSetting("Encryption:CurrentKeyVersion", "1");

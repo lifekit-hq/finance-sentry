@@ -13,7 +13,7 @@ Backend/MCP only. No new dependencies. This records the decisions that resolve t
 | Market / narration | `get_radar_summary` | `get_market_structure`, `get_market_breadth`, `get_relative_strength`, `get_sector_rotation` | Entry says "first call for any market/narration question"; each drill-down says "drill-down — call `get_radar_summary` first for the overview." |
 | Candidate → position | `score_candidate` / `list_candidates` | `promote_candidate` → `check_risk_rules` | `promote_candidate` states it invokes `check_risk_rules` as a hard gate (019). |
 | Thesis health | `run_thesis_monitor` (now returns breaks) | `list_thesis_breaks` (pure read) | `run_thesis_monitor` says "re-evaluates + returns current breaks; for a read-only view without re-eval use `list_thesis_breaks`." |
-| Ad-hoc structured query | `describe_query_schema` | `run_analytics_query` | Already cross-references (033) — leave as reference exemplar. |
+| ~~Ad-hoc structured query~~ | ~~`describe_query_schema`~~ | ~~`run_analytics_query`~~ | Both tools removed (033 superseded, #1508). |
 
 **Rationale**: Descriptions travel with the tool to every client; agent prose does not and drifts. **Alternatives rejected**: keeping guidance in Ledger's persona (invisible to other clients, drifts out of sync).
 
