@@ -53,14 +53,16 @@ public sealed class PersonaParityTests
     }
 
     [Fact]
-    public void Core_InstructsRecordingEveryCallThroughProposeRecommendation()
+    public void BothComposes_InstructRecordingEveryCallAndReadingTheTrackRecord()
     {
         // Ledger gave calls in Telegram but never routed them through the queue, so there was no hit rate.
-        var core = RepoPaths.ReadLedgerFile("persona.core.md");
-
-        core.Should().Contain("Record every call you make to Denys");
-        core.Should().Contain("through `propose_recommendation`");
-        core.Should().Contain("`get_track_record`");
+        foreach (var prompt in new[] { BrowserPrompt(), OpenClawPrompt() })
+        {
+            prompt.Should().Contain("Record each call you make to Denys")
+                .And.Contain("through `propose_recommendation`")
+                .And.Contain("never relabel one to force a proposal through")
+                .And.Contain("Asked how you are doing → `get_track_record`");
+        }
     }
 
     [Fact]
