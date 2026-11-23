@@ -5,6 +5,28 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.22.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.21.0...v1.22.0) (2026-11-22)
+
+
+### Features
+
+* **agent:** Ledger records every call through propose_recommendation ([#1519](https://github.com/lifekit-hq/finance-sentry/issues/1519)) ([dd004a8](https://github.com/lifekit-hq/finance-sentry/commit/dd004a8be13df42cbdaa31ee5e2c1079b4ecb6b6))
+* **alerts:** keep MarketStructure and NewsCluster out of the in-app feed ([#1515](https://github.com/lifekit-hq/finance-sentry/issues/1515)) ([ab249d0](https://github.com/lifekit-hq/finance-sentry/commit/ab249d0a6a2bb8e0b2bc408e3e3930589c9d5be9))
+* **frontend:** put login, access-denied, mcp-connect, privacy and terms on cmn-page ([#1464](https://github.com/lifekit-hq/finance-sentry/issues/1464)) ([6614cea](https://github.com/lifekit-hq/finance-sentry/commit/6614ceac640f42051a001f1942f95ce4111cce97))
+* **frontend:** show book vs S&P 500 on Home since inception and over 3 months ([#1512](https://github.com/lifekit-hq/finance-sentry/issues/1512)) ([31f3844](https://github.com/lifekit-hq/finance-sentry/commit/31f3844478fd8aef3eb23d03e85eaf32003831e1))
+* **radar:** show the risk picture on the brokerage panel ([#1514](https://github.com/lifekit-hq/finance-sentry/issues/1514)) ([6df40d3](https://github.com/lifekit-hq/finance-sentry/commit/6df40d32479a5965fb03c6ff7c153d7edd8c8b12))
+
+
+### Bug Fixes
+
+* **docker:** pin libxml2 to the CVE-2026-86144 fix in the frontend image ([#1524](https://github.com/lifekit-hq/finance-sentry/issues/1524)) ([e31677c](https://github.com/lifekit-hq/finance-sentry/commit/e31677cafaf92eb9300acc7da4d726e6bc2fe192))
+* **research:** one advice engine for rebalancing and cash deployment ([#1513](https://github.com/lifekit-hq/finance-sentry/issues/1513)) ([9d78326](https://github.com/lifekit-hq/finance-sentry/commit/9d78326abbeb48231ebb6ad4b3a87a294058e3e8))
+
+
+### Refactoring
+
+* **mcp:** remove ad-hoc analytics query tool and the Analytics module ([#1520](https://github.com/lifekit-hq/finance-sentry/issues/1520)) ([46a71f4](https://github.com/lifekit-hq/finance-sentry/commit/46a71f4827a1da298088cee7087d613779b3b770))
+
 ## [1.21.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.20.0...v1.21.0) (2026-11-19)
 
 
