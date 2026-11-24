@@ -93,7 +93,7 @@ public sealed class GetBookPerformanceToolTests
     public async Task ExecuteAsync_AttachesTheBooksIncomeReceived()
     {
         var income = new BookIncome(
-            Today, new IncomeWindow(120m, 18m, 102m), new IncomeWindow(40m, 6m, 34m), 150m, 0.03m, 0, []);
+            Today, new IncomeWindow(120m, 18m, 102m), new IncomeWindow(40m, 6m, 34m), 150m, 0.03m, 0, 0, [], []);
         _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
             .ReturnsAsync(new BookPerformanceResult([], Today));
         _income.Setup(s => s.GetAsync(UserId, default)).ReturnsAsync(income);

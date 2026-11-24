@@ -63,6 +63,22 @@ public class BrokerageIncomeReaderTests
     }
 
     [Fact]
+    public async Task ReadAsync_CarriesTheFxStatusOfEachRowsConversion()
+    {
+        _fx.Setup(f => f.ConvertToUsdAsync(It.IsAny<decimal>(), "PLN", It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((decimal amount, string _, DateOnly _, CancellationToken _) => new ConvertResult(amount, FxStatus.Unknown1To1));
+        await using var db = NewDb();
+        db.BrokerageCashTransactions.AddRange(
+            Cash("ibkr", "Dividends", 10m, "USD", Utc(3, 1), "KO"),
+            Cash("ibkr", "Dividends", 100m, "PLN", Utc(4, 1), "PKN"));
+        await db.SaveChangesAsync();
+
+        var receipts = await new BrokerageIncomeReader(db, _fx.Object).ReadAsync(UserId, From);
+
+        receipts.Select(r => (r.Symbol, r.Fx)).Should().Equal(("KO", FxStatus.Exact), ("PKN", FxStatus.Unknown1To1));
+    }
+
+    [Fact]
     public async Task ReadAsync_LeavesOutNonIncomeRows_OtherUsersRows_AndRowsOnOrBeforeFrom()
     {
         await using var db = NewDb();

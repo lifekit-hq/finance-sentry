@@ -106,6 +106,16 @@
         }
       }
 
+      @if (income.approximateReceipts > 0) {
+        <p
+          class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+          data-testid="book-income-approximate"
+        >
+          Approximate: {{ income.approximateReceipts }} income rows were converted without a
+          published rate.
+        </p>
+      }
+
       @if (income.unvaluedReceipts > 0) {
         <p
           class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"

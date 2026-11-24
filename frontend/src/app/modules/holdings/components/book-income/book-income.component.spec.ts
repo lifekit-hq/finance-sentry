@@ -20,6 +20,8 @@ const INCOME: BookIncome = {
   forwardAnnualUsd: 140,
   yieldOnCost: 0.057,
   unvaluedReceipts: 0,
+  approximateReceipts: 0,
+  fxReasons: [],
   holdings: [
     {
       symbol: 'KO',
@@ -84,6 +86,16 @@ describe('BookIncomeComponent', () => {
     expect(text(el, 'book-income-holding-KO-ex-dividend')).toBe('Next ex-dividend 1 Dec 2026');
     expect(text(el, 'book-income-holding-KO-ttm')).toContain('$102.00');
     expect(text(el, 'book-income-holding-KO-ttm')).toBe('$102.00 after $18.00 tax');
+  });
+
+  it('says how many rows were converted without a published rate, and nothing when none were', () => {
+    expect(text(render(), 'book-income-approximate')).toBe('');
+
+    income.set({...INCOME, approximateReceipts: 2, fxReasons: ['FX_UNKNOWN_1TO1']});
+
+    expect(text(render(), 'book-income-approximate')).toBe(
+      'Approximate: 2 income rows were converted without a published rate.',
+    );
   });
 
   it('says "Not available" for a missing estimate and yield, never zero', () => {

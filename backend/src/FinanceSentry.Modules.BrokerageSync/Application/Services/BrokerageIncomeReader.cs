@@ -59,7 +59,7 @@ public sealed class BrokerageIncomeReader(BrokerageSyncDbContext db, IHistorical
             var date = DateOnly.FromDateTime(row.DateTime);
             var usd = await fx.ConvertToUsdAsync(row.Amount, row.Currency, date, ct);
             var symbol = string.IsNullOrWhiteSpace(row.Symbol) ? CashSymbol : row.Symbol.Trim().ToUpperInvariant();
-            receipts.Add(new IncomeReceipt(symbol, kind ?? IncomeReceiptKind.Dividend, date, usd.Amount, withholding));
+            receipts.Add(new IncomeReceipt(symbol, kind ?? IncomeReceiptKind.Dividend, date, usd.Amount, withholding, usd.Status));
         }
 
         return receipts;

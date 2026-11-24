@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
@@ -136,6 +137,34 @@ public sealed class BookIncomeServiceTests
     }
 
     [Fact]
+    public async Task ReceiptConvertedWithoutAPublishedRate_StaysInTheTotalsAndIsCountedAsApproximate()
+    {
+        var sut = Sut(
+            new Brokerage(
+                Dividend("KO", new DateOnly(2026, 3, 14), 30m),
+                new IncomeReceipt("CEZ", IncomeReceiptKind.Dividend, new DateOnly(2026, 5, 1), 100m, false, FxStatus.Unknown1To1),
+                new IncomeReceipt("CEZ", IncomeReceiptKind.Dividend, new DateOnly(2026, 5, 1), -15m, true, FxStatus.Unknown1To1),
+                new IncomeReceipt("KO", IncomeReceiptKind.Dividend, new DateOnly(2026, 6, 14), 30m, false, FxStatus.NearestPublished)));
+
+        var income = await sut.GetAsync(UserId);
+
+        income.Ttm.Should().Be(new IncomeWindow(160m, 15m, 145m), "the 1:1 rows are kept, not excluded");
+        income.ApproximateReceipts.Should().Be(2, "a nearest published rate is a published rate");
+        income.FxReasons.Should().Equal(FxReasons.Unknown1To1);
+    }
+
+    [Fact]
+    public async Task ExactRateReceipts_AreNotMarkedApproximate()
+    {
+        var sut = Sut(new Brokerage(Dividend("KO", new DateOnly(2026, 3, 14), 30m)));
+
+        var income = await sut.GetAsync(UserId);
+
+        income.ApproximateReceipts.Should().Be(0);
+        income.FxReasons.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task UnverifiedCostBasis_GivesNoYieldOnCost()
     {
         var sut = Sut(
@@ -158,6 +187,7 @@ public sealed class BookIncomeServiceTests
         income.Ttm.Should().Be(IncomeWindow.Zero);
         income.Ytd.Should().Be(IncomeWindow.Zero);
         income.UnvaluedReceipts.Should().Be(0);
+        income.ApproximateReceipts.Should().Be(0);
         income.Holdings.Should().BeEmpty();
         income.ForwardAnnualUsd.Should().BeNull();
         income.YieldOnCost.Should().BeNull();

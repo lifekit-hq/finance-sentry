@@ -1587,7 +1587,10 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   tax rows, and `CryptoFlowEvent` rewards and airdrops (staking) priced at the event's `UnitPriceUsd`. Each
   amount is converted to USD on its own date. Windows are the trailing 12 months (the day one year ago excluded)
   and year to date; each carries `gross`, `withholding` and `net = gross - withholding`, and the tax is shown,
-  never hidden inside the net. A reward with no USD price is counted in `unvaluedReceipts`, not valued at zero.
+  never hidden inside the net. A reward with no USD price is counted in `unvaluedReceipts`, not valued at zero. A cash row converted without a
+  published rate (today's rate, the seed table or 1:1 for an unknown currency, §3) stays in the totals and is counted
+  in `approximateReceipts`, with its `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1` code in `fxReasons`; a nearest-published
+  rate is a published rate and is not counted.
   `forwardAnnualUsd` is a holding's stored `ValuationSnapshot.DividendYield` times its USD value, null without a
   yield; `yieldOnCost` is the trailing-12-month net over the verified cost basis (every row of the holding
   `Verified`), null otherwise. Book-level estimate and yield sum or divide only the holdings that supply the

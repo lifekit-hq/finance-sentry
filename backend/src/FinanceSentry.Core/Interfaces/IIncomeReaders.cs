@@ -1,5 +1,7 @@
 namespace FinanceSentry.Core.Interfaces;
 
+using FinanceSentry.Core.Utils;
+
 /// <summary>What an income receipt was: a dividend or distribution, interest, or a staking or earn reward.</summary>
 public enum IncomeReceiptKind
 {
@@ -12,9 +14,11 @@ public enum IncomeReceiptKind
 /// One income row a provider reported, valued in USD at the day it was paid. <paramref name="Usd"/> is signed as the
 /// provider booked it: a dividend is positive, withholding tax (<paramref name="IsWithholding"/>) is negative and a
 /// refund of it positive. It is null when the row cannot be valued (a reward with no price), which is counted, never
-/// read as a zero.
+/// read as a zero. <paramref name="Fx"/> is how the USD rate was obtained (framework R4); a row converted without a
+/// published rate stays in the figure and is counted as approximate.
 /// </summary>
-public sealed record IncomeReceipt(string Symbol, IncomeReceiptKind Kind, DateOnly Date, decimal? Usd, bool IsWithholding);
+public sealed record IncomeReceipt(
+    string Symbol, IncomeReceiptKind Kind, DateOnly Date, decimal? Usd, bool IsWithholding, FxStatus Fx = FxStatus.Exact);
 
 /// <summary>
 /// Reads the brokerage sleeve's income rows (dividends, distributions, interest and the tax withheld from them) dated

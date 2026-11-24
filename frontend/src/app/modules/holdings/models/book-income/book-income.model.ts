@@ -32,5 +32,9 @@ export interface BookIncome {
   yieldOnCost: Nullable<number>;
   /** Income rows left out for want of a USD value. */
   unvaluedReceipts: number;
+  /** Rows kept in the figures that were converted without a published rate (today's rate, seed table or 1:1). */
+  approximateReceipts: number;
+  /** Typed reason codes for those rows: `FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`; empty when none. */
+  fxReasons: string[];
   holdings: HoldingIncome[];
 }

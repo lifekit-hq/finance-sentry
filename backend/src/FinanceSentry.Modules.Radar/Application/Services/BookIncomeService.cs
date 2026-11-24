@@ -1,5 +1,6 @@
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 
@@ -83,6 +84,7 @@ public sealed class BookIncomeService(
 
         var withCost = rows.Where(r => r.YieldOnCost is not null).Select(r => r.Symbol).ToList();
         var costTotal = withCost.Sum(s => positions[s].Cost!.Value);
+        var approximate = valued.Where(r => r.Fx.ToReason() is not null).ToList();
         var withForward = rows.Where(r => r.ForwardAnnualUsd is not null).ToList();
 
         return new BookIncome(
@@ -94,6 +96,8 @@ public sealed class BookIncomeService(
                 ? null
                 : Math.Round(rows.Where(r => withCost.Contains(r.Symbol)).Sum(r => r.Ttm.Net) / costTotal, 4),
             receipts.Count(r => r.Usd is null),
+            approximate.Count,
+            [.. approximate.Select(r => r.Fx.ToReason()!).Distinct().Order(StringComparer.Ordinal)],
             rows);
     }
 

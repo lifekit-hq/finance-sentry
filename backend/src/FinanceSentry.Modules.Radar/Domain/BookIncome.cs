@@ -30,7 +30,9 @@ public sealed record HoldingIncome(
 /// The book's income received (finance-framework §6 C2a counts it as growth; this shows it as a stream): dividends,
 /// interest and staking rewards by holding, trailing 12 months and year to date, with the forward estimate and the
 /// yield on cost. <c>ForwardAnnualUsd</c> and <c>YieldOnCost</c> are null when no holding gives the input, never a
-/// zero. <c>UnvaluedReceipts</c> counts rows left out for want of a USD value. A view over rows already collected:
+/// zero. <c>UnvaluedReceipts</c> counts rows left out for want of a USD value. <c>ApproximateReceipts</c> counts the
+/// rows kept in the figures that were converted without a published rate (today's rate, the seed table or 1:1), and
+/// <c>FxReasons</c> carries the typed reason codes for them (empty when none). A view over rows already collected:
 /// the parts stay separate and nothing is scored.
 /// </summary>
 public sealed record BookIncome(
@@ -40,7 +42,9 @@ public sealed record BookIncome(
     decimal? ForwardAnnualUsd,
     decimal? YieldOnCost,
     int UnvaluedReceipts,
+    int ApproximateReceipts,
+    IReadOnlyList<string> FxReasons,
     IReadOnlyList<HoldingIncome> Holdings)
 {
-    public static BookIncome Empty(DateOnly asOf) => new(asOf, IncomeWindow.Zero, IncomeWindow.Zero, null, null, 0, []);
+    public static BookIncome Empty(DateOnly asOf) => new(asOf, IncomeWindow.Zero, IncomeWindow.Zero, null, null, 0, 0, [], []);
 }
