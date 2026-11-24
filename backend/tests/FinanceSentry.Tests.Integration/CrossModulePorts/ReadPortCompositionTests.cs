@@ -249,6 +249,28 @@ public sealed class ReadPortCompositionTests
         captures[1].Holdings.Should().ContainSingle().Which.UsdValue.Should().Be(1_100m);
     }
 
+    [Fact]
+    public async Task Book_holdings_history_groups_both_sleeves_into_captures_oldest_first()
+    {
+        var first = new DateTimeOffset(2026, 9, 1, 6, 0, 0, TimeSpan.Zero);
+        var second = first.AddDays(1);
+        var snapshots = new Mock<IHoldingSnapshotRepository>();
+        snapshots.Setup(s => s.ListSinceUnscopedAsync(User, first, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new HoldingSnapshot { UserId = User, Symbol = "AAA", Sleeve = RiskSleeve.Brokerage, Quantity = 10m, UsdValue = 1_100m, CapturedAt = second },
+                new HoldingSnapshot { UserId = User, Symbol = "BTC", Sleeve = RiskSleeve.Crypto, Quantity = 1m, UsdValue = 60_000m, CapturedAt = first },
+                new HoldingSnapshot { UserId = User, Symbol = "AAA", Sleeve = RiskSleeve.Brokerage, Quantity = 10m, UsdValue = 1_000m, CapturedAt = first },
+            ]);
+
+        var captures = await new BookHoldingsHistoryReader(snapshots.Object).ListSinceAsync(User, first);
+
+        captures.Select(c => c.CapturedAt).Should().Equal(first, second);
+        captures[0].Positions.Select(p => (p.Symbol, p.Sleeve, p.UsdValue))
+            .Should().BeEquivalentTo([("BTC", RiskSleeve.Crypto, 60_000m), ("AAA", RiskSleeve.Brokerage, 1_000m)]);
+        captures[1].Positions.Should().ContainSingle().Which.UsdValue.Should().Be(1_100m);
+    }
+
     private static Mock<INetWorthSnapshotRepository> SnapshotsOf(DateOnly from, DateOnly to, params NetWorthSnapshot[] rows)
     {
         var snapshots = new Mock<INetWorthSnapshotRepository>();

@@ -87,6 +87,7 @@ public static class WealthModule
         services.AddScoped<IAccountScopeChangeReader, ManualHoldingScopeChangeReader>();
         // #673: published read port - the Integration adapter reaches the snapshots only through it.
         services.AddScoped<IBrokerageValueHistoryReader, BrokerageValueHistoryReader>();
+        services.AddScoped<IBookCashHistoryReader, BookCashHistoryReader>();
         services.AddScoped<INetWorthSnapshotService, NetWorthSnapshotService>();
         services.AddScoped<NetWorthSnapshotBackfillService>();
         services.AddScoped<NetWorthSplitBackfillService>();

@@ -34,6 +34,7 @@ public static class CrossModulePortRegistration
         // 412: portfolio value source for book-vs-benchmark change in invested value; bridges Wealth snapshots → Radar.
         services.AddScoped<IPortfolioValueSource, RadarPortfolioValueSource>();
         services.AddScoped<IRiskPictureInputsSource, RadarRiskPictureInputsSource>();
+        services.AddScoped<IConcentrationHistorySource, RadarConcentrationHistorySource>();
         // Book income: stored dividend yield and ex-dividend dates bridge Research -> Radar.
         services.AddScoped<IIncomeOutlookSource, RadarIncomeOutlookAdapter>();
 

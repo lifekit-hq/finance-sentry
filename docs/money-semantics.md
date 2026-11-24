@@ -1373,6 +1373,18 @@ stored is said so) beside the top-1 weight and marks a weight above it. Maximum 
 `MaxDrawdownTolerancePct` when set, and as "tolerance not set" when it is NULL (this surface never sets it). Nothing is
 stored, and an ETF is one symbol (no look-through).
 
+**Concentration history (#1534).** `GET /radar/risk-picture/history` charts, over the last two years of stored
+`risk.HoldingSnapshots` and `wealth.NetWorthSnapshotSources`, the top-three share, the crypto share and the cash
+share, each as one reading per UTC day (the day's latest capture). Unlike the weights above, the top-three and crypto
+shares take the **priced invested book** (positions with a USD value above zero, a symbol on several venues counted
+once) as denominator, cash excluded; the panel says so. Cash share is `(total - invested) / total` over the brokerage
+and crypto snapshot sources of that day, so it is the book's idle cash, not the net-worth cash. It is read through
+`SnapshotSources` and left out (the day carries no cash share, never an estimate) when either source was carried
+forward, has no row or lacks a total or invested figure. The IPS targets drawn as reference lines are the stored
+statement's Crypto and Cash sleeve targets (`TargetPct` / 100, summed per canonical class); top-three has none.
+A day with no priced position is skipped, and fewer than two days is a typed `NotEnoughHistory`, never a line.
+Nothing is stored and no detector reads it.
+
 ## 8b. Rebalance and cash-deployment advice (one engine, #1492)
 
 `PortfolioAdviceEngine` (Research module) answers "what to trade" and "what to do with idle cash" in one pass from

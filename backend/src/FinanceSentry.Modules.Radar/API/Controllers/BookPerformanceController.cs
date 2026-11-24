@@ -34,9 +34,14 @@ public class BookPerformanceController(IBookPerformanceService performance, IBoo
 [ApiController]
 [Authorize]
 [Route("radar/risk-picture")]
-public class RiskPictureController(IRiskPictureService riskPicture) : ControllerBase
+public class RiskPictureController(IRiskPictureService riskPicture, IConcentrationHistoryService history) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)
         => Ok(await riskPicture.GetAsync(User.RequireUserId(), ct));
+
+    /// <summary>Top-three share, crypto share and cash share of the book over the captured days, with the IPS targets they are read against.</summary>
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory(CancellationToken ct)
+        => Ok(await history.GetAsync(User.RequireUserId(), ct));
 }

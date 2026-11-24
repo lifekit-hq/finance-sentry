@@ -57,6 +57,7 @@ public static class RiskModule
         services.AddScoped<IBrokeragePriceHistoryReader, HoldingSnapshotBrokeragePriceHistoryReader>();
         // R1(b): published read port - Radar's holdings-based return reaches the brokerage captures only through it.
         services.AddScoped<IBrokerageHoldingsHistoryReader, BrokerageHoldingsHistoryReader>();
+        services.AddScoped<IBookHoldingsHistoryReader, BookHoldingsHistoryReader>();
 
         services.AddScoped<IBookSnapshotReader, BookSnapshotReader>();
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();

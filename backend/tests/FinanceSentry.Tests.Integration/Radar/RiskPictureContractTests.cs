@@ -18,6 +18,7 @@ using Xunit;
 public class RiskPictureContractTests(WealthApiFactory factory) : IClassFixture<WealthApiFactory>
 {
     private readonly Mock<IRiskPictureService> _riskPicture = new(MockBehavior.Loose);
+    private readonly Mock<IConcentrationHistoryService> _history = new(MockBehavior.Loose);
 
     [Fact]
     public async Task GetRiskPicture_NoAuth_Returns401()
@@ -64,9 +65,41 @@ public class RiskPictureContractTests(WealthApiFactory factory) : IClassFixture<
         body.Top1OverFlag.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task GetRiskPictureHistory_NoAuth_Returns401()
+    {
+        var response = await factory.CreateClient().GetAsync("/api/v1/radar/risk-picture/history");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetRiskPictureHistory_ReturnsTheSeriesAndTargetsAsFractions_ForTheSignedInPerson()
+    {
+        _history
+            .Setup(h => h.GetAsync(factory.TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConcentrationHistory(
+                [
+                    new ConcentrationPoint(new DateOnly(2026, 1, 5), 0.8m, 0.1m, null),
+                    new ConcentrationPoint(new DateOnly(2026, 6, 5), 0.85m, 0.15m, 0.3m),
+                ],
+                0.10m, 0.05m, null));
+
+        var response = await Client().GetAsync("/api/v1/radar/risk-picture/history");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ConcentrationHistoryShape>();
+        body!.Points.Select(p => (p.Date, p.Top3Share, p.CryptoShare, p.CashShare)).Should().Equal(
+            ("2026-01-05", 0.8m, 0.1m, (decimal?)null),
+            ("2026-06-05", 0.85m, 0.15m, 0.3m));
+        body.CryptoTarget.Should().Be(0.10m);
+        body.CashTarget.Should().Be(0.05m);
+        body.Reason.Should().BeNull();
+    }
+
     private HttpClient Client()
     {
-        var withMock = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped(_ => _riskPicture.Object)));
+        var withMock = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped(_ => _riskPicture.Object).AddScoped(_ => _history.Object)));
         TestUsers.EnsureExists(withMock.Services, factory.TestUserId);
         var client = withMock.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Add("Cookie", factory.CreateAuthenticatedClient().DefaultRequestHeaders.GetValues("Cookie"));
@@ -80,3 +113,7 @@ public record RiskPictureShape(
     RiskFigureShape Volatility, RiskFigureShape MaxDrawdown, RiskFigureShape Beta,
     decimal? DrawdownTolerance, string? Top1Symbol, decimal? Top1Weight, List<string> Top3Symbols,
     decimal? Top3Weight, decimal? CryptoShare, decimal? PositionFlag, bool? Top1OverFlag);
+
+public record ConcentrationPointShape(string Date, decimal Top3Share, decimal CryptoShare, decimal? CashShare);
+public record ConcentrationHistoryShape(
+    List<ConcentrationPointShape> Points, decimal? CryptoTarget, decimal? CashTarget, string? Reason);

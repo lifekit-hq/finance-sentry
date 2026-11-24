@@ -35,3 +35,34 @@ export interface RiskFigureRow {
   /** Set when the row's own rule is breached (the position flag); read as a warning. */
   warning: boolean;
 }
+
+/** One captured day of `GET /radar/risk-picture/history`; shares are fractions of the invested book. */
+export interface ConcentrationPoint {
+  date: string;
+  top3Share: number;
+  cryptoShare: number;
+  cashShare: Nullable<number>;
+}
+
+/** `GET /radar/risk-picture/history`: the series and the IPS targets it is read against; `reason` is set when there is too little history. */
+export interface ConcentrationHistory {
+  points: ConcentrationPoint[];
+  cryptoTarget: Nullable<number>;
+  cashTarget: Nullable<number>;
+  reason: Nullable<string>;
+}
+
+export type ConcentrationMeasure = 'top3' | 'crypto' | 'cash';
+
+/** What the history chart draws for one measure, with the plain-language line beneath it. */
+export interface ConcentrationView {
+  measure: ConcentrationMeasure;
+  label: string;
+  chart: {label: string; value: number; time: number}[];
+  /** The IPS target on the same days as `chart`, drawn as a reference line; empty when the measure has no target. */
+  target: {label: string; value: number; time: number}[];
+  /** The value range both lines are drawn in, so the target sits on the same scale as the share. */
+  domain: {min: number; max: number};
+  /** Latest value against the IPS target, or just the latest value when no target applies. */
+  summary: string;
+}
