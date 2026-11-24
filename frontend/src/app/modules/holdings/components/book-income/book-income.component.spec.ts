@@ -94,7 +94,7 @@ describe('BookIncomeComponent', () => {
     income.set({...INCOME, approximateReceipts: 2, fxReasons: ['FX_UNKNOWN_1TO1']});
 
     expect(text(render(), 'book-income-approximate')).toBe(
-      'Approximate: 2 income rows were converted without a published rate.',
+      'Approximate: 2 income rows were converted without a published rate.'
     );
   });
 
