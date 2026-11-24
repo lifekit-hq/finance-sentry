@@ -54,6 +54,12 @@
         <span class="font-semibold">{{ turnsBuyPrefix }}</span> {{ turnsBuyWhen }}.
       </p>
     }
+
+    @if (v.note; as note) {
+      <p class="text-cmn-xs text-text-secondary" data-testid="verdict-trend-only-note">
+        {{ note }}
+      </p>
+    }
   </div>
 
   <aside
