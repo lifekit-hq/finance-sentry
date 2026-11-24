@@ -15,6 +15,12 @@ public sealed partial class SecEdgarOptions
 
     public string? Contact { get; set; }
 
+    /// <summary>
+    /// Requests a second the <c>sec-edgar</c> client may send across all callers. The SEC's fair-access limit is 10
+    /// and it answers 429 above it, so this stays under it.
+    /// </summary>
+    public int RequestsPerSecond { get; set; } = 8;
+
     /// <summary>Whether <paramref name="contact"/> carries an email address, the one contact form the SEC edge accepts.</summary>
     public static bool IsEmailContact(string? contact)
         => !string.IsNullOrWhiteSpace(contact) && EmailPattern().IsMatch(contact);

@@ -458,6 +458,9 @@ public static class ResearchModule
         // so resilience never retries it) refuses to send without one, and the ticker map reports it unhealthy.
         services.AddOptions<SecEdgarOptions>().Bind(config.GetSection(SecEdgarOptions.SectionName));
         services.AddTransient<SecContactGuardHandler>();
+        services.AddTransient<SecRequestPacingHandler>();
+        services.AddKeyedSingleton(SecRequestPacingHandler.PacerKey, (sp, _) =>
+            RequestPacer.PerSecond(sp.GetRequiredService<IOptions<SecEdgarOptions>>().Value.RequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
 
         services.AddHttpClient(SecEdgarService.HttpClientName, (sp, client) =>
         {
@@ -468,6 +471,7 @@ public static class ResearchModule
         })
             .AddHttpMessageHandler<SecContactGuardHandler>()
             .AddProviderResilience(secTimeout)
+            .AddHttpMessageHandler<SecRequestPacingHandler>()
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
