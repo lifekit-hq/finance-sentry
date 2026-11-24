@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// What one attention refresh did. <see cref="Note"/> says why a run that stored nothing is not a failure (switched off, or no
-/// phrase to ask) and, for a run that stored some phrases but not all, that the rest were throttled.
+/// phrase to ask).
 /// </summary>
 public sealed record AttentionRefreshSummary(bool Ran, int Themes, int Phrases, int DaysWritten, int Failed, int Unmeasured, string? Note = null)
 {
@@ -26,11 +26,10 @@ public sealed class ThemeAttentionRefreshException(string step, string message, 
 /// <summary>
 /// Stores GDELT article volume per theme phrase (discovery funnel stage 7). The themes are the reference universe's (the stage 3
 /// lists, plus any theme declared in <c>ReferenceUniverse:Themes</c> that the weekly refresh has not materialised yet); the words
-/// that mean each theme in the press are <see cref="CatalystOptions.ThemePhrases"/>. Requests are spaced to GDELT's one per five
-/// seconds. A phrase GDELT will not answer is counted and logged and the others are still stored. GDELT throttles this host's egress
-/// for days at a time, so a run that stored some phrases ends with a partial summary (the failed count and a warning) rather than
-/// failing the daily job; a run that measured none of the phrases it asked for throws a <see cref="ThemeAttentionRefreshException"/>
-/// naming the step, so the job ends Failed instead of leaving a stale measure looking current. No model is called.
+/// that mean each theme in the press are <see cref="CatalystOptions.ThemePhrases"/>. Requests are spaced wider than GDELT's one per
+/// five seconds and a throttled phrase is retried after a wait (<see cref="IGdeltTimelineClient"/>). A phrase GDELT still will not
+/// answer is counted and logged and the others are still stored; the run then throws a <see cref="ThemeAttentionRefreshException"/>
+/// naming the step and the failed count, so the job ends Failed instead of leaving a stale measure looking current. No model is called.
 /// </summary>
 public sealed class ThemeAttentionRefresher(
     IReferenceUniverseReader reference,
@@ -123,18 +122,11 @@ public sealed class ThemeAttentionRefresher(
                 return new AttentionRefreshSummary(true, themes.Count, 0, 0, 0, unmeasured, NoInput);
             }
 
-            if (failed >= phrases)
+            if (failed > 0)
             {
                 step = "fetch-volume";
                 throw new ThemeAttentionRefreshException(
-                    step, $"Theme attention could not read any of {phrases} phrase(s); nothing was stored.");
-            }
-
-            if (failed > 0)
-            {
-                var partial = $"{failed} of {phrases} phrase(s) were not answered (GDELT throttling); their last stored readings are kept";
-                logger.LogWarning("Theme attention refresh partial: {Reason}", partial);
-                return new AttentionRefreshSummary(true, themes.Count, phrases, written, failed, unmeasured, partial);
+                    step, $"Theme attention could not read {failed} of {phrases} phrase(s); the others were stored.");
             }
 
             return new AttentionRefreshSummary(true, themes.Count, phrases, written, failed, unmeasured);

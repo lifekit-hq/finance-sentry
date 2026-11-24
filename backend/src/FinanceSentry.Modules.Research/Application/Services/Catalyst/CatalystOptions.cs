@@ -80,12 +80,13 @@ public sealed class CatalystOptions
     public int GdeltTimespanDays { get; set; } = 14;
 
     /// <summary>
-    /// Seconds between GDELT requests. GDELT answers HTTP 429 above one request per five seconds, so 5 is the floor, not a tuning knob.
+    /// Seconds between GDELT requests. GDELT documents one request per five seconds but still answered HTTP 429 to this host at a
+    /// six-second spacing, so the default leaves a wider gap.
     /// </summary>
-    public int GdeltMinIntervalSeconds { get; set; } = 5;
+    public int GdeltMinIntervalSeconds { get; set; } = 10;
 
     /// <summary>Tries per phrase when GDELT throttles (429) or fails (5xx); 1 turns the retry off.</summary>
-    public int GdeltMaxAttempts { get; set; } = 3;
+    public int GdeltMaxAttempts { get; set; } = 4;
 
     /// <summary>Seconds waited after the first throttled try (doubling each time) unless GDELT sends Retry-After.</summary>
     public int GdeltRetryDelaySeconds { get; set; } = 30;

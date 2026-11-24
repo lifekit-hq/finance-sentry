@@ -20,8 +20,8 @@ public sealed class CatalystDetectionJob(CatalystDetector detector)
 
 /// <summary>
 /// Daily GDELT attention refresh (discovery funnel stage 7): article volume per theme phrase, stored as the attention measure the
-/// scorecard and readers expose. A phrase GDELT will not answer is stored around and reported in the run's summary; a run that
-/// measured nothing it asked for ends Failed, and any failure is logged here with the job name, the step and the exception.
+/// scorecard and readers expose. A phrase GDELT will not answer makes the job end Failed after the others are stored; any
+/// failure is logged here with the job name, the step and the exception.
 /// </summary>
 public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher, ILogger<ThemeAttentionRefreshJob> logger)
 {
@@ -34,8 +34,8 @@ public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher, 
         {
             var summary = await refresher.RefreshAsync(ct);
             logger.LogInformation(
-                "Job {Job} finished: ran {Ran}, {Phrases} phrase(s), {Failed} failed. {Note}",
-                nameof(ThemeAttentionRefreshJob), summary.Ran, summary.Phrases, summary.Failed, summary.Note);
+                "Job {Job} finished: ran {Ran}, {Phrases} phrase(s). {Note}",
+                nameof(ThemeAttentionRefreshJob), summary.Ran, summary.Phrases, summary.Note);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

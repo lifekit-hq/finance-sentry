@@ -100,17 +100,15 @@ public sealed class ThemeAttentionTests
     }
 
     [Fact]
-    public async Task Refresh_AThrottledPhrase_StoresTheOthers_AndReportsAPartialRun()
+    public async Task Refresh_AThrottledPhrase_StoresTheOthers_ThenFailsTheJobInTheFetchStep()
     {
         await _h.ListAsync("theme:memory", "MU");
         _gdelt.Failing.Add("HBM memory");
         _gdelt.ByPhrase["DRAM prices"] = Series(new DateOnly(2026, 11, 15), 5);
 
-        var summary = await Refresher(Options()).RefreshAsync();
+        var act = () => Refresher(Options()).RefreshAsync();
 
-        summary.Failed.Should().Be(1);
-        summary.Phrases.Should().Be(2);
-        summary.Note.Should().Contain("1 of 2");
+        (await act.Should().ThrowAsync<ThemeAttentionRefreshException>().WithMessage("*1 of 2*")).Which.Step.Should().Be("fetch-volume");
         (await StoredAsync()).Should().ContainSingle().Which.Phrase.Should().Be("DRAM prices");
     }
 
@@ -123,8 +121,33 @@ public sealed class ThemeAttentionTests
 
         var act = () => Refresher(Options()).RefreshAsync();
 
-        (await act.Should().ThrowAsync<ThemeAttentionRefreshException>().WithMessage("*any of 2*")).Which.Step.Should().Be("fetch-volume");
+        (await act.Should().ThrowAsync<ThemeAttentionRefreshException>().WithMessage("*2 of 2*")).Which.Step.Should().Be("fetch-volume");
         (await StoredAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Refresh_APhraseThrottledOnce_RecoversOnRetry_AndTheRunCompletes()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        const string Timeline = """{"timeline":[{"series":"Article Count","data":[{"date":"20261112T000000Z","value":7}]}]}""";
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var http = new ScriptedHttp(url => seen.Add(url)
+            ? (System.Net.HttpStatusCode.TooManyRequests, "Please limit requests to one every 5 seconds")
+            : (System.Net.HttpStatusCode.OK, Timeline));
+        var clock = new AutoAdvanceClock(DateTimeOffset.UnixEpoch);
+        var gdelt = new FinanceSentry.Modules.Research.Infrastructure.Sources.Catalyst.GdeltTimelineClient(
+            http, new RequestPacer(TimeSpan.FromSeconds(10), clock), Microsoft.Extensions.Options.Options.Create(Options()), clock,
+            NullLogger<FinanceSentry.Modules.Research.Infrastructure.Sources.Catalyst.GdeltTimelineClient>.Instance);
+        var refresher = new ThemeAttentionRefresher(
+            _h.Reference, gdelt, new ThemeAttentionRepository(_h.Coverage.Db), Microsoft.Extensions.Options.Options.Create(Options()),
+            Microsoft.Extensions.Options.Options.Create(new ReferenceUniverseOptions()), _h.Clock, NullLogger<ThemeAttentionRefresher>.Instance);
+
+        var summary = await refresher.RefreshAsync();
+
+        summary.Failed.Should().Be(0);
+        summary.Phrases.Should().Be(2);
+        (await StoredAsync()).Select(d => d.Phrase).Should().BeEquivalentTo("HBM memory", "DRAM prices");
+        http.Requested.Should().HaveCount(4, "each phrase was throttled once and answered on the retry");
     }
 
     [Fact]
