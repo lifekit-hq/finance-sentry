@@ -62,5 +62,12 @@ describe('ConcentrationHistoryComponent', () => {
     expect(el.querySelector('[data-testid="concentration-summary"]')?.textContent).toContain(
       'drift +5.0 pts'
     );
+    expect(el.querySelector('[data-testid="concentration-target"]')).toBeTruthy();
+
+    fixture.componentInstance.chooseMeasure('top3');
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="concentration-chart"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="concentration-target"]')).toBeNull();
   });
 });

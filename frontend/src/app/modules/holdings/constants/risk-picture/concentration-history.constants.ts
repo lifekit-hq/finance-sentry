@@ -10,6 +10,8 @@ export const CONCENTRATION_PERCENT_POINTS = 100;
 
 export const CONCENTRATION_PERCENT_DIGITS = 1;
 
+export const CONCENTRATION_DOMAIN_PADDING = 1;
+
 export const CONCENTRATION_BASIS =
   'Shares of the invested book on each day the book was captured; the cash share is of the brokerage and crypto sources on that snapshot day. Targets are the Investment Policy Statement.';
 

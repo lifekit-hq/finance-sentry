@@ -59,6 +59,10 @@ export interface ConcentrationView {
   measure: ConcentrationMeasure;
   label: string;
   chart: {label: string; value: number; time: number}[];
+  /** The IPS target on the same days as `chart`, drawn as a reference line; empty when the measure has no target. */
+  target: {label: string; value: number; time: number}[];
+  /** The value range both lines are drawn in, so the target sits on the same scale as the share. */
+  domain: {min: number; max: number};
   /** Latest value against the IPS target, or just the latest value when no target applies. */
   summary: string;
 }

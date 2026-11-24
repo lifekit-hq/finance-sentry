@@ -25,15 +25,32 @@
         label="Measure"
       />
       @if (store.view(); as view) {
-        <cmn-line-chart
-          [data]="view.chart"
-          [label]="view.label"
-          [summary]="view.summary"
-          class="block h-24 w-full"
-          data-testid="concentration-chart"
-          valueFormat="number"
-          xSpacing="time"
-        />
+        <div class="relative h-24 w-full">
+          <cmn-line-chart
+            [data]="view.chart"
+            [label]="view.label"
+            [summary]="view.summary"
+            [compact]="true"
+            [yDomain]="view.domain"
+            class="block h-full w-full"
+            data-testid="concentration-chart"
+            valueFormat="number"
+            xSpacing="time"
+          />
+          @if (view.target.length > 0) {
+            <cmn-line-chart
+              [data]="view.target"
+              [label]="view.label + ' IPS target'"
+              [compact]="true"
+              [yDomain]="view.domain"
+              aria-hidden="true"
+              class="pointer-events-none absolute inset-0 block h-full w-full opacity-60"
+              data-testid="concentration-target"
+              valueFormat="number"
+              xSpacing="time"
+            />
+          }
+        </div>
         <p class="text-cmn-xs text-text-primary" data-testid="concentration-summary">
           {{ view.label }}: {{ view.summary }}
         </p>

@@ -1,6 +1,7 @@
 import {type Nullable} from '@lifekit-hq/ui';
 
 import {
+  CONCENTRATION_DOMAIN_PADDING,
   CONCENTRATION_PERCENT_DIGITS,
   CONCENTRATION_PERCENT_POINTS,
 } from '../constants/risk-picture/concentration-history.constants';
@@ -42,14 +43,22 @@ export class ConcentrationHistoryUtils {
       return null;
     }
     const latest = chart[chart.length - 1].value;
+    const target = ConcentrationHistoryUtils.targetOf(history, measure);
+    const targetPoints =
+      target === null
+        ? []
+        : chart.map(point => ({...point, value: target * CONCENTRATION_PERCENT_POINTS}));
+    const values = [...chart, ...targetPoints].map(point => point.value);
     return {
       measure,
       label: LABELS[measure],
       chart,
-      summary: ConcentrationHistoryUtils.summary(
-        latest,
-        ConcentrationHistoryUtils.targetOf(history, measure)
-      ),
+      target: targetPoints,
+      domain: {
+        min: Math.min(...values) - CONCENTRATION_DOMAIN_PADDING,
+        max: Math.max(...values) + CONCENTRATION_DOMAIN_PADDING,
+      },
+      summary: ConcentrationHistoryUtils.summary(latest, target),
     };
   }
 
