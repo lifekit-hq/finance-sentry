@@ -16,17 +16,19 @@
         }
       </span>
     </cmn-list-item-row>
-    <p
-      [attr.data-testid]="store.sleeve + '-cost-parts'"
-      class="px-cmn-4 pb-cmn-1 text-cmn-xs text-text-secondary"
-    >
-      Year to date:
-      @for (part of store.parts(); track part.key; let last = $last) {
-        <span [attr.data-testid]="store.sleeve + '-cost-' + part.key"
-          >{{ part.label }} {{ part.amount | money: costs.currency }}</span
-        >{{ last ? '' : ' · ' }}
-      }
-    </p>
+    @if (store.parts().length > 0) {
+      <p
+        [attr.data-testid]="store.sleeve + '-cost-parts'"
+        class="px-cmn-4 pb-cmn-1 text-cmn-xs text-text-secondary"
+      >
+        Year to date:
+        @for (part of store.parts(); track part.key; let last = $last) {
+          <span [attr.data-testid]="store.sleeve + '-cost-' + part.key"
+            >{{ part.label }} {{ part.amount | money: costs.currency }}</span
+          >{{ last ? '' : ' · ' }}
+        }
+      </p>
+    }
     @if (costs.approximateRows > 0) {
       <p
         [attr.data-testid]="store.sleeve + '-cost-approximate'"
