@@ -239,8 +239,10 @@ public sealed class YahooValuationDataService(
     // Yahoo wraps numeric fields as { "raw": <number>, "fmt": "<string>" }.
     /// <summary>
     /// A price is stale when it is older than the last trading session plus a margin, never because the market is
-    /// closed. The last session is the most recent weekday whose US open (13:30 UTC) has passed; the margin of one
-    /// day covers an exchange holiday and an earlier-in-the-day exchange. An unknown price time is stale.
+    /// closed. The last session is the most recent weekday whose US open has passed; the margin of one day covers an
+    /// earlier-in-the-day exchange. An unknown price time is stale. Known limits: there is no holiday calendar, so a
+    /// quote from before a Monday US market holiday reads stale until the next session opens, and the session open is
+    /// a fixed UTC hour (13:30) that ignores daylight saving.
     /// </summary>
     internal static bool IsPriceStale(DateTimeOffset? priceTime, DateTimeOffset now)
     {
