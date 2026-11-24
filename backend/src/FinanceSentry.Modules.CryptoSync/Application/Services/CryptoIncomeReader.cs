@@ -15,7 +15,7 @@ public sealed class CryptoIncomeReader(CryptoSyncDbContext db) : ICryptoIncomeRe
 {
     public async Task<IReadOnlyList<IncomeReceipt>> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
     {
-        var fromTime = from.ToDateTime(TimeOnly.MaxValue);
+        var fromTime = from.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
         var rows = await db.CryptoFlowEvents.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(e => e.UserId == userId

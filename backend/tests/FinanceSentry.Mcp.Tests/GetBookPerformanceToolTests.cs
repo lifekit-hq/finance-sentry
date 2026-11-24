@@ -104,6 +104,22 @@ public sealed class GetBookPerformanceToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_KeepsTheReturns_WhenTheIncomeReadFails()
+    {
+        var expected = new BookPerformanceResult(
+            [new PeriodTwr(BookPerformancePeriod.OneWeek, Today.AddDays(-7), 0.03m, 0.01m, 0.02m, "outperform")],
+            Today);
+        _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
+            .ReturnsAsync(expected);
+        _income.Setup(s => s.GetAsync(UserId, default)).ThrowsAsync(new InvalidOperationException("income read failed"));
+
+        var result = await CreateSut().ExecuteAsync();
+
+        result.Periods.Should().Equal(expected.Periods);
+        result.Income.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenIdentityUnresolvable()
     {
         var sut = new GetBookPerformanceTool(

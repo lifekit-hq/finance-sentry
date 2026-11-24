@@ -39,7 +39,7 @@ public sealed class BrokerageIncomeReader(BrokerageSyncDbContext db, IHistorical
 
     public async Task<IReadOnlyList<IncomeReceipt>> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
     {
-        var fromTime = from.ToDateTime(TimeOnly.MaxValue);
+        var fromTime = from.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
         var rows = await db.BrokerageCashTransactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(c => c.UserId == userId && c.DateTime > fromTime && c.Amount != 0m)
