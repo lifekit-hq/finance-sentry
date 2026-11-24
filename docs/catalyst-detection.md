@@ -41,6 +41,6 @@ The measure is a fact, not a rule: for each phrase the newest *complete* UTC day
 
 ## Options (`Catalyst`)
 
-`Enabled` (true; false stops both jobs before any request), `AttentionEnabled` (true), `Items`, `ListKinds`, `LookbackDays` (3), `MaxNominationsPerRun` (3), `ScanHourUtc`/`ScanMinuteUtc` (0:30), `FullTextUrl`, `FullTextPageSize` (100), `FullTextMaxPagesPerItem` (8), `SecRequestsPerSecond` (5), `FallbackMaxTickers` (700), `GdeltUrl`, `GdeltTimespanDays` (14), `GdeltMinIntervalSeconds` (5), `AttentionHourUtc`/`AttentionMinuteUtc` (0:10), `AttentionRetentionDays` (90), `AttentionBaselineDays` (13), `AttentionMinBaselineDays` (5), `EventRetentionDays` (120), `MaxListedEvents` (200), `ThemePhrases`.
+`Enabled` (true; false stops both jobs before any request), `AttentionEnabled` (true), `Items`, `ListKinds`, `LookbackDays` (3), `MaxNominationsPerRun` (3), `ScanHourUtc`/`ScanMinuteUtc` (0:30), `FullTextUrl`, `FullTextPageSize` (100), `FullTextMaxPagesPerItem` (8), `SecRequestsPerSecond` (5), `FallbackMaxTickers` (700), `GdeltUrl`, `GdeltTimespanDays` (14), `GdeltMinIntervalSeconds` (10), `AttentionHourUtc`/`AttentionMinuteUtc` (0:10), `AttentionRetentionDays` (90), `AttentionBaselineDays` (13), `AttentionMinBaselineDays` (5), `EventRetentionDays` (120), `MaxListedEvents` (200), `ThemePhrases`.
 
 Rollback: set `Catalyst:Enabled` false (jobs stop, nothing else changes). Migration `M029` only creates the two tables above; its `Down` drops them.
