@@ -1581,6 +1581,22 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   stored, never recomputed, and is left off if the record cannot be read. No new calculation: every figure is the
   one above.
 
+- **Income received (issue 1532).** `GET /api/v1/radar/book-performance/income` and the `income` field of
+  `get_book_performance` read the brokerage book's income from rows already collected, as a view with no new
+  source: `BrokerageCashTransaction` dividends, payments in lieu, broker and bond interest and the withholding
+  tax rows, and `CryptoFlowEvent` rewards and airdrops (staking) priced at the event's `UnitPriceUsd`. Each
+  amount is converted to USD on its own date. Windows are the trailing 12 months (the day one year ago excluded)
+  and year to date; each carries `gross`, `withholding` and `net = gross - withholding`, and the tax is shown,
+  never hidden inside the net. A reward with no USD price is counted in `unvaluedReceipts`, not valued at zero. A cash row converted without a
+  published rate (today's rate, the seed table or 1:1 for an unknown currency, §3) stays in the totals and is counted
+  in `approximateReceipts`, with its `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1` code in `fxReasons`; a nearest-published
+  rate is a published rate and is not counted.
+  `forwardAnnualUsd` is a holding's stored `ValuationSnapshot.DividendYield` times its USD value, null without a
+  yield; `yieldOnCost` is the trailing-12-month net over the verified cost basis (every row of the holding
+  `Verified`), null otherwise. Book-level estimate and yield sum or divide only the holdings that supply the
+  input. `nextExDividend` is the next `ex_dividend` event within 90 days. The figures are separate axes: no
+  composite score and no total return.
+
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the
   deposits and withdrawals the brokers report (§8 *Brokerage contributions vs growth*) taken out, so a

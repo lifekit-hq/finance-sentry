@@ -1,0 +1,129 @@
+<cmn-async-state
+  [status]="store.status()"
+  [errorMessage]="store.errorMessage()"
+  [keepContent]="false"
+  [crossfade]="false"
+  (retry)="store.load()"
+  emptySubMessage="Income received shows once dividends, interest or staking rewards are recorded."
+  retryable
+>
+  <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="1rem" width="70%" />
+
+  @if (store.hasIncome() && store.income(); as income) {
+    <div data-testid="book-income">
+      <h2 class="px-cmn-4 pt-cmn-3 font-headline text-cmn-md font-semibold text-text-primary">
+        Income received
+      </h2>
+      <cmn-list-item-row
+        [sublabel]="'Tax withheld ' + (income.ttm.withholding | money: 'USD')"
+        label="Last 12 months"
+        data-testid="book-income-ttm-row"
+      >
+        <span
+          amount
+          class="tabular-nums text-cmn-sm text-text-primary"
+          data-testid="book-income-ttm"
+        >
+          {{ income.ttm.net | money: 'USD' }}
+        </span>
+      </cmn-list-item-row>
+      <cmn-list-item-row
+        [sublabel]="'Tax withheld ' + (income.ytd.withholding | money: 'USD')"
+        label="Year to date"
+        data-testid="book-income-ytd-row"
+      >
+        <span
+          amount
+          class="tabular-nums text-cmn-sm text-text-primary"
+          data-testid="book-income-ytd"
+        >
+          {{ income.ytd.net | money: 'USD' }}
+        </span>
+      </cmn-list-item-row>
+      <cmn-list-item-row
+        label="Forward estimate"
+        sublabel="Stored dividend yield times position value, per year"
+        data-testid="book-income-forward-row"
+      >
+        <span
+          amount
+          class="tabular-nums text-cmn-sm text-text-primary"
+          data-testid="book-income-forward"
+        >
+          @if (income.forwardAnnualUsd !== null) {
+            {{ income.forwardAnnualUsd | money: 'USD' }}
+          } @else {
+            <span class="text-text-secondary">Not available</span>
+          }
+        </span>
+      </cmn-list-item-row>
+      <cmn-list-item-row
+        label="Yield on cost"
+        sublabel="Last 12 months net income over verified cost basis"
+        data-testid="book-income-yield-row"
+      >
+        <span
+          amount
+          class="tabular-nums text-cmn-sm text-text-primary"
+          data-testid="book-income-yield"
+        >
+          @if (store.yieldOnCostLabel(); as label) {
+            {{ label }}
+          } @else {
+            <span class="text-text-secondary">Not available</span>
+          }
+        </span>
+      </cmn-list-item-row>
+
+      @for (holding of store.holdings(); track holding.symbol) {
+        <cmn-list-item-row
+          [label]="holding.symbol"
+          [sublabel]="'Year to date ' + (holding.ytd.net | money: 'USD')"
+          [attr.data-testid]="'book-income-holding-' + holding.symbol"
+        >
+          <span
+            [attr.data-testid]="'book-income-holding-' + holding.symbol + '-ttm'"
+            amount
+            class="tabular-nums text-cmn-sm text-text-primary"
+          >
+            {{ holding.ttm.net | money: 'USD' }}
+            @if (holding.ttm.withholding > 0) {
+              <span
+                [attr.data-testid]="'book-income-holding-' + holding.symbol + '-withholding'"
+                class="ml-cmn-1 text-cmn-xs text-text-secondary"
+                >after {{ holding.ttm.withholding | money: 'USD' }} tax</span
+              >
+            }
+          </span>
+        </cmn-list-item-row>
+        @if (holding.nextExDividend) {
+          <p
+            [attr.data-testid]="'book-income-holding-' + holding.symbol + '-ex-dividend'"
+            class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+          >
+            Next ex-dividend {{ holding.nextExDividend | date: 'd MMM y' }}
+          </p>
+        }
+      }
+
+      @if (income.approximateReceipts > 0) {
+        <p
+          class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+          data-testid="book-income-approximate"
+        >
+          Approximate: {{ income.approximateReceipts }} income rows were converted without a
+          published rate.
+        </p>
+      }
+
+      @if (income.unvaluedReceipts > 0) {
+        <p
+          class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+          data-testid="book-income-unvalued"
+        >
+          {{ income.unvaluedReceipts }} reward rows have no USD price and are left out.
+        </p>
+      }
+    </div>
+  }
+</cmn-async-state>

@@ -8,18 +8,23 @@ using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
 /// Book vs SPY over the four standard lookback windows, the figures the MCP tool <c>get_book_performance</c>
-/// returns. The investments tab reads it for the growth-of-10,000 chart (presentation pattern P2).
+/// returns; its <c>income</c> sub-route serves the income-received tile. The investments tab reads it for the growth-of-10,000 chart (presentation pattern P2).
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("radar/book-performance")]
-public class BookPerformanceController(IBookPerformanceService performance) : ControllerBase
+public class BookPerformanceController(IBookPerformanceService performance, IBookIncomeService income) : ControllerBase
 {
     private static readonly IReadOnlyList<BookPerformancePeriod> AllPeriods = Enum.GetValues<BookPerformancePeriod>();
 
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)
         => Ok(await performance.GetAsync(User.RequireUserId(), AllPeriods, ct));
+
+    /// <summary>The book's income received, the same figure <c>get_book_performance</c> carries as <c>income</c>; read apart so the returns tab does not wait on the dividend calendar.</summary>
+    [HttpGet("income")]
+    public async Task<IActionResult> GetIncome(CancellationToken ct)
+        => Ok(await income.GetAsync(User.RequireUserId(), ct));
 }
 
 /// <summary>

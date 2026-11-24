@@ -64,11 +64,14 @@ public sealed record PeriodTwr(
     decimal? QqqDelta = null);
 
 /// <summary>
-/// Book-vs-SPY time-weighted scoreboard across the four standard lookback windows.
+/// Book-vs-SPY time-weighted scoreboard across the four standard lookback windows. <c>Income</c> is the book's
+/// income received (dividends, interest, staking), a separate figure beside the returns: it is not part of any
+/// period's number and is null where the caller did not read it.
 /// </summary>
 public sealed record BookPerformanceResult(
     IReadOnlyList<PeriodTwr> Periods,
-    DateOnly AsOf)
+    DateOnly AsOf,
+    BookIncome? Income = null)
 {
     public static BookPerformanceResult Empty(DateOnly asOf) =>
         new([], asOf);

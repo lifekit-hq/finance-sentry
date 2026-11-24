@@ -343,6 +343,7 @@ public static class ResearchModule
 
         // #673: published read ports - the Integration adapters reach Research only through these.
         services.AddScoped<IEarningsCalendarReader, EarningsCalendarReader>();
+        services.AddScoped<IDividendYieldReader, DividendYieldReader>();
         services.AddScoped<IMacroCalendarReader, MacroCalendarReader>();
         services.AddScoped<IEdgarFilingReader, EdgarFilingReader>();
         services.AddScoped<IActiveThesisCatalystReader, ActiveThesisCatalystReader>();
