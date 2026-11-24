@@ -1609,7 +1609,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   `FeeUsd` is counted in `unvaluedRows`, not valued at zero; a cash row converted without a published rate stays in
   the totals and is counted in `approximateRows`, with its code in `fxReasons` (§3). `shareOfReturns` is
   `cost / (growth + cost)` over the growth window, because the sleeve growth (§8) is already after costs; costs
-  dated before the window opens are left out of it. It is null, never zero, when the growth is unknown or the
+  dated before the window opens or after it closes (its last value-series point) are left out of it. It is null, never zero, when the growth is unknown or the
   return before costs is not positive. The controller applies the base currency like the growth card. The figures
   are separate axes: no composite score.
 

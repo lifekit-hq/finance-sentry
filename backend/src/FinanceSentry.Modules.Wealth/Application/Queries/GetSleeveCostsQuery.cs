@@ -73,7 +73,7 @@ public class GetSleeveCostsQueryHandler(
     }
 
     // The year's growth is read over the same window as the costs, so a series that starts mid-year is not divided by
-    // a full year of costs: only the costs after the growth window's opening close count.
+    // a full year of costs: only the costs after the window's opening close, up to its closing date, count.
     private async Task<decimal?> ShareOfReturnsAsync(
         GetSleeveCostsQuery query, List<CostItem> items, decimal total, DateOnly dayBefore, CancellationToken ct)
     {
@@ -81,10 +81,10 @@ public class GetSleeveCostsQueryHandler(
             return null;
 
         var growth = await sleeveGrowth.Handle(new GetSleeveGrowthQuery(query.UserId, query.Sleeve, dayBefore), ct);
-        if (growth is not { Growth: { } net, From: { } opening })
+        if (growth is not { Growth: { } net, From: { } opening, To: { } closing })
             return null;
 
-        var windowCost = items.Where(i => i.Date > opening).Sum(i => i.Usd);
+        var windowCost = items.Where(i => i.Date > opening && i.Date <= closing).Sum(i => i.Usd);
         var gross = net + windowCost;
         return windowCost <= 0m || gross <= 0m ? null : Math.Round(windowCost / gross, RateDecimals);
     }

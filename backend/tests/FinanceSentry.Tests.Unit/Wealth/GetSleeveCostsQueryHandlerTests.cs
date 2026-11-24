@@ -36,12 +36,12 @@ public class GetSleeveCostsQueryHandlerTests
         => _crypto.Setup(r => r.ReadAsync(UserId, YearOpening, It.IsAny<CancellationToken>())).ReturnsAsync(reading);
 
     // The year's growth is after costs, from the opening close on the day before the year.
-    private void GrowthIs(string sleeve, decimal? growth, DateOnly? from = null)
+    private void GrowthIs(string sleeve, decimal? growth, DateOnly? from = null, DateOnly? to = null)
         => _growth.Setup(g => g.Handle(
                 It.Is<GetSleeveGrowthQuery>(q => q.UserId == UserId && q.Sleeve == sleeve && q.From == YearOpening),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SleeveGrowthResponse(
-                null, from ?? YearOpening, Today, 0m, 0m, 0m, 0m, growth, null, null, null, null, [],
+                null, from ?? YearOpening, to ?? Today, 0m, 0m, 0m, 0m, growth, null, null, null, null, [],
                 HeadlineFactory.Growth(null, MeasuredRate.Fails(MeasureFailure.InsufficientData),
                     HeadlineScope.Sleeve(sleeve), YearOpening, Today, HeadlineSignals.None)));
 
@@ -149,6 +149,23 @@ public class GetSleeveCostsQueryHandlerTests
         var result = await Handle(WealthSourceIds.Brokerage);
 
         result.Total.Should().Be(125m);
+        result.ShareOfReturns.Should().Be(0.1m); // 25 / (225 + 25)
+    }
+
+    [Fact]
+    public async Task ShareOfReturns_LeavesOutCostsDatedAfterTheGrowthWindowCloses()
+    {
+        // The last value-series point is 23 November: the 25 paid on 24 November is not in the growth, so not in the share.
+        BrokerageReads(new CostReading(
+            [
+                Cost(CostKind.Commission, 7, 25m),
+                new CostItem(CostKind.Commission, new DateOnly(2026, 11, 24), 25m, FxStatus.Exact),
+            ], 0));
+        GrowthIs(WealthSourceIds.Brokerage, 225m, to: new DateOnly(2026, 11, 23));
+
+        var result = await Handle(WealthSourceIds.Brokerage);
+
+        result.Total.Should().Be(50m);
         result.ShareOfReturns.Should().Be(0.1m); // 25 / (225 + 25)
     }
 
