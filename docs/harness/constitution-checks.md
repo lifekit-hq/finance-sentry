@@ -4,7 +4,7 @@ The constitution (`.specify/memory/constitution.md`, Code Review & Compliance) l
 
 **Decisions:** *keep as is* (a named check enforces it), *rewrite as guidance* (no check; the constitution says what the author and reviewer do), *needs a new check* (filed as its own issue, not built here). A rule that is partly enforced says so in the row; its constitution bullet names the check for the enforced part and marks the rest Guidance.
 
-Enforced by earlier exercises: warnings as errors (CC9, #1478) and the file-organisation and provider-extraction lint rules (CC7 #1496, CC6 provider part #1499). The shared-boundary lint rule landed for CC8 (#1505).
+Enforced by earlier exercises: warnings as errors (CC9, #1478) and the file-organisation and provider-extraction lint rules (CC7 #1496, CC6 provider part #1499). The shared-boundary lint rule landed for CC8 (#1505), and the component-state, `setInterval` and error-ladder lint rules for the rest of CC6 (#1506).
 
 The check cell is `none` or starts with the backticked name of the check; the constitution bullet for the rule must contain that name. `tests/harness/test_constitution.py` fails when a bullet still says "automatic block" next to a rule marked `none` here, and when a rule with a check does not name it.
 
