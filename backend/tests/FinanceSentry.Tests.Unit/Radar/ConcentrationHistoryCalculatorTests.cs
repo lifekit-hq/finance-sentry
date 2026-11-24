@@ -93,19 +93,55 @@ public sealed class ConcentrationHistoryCalculatorTests
     }
 
     [Fact]
-    public void Build_UnpricedDay_IsSkippedAndSameDayCapturesKeepTheLatest()
+    public void Build_UnpricedDay_IsSkipped()
     {
         var result = ConcentrationHistoryCalculator.Build(Inputs(
         [
             Capture("2026-01-05", Stock("A", 0), Stock("B", -1)),
+            Capture("2026-02-05", Stock("A", 50), Stock("B", 50)),
+            Capture("2026-03-05", Stock("A", 50), Stock("B", 50)),
+        ]));
+
+        result.Points.Select(p => p.Date).Should().Equal(new DateOnly(2026, 2, 5), new DateOnly(2026, 3, 5));
+    }
+
+    [Fact]
+    public void Build_SameDayCaptures_KeepOnlyTheLatestWhateverTheInputOrder()
+    {
+        var result = ConcentrationHistoryCalculator.Build(Inputs(
+        [
+            new ConcentrationCapture(DateTimeOffset.Parse("2026-02-05T09:00:00Z"), [Stock("A", 50), Coin("BTC", 50)]),
             new ConcentrationCapture(DateTimeOffset.Parse("2026-02-05T01:00:00Z"), [Stock("A", 90), Stock("B", 10)]),
-            new ConcentrationCapture(DateTimeOffset.Parse("2026-02-05T09:00:00Z"), [Stock("A", 50), Stock("B", 50)]),
             Capture("2026-03-05", Stock("A", 50), Stock("B", 50)),
         ]));
 
         result.Points.Should().HaveCount(2);
         result.Points[0].Date.Should().Be(new DateOnly(2026, 2, 5));
-        result.Points[0].Top3Share.Should().Be(1m);
+        result.Points[0].CryptoShare.Should().Be(0.5m);
+    }
+
+    [Fact]
+    public void Build_DayWithNoSnapshotTotal_CarriesNoCashShare()
+    {
+        var result = ConcentrationHistoryCalculator.Build(Inputs(
+            [Capture("2026-01-05", Stock("A", 50)), Capture("2026-01-06", Stock("A", 50))],
+            [new ConcentrationCash(new DateOnly(2026, 1, 5), 0, 0), new ConcentrationCash(new DateOnly(2026, 1, 6), 20, 100)]));
+
+        result.Points.Select(p => p.CashShare).Should().Equal(null, 0.2m);
+    }
+
+    [Fact]
+    public void Build_SeveralTargetsOfOneClass_AreSummed()
+    {
+        var result = ConcentrationHistoryCalculator.Build(Inputs(
+            [Capture("2026-01-05", Stock("A", 50)), Capture("2026-01-06", Stock("A", 50))],
+            targets:
+            [
+                new ConcentrationTarget(AssetClassNormalizer.Crypto, 0.04m),
+                new ConcentrationTarget(AssetClassNormalizer.Crypto, 0.06m),
+            ]));
+
+        result.CryptoTarget.Should().Be(0.10m);
     }
 
     [Fact]
