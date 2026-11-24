@@ -11,7 +11,7 @@ import {
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
-import {BINANCE_HELP_URL} from './connect-modal.constants';
+import {BINANCE_DUPLICATE_CODES, BINANCE_HELP_URL} from './connect-modal.constants';
 
 @Component({
   selector: 'fns-binance-form',
@@ -39,11 +39,9 @@ export class BinanceFormComponent {
 
   public readonly helpUrl = BINANCE_HELP_URL;
 
-  // Backend emits ALREADY_CONNECTED (409) for a duplicate Binance connection;
-  // BINANCE_DUPLICATE is kept for backwards compatibility.
   public readonly isDuplicateError = computed(() => {
     const code = this.store.connectErrorCode();
-    return code === 'ALREADY_CONNECTED' || code === 'BINANCE_DUPLICATE';
+    return code !== null && BINANCE_DUPLICATE_CODES.has(code);
   });
 
   public submit(): void {

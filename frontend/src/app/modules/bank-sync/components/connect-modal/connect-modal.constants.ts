@@ -5,6 +5,12 @@ export const MONOBANK_TOKEN_MAX_LENGTH = 64;
 export const MONOBANK_TOKEN_PATTERN = /^u[A-Za-z0-9_-]+$/;
 export const MONOBANK_HELP_URL = 'https://api.monobank.ua';
 
+/** Backend emits ALREADY_CONNECTED (409) for a duplicate Binance connection; BINANCE_DUPLICATE is kept for backwards compatibility. */
+export const BINANCE_DUPLICATE_CODES: ReadonlySet<string> = new Set([
+  'ALREADY_CONNECTED',
+  'BINANCE_DUPLICATE',
+]);
+
 export const BINANCE_HELP_URL = 'https://www.binance.com/en/support/faq/360002502072';
 
 export const REVOLUT_X_HELP_URL =

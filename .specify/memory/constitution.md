@@ -255,7 +255,8 @@ the reviewer confirms it during review, and a violation found there is fixed bef
 - CC6 Frontend state and composition (Principle VI): custom providers live under
   `core/providers/`, enforced by the `providers/provider-extraction` ESLint rule (#1499).
   Feature state held in a component, `setInterval` polling and inline error-code ladders are
-  Guidance.
+  enforced by the `composition/no-component-state`, `composition/no-set-interval` and
+  `composition/no-error-code-ladder` ESLint rules (#1506).
 - CC7 Interfaces and constants stay out of component and service files (Principle VI.5).
   Enforced by the `structure/file-per-concept` ESLint rule (#1496).
 - CC8 A type, utility or enum used across modules lives in `shared/` (Principle VI.5).
