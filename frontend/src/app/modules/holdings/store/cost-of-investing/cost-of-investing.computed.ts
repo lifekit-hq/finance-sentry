@@ -14,7 +14,9 @@ export function costOfInvestingComputed(store: StoreState) {
     /** The row shows once something was paid, or when fees were paid but left out of the figures. */
     hasCosts: computed(() => {
       const costs = store.costs();
-      return costs !== null && (costs.total !== 0 || costs.unvaluedRows > 0 || costs.approximateRows > 0);
+      return (
+        costs !== null && (costs.total !== 0 || costs.unvaluedRows > 0 || costs.approximateRows > 0)
+      );
     }),
     /** The nonzero parts in a fixed order, e.g. "Commissions 12.00 · Withholding tax 4.00". */
     parts: computed(() => {
