@@ -82,6 +82,36 @@ public sealed class VerdictReasonsTests
     }
 
     [Fact]
+    public void Explain_Avoid_OnWeakStructureAlone_CarriesTheTrendOnlyNote()
+    {
+        var explanation = Explain(9, 75, CrowdingClass.Early, null);
+
+        explanation.Note.Should().Be(VerdictReasons.TrendOnlyNote);
+        explanation.Note.Should().Contain("price structure alone").And.Contain("Fundamentals and valuation did not enter it");
+    }
+
+    [Fact]
+    public void Explain_Avoid_OnExtendedAndRich_HasNoTrendOnlyNote()
+    {
+        Explain(88, 80, CrowdingClass.Extended, 29.2).Note.Should().BeNull();
+    }
+
+    [Fact]
+    public void Explain_Avoid_WhenWeakStructureAndExtendedAndRichBothMatch_HasNoTrendOnlyNote()
+    {
+        Explain(9, 75, CrowdingClass.Extended, 29.2).Note.Should().BeNull("another AVOID rule also had a say");
+    }
+
+    [Theory]
+    [InlineData(78, 72)]
+    [InlineData(39, 78)]
+    [InlineData(45, null)]
+    public void Explain_NonAvoid_HasNoTrendOnlyNote(int structure, int? fundamentals)
+    {
+        Explain(structure, fundamentals, CrowdingClass.Normal, 5.0).Note.Should().BeNull();
+    }
+
+    [Fact]
     public void Explain_Avoid_OnExtendedAndRich_NamesTheGuardInTheTurnsBuyLine()
     {
         var explanation = Explain(88, 80, CrowdingClass.Extended, 29.2);

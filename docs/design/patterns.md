@@ -366,6 +366,8 @@ One instrument, one call, what would change it, a horizon.
      next rule up and the nearest AVOID trigger.
   4. **Horizon:** the thesis horizon when a thesis exists, otherwise omitted, never invented.
   5. **Why this word:** the fired rule, its facts and the rules version.
+  6. **Trend-only note:** an AVOID that only the weak-structure rule produced says so in one line (price
+     structure alone; fundamentals and valuation did not enter it). No other word carries it.
 - **Compare against:** [Trading Central ETF Trade
   Ideas](https://newsletters.tradingcentral.com/direxion/etf_en.html) and [trading
   horizons](https://investor.tradingcentral.com/technical-insight); [Seeking Alpha, Quant Ratings

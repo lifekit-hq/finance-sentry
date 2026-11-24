@@ -15,7 +15,8 @@ using Microsoft.Extensions.Logging;
 public sealed class YahooValuationDataService(
     IHttpClientFactory httpFactory,
     IMarketDataService marketData,
-    ILogger<YahooValuationDataService> logger) : IValuationDataService
+    ILogger<YahooValuationDataService> logger,
+    TimeProvider clock) : IValuationDataService
 {
     public const string HttpClientName = "yahoo-valuation";
 
@@ -24,6 +25,8 @@ public sealed class YahooValuationDataService(
     private const string Modules = "price,summaryDetail,defaultKeyStatistics,financialData,assetProfile";
     private const int MaxPeers = 6;
 
+    private static readonly TimeSpan SessionOpenUtc = new(13, 30, 0);
+    private static readonly TimeSpan StalenessMargin = TimeSpan.FromDays(1);
     private static readonly TimeSpan CrumbTtl = TimeSpan.FromMinutes(30);
 
     private readonly SemaphoreSlim crumbLock = new(1, 1);
@@ -66,20 +69,21 @@ public sealed class YahooValuationDataService(
 
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
-            var parsed = Parse(json, upper);
+            var parsed = Parse(json, upper, clock.GetUtcNow());
             if (parsed is null || parsed.NotApplicable)
             {
                 return parsed;
             }
 
-            // Refine price + staleness against the shared quote path so they match the rest of the app.
+            // Refine the price against the shared quote path so it matches the rest of the app. Staleness is the
+            // age of that price, not the market state: a CLOSED-session quote from the last session is fresh.
             var quotes = await marketData.GetQuotesAsync([upper], ct);
             if (quotes.TryGetValue(upper, out var quote))
             {
                 return parsed with
                 {
                     Price = quote.Price,
-                    IsStale = quote.IsStale,
+                    IsStale = IsPriceStale(quote.SourcePriceTime, clock.GetUtcNow()),
                     PriceAsOf = quote.SourcePriceTime ?? quote.FetchedAt,
                 };
             }
@@ -123,7 +127,7 @@ public sealed class YahooValuationDataService(
     /// the JSON shape against a recorded fixture. Every ratio is optional-tolerant; a missing field is
     /// <c>null</c>, never zero. Returns <c>null</c> if the result block is absent.
     /// </summary>
-    public static ValuationCurrentMetrics? Parse(string json, string ticker)
+    public static ValuationCurrentMetrics? Parse(string json, string ticker, DateTimeOffset? now = null)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
@@ -173,7 +177,7 @@ public sealed class YahooValuationDataService(
             evToEbitda,
             dividendYield,
             consensusTarget,
-            IsStale: true,
+            IsStale: IsPriceStale(ReadUnixTime(price, "regularMarketTime"), now ?? DateTimeOffset.UtcNow),
             NotApplicable: false,
             ReadString(assetProfile, "sector"),
             ReadString(assetProfile, "industry"),
@@ -233,6 +237,47 @@ public sealed class YahooValuationDataService(
     }
 
     // Yahoo wraps numeric fields as { "raw": <number>, "fmt": "<string>" }.
+    /// <summary>
+    /// A price is stale when it is older than the last trading session plus a margin, never because the market is
+    /// closed. The last session is the most recent weekday whose US open has passed; the margin of one day covers an
+    /// earlier-in-the-day exchange. An unknown price time is stale. Known limits: there is no holiday calendar, so a
+    /// quote from before a Monday US market holiday reads stale until the next session opens, and the session open is
+    /// a fixed UTC hour (13:30) that ignores daylight saving.
+    /// </summary>
+    internal static bool IsPriceStale(DateTimeOffset? priceTime, DateTimeOffset now)
+    {
+        if (priceTime is not { } time)
+        {
+            return true;
+        }
+
+        var utc = now.UtcDateTime;
+        var day = utc.TimeOfDay >= SessionOpenUtc ? utc.Date : utc.Date.AddDays(-1);
+        while (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            day = day.AddDays(-1);
+        }
+
+        return time.UtcDateTime < day - StalenessMargin;
+    }
+
+    private static DateTimeOffset? ReadUnixTime(JsonElement parent, string property)
+    {
+        if (parent.ValueKind is not JsonValueKind.Object || !parent.TryGetProperty(property, out var el))
+        {
+            return null;
+        }
+
+        if (el.ValueKind is JsonValueKind.Object && el.TryGetProperty("raw", out var raw))
+        {
+            el = raw;
+        }
+
+        return el.ValueKind is JsonValueKind.Number && el.TryGetInt64(out var seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
+    }
+
     private static decimal? ReadRaw(JsonElement parent, string property)
     {
         if (parent.ValueKind is not JsonValueKind.Object ||

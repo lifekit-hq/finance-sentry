@@ -28,6 +28,17 @@ describe('ScorecardVerdictComponent', () => {
     expect(text(host, 'verdict-fired-rule')).toBe('Rule extended_and_rich.');
   });
 
+  it('shows the trend-only note when the API sends one, and nothing when it does not', () => {
+    const card = ScorecardFixtures.scorecard();
+    const note =
+      'Trend-only: this AVOID comes from price structure alone. Fundamentals and valuation did not enter it.';
+
+    expect(text(render(card), 'verdict-trend-only-note')).toBe('');
+    expect(
+      text(render({...card, verdict: {...card.verdict, note}}), 'verdict-trend-only-note')
+    ).toBe(note);
+  });
+
   it('drops the word row, the notice and the fired rule when the summary is turned off, keeping the drill-down', () => {
     const fixture = TestBed.createComponent(ScorecardVerdictComponent);
     fixture.componentRef.setInput('scorecard', ScorecardFixtures.scorecard());

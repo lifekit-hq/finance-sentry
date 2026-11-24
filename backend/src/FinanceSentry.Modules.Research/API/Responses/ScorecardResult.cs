@@ -211,7 +211,8 @@ public sealed record ScorecardValuationAxis(
 /// reach only the callers the verdict reaches (<c>ai.use</c>). <see cref="WaitReason"/> (a code) and
 /// <see cref="WaitReasonLabel"/> (its short label) name why a WAIT waits and are null for every other word;
 /// <see cref="PriceLens"/> says which yardstick the valuation conditions read (<c>own_history</c> or
-/// <c>peers</c>), null when there was none.
+/// <c>peers</c>), null when there was none. <see cref="Note"/> is set only on an AVOID that the weak-structure rule
+/// alone produced: the word comes from price structure and fundamentals and valuation did not enter it.
 /// </summary>
 public sealed record VerdictDto(
     string Word,
@@ -223,7 +224,8 @@ public sealed record VerdictDto(
     string? TurnsBuyWhen,
     string? WaitReason = null,
     string? WaitReasonLabel = null,
-    string? PriceLens = null)
+    string? PriceLens = null,
+    string? Note = null)
 {
     public const string AdjustedBasis = "adjusted";
     public const string RawBasis = "raw";
@@ -248,7 +250,8 @@ public sealed record VerdictDto(
             explanation.TurnsBuyWhen,
             verdict.WaitReason,
             WaitReasons.Label(verdict.WaitReason),
-            verdict.PriceLens);
+            verdict.PriceLens,
+            explanation.Note);
     }
 }
 

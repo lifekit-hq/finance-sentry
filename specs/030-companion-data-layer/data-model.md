@@ -74,7 +74,7 @@ Persisted on every computation to accrue self-built history (R3).
 | `EvToEbitda` | numeric(12,4) NULL | |
 | `DividendYield` | numeric(8,6) NULL | |
 | `ConsensusTarget` | numeric(18,4) NULL | |
-| `IsStale` | boolean | mirrors quote staleness semantics |
+| `IsStale` | boolean | price older than the last trading session plus a margin, not market state (#1529) |
 
 **Index**: `(Ticker, CapturedAt desc)`.
 

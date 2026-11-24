@@ -135,6 +135,16 @@ describe('VerdictBlockComponent', () => {
     expect(has(buying, 'verdict-turns-buy')).toBe(false);
   });
 
+  it('shows the trend-only note only when the backend sent one', () => {
+    const note =
+      'Trend-only: this AVOID comes from price structure alone. Fundamentals and valuation did not enter it.';
+    const avoid = card('Avoid');
+    const trendOnly: ScorecardDto = {...avoid, verdict: {...avoid.verdict, note}};
+
+    expect(text(render(trendOnly), 'verdict-trend-only-note')).toBe(note);
+    expect(has(render(avoid), 'verdict-trend-only-note')).toBe(false);
+  });
+
   it('shows no reasons list for a verdict that carries none', () => {
     const empty: ScorecardDto = {...card('Wait'), verdict: {...card('Wait').verdict, reasons: []}};
 

@@ -1,7 +1,13 @@
 namespace FinanceSentry.Modules.Research.Tests.Companion;
 
+using System.Globalization;
+using System.Net;
+using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Sources;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -165,6 +171,86 @@ public sealed class YahooValuationModulesContractTests
         metrics.ConsensusTarget.Should().Be(3000m);
         metrics.TargetLow.Should().Be(2400m);
         metrics.TargetHigh.Should().Be(3600m);
+    }
+
+    private static string QuoteAt(long? regularMarketTime) => $$"""
+        { "quoteSummary": { "result": [ { "price": { "quoteType": "EQUITY", "marketState": "CLOSED"{{(regularMarketTime is { } t ? $", \"regularMarketTime\": {t}" : "")}} } } ], "error": null } }
+        """;
+
+    [Theory]
+    [InlineData("2026-11-23T21:00:00Z", "2026-11-24T03:00:00Z", false)] // closed overnight, quote from the last session
+    [InlineData("2026-11-27T21:00:00Z", "2026-11-28T12:00:00Z", false)] // Saturday, quote from Friday's session
+    [InlineData("2026-11-27T21:00:00Z", "2026-11-30T09:00:00Z", false)] // Monday before the open, still Friday's session
+    [InlineData("2026-11-18T21:00:00Z", "2026-11-24T15:00:00Z", true)] // days behind the last session
+    [InlineData("2026-11-20T21:00:00Z", "2026-11-23T15:00:00Z", true)] // stated limit: Monday US holiday, Friday's quote reads stale until the next open
+    public void Parse_derives_IsStale_from_the_age_of_the_price_not_the_closed_market_state(string quoteAt, string now, bool expected)
+    {
+        var quote = DateTimeOffset.Parse(quoteAt, System.Globalization.CultureInfo.InvariantCulture).ToUnixTimeSeconds();
+
+        var metrics = YahooValuationDataService.Parse(
+            QuoteAt(quote), "GRAB", DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture));
+
+        metrics!.IsStale.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Parse_treats_a_price_with_no_time_as_stale()
+    {
+        YahooValuationDataService.Parse(QuoteAt(null), "GRAB", DateTimeOffset.Parse("2026-11-24T03:00:00Z", System.Globalization.CultureInfo.InvariantCulture))!
+            .IsStale.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("2026-11-23T21:00:00Z", true, false)] // CLOSED quote from the last session, shared path flags it stale
+    [InlineData("2026-11-18T21:00:00Z", false, true)] // days behind the last session, shared path says fresh
+    [InlineData(null, false, true)] // no price time is stale
+    public async Task GetCurrentMetricsAsync_takes_IsStale_from_the_quote_price_age_not_the_quote_flag(
+        string? quoteAt, bool quoteFlag, bool expected)
+    {
+        var now = DateTimeOffset.Parse("2026-11-24T03:00:00Z", CultureInfo.InvariantCulture);
+        var sourceTime = quoteAt is null ? (DateTimeOffset?)null : DateTimeOffset.Parse(quoteAt, CultureInfo.InvariantCulture);
+        var quote = new QuoteCacheEntry
+        {
+            Ticker = "GRAB",
+            Price = 4.5m,
+            MarketState = "CLOSED",
+            IsStale = quoteFlag,
+            SourcePriceTime = sourceTime,
+            FetchedAt = now,
+        };
+        var marketData = new Mock<IMarketDataService>();
+        marketData
+            .Setup(m => m.GetQuotesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, QuoteCacheEntry> { ["GRAB"] = quote });
+        var factory = new Mock<IHttpClientFactory>();
+        factory
+            .Setup(f => f.CreateClient(YahooValuationDataService.HttpClientName))
+            .Returns(new HttpClient(new RoutingHandler(QuoteAt(now.AddDays(-30).ToUnixTimeSeconds()))));
+        var sut = new YahooValuationDataService(
+            factory.Object, marketData.Object, NullLogger<YahooValuationDataService>.Instance, new FixedTimeProvider(now));
+
+        var metrics = await sut.GetCurrentMetricsAsync("grab");
+
+        metrics.Should().NotBeNull();
+        metrics!.Price.Should().Be(4.5m);
+        metrics.IsStale.Should().Be(expected);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class RoutingHandler(string quoteSummaryJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var url = request.RequestUri!.AbsoluteUri;
+            var body = url.Contains("getcrumb", StringComparison.Ordinal) ? "crumb"
+                : url.Contains("quoteSummary", StringComparison.Ordinal) ? quoteSummaryJson
+                : string.Empty;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        }
     }
 
     [Fact]

@@ -28,7 +28,14 @@ public sealed record VerdictReason(string Axis, VerdictReasonStatus Status, stri
 /// The reasons for a verdict word and the line saying what would turn it into BUY. <see cref="TurnsBuyWhen"/>
 /// is null when the word is already BUY or better, or when the name is not scored at all.
 /// </summary>
-public sealed record VerdictExplanation(IReadOnlyList<VerdictReason> Reasons, string? TurnsBuyWhen);
+public sealed record VerdictExplanation(IReadOnlyList<VerdictReason> Reasons, string? TurnsBuyWhen)
+{
+    /// <summary>
+    /// A short note set only when the weak-structure rule alone produced an AVOID: the word comes from price
+    /// structure and fundamentals and valuation did not enter it. Null for every other verdict.
+    /// </summary>
+    public string? Note { get; init; }
+}
 
 /// <summary>
 /// Explains a <see cref="Verdict"/> in words, deterministically (spec 726 US2): every number and bar comes from
@@ -38,6 +45,10 @@ public sealed record VerdictExplanation(IReadOnlyList<VerdictReason> Reasons, st
 /// </summary>
 public static class VerdictReasons
 {
+    /// <summary>The note on an AVOID that only the weak-structure rule produced (issue #1529).</summary>
+    public const string TrendOnlyNote =
+        "Trend-only: this AVOID comes from price structure alone. Fundamentals and valuation did not enter it.";
+
     private const string UniverseText = "Not a single equity: valuation does not apply, so the rules do not score it.";
 
     public static VerdictExplanation Explain(Verdict verdict)
@@ -68,8 +79,16 @@ public static class VerdictReasons
         };
 
         var turnsBuy = verdict.Word is VerdictWord.Wait or VerdictWord.Avoid ? TurnsBuyWhen(bars) : null;
-        return new VerdictExplanation(reasons, turnsBuy);
+        return new VerdictExplanation(reasons, turnsBuy) { Note = TrendOnly(verdict) ? TrendOnlyNote : null };
     }
+
+    /// <summary>
+    /// True when the weak-structure rule fired and no other AVOID rule also matched, so no other axis had a say in
+    /// the word. The rule table and its thresholds are read, never changed.
+    /// </summary>
+    private static bool TrendOnly(Verdict verdict) =>
+        verdict.FiredRuleId == VerdictRules.WeakStructure
+        && verdict.Rules.Where(r => r.Word == VerdictWord.Avoid && r.Id != VerdictRules.WeakStructure).All(r => !r.Matched);
 
     /// <summary>
     /// The reasons for an ETF word (issue #1324): the fund's own structure and crowding, and the look-through, one
