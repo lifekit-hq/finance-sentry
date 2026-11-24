@@ -1,7 +1,7 @@
-namespace FinanceSentry.Tests.Unit.Liquidity;
+namespace FinanceSentry.Tests.Unit.Alerts;
 
 using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Modules.Liquidity.Application.Jobs;
+using FinanceSentry.Modules.Alerts.Infrastructure.Jobs;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;

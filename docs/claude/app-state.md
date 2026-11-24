@@ -324,11 +324,11 @@ backend/
     FinanceSentry.Modules.CryptoSync/# Binance + Revolut X adapters, crypto holdings
     FinanceSentry.Modules.BrokerageSync/ # IBKR adapter, brokerage holdings
     FinanceSentry.Modules.Wealth/    # Aggregated net-worth queries
-    FinanceSentry.Modules.Alerts/    # Alert rules + Hangfire delivery
+    FinanceSentry.Modules.Alerts/    # Alert rules + Hangfire delivery; also the daily cash-shortfall sentinel (was Modules.Liquidity, folded in #1531)
     FinanceSentry.Modules.Budgets/   # Budget tracking
     FinanceSentry.Modules.Subscriptions/ # Detected recurring subscriptions
     # also: FinanceSentry.Gateway, FinanceSentry.Integration, Modules.{Agent, Companion,
-    #       Events, Liquidity, Radar, Research, Retention, Risk} — `ls backend/src` is canonical
+    #       Events, Radar, Research, Retention, Risk} — `ls backend/src` is canonical
   tests/
     FinanceSentry.Tests.Unit/        # Pure unit tests (no DB)
     FinanceSentry.Tests.Integration/ # Contract tests via WebApplicationFactory + mocks

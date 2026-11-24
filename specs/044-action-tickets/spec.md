@@ -88,7 +88,7 @@ Companion `AcknowledgeCompanionEventsCommand` marks the event as delivered. No o
   get a "Review" line.
 - **FR-007**: The job lives in `Modules.Research/Infrastructure/Jobs/` (Research already owns IPS +
   drift pipeline; `IAlertGeneratorService` from Core is injected cross-module, following the
-  same pattern as `LiquiditySentinelJob` in `Modules.Liquidity`).
+  same pattern as `LiquiditySentinelJob` in `Modules.Alerts`).
 - **FR-008**: One-per-user active-alert dedup: the referenceId for portfolio proposals is a stable
   MD5-derived GUID from `userId + "rebalance:portfolio"`, so find/resolve is deterministic.
 - **FR-009**: Severity = Warning; Title = "Rebalance proposal: {N} order(s)";
