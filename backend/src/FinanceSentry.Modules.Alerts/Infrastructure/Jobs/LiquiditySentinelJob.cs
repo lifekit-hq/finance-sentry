@@ -1,8 +1,8 @@
-namespace FinanceSentry.Modules.Liquidity.Application.Jobs;
+namespace FinanceSentry.Modules.Alerts.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
-using FinanceSentry.Modules.Liquidity.Application.Services;
+using FinanceSentry.Modules.Alerts.Application.Services;
 using Microsoft.Extensions.Logging;
 
 /// <summary>

@@ -111,7 +111,7 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     public bool IsClosed => ClosedAt is not null;
 
     /// <summary>
-    /// Whether the account's balance counts in live totals (net worth, Accounts totals, Liquidity): not closed, and not
+    /// Whether the account's balance counts in live totals (net worth, Accounts totals, the cash-shortfall projection): not closed, and not
     /// absent from the provider's list for <see cref="AbsenceExclusionThreshold"/> or more.
     /// </summary>
     public bool CountsInLiveTotals(DateTimeOffset now)

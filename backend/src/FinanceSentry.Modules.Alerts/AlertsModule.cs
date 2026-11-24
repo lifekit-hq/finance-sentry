@@ -30,6 +30,10 @@ public static class AlertsModule
                 .AddOrUpdate<AlertPurgeJob>("alert-purge", job => job.ExecuteAsync(CancellationToken.None), Cron.Monthly());
             sp.GetRequiredService<IRecurringJobManager>()
                 .AddOrUpdate<AlertExpiryJob>("alert-expiry", job => job.ExecuteAsync(CancellationToken.None), Cron.Daily());
+            // Folded in from the retired Liquidity module (#1531); the job id is unchanged so the
+            // existing recurring-job row is updated in place rather than duplicated.
+            sp.GetRequiredService<IRecurringJobManager>()
+                .AddOrUpdate<LiquiditySentinelJob>("liquidity-sentinel", job => job.ExecuteAsync(CancellationToken.None), Cron.Daily());
         }
     }
 
@@ -51,6 +55,7 @@ public static class AlertsModule
         services.AddScoped<IAlertsByTypeReader, AlertsByTypeReader>();
         services.AddScoped<AlertPurgeJob>();
         services.AddScoped<AlertExpiryJob>();
+        services.AddScoped<LiquiditySentinelJob>();
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();

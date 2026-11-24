@@ -312,7 +312,7 @@ An account leaves every **live** balance in two steps (`BankAccount.CountsInLive
 
 1. **Vanished** - the provider's successful account-list read has not named it for 24 h or more
    (`AbsentSince`, written only while a sibling of the same connection is still listed). Its balance is excluded from
-   live net worth, Accounts totals, aggregation and Liquidity even though it is not retired yet; the list naming it
+   live net worth, Accounts totals, aggregation and the cash-shortfall projection even though it is not retired yet; the list naming it
    again clears the mark and restores the balance. This stops a reissued card's balance counting twice (the balance of
    a reissued card migrates to its successor).
 2. **Retired** - `ClosedAt` is set (Dormant 7 days with `ResourceGone` **and** absent from the list, or an exact-IBAN
@@ -356,7 +356,7 @@ Net worth totals stay signed.
 
 **Hidden is display-only; totals unchanged.** A person's asset-visibility preferences (`HideEmptyBalances`,
 `HideSmallBalances`, `SmallBalanceThreshold`, read through `IUserAssetVisibilityReader`) decide which rows a list
-tucks away. They never touch a figure: net worth, sleeve, institution and card totals, snapshots, Liquidity, MCP
+tucks away. They never touch a figure: net worth, sleeve, institution and card totals, snapshots, the cash-shortfall projection, MCP
 and AI all sum every row, hidden or not.
 
 `AssetVisibility.Classify(valueInBase, isOwed, prefs)` (Core) labels a row `empty`, `small` or none:

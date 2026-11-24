@@ -3,7 +3,7 @@
 **Feature Branch**: `041-liquidity-brain`
 **GitHub Issue**: #430
 **Created**: 2026-08-22
-**Status**: In Progress
+**Status**: Implemented (the module was folded into Alerts in #1531; the sentinel job and projection now live in `Modules.Alerts`)
 **Input**: Project every account 30 days forward from its recurring flows and warn BEFORE an account runs dry, rather than after. Recurrence detection reuses the subscriptions module's prior art. The daily re-check is deterministic and makes no LLM call unless a threshold trips. Shortfall alert rides the existing Alerts → Companion → Telegram pipeline.
 
 ## User Scenarios & Testing *(mandatory)*

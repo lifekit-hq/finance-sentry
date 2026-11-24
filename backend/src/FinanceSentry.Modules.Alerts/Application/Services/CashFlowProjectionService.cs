@@ -1,4 +1,4 @@
-namespace FinanceSentry.Modules.Liquidity.Application.Services;
+namespace FinanceSentry.Modules.Alerts.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
 

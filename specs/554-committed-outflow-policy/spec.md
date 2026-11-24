@@ -121,7 +121,7 @@ paid off here rather than carried.
 
 - The #538 dashboard chart (clauses 2–5 of that issue). It stays unshipped; re-file it as a
   fresh ticket only after the coverage gate is re-measured on production.
-- `Liquidity/Application/Services/CashFlowProjectionService` — a different question
+- `Alerts/Application/Services/CashFlowProjectionService` — a different question
   (what will I owe next), not this one (what did I owe last month).
 - Re-running the #538 AC1 coverage query: it needs production data, which no sandbox has.
 

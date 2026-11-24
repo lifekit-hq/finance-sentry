@@ -1,7 +1,7 @@
-namespace FinanceSentry.Tests.Unit.Liquidity;
+namespace FinanceSentry.Tests.Unit.Alerts;
 
 using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Modules.Liquidity.Application.Services;
+using FinanceSentry.Modules.Alerts.Application.Services;
 using Xunit;
 
 public class CashFlowProjectionServiceTests

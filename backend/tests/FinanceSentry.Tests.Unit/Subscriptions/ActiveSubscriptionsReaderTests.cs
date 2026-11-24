@@ -67,7 +67,7 @@ public class ActiveSubscriptionsReaderTests
     public async Task GetActiveSubscriptions_StillExcludesInstallments()
     {
         // Regression guard: the new method must not have widened the existing one, which
-        // Liquidity's cash-flow projection depends on.
+        // The Alerts cash-shortfall sentinel's cash-flow projection depends on.
         var (reader, _) = MakeSut(
             Make("netflix", "Netflix"),
             Make("installment:allo:2340", "Алло", SubscriptionKinds.Installment));
