@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
 using FinanceSentry.Modules.Research.Application.Services.Catalyst;
 using Hangfire;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Daily catalyst scan (discovery funnel stage 7): 8-K items 1.01, 2.02, 5.02 and 8.01 filed on reference-universe names, so a
@@ -19,12 +20,28 @@ public sealed class CatalystDetectionJob(CatalystDetector detector)
 
 /// <summary>
 /// Daily GDELT attention refresh (discovery funnel stage 7): article volume per theme phrase, stored as the attention measure the
-/// scorecard and readers expose. A phrase GDELT will not answer makes the job end Failed after the others are stored.
+/// scorecard and readers expose. A phrase GDELT will not answer is stored around and reported in the run's summary; a run that
+/// measured nothing it asked for ends Failed, and any failure is logged here with the job name, the step and the exception.
 /// </summary>
-public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher)
+public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher, ILogger<ThemeAttentionRefreshJob> logger)
 {
     public const string RecurringJobId = "theme-attention-refresh";
 
     [AutomaticRetry(Attempts = 1)]
-    public async Task ExecuteAsync(CancellationToken ct = default) => await refresher.RefreshAsync(ct);
+    public async Task ExecuteAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var summary = await refresher.RefreshAsync(ct);
+            logger.LogInformation(
+                "Job {Job} finished: ran {Ran}, {Phrases} phrase(s), {Failed} failed. {Note}",
+                nameof(ThemeAttentionRefreshJob), summary.Ran, summary.Phrases, summary.Failed, summary.Note);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var step = ex is ThemeAttentionRefreshException refresh ? refresh.Step : "unknown";
+            logger.LogError(ex, "Job {Job} failed at step {Step}", nameof(ThemeAttentionRefreshJob), step);
+            throw;
+        }
+    }
 }

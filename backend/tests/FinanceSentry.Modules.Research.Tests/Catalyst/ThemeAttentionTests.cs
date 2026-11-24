@@ -7,6 +7,9 @@ using FinanceSentry.Modules.Research.Domain.Catalyst;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Infrastructure.Jobs;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -97,16 +100,99 @@ public sealed class ThemeAttentionTests
     }
 
     [Fact]
-    public async Task Refresh_AThrottledPhrase_FailsTheJob_ButTheOthersAreStored()
+    public async Task Refresh_AThrottledPhrase_StoresTheOthers_AndReportsAPartialRun()
     {
         await _h.ListAsync("theme:memory", "MU");
         _gdelt.Failing.Add("HBM memory");
         _gdelt.ByPhrase["DRAM prices"] = Series(new DateOnly(2026, 11, 15), 5);
 
+        var summary = await Refresher(Options()).RefreshAsync();
+
+        summary.Failed.Should().Be(1);
+        summary.Phrases.Should().Be(2);
+        summary.Note.Should().Contain("1 of 2");
+        (await StoredAsync()).Should().ContainSingle().Which.Phrase.Should().Be("DRAM prices");
+    }
+
+    [Fact]
+    public async Task Refresh_EveryPhraseThrottled_FailsInTheFetchStep()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        _gdelt.Failing.Add("HBM memory");
+        _gdelt.Failing.Add("DRAM prices");
+
         var act = () => Refresher(Options()).RefreshAsync();
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*1 of 2*");
-        (await StoredAsync()).Should().ContainSingle().Which.Phrase.Should().Be("DRAM prices");
+        (await act.Should().ThrowAsync<ThemeAttentionRefreshException>().WithMessage("*any of 2*")).Which.Step.Should().Be("fetch-volume");
+        (await StoredAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Refresh_WithNoPhraseToAsk_RecordsASkippedResult_NotAFailure()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+
+        var summary = await Refresher(new CatalystOptions()).RefreshAsync();
+
+        summary.Ran.Should().BeTrue();
+        summary.Phrases.Should().Be(0);
+        summary.Note.Should().Contain("nothing to measure");
+        _gdelt.Asked.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Job_WhenTheRefreshFails_LogsTheJobNameTheStepAndTheException()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        _gdelt.Failing.Add("HBM memory");
+        _gdelt.Failing.Add("DRAM prices");
+        var log = new RecordingLogger<ThemeAttentionRefreshJob>();
+        var job = new ThemeAttentionRefreshJob(Refresher(Options()), log);
+
+        var act = () => job.ExecuteAsync();
+
+        await act.Should().ThrowAsync<ThemeAttentionRefreshException>();
+        var entry = log.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error).Subject;
+        entry.Message.Should().Contain("ThemeAttentionRefreshJob").And.Contain("fetch-volume");
+        entry.Exception.Should().BeOfType<ThemeAttentionRefreshException>();
+    }
+
+    [Fact]
+    public async Task Refresh_AStoreFailure_NamesTheStoreStep()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        _gdelt.ByPhrase["HBM memory"] = Series(new DateOnly(2026, 11, 15), 5);
+        var refresher = new ThemeAttentionRefresher(
+            _h.Reference, _gdelt, new ThrowingRepository(), Microsoft.Extensions.Options.Options.Create(Options()),
+            Microsoft.Extensions.Options.Options.Create(new ReferenceUniverseOptions()), _h.Clock, NullLogger<ThemeAttentionRefresher>.Instance);
+
+        var act = () => refresher.RefreshAsync();
+
+        (await act.Should().ThrowAsync<ThemeAttentionRefreshException>()).Which.Should().Match<ThemeAttentionRefreshException>(
+            e => e.Step == "store-volume" && e.InnerException is TimeoutException);
+    }
+
+    private sealed class ThrowingRepository : IThemeAttentionRepository
+    {
+        public Task<int> UpsertDaysAsync(IReadOnlyCollection<ThemeAttentionDay> days, CancellationToken ct = default)
+            => throw new TimeoutException("db down");
+
+        public Task<IReadOnlyList<ThemeAttentionDay>> ListDaysAsync(string? theme, DateOnly since, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ThemeAttentionDay>>([]);
+
+        public Task<int> PruneAsync(DateOnly before, CancellationToken ct = default) => Task.FromResult(0);
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception), exception));
     }
 
     [Fact]
