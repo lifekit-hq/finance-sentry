@@ -10,6 +10,7 @@ import {
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
+import {BookIncomeComponent} from '../book-income/book-income.component';
 import {BookVsSpyComponent} from '../book-vs-spy/book-vs-spy.component';
 import {BrokeragePnlComponent} from '../brokerage-pnl/brokerage-pnl.component';
 import {RiskPictureComponent} from '../risk-picture/risk-picture.component';
@@ -27,6 +28,7 @@ import {RiskPictureComponent} from '../risk-picture/risk-picture.component';
     AsyncStateComponent,
     BookVsSpyComponent,
     RiskPictureComponent,
+    BookIncomeComponent,
     BrokeragePnlComponent,
     DatePipe,
     DisclosureRowComponent,

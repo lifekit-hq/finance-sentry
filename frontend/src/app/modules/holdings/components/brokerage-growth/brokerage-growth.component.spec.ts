@@ -13,6 +13,7 @@ import {NEVER, of} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {GROWTH_SLEEVE_COPY} from '../../constants/brokerage-growth/brokerage-growth.constants';
+import {BookIncomeService} from '../../services/book-income.service';
 import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokeragePnlService} from '../../services/brokerage-pnl.service';
@@ -106,6 +107,7 @@ describe('BrokerageGrowthComponent', () => {
         {provide: RiskPictureService, useValue: {getRiskPicture: () => NEVER}},
         {provide: TrackRecordService, useValue: {getTrackRecord: () => NEVER}},
         {provide: BrokeragePnlService, useValue: {getPnl: () => NEVER}},
+        {provide: BookIncomeService, useValue: {getIncome: () => NEVER}},
       ],
     })
       .overrideComponent(BrokerageGrowthComponent, {

@@ -15,9 +15,10 @@ public sealed class GetBookPerformanceToolTests
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
 
     private readonly Mock<IBookPerformanceService> _performance = new();
+    private readonly Mock<IBookIncomeService> _income = new();
 
     private GetBookPerformanceTool CreateSut() =>
-        new(_performance.Object, new FakeIdentityResolver { ResolvedUserId = UserId });
+        new(_performance.Object, _income.Object, new FakeIdentityResolver { ResolvedUserId = UserId });
 
     [Fact]
     public async Task ExecuteAsync_DelegatesToService_WithAllPeriodsWhenNoneRequested()
@@ -89,10 +90,25 @@ public sealed class GetBookPerformanceToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_AttachesTheBooksIncomeReceived()
+    {
+        var income = new BookIncome(
+            Today, new IncomeWindow(120m, 18m, 102m), new IncomeWindow(40m, 6m, 34m), 150m, 0.03m, 0, []);
+        _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
+            .ReturnsAsync(new BookPerformanceResult([], Today));
+        _income.Setup(s => s.GetAsync(UserId, default)).ReturnsAsync(income);
+
+        var result = await CreateSut().ExecuteAsync();
+
+        result.Income.Should().Be(income);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenIdentityUnresolvable()
     {
         var sut = new GetBookPerformanceTool(
             _performance.Object,
+            _income.Object,
             new FakeIdentityResolver { ResolvedUserId = null });
 
         var result = await sut.ExecuteAsync();
