@@ -77,10 +77,12 @@ describe('BookIncomeComponent', () => {
     expect(text(el, 'book-income-yield')).toBe('5.7%');
   });
 
-  it('shows a holding with its tax netted and its next ex-dividend date', () => {
+  it('shows a holding with its TTM, YTD and next ex-dividend date together', () => {
     const el = render();
 
-    expect(text(el, 'book-income-holding-KO')).toContain('Next ex-dividend 1 Dec 2026');
+    expect(text(el, 'book-income-holding-KO')).toContain('Year to date $85.00');
+    expect(text(el, 'book-income-holding-KO-ex-dividend')).toBe('Next ex-dividend 1 Dec 2026');
+    expect(text(el, 'book-income-holding-KO-ttm')).toContain('$102.00');
     expect(text(el, 'book-income-holding-KO-ttm')).toBe('$102.00 after $18.00 tax');
   });
 

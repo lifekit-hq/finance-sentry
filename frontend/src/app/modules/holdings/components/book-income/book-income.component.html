@@ -78,11 +78,7 @@
       @for (holding of store.holdings(); track holding.symbol) {
         <cmn-list-item-row
           [label]="holding.symbol"
-          [sublabel]="
-            holding.nextExDividend
-              ? 'Next ex-dividend ' + (holding.nextExDividend | date: 'd MMM y')
-              : 'Year to date ' + (holding.ytd.net | money: 'USD')
-          "
+          [sublabel]="'Year to date ' + (holding.ytd.net | money: 'USD')"
           [attr.data-testid]="'book-income-holding-' + holding.symbol"
         >
           <span
@@ -100,6 +96,14 @@
             }
           </span>
         </cmn-list-item-row>
+        @if (holding.nextExDividend) {
+          <p
+            [attr.data-testid]="'book-income-holding-' + holding.symbol + '-ex-dividend'"
+            class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+          >
+            Next ex-dividend {{ holding.nextExDividend | date: 'd MMM y' }}
+          </p>
+        }
       }
 
       @if (income.unvaluedReceipts > 0) {
