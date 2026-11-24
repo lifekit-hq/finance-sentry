@@ -605,7 +605,7 @@ public static class ResearchModule
 
         // Catalyst detection (discovery funnel stage 7): the daily 8-K scan over the reference universe and the GDELT
         // attention measure per theme. Provider rates are enforced by one keyed pacer each: the SEC's fair-access ceiling is
-        // 10 requests a second (this stays at Catalyst:SecRequestsPerSecond) and GDELT answers 429 above one request per 5 s.
+        // 10 requests a second (this stays at Catalyst:SecRequestsPerSecond) and GDELT answers 429 to this host even at one request per 6 s (Catalyst:GdeltMinIntervalSeconds).
         services.Configure<CatalystOptions>(config.GetSection(CatalystOptions.SectionName));
         services.AddKeyedSingleton(CatalystPacers.Sec, (sp, _) =>
             RequestPacer.PerSecond(sp.GetRequiredService<IOptions<CatalystOptions>>().Value.SecRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
