@@ -1,0 +1,48 @@
+<cmn-async-state
+  [status]="store.status()"
+  [errorMessage]="store.errorMessage()"
+  [keepContent]="false"
+  [crossfade]="false"
+  (retry)="store.load()"
+  emptySubMessage="The concentration history shows once the book has been captured."
+  retryable
+>
+  <cmn-skeleton skeleton class="block px-cmn-4 py-cmn-3" height="4rem" width="100%" />
+
+  <div class="space-y-cmn-2 px-cmn-4 py-cmn-3" data-testid="concentration-history">
+    <h3 class="text-cmn-sm font-semibold text-text-primary">
+      Concentration and allocation over time
+    </h3>
+    @if (store.tooLittleHistory()) {
+      <p class="text-cmn-xs text-text-secondary" data-testid="concentration-too-little">
+        {{ tooLittleHistory }}
+      </p>
+    } @else {
+      <cmn-segmented
+        [options]="measures"
+        [value]="store.measure()"
+        (valueChange)="chooseMeasure($event)"
+        label="Measure"
+      />
+      @if (store.view(); as view) {
+        <cmn-line-chart
+          [data]="view.chart"
+          [label]="view.label"
+          [summary]="view.summary"
+          class="block h-24 w-full"
+          data-testid="concentration-chart"
+          valueFormat="number"
+          xSpacing="time"
+        />
+        <p class="text-cmn-xs text-text-primary" data-testid="concentration-summary">
+          {{ view.label }}: {{ view.summary }}
+        </p>
+      } @else {
+        <p class="text-cmn-xs text-text-secondary" data-testid="concentration-no-data">
+          {{ noData }}
+        </p>
+      }
+      <p class="text-cmn-xs text-text-secondary" data-testid="concentration-basis">{{ basis }}</p>
+    }
+  </div>
+</cmn-async-state>

@@ -99,6 +99,7 @@ public static class RadarModule
         services.AddScoped<IBookPerformanceService, BookPerformanceService>();
         services.AddScoped<IBookIncomeService, BookIncomeService>();
         services.AddScoped<IRiskPictureService, RiskPictureService>();
+        services.AddScoped<IConcentrationHistoryService, ConcentrationHistoryService>();
         services.AddCompanionLinks();
         services.AddScoped<BookPerformanceBriefJob>();
         services.AddScoped<RadarIngestionJob>();

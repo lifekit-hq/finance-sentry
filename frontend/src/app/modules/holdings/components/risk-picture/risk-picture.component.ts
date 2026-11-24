@@ -2,6 +2,7 @@ import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {AsyncStateComponent, ListItemRowComponent, SkeletonComponent} from '@lifekit-hq/ui';
 
 import {RiskPictureStore} from '../../store/risk-picture/risk-picture.store';
+import {ConcentrationHistoryComponent} from '../concentration-history/concentration-history.component';
 
 /**
  * The risk picture (finance-framework M8): volatility, maximum drawdown against the owner's tolerance, beta against
@@ -11,7 +12,12 @@ import {RiskPictureStore} from '../../store/risk-picture/risk-picture.store';
  */
 @Component({
   selector: 'fns-risk-picture',
-  imports: [AsyncStateComponent, ListItemRowComponent, SkeletonComponent],
+  imports: [
+    AsyncStateComponent,
+    ConcentrationHistoryComponent,
+    ListItemRowComponent,
+    SkeletonComponent,
+  ],
   templateUrl: './risk-picture.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [RiskPictureStore],

@@ -51,7 +51,16 @@ function expectEveryFigureExplained(root: ParentNode): Element[] {
 describe('RiskPictureComponent', () => {
   const render = (picture: RiskPicture): HTMLElement => {
     TestBed.configureTestingModule({
-      providers: [{provide: RiskPictureService, useValue: {getRiskPicture: () => of(picture)}}],
+      providers: [
+        {
+          provide: RiskPictureService,
+          useValue: {
+            getRiskPicture: () => of(picture),
+            getConcentrationHistory: () =>
+              of({points: [], cryptoTarget: null, cashTarget: null, reason: 'NotEnoughHistory'}),
+          },
+        },
+      ],
     });
     vi.useFakeTimers();
     onTestFinished(() => {
