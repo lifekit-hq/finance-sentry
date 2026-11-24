@@ -18,6 +18,7 @@ public class WealthController(
     IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
     IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> sleeveGrowthHandler,
+    IQueryHandler<GetSleeveCostsQuery, SleeveCostsResponse> sleeveCostsHandler,
     IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> netWorthProjectionHandler,
     IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> monthlyIncomeLensHandler,
     IQueryHandler<GetCashflowProfileQuery, CashflowProfileResponse> cashflowProfileHandler,
@@ -29,6 +30,7 @@ public class WealthController(
     private readonly IQueryHandler<GetMonthlyIncomeLensQuery, MonthlyIncomeLensResponse> _monthlyIncomeLensHandler = monthlyIncomeLensHandler ?? throw new ArgumentNullException(nameof(monthlyIncomeLensHandler));
     private readonly IQueryHandler<GetNetWorthProjectionQuery, NetWorthProjectionResponse> _netWorthProjectionHandler = netWorthProjectionHandler ?? throw new ArgumentNullException(nameof(netWorthProjectionHandler));
     private readonly IQueryHandler<GetSleeveGrowthQuery, SleeveGrowthResponse> _sleeveGrowthHandler = sleeveGrowthHandler ?? throw new ArgumentNullException(nameof(sleeveGrowthHandler));
+    private readonly IQueryHandler<GetSleeveCostsQuery, SleeveCostsResponse> _sleeveCostsHandler = sleeveCostsHandler ?? throw new ArgumentNullException(nameof(sleeveCostsHandler));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
     private readonly IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> _txSummaryHandler = txSummaryHandler ?? throw new ArgumentNullException(nameof(txSummaryHandler));
@@ -300,6 +302,43 @@ public class WealthController(
     /// </summary>
     [HttpGet("crypto/growth")]
     public Task<IActionResult> GetCryptoGrowth(CancellationToken ct) => GetSleeveGrowth(WealthSourceIds.Crypto, ct);
+
+    /// <summary>
+    /// What the brokerage sleeve cost to run this calendar year (commissions, fees, FX conversion and withholding tax)
+    /// and the share of its returns that went to it: <c>GET /api/v1/wealth/brokerage/costs</c>.
+    /// </summary>
+    [HttpGet("brokerage/costs")]
+    public Task<IActionResult> GetBrokerageCosts(CancellationToken ct) => GetSleeveCosts(WealthSourceIds.Brokerage, ct);
+
+    /// <summary>The same cost of investing for the crypto sleeve (trading fees): <c>GET /api/v1/wealth/crypto/costs</c>.</summary>
+    [HttpGet("crypto/costs")]
+    public Task<IActionResult> GetCryptoCosts(CancellationToken ct) => GetSleeveCosts(WealthSourceIds.Crypto, ct);
+
+    private async Task<IActionResult> GetSleeveCosts(string sleeve, CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _sleeveCostsHandler.Handle(new GetSleeveCostsQuery(userId, sleeve), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // Costs are valued in USD on the day they were charged; the base currency is applied once here, at today's rate.
+    private static SleeveCostsResponse InBaseCurrency(SleeveCostsResponse costs, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return costs;
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        return costs with
+        {
+            Commissions = Fx(costs.Commissions),
+            Fees = Fx(costs.Fees),
+            FxConversion = Fx(costs.FxConversion),
+            Withholding = Fx(costs.Withholding),
+            Total = Fx(costs.Total),
+            Currency = baseCurrency,
+        };
+    }
 
     private async Task<IActionResult> GetSleeveGrowth(string sleeve, CancellationToken ct)
     {

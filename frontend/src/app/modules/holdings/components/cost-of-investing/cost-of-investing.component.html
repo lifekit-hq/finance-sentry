@@ -1,0 +1,49 @@
+@if (store.hasCosts() && store.costs(); as costs) {
+  <div [attr.data-testid]="store.sleeve + '-cost-of-investing'">
+    <cmn-list-item-row [attr.data-testid]="store.sleeve + '-cost-row'" label="Cost of investing">
+      <span
+        [attr.data-testid]="store.sleeve + '-cost-total'"
+        amount
+        class="tabular-nums text-cmn-sm text-text-primary"
+      >
+        {{ costs.total | money: costs.currency }}
+        @if (store.shareLabel(); as share) {
+          <span
+            [attr.data-testid]="store.sleeve + '-cost-share'"
+            class="ml-cmn-1 text-cmn-xs text-text-secondary"
+            >{{ share }} of returns</span
+          >
+        }
+      </span>
+    </cmn-list-item-row>
+    @if (store.parts().length > 0) {
+      <p
+        [attr.data-testid]="store.sleeve + '-cost-parts'"
+        class="px-cmn-4 pb-cmn-1 text-cmn-xs text-text-secondary"
+      >
+        Year to date:
+        @for (part of store.parts(); track part.key; let last = $last) {
+          <span [attr.data-testid]="store.sleeve + '-cost-' + part.key"
+            >{{ part.label }} {{ part.amount | money: costs.currency }}</span
+          >{{ last ? '' : ' · ' }}
+        }
+      </p>
+    }
+    @if (costs.approximateRows > 0) {
+      <p
+        [attr.data-testid]="store.sleeve + '-cost-approximate'"
+        class="px-cmn-4 pb-cmn-1 text-cmn-xs text-text-secondary"
+      >
+        Approximate: {{ costs.approximateRows }} cost rows were converted without a published rate.
+      </p>
+    }
+    @if (costs.unvaluedRows > 0) {
+      <p
+        [attr.data-testid]="store.sleeve + '-cost-unvalued'"
+        class="px-cmn-4 pb-cmn-2 text-cmn-xs text-text-secondary"
+      >
+        {{ costs.unvaluedRows }} fees are not counted: no USD value was recorded.
+      </p>
+    }
+  </div>
+}
