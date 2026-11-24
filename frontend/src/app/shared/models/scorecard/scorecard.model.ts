@@ -61,6 +61,8 @@ export interface VerdictDto {
   waitReasonLabel?: Nullable<string>;
   /** Which yardstick the valuation conditions read; null when the price lens had nothing to read. */
   priceLens?: Nullable<VerdictPriceLens>;
+  /** Set only on an AVOID that the weak-structure rule alone produced: the word comes from price structure alone. */
+  note?: Nullable<string>;
 }
 
 /**

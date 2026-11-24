@@ -167,6 +167,32 @@ public sealed class YahooValuationModulesContractTests
         metrics.TargetHigh.Should().Be(3600m);
     }
 
+    private static string QuoteAt(long? regularMarketTime) => $$"""
+        { "quoteSummary": { "result": [ { "price": { "quoteType": "EQUITY", "marketState": "CLOSED"{{(regularMarketTime is { } t ? $", \"regularMarketTime\": {t}" : "")}} } } ], "error": null } }
+        """;
+
+    [Theory]
+    [InlineData("2026-11-23T21:00:00Z", "2026-11-24T03:00:00Z", false)] // closed overnight, quote from the last session
+    [InlineData("2026-11-27T21:00:00Z", "2026-11-28T12:00:00Z", false)] // Saturday, quote from Friday's session
+    [InlineData("2026-11-27T21:00:00Z", "2026-11-30T09:00:00Z", false)] // Monday before the open, still Friday's session
+    [InlineData("2026-11-18T21:00:00Z", "2026-11-24T15:00:00Z", true)] // days behind the last session
+    public void Parse_derives_IsStale_from_the_age_of_the_price_not_the_closed_market_state(string quoteAt, string now, bool expected)
+    {
+        var quote = DateTimeOffset.Parse(quoteAt, System.Globalization.CultureInfo.InvariantCulture).ToUnixTimeSeconds();
+
+        var metrics = YahooValuationDataService.Parse(
+            QuoteAt(quote), "GRAB", DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture));
+
+        metrics!.IsStale.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Parse_treats_a_price_with_no_time_as_stale()
+    {
+        YahooValuationDataService.Parse(QuoteAt(null), "GRAB", DateTimeOffset.Parse("2026-11-24T03:00:00Z", System.Globalization.CultureInfo.InvariantCulture))!
+            .IsStale.Should().BeTrue();
+    }
+
     [Fact]
     public void Parse_returns_null_when_result_block_absent()
     {
