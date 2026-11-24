@@ -13,6 +13,7 @@ import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growt
 import {BookIncomeComponent} from '../book-income/book-income.component';
 import {BookVsSpyComponent} from '../book-vs-spy/book-vs-spy.component';
 import {BrokeragePnlComponent} from '../brokerage-pnl/brokerage-pnl.component';
+import {CostOfInvestingComponent} from '../cost-of-investing/cost-of-investing.component';
 import {RiskPictureComponent} from '../risk-picture/risk-picture.component';
 
 /**
@@ -30,6 +31,7 @@ import {RiskPictureComponent} from '../risk-picture/risk-picture.component';
     RiskPictureComponent,
     BookIncomeComponent,
     BrokeragePnlComponent,
+    CostOfInvestingComponent,
     DatePipe,
     DisclosureRowComponent,
     HeadlineBadgeComponent,

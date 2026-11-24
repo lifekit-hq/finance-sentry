@@ -1597,6 +1597,22 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   input. `nextExDividend` is the next `ex_dividend` event within 90 days. The figures are separate axes: no
   composite score and no total return.
 
+- **Cost of investing (issue 1533).** `GET /api/v1/wealth/brokerage/costs` and `GET /api/v1/wealth/crypto/costs`
+  (the cost row of each Holdings growth card) sum what a sleeve cost to run since 1 January, from rows already
+  collected, as a view with no new source: `BrokerageTrade` commissions and taxes, `BrokerageCashTransaction` fee,
+  commission, conversion-surcharge and withholding rows, and `CryptoTradeRecord` fees (`FeeUsd`). Each amount is
+  converted to USD on its own date and reported by kind: `commissions`, `fees`, `fxConversion`, `withholding`,
+  `total`. Flex books money paid as a negative amount, so a cost is the negation and a refund (an adjustment or a
+  reversed tax) reduces it. **FX conversion cost** is only what is recorded: the commission on a currency-pair
+  (`CASH`) trade and a broker's conversion surcharge; the spread inside the rate is not recorded and not
+  estimated. Interest paid on margin is financing, not one of the four kinds, and is left out. A crypto fee with no
+  `FeeUsd` is counted in `unvaluedRows`, not valued at zero; a cash row converted without a published rate stays in
+  the totals and is counted in `approximateRows`, with its code in `fxReasons` (§3). `shareOfReturns` is
+  `cost / (growth + cost)` over the growth window, because the sleeve growth (§8) is already after costs; costs
+  dated before the window opens are left out of it. It is null, never zero, when the growth is unknown or the
+  return before costs is not positive. The controller applies the base currency like the growth card. The figures
+  are separate axes: no composite score.
+
 - **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
   return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the
   deposits and withdrawals the brokers report (§8 *Brokerage contributions vs growth*) taken out, so a

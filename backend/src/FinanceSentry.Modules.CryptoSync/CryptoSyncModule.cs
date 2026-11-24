@@ -86,6 +86,7 @@ public static class CryptoSyncModule
         services.AddScoped<IAccountScopeChangeReader, ExchangeScopeChangeReader>();
         services.AddScoped<ICryptoFlowReader, CryptoFlowReader>();
         services.AddScoped<ICryptoIncomeReader, CryptoIncomeReader>();
+        services.AddScoped<ICryptoCostReader, CryptoCostReader>();
         services.AddSingleton<BinanceFailureClassifier>();
         services.AddSingleton<RevolutXFailureClassifier>();
         services.AddScoped<BinanceSyncJob>();

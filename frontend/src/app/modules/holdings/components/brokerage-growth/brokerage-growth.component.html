@@ -95,6 +95,12 @@
           }
         }
 
+        @if (store.sleeve === 'crypto') {
+          <fns-cost-of-investing class="block" sleeve="crypto" />
+        } @else {
+          <fns-cost-of-investing class="block" />
+        }
+
         @if (store.sleeve === 'brokerage') {
           <fns-brokerage-pnl class="block" />
           <fns-book-vs-spy class="block" />

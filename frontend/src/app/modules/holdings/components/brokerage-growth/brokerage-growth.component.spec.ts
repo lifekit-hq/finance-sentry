@@ -17,6 +17,7 @@ import {BookIncomeService} from '../../services/book-income.service';
 import {BookPerformanceService} from '../../services/book-performance.service';
 import {BrokerageGrowthService} from '../../services/brokerage-growth.service';
 import {BrokeragePnlService} from '../../services/brokerage-pnl.service';
+import {CostOfInvestingService} from '../../services/cost-of-investing.service';
 import {RiskPictureService} from '../../services/risk-picture.service';
 import {TrackRecordService} from '../../services/track-record.service';
 import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
@@ -108,6 +109,7 @@ describe('BrokerageGrowthComponent', () => {
         {provide: TrackRecordService, useValue: {getTrackRecord: () => NEVER}},
         {provide: BrokeragePnlService, useValue: {getPnl: () => NEVER}},
         {provide: BookIncomeService, useValue: {getIncome: () => NEVER}},
+        {provide: CostOfInvestingService, useValue: {getCosts: () => NEVER}},
       ],
     })
       .overrideComponent(BrokerageGrowthComponent, {
@@ -247,7 +249,10 @@ describe('BrokerageGrowthComponent', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [CryptoHostComponent],
-      providers: [{provide: BrokerageGrowthService, useValue: {getGrowth}}],
+      providers: [
+        {provide: BrokerageGrowthService, useValue: {getGrowth}},
+        {provide: CostOfInvestingService, useValue: {getCosts: () => NEVER}},
+      ],
     });
     const fixture = TestBed.createComponent(CryptoHostComponent);
     fixture.detectChanges();
