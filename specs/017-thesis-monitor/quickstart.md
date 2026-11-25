@@ -47,7 +47,7 @@ dotnet test backend/tests/FinanceSentry.Modules.Research.Tests \
 
 Cases that MUST pass: consecutive-period breach, YoY (same fiscal period prior year), proxy-ticker
 substitution, divide-by-zero → non-evaluable, insufficient periods → non-evaluable, price_drawdown
-over N trading days, idempotent re-run (no second alert), auto-clear on recovered data.
+over N quarterly readings, idempotent re-run (no second alert), auto-clear on recovered data.
 
 ## Build gate
 

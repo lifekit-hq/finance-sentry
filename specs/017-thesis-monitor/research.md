@@ -44,7 +44,7 @@ All unknowns from Technical Context resolved below. Sources are the existing cod
 - **Rationale**: EDGAR lags price 1–3 months; price triggers (`price_drawdown`, `price_return`) are
   the intraquarter defense (spec 2026-07-07 decision). The existing Yahoo client already fetches
   daily bars; we widen `range` to cover since-creation and keep the closes. `ConsecutivePeriods` for
-  price metrics = consecutive trading days.
+  price metrics = consecutive quarterly/annual readings per `PeriodType` (#1517), not trading days.
 - **Rationale (non-evaluable)**: FR-013/FR-003 — if price history since `CreatedAt` is unavailable,
   the price trigger is non-evaluable, never a break.
 - **Alternatives**: A new market-data adapter — rejected; reuse the existing interface + client.

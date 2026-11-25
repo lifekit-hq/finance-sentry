@@ -13,16 +13,17 @@ Stored inside `research.theses.invalidation_triggers` (jsonb list, System.Text.J
 | `Direction` | string | `lessThan` \| `greaterThan` | existing convention |
 | `Threshold` | decimal | — | compared per breach rule |
 | `ProxyTicker` | string? | nullable; defaults to thesis ticker when absent (FR-005) | e.g. DRAM→`MU` |
-| `ConsecutivePeriods` | int | default `1`; ≥1 | fundamentals: reported periods; price: trading days (FR-006) |
-| `PeriodType` | `ThesisPeriodType` enum | `Quarter` (default) \| `Annual` | ignored for price metrics |
+| `ConsecutivePeriods` | int | default `1`; ≥1 | fundamentals: reported periods; price: quarterly/annual readings per `PeriodType` (#1517) |
+| `PeriodType` | `ThesisPeriodType` enum | `Quarter` (default) \| `Annual` | price metrics: one reading per calendar quarter/year (#1517) |
 
 **Backward read**: missing `ProxyTicker`/`ConsecutivePeriods`/`PeriodType` keys deserialize to
 defaults; M004 still performs the explicit backfill below so persisted rows match the target state.
 
 ## New: `ThesisPeriodType` enum
 
-`Quarter` | `Annual`. For price metrics (`price_drawdown`, `price_return`) `PeriodType` is
-**not applicable** — the evaluator ignores it and treats `ConsecutivePeriods` as trading days.
+`Quarter` | `Annual`. For price metrics (`price_drawdown`, `price_return`) `PeriodType` selects the
+sampling: each calendar quarter or year contributes one reading (its last close so far, so the
+in-progress period counts), and `ConsecutivePeriods` counts those readings, not trading days (#1517).
 
 ## Reused (no change): `InvestmentThesis`
 
@@ -83,7 +84,7 @@ Definitions per spec §Metric Vocabulary. Any metric outside this set → reject
 
 | Thesis | id | Triggers after backfill |
 |---|---|---|
-| DRAM | `9c091f57-521d-441c-95e1-50400ded1966` | `gross_margin` proxy `MU` `lessThan` `0.35` · 2Q; `revenue_yoy` proxy `MU` `lessThan` `0` · 2Q; `price_drawdown` `greaterThan` `0.30` · 3 trading days *(suggested, per 2026-07-07 decision)* |
+| DRAM | `9c091f57-521d-441c-95e1-50400ded1966` | `gross_margin` proxy `MU` `lessThan` `0.35` · 2Q; `revenue_yoy` proxy `MU` `lessThan` `0` · 2Q; `price_drawdown` `greaterThan` `0.30` · 3Q *(suggested, per 2026-07-07 decision)* |
 | GRAB | `e7b9af2c-…` | `revenue_yoy` proxy `GRAB`(or null) `lessThan` `0.10` · 2Q; `operating_margin` proxy `GRAB` `lessThan` `0` · 2Q |
 
 > Confirm the exact GRAB id and whether DRAM's `price_drawdown` threshold is 0.30 before running
