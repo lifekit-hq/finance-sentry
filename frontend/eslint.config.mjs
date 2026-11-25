@@ -1,6 +1,7 @@
 import {createEslintConfig} from '@lifekit-hq/config/eslint';
 
 import {structurePlugin} from './eslint-rules/file-per-concept.mjs';
+import {compositionPlugin} from './eslint-rules/composition-discipline.mjs';
 import {keyboardsPlugin} from './eslint-rules/money-inputmode.mjs';
 import {moneyPipePlugin} from './eslint-rules/money-pipe-location.mjs';
 import {providerPlugin} from './eslint-rules/provider-extraction.mjs';
@@ -61,6 +62,23 @@ export default createEslintConfig({
       files: ['src/app/modules/**/*.ts'],
       plugins: {boundary: sharedBoundaryPlugin},
       rules: {'boundary/shared-boundary': 'error'},
+    },
+    {
+      // Constitution CC6 (Principle VI): no feature state in a component, no `setInterval` polling,
+      // no inline error-code ladders (replaces the guidance-only wording).
+      files: ['src/app/**/*.ts'],
+      ignores: ['src/app/**/*.spec.ts'],
+      plugins: {composition: compositionPlugin},
+      rules: {
+        'composition/no-set-interval': 'error',
+        'composition/no-error-code-ladder': 'error',
+      },
+    },
+    {
+      files: ['src/app/**/*.component.ts'],
+      ignores: ['src/app/**/*.spec.ts'],
+      plugins: {composition: compositionPlugin},
+      rules: {'composition/no-component-state': 'error'},
     },
     {
       files: ['**/*.html'],
