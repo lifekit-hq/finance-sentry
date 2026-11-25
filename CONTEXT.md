@@ -92,7 +92,6 @@ A propose-only, confirmable order list or cash-sweep proposal produced when allo
 - The **IPS** states target allocation; the **Risk rule set** enforces limits; breaches yield **Action tickets**.
 
 ## Flagged ambiguities
-- Verdict word set: README says "Buy, Hold, Avoid" (`README.md:23`) but `VerdictWord` is `StrongBuy, Buy, Wait, Avoid, NotScored` (`backend/src/FinanceSentry.Modules.Research/Domain/Scoring/Verdict.cs:9-16`); there is no Hold.
 - "Ledger" is the agent, but the frontend also has a `transaction-ledger` page and store (`docs/claude/app-state.md`, "TransactionLedgerStore"); open issue #1507 exists to keep the name Ledger out of endpoints and payloads.
 - "Book": `BookFiguresService` sums banking, brokerage and crypto sources (`docs/finance-framework.md:99`), yet decision C3 says the book headline is the cash-inclusive brokerage (`docs/finance-framework.md:29`).
 - "Stage" numbering of the discovery funnel is inconsistent: reference universe is "Stage A" (`docs/reference-universe.md:3`), coverage is "stage 1" (`docs/coverage-universe.md:3`), catalysts are "stage 7" (`docs/catalyst-detection.md:3`), and the scan is a separate "two-stage funnel" (`docs/claude/app-state.md`, #558).

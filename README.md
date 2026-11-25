@@ -20,7 +20,7 @@ Personal finance aggregation platform — bank accounts, crypto, brokerage, budg
 ## Not financial advice, no warranty
 
 Finance Sentry is a personal tool that shows you information about your own money: balances, totals, scores, verdict
-words (Buy, Hold, Avoid) and AI-written text. None of it is financial, investment, tax or legal advice, and none of it
+words (StrongBuy, Buy, Wait, Avoid, or NotScored; see the glossary in [CONTEXT.md](CONTEXT.md)) and AI-written text. None of it is financial, investment, tax or legal advice, and none of it
 is a recommendation to buy, sell or hold anything. The app never places a trade. The software is provided as it is,
 without warranty of any kind, under its licence; the data comes from third parties and can be late, wrong or missing.
 Check anything that matters against the source.
