@@ -265,7 +265,9 @@ the reviewer confirms it during review, and a violation found there is fixed bef
 - CC9 Backend `dotnet build` warnings are resolved (Principle II). Enforced by
   `TreatWarningsAsErrors` in `backend/Directory.Build.props` (#1478), built in Backend CI.
 - CC10 Ledger gets no tool surface other than MCP, a hook payload carries only ids, and no
-  endpoint, tool or field is named after Ledger (Principle VII). Guidance.
+  endpoint, tool or field is named after Ledger (Principle VII). Enforced by
+  `LedgerBoundaryTests` (Backend CI, `FinanceSentry.Tests.Unit`, #1507): route templates, MCP tool and
+  parameter names and the wake payload keys. Three legacy tool names are listed in the test until renamed. The MCP-only clause is Guidance.
 - CC11 Version bumps: `release-please` owns them through the release PR (Weekly Release workflow
   and the `lifekit-release-bot` token); never hand-bump. The author's part is a conventional
   commit type that carries the highest-ranked type of the branch. Guidance (see Versioning &
