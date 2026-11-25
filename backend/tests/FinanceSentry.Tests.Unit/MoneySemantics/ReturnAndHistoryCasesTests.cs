@@ -149,8 +149,8 @@ public sealed class ReturnAndHistoryCasesTests
 
     // ---- Case 30 ----
 
-    [Fact(Skip = "Blessed case 30, tracked in https://github.com/lifekit-hq/finance-sentry/issues/1488")]
-    public async Task Case_30_CashflowProfile_TwoCompleteMonths_Income1000Net100_Income3000Net900_PooledSavingsRateIs25Percent()
+    [Fact]
+    public async Task Case_30_CashflowProfile_ThreeCompleteMonths_Income1000Net100_Income3000Net900_Income2000Net500_PooledSavingsRateIs25Percent()
     {
         var now = new DateTimeOffset(2026, 9, 26, 0, 0, 0, TimeSpan.Zero);
         var snapshots = new Mock<INetWorthSnapshotRepository>();
@@ -164,14 +164,15 @@ public sealed class ReturnAndHistoryCasesTests
             CashTotal = 18_000m,
         });
         var monthly = new Mock<IHonestMonthlyFlowReader>();
-        // Income is each month's net plus its outflow: 100 + 900 = 1,000 and 900 + 2,100 = 3,000.
+        // Income is each month's net plus its outflow: 100 + 900 = 1,000, 900 + 2,100 = 3,000 and 500 + 1,500 = 2,000.
+        // Three complete months is the floor (Projection.MinCompleteMonths); pooled 1,500 / 6,000 = 25%.
         monthly.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(
-            [new HonestMonthlyFlow("2026-07", 900m, 100m), new HonestMonthlyFlow("2026-08", 2_100m, 900m)]);
+            [new HonestMonthlyFlow("2026-06", 1_500m, 500m), new HonestMonthlyFlow("2026-07", 900m, 100m), new HonestMonthlyFlow("2026-08", 2_100m, 900m)]);
         var handler = new GetCashflowProfileQueryHandler(new ProjectionInputsReader(
             snapshots.Object, monthly.Object, Mock.Of<IUserFireAssumptionsReader>(), NoCoverageHoles.Reader, new FakeTimeProvider(now)));
 
         var result = await handler.Handle(new GetCashflowProfileQuery(UserId), CancellationToken.None);
 
-        result.SavingsRate.Should().Be(0.25m, "pooled 1,000 / 4,000, not the mean of 10% and 30%");
+        result.SavingsRate.Should().Be(0.25m, "pooled 1,500 / 6,000, not the mean of 10%, 30% and 25% (21.7%)");
     }
 }
