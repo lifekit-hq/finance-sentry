@@ -61,7 +61,7 @@ Grounded in the implemented 017/018/020/022 code (2026-07-08) + spec decisions.
 
 ## R7 — Promotion prefills triggers deterministically (FR-011)
 - **Decision**: `TriggerPrefill` produces proposed `ThesisInvalidationTrigger`s from the scorecard,
-  caller-overridable: (a) `price_drawdown greaterThan <config 0.30>` for 3 days — always; (b) if
+  caller-overridable: (a) no `price_drawdown` trigger (`TriggerPrefill` proposes fundamentals triggers only; a caller-supplied one counts the period type it names, quarterly by default); (b) if
   revenue YoY currently positive: `revenue_yoy lessThan 0` for 2 quarters; (c) if gross margin
   evaluable: `gross_margin lessThan <latest gm − config buffer 0.10>` for 2 quarters. Rounded, cited.
   Promotion calls `SaveThesisCommand` (validates via `ThesisTriggerVocabulary`) and links the
