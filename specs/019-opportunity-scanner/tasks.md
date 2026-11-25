@@ -48,7 +48,7 @@ Paths under repo root. Feature lives in `FinanceSentry.Modules.Research` + 2 Cor
 ## Phase 4: User Story 3 — Promote / reject / expire (P2)
 
 ### Tests (write first)
-- [X] T019 [P] [US3] `Opportunity/TriggerPrefillTests.cs`: prefill formula (always price_drawdown 0.30×3d; revenue_yoy<0 if rev YoY positive; gross_margin< latest−buffer if evaluable) → valid `ThesisMetric`s; rounded/cited.
+- [X] T019 [P] [US3] `Opportunity/TriggerPrefillTests.cs`: prefill formula (no price_drawdown trigger; revenue_yoy<0 if rev YoY positive; gross_margin< latest−buffer if evaluable) → valid `ThesisMetric`s; rounded/cited.
 - [X] T020 [P] [US3] `Opportunity/PromoteRejectExpireHandlerTests.cs`: promote Refused by gate (fake `IRiskPolicyGate`) → no thesis, verdict returned; Allowed → SaveThesis called + candidate Promoted + Promoted event; override records signal; reject → Rejected + reason + event; expire past TTL → Expired + final score snapshot.
 
 ### Implementation

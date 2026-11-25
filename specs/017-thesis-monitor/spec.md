@@ -124,7 +124,7 @@ Derived only from the six concepts `get_fundamentals` already returns — **Reve
 | `price_drawdown` | (peak close since thesis `CreatedAt` − latest close) / peak close | ratio (0–1) |
 | `price_return` | (latest close − close at thesis `CreatedAt`) / close at creation | ratio |
 
-Price metrics use `PeriodType` = `Quarter`/`Annual` **not applicable**; they evaluate on the latest close with `ConsecutivePeriods` interpreted as consecutive **trading days** the condition must hold (default 1; recommended ≥ 3 to avoid single-day whipsaw breaks). Example: DRAM `price_drawdown greaterThan 0.30` for 3 days = "break the thesis if the position sits 30% off its peak."
+Price metrics honour `PeriodType` (`Quarter` default / `Annual`, #1517): each calendar quarter or year contributes one reading (its last close so far; the in-progress period uses the latest close), and `ConsecutivePeriods` is the number of consecutive such readings the condition must hold (default 1). Example: DRAM `price_drawdown greaterThan 0.30` for 3 quarters = "break the thesis if the position sits 30% off its peak."
 
 **Direction** values: `lessThan` | `greaterThan` (existing convention). **Breach rule**: for the target ticker (proxy or thesis), compute the metric over the most recent `consecutivePeriods` reported periods of the trigger's period type; the trigger breaches iff `(metric direction threshold)` is true for **all** of those periods.
 

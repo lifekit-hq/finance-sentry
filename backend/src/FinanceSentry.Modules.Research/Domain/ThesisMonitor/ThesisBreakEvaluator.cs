@@ -199,34 +199,31 @@ public static class ThesisBreakEvaluator
             return new TriggerVerdict.NonEvaluable(NonEvaluableReason.NoPriceHistory);
         }
 
-        if (closes.Count < trigger.ConsecutivePeriods)
+        // One reading per calendar period (#1517): consecutivePeriods counts quarters or years, honouring
+        // periodType, not trading days. Each period contributes its last close (the in-progress period
+        // contributes the latest close seen so far). The baseline still anchors to the entry price.
+        var readings = SamplePeriodReadings(closes, trigger.PeriodType);
+        if (readings.Count < trigger.ConsecutivePeriods)
         {
             return new TriggerVerdict.NonEvaluable(NonEvaluableReason.InsufficientPeriods);
         }
 
-        var trailing = closes.TakeLast(trigger.ConsecutivePeriods).ToList();
+        var trailing = readings.TakeLast(trigger.ConsecutivePeriods).ToList();
         var values = new decimal[trailing.Count];
         var labels = new string[trailing.Count];
 
         for (var i = 0; i < trailing.Count; i++)
         {
-            var day = trailing[i];
+            var day = trailing[i].Close;
 
             // price_drawdown: anchor to entryPrice when recorded (FR-draw-1).
             // If entryPrice is absent, fall back to the first close on/after thesis creation — a
             // closer proxy to entry than the rolling max, which was anchored to the all-time peak
             // and caused false breaks for beaten-down names (e.g. MHPC reported 0.84 vs ~0.10).
             // price_return always anchors to the first close (unchanged behaviour).
-            decimal baseline;
-            if (trigger.Metric == ThesisMetric.PriceDrawdown)
-            {
-                baseline = entryPrice ?? closes[0].Close;
-            }
-            else
-            {
-                var upToDay = closes.Where(c => c.Date <= day.Date).ToList();
-                baseline = upToDay[0].Close;
-            }
+            var baseline = trigger.Metric == ThesisMetric.PriceDrawdown
+                ? entryPrice ?? closes[0].Close
+                : closes[0].Close;
 
             if (baseline == 0)
             {
@@ -236,11 +233,30 @@ public static class ThesisBreakEvaluator
             values[i] = trigger.Metric == ThesisMetric.PriceDrawdown
                 ? (baseline - day.Close) / baseline
                 : (day.Close - baseline) / baseline;
-            labels[i] = day.Date.ToString("yyyy-MM-dd");
+            labels[i] = trailing[i].Label;
         }
 
         return BuildVerdict(trigger, values, labels);
     }
+
+    private readonly record struct PeriodReading(DailyClose Close, string Label);
+
+    /// <summary>
+    /// Collapses date-ordered closes to one reading per calendar quarter or year: the period's last close,
+    /// labelled with its period and date (e.g. "2026-Q3 (2026-09-30)").
+    /// </summary>
+    private static List<PeriodReading> SamplePeriodReadings(IReadOnlyList<DailyClose> orderedCloses, ThesisPeriodType periodType)
+        => orderedCloses
+            .GroupBy(c => periodType == ThesisPeriodType.Annual
+                ? (c.Date.Year, 0)
+                : (c.Date.Year, (c.Date.Month - 1) / 3 + 1))
+            .Select(g => g.Last())
+            .Select(c => new PeriodReading(
+                c,
+                periodType == ThesisPeriodType.Annual
+                    ? $"{c.Date.Year} ({c.Date:yyyy-MM-dd})"
+                    : $"{c.Date.Year}-Q{(c.Date.Month - 1) / 3 + 1} ({c.Date:yyyy-MM-dd})"))
+            .ToList();
 
     /// <summary>
     /// relative_return (#697): excess return = subject's trailing <see cref="ThesisInvalidationTrigger.WindowDays"/>

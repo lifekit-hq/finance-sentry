@@ -33,10 +33,10 @@ public sealed class OpportunityOptions
     /// <summary>Days after creation an Active candidate auto-expires if never promoted/rejected.</summary>
     public int CandidateTtlDays { get; set; } = 30;
 
-    /// <summary>Default drawdown fraction used to prefill the price_drawdown invalidation trigger.</summary>
+    /// <summary>Unused config: no scanner prefill emits a price_drawdown trigger (<c>TriggerPrefill</c> proposes fundamentals triggers only).</summary>
     public decimal DefaultDrawdownPrefill { get; set; } = 0.30m;
 
-    /// <summary>Consecutive trading days the default drawdown trigger requires.</summary>
+    /// <summary>Unused config, like <see cref="DefaultDrawdownPrefill"/>. A price_drawdown trigger counts periods of its periodType (quarters by default), not trading days.</summary>
     public int DefaultDrawdownConsecutiveDays { get; set; } = 3;
 
     /// <summary>Buffer subtracted from the latest gross margin when prefilling a gross_margin trigger.</summary>

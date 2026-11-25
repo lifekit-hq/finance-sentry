@@ -111,22 +111,116 @@ public class ThesisBreakEvaluatorTests
     }
 
     [Fact]
-    public void PriceDrawdown_BreachesWhenDrawdownExceedsThresholdForAllTrailingDays()
+    public void PriceDrawdown_ThreeConsecutiveDailyReadingsOverThreshold_DoesNotBreakAQuarterlyTrigger()
+    {
+        // #1517: three consecutive DAILY readings over threshold, all in one quarter, are one quarterly reading.
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 11, 2), 100m),
+            new(new DateOnly(2026, 11, 9), 64m),
+            new(new DateOnly(2026, 11, 10), 62m),
+            new(new DateOnly(2026, 11, 11), 69m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 3, PeriodType: ThesisPeriodType.Quarter);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero), [], closes);
+
+        verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Which.Reason.Should().Be(NonEvaluableReason.InsufficientPeriods);
+    }
+
+    [Fact]
+    public void PriceDrawdown_ThreeConsecutiveQuarterEndsOverThreshold_Breaches()
     {
         var closes = new List<DailyClose>
         {
             new(new DateOnly(2026, 1, 2), 100m),
-            new(new DateOnly(2026, 1, 3), 65m),
-            new(new DateOnly(2026, 1, 4), 60m),
-            new(new DateOnly(2026, 1, 5), 55m),
+            new(new DateOnly(2026, 3, 31), 65m),
+            new(new DateOnly(2026, 6, 30), 60m),
+            new(new DateOnly(2026, 9, 30), 55m),
         };
-
         var trigger = new ThesisInvalidationTrigger(
-            ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 3);
+            ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 3, PeriodType: ThesisPeriodType.Quarter);
 
         var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes);
 
-        verdict.Should().BeOfType<TriggerVerdict.Breached>();
+        var breached = verdict.Should().BeOfType<TriggerVerdict.Breached>().Subject;
+        breached.Periods.Should().Equal("2026-Q1 (2026-03-31)", "2026-Q2 (2026-06-30)", "2026-Q3 (2026-09-30)");
+    }
+
+    [Fact]
+    public void PriceDrawdown_OneQuarterBelowThreshold_Holds()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 3, 31), 65m),
+            new(new DateOnly(2026, 6, 30), 90m),
+            new(new DateOnly(2026, 9, 30), 55m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 3, PeriodType: ThesisPeriodType.Quarter);
+
+        ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes).Should().BeOfType<TriggerVerdict.Held>();
+    }
+
+    [Fact]
+    public void PriceDrawdown_AnnualPeriodType_SamplesOneReadingPerYear()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 12, 31), 60m),
+            new(new DateOnly(2027, 12, 31), 55m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 2, PeriodType: ThesisPeriodType.Annual);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes);
+
+        verdict.Should().BeOfType<TriggerVerdict.Breached>().Which.Periods.Should().Equal("2026 (2026-12-31)", "2027 (2027-12-31)");
+    }
+
+    [Fact]
+    public void PriceReturn_QuarterlyReadings_AnchorToFirstClose_AndBreachOnlyWhenAllQuarters()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 3, 31), 80m),
+            new(new DateOnly(2026, 6, 30), 70m),
+            new(new DateOnly(2026, 9, 30), 60m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceReturn, "lessThan", -0.10m, ConsecutivePeriods: 3, PeriodType: ThesisPeriodType.Quarter);
+
+        var breached = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes)
+            .Should().BeOfType<TriggerVerdict.Breached>().Subject;
+        breached.ObservedValues.Should().Equal(-0.20m, -0.30m, -0.40m);
+
+        var recovered = closes.ToList();
+        recovered[2] = new DailyClose(new DateOnly(2026, 6, 30), 95m);
+        ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], recovered).Should().BeOfType<TriggerVerdict.Held>();
+    }
+
+    [Fact]
+    public void PriceReturn_InProgressQuarterSuppliesLatestReading()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 3, 31), 80m),
+            new(new DateOnly(2026, 4, 10), 90m),
+            new(new DateOnly(2026, 4, 20), 70m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceReturn, "lessThan", -0.10m, ConsecutivePeriods: 2, PeriodType: ThesisPeriodType.Quarter);
+
+        var breached = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes)
+            .Should().BeOfType<TriggerVerdict.Breached>().Subject;
+
+        breached.ObservedValues.Should().Equal(-0.20m, -0.30m);
+        breached.Periods.Should().Equal("2026-Q1 (2026-03-31)", "2026-Q2 (2026-04-20)");
     }
 
     [Fact]

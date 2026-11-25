@@ -460,7 +460,7 @@ public class RunThesisMonitorHandlerTests
     {
         var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
         var closes = new List<DailyClose> { new(today.AddDays(-2), 100m), new(today.AddDays(-1), 60m), new(today, 55m) };
-        var trigger = new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 2);
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 1);
         var thesis = Thesis([trigger]);
         var alerts = new FakeAlertGeneratorService();
         var marketData = new FakeMarketDataService(new Dictionary<string, IReadOnlyList<DailyClose>> { ["MU"] = closes });
@@ -490,7 +490,7 @@ public class RunThesisMonitorHandlerTests
         };
         var thesis = Thesis(
         [
-            new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 2),
+            new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 1),
             new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1),
         ]);
         var alerts = new FakeAlertGeneratorService();
@@ -516,7 +516,7 @@ public class RunThesisMonitorHandlerTests
         };
         var thesis = Thesis(
         [
-            new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 2),
+            new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.30m, ConsecutivePeriods: 1),
             new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1),
         ]);
         thesis.BrokenAt = DateTimeOffset.UtcNow.AddDays(-10);
