@@ -182,6 +182,48 @@ public class ThesisBreakEvaluatorTests
     }
 
     [Fact]
+    public void PriceReturn_QuarterlyReadings_AnchorToFirstClose_AndBreachOnlyWhenAllQuarters()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 3, 31), 80m),
+            new(new DateOnly(2026, 6, 30), 70m),
+            new(new DateOnly(2026, 9, 30), 60m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceReturn, "lessThan", -0.10m, ConsecutivePeriods: 3, PeriodType: ThesisPeriodType.Quarter);
+
+        var breached = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes)
+            .Should().BeOfType<TriggerVerdict.Breached>().Subject;
+        breached.ObservedValues.Should().Equal(-0.20m, -0.30m, -0.40m);
+
+        var recovered = closes.ToList();
+        recovered[2] = new DailyClose(new DateOnly(2026, 6, 30), 95m);
+        ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], recovered).Should().BeOfType<TriggerVerdict.Held>();
+    }
+
+    [Fact]
+    public void PriceReturn_InProgressQuarterSuppliesLatestReading()
+    {
+        var closes = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 3, 31), 80m),
+            new(new DateOnly(2026, 4, 10), 90m),
+            new(new DateOnly(2026, 4, 20), 70m),
+        };
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.PriceReturn, "lessThan", -0.10m, ConsecutivePeriods: 2, PeriodType: ThesisPeriodType.Quarter);
+
+        var breached = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], closes)
+            .Should().BeOfType<TriggerVerdict.Breached>().Subject;
+
+        breached.ObservedValues.Should().Equal(-0.20m, -0.30m);
+        breached.Periods.Should().Equal("2026-Q1 (2026-03-31)", "2026-Q2 (2026-04-20)");
+    }
+
+    [Fact]
     public void NoTriggers_IsCallerResponsibility_EvaluatorNeverCalledWithNone()
     {
         // Documents the contract: the handler skips theses with zero triggers before calling the
