@@ -42,10 +42,11 @@ public sealed class ResearchWriteAuthorizationTests(McpHttpHostFixture host) : I
         "save_thesis",
     ];
 
-    /// <summary>What Ledger's service token may call: the candidate and watchlist writes and the thesis proposal.</summary>
+    /// <summary>What Ledger's service token may call: the candidate and watchlist writes the thesis proposal and the no-change thesis review.</summary>
     private static readonly string[] LedgerWritableTools =
     [
         "propose_thesis_revision",
+        "record_thesis_review",
         "reject_candidate",
         "watchlist",
     ];

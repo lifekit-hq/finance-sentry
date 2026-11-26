@@ -23,4 +23,10 @@ public enum ThesisEventType
 
     /// <summary>A revision was reverted to the prior version it recorded.</summary>
     Reverted,
+
+    /// <summary>
+    /// A thesis was reviewed and nothing in it changed (#1518): <see cref="ThesisEvent.DecisionNote"/> holds the verdict,
+    /// <see cref="ThesisEvent.Audit"/> the reasoning and evidence. Price-stamped, so the review can be graded later.
+    /// </summary>
+    Reviewed,
 }
