@@ -20,14 +20,18 @@ public sealed class CatalystDetectionJob(CatalystDetector detector)
 
 /// <summary>
 /// Daily GDELT attention refresh (discovery funnel stage 7): article volume per theme phrase, stored as the attention measure the
-/// scorecard and readers expose. A phrase GDELT will not answer makes the job end Failed after the others are stored; any
-/// failure is logged here with the job name, the step and the exception.
+/// scorecard and readers expose. A phrase GDELT will not answer makes the attempt fail after the others are stored; any
+/// failure is logged here with the job name, the step and the exception. GDELT answers only a minority of this host's requests, so
+/// the job is retried <see cref="RetryAttempts"/> times with Hangfire's growing delay, and each retry asks only the phrases not yet
+/// measured that day. The job ends Failed only when a phrase is still unread after the last retry.
 /// </summary>
 public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher, ILogger<ThemeAttentionRefreshJob> logger)
 {
     public const string RecurringJobId = "theme-attention-refresh";
 
-    [AutomaticRetry(Attempts = 1)]
+    public const int RetryAttempts = 10;
+
+    [AutomaticRetry(Attempts = RetryAttempts)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         try
@@ -40,7 +44,7 @@ public sealed class ThemeAttentionRefreshJob(ThemeAttentionRefresher refresher, 
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             var step = ex is ThemeAttentionRefreshException refresh ? refresh.Step : "unknown";
-            logger.LogError(ex, "Job {Job} failed at step {Step}", nameof(ThemeAttentionRefreshJob), step);
+            logger.LogError(ex, "Job {Job} failed at step {Step}: {Error}", nameof(ThemeAttentionRefreshJob), step, ex.Message);
             throw;
         }
     }

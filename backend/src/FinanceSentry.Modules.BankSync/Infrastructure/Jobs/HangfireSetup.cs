@@ -29,6 +29,10 @@ public static class HangfireSetup
             SchemaName = HangfireSchema,
             PrepareSchemaIfNecessary = true,
             QueuePollInterval = TimeSpan.FromSeconds(15),
+            // A fetched job is invisible to other workers for InvisibilityTimeout (30 min). Without the sliding timeout a job still
+            // running at 30 min is fetched again and a second copy runs alongside the first (the theme attention refresh did, from
+            // 2026-11-25, doubling its GDELT requests). Sliding keeps extending the timeout while the job is processing.
+            UseSlidingInvisibilityTimeout = true,
         };
         if (!environment.IsEnvironment("Testing"))
             services.AddSingleton(storageOptions);

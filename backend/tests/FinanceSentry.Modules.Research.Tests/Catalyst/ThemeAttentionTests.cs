@@ -31,9 +31,9 @@ public sealed class ThemeAttentionTests
         },
     };
 
-    private ThemeAttentionRefresher Refresher(CatalystOptions options) => new(
+    private ThemeAttentionRefresher Refresher(CatalystOptions options, TimeProvider? clock = null) => new(
         _h.Reference, _gdelt, new ThemeAttentionRepository(_h.Coverage.Db), Microsoft.Extensions.Options.Options.Create(options),
-        Microsoft.Extensions.Options.Options.Create(new ReferenceUniverseOptions()), _h.Clock, NullLogger<ThemeAttentionRefresher>.Instance);
+        Microsoft.Extensions.Options.Options.Create(new ReferenceUniverseOptions()), clock ?? _h.Clock, NullLogger<ThemeAttentionRefresher>.Instance);
 
     private ThemeAttentionReader Reader(CatalystOptions options) => new(
         new ThemeAttentionRepository(_h.Coverage.Db), _h.Reference, Microsoft.Extensions.Options.Options.Create(options), _h.Clock);
@@ -83,7 +83,7 @@ public sealed class ThemeAttentionTests
     }
 
     [Fact]
-    public async Task Refresh_ARerun_ReplacesTheDay_NeverDuplicatesIt()
+    public async Task Refresh_TheNextDaysRun_ReplacesTheDay_NeverDuplicatesIt()
     {
         await _h.ListAsync("theme:memory", "MU");
         var day = new DateOnly(2026, 11, 15);
@@ -92,7 +92,7 @@ public sealed class ThemeAttentionTests
         await Refresher(Options()).RefreshAsync();
 
         _gdelt.ByPhrase["HBM memory"] = Series(day, 99);
-        await Refresher(Options()).RefreshAsync();
+        await Refresher(Options(), new AutoAdvanceClock(Now.AddDays(1))).RefreshAsync();
 
         var stored = await StoredAsync();
         stored.Where(d => d.Phrase == "HBM memory").Should().ContainSingle().Which.Articles.Should().Be(99);
@@ -176,8 +176,66 @@ public sealed class ThemeAttentionTests
 
         await act.Should().ThrowAsync<ThemeAttentionRefreshException>();
         var entry = log.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error).Subject;
-        entry.Message.Should().Contain("ThemeAttentionRefreshJob").And.Contain("fetch-volume");
+        entry.Message.Should().Contain("ThemeAttentionRefreshJob").And.Contain("fetch-volume").And.Contain("could not read 2 of 2");
         entry.Exception.Should().BeOfType<ThemeAttentionRefreshException>();
+    }
+
+    // Issue 1554: GDELT answers only a minority of this host's requests, so a run rarely reads every phrase. The retry used to
+    // re-ask every phrase and lose a different share each time, so the job failed every night. A retry now asks only the
+    // phrases not yet measured that day, and the job ends Succeeded once each has been read once.
+    [Fact]
+    public async Task Job_ARetryAfterAPartialRun_AsksOnlyThePhrasesStillMissing_AndSucceeds()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        var last = new DateOnly(2026, 11, 15);
+        _gdelt.ByPhrase["HBM memory"] = Series(last, 7);
+        _gdelt.ByPhrase["DRAM prices"] = Series(last, 3);
+        _gdelt.Failing.Add("DRAM prices");
+        var log = new RecordingLogger<ThemeAttentionRefreshJob>();
+
+        var first = () => new ThemeAttentionRefreshJob(Refresher(Options()), log).ExecuteAsync();
+        await first.Should().ThrowAsync<ThemeAttentionRefreshException>();
+
+        // The retry: GDELT now throttles the phrase it answered before and answers the one it throttled.
+        _gdelt.Failing.Clear();
+        _gdelt.Failing.Add("HBM memory");
+        _gdelt.Asked.Clear();
+
+        await new ThemeAttentionRefreshJob(Refresher(Options()), log).ExecuteAsync();
+
+        _gdelt.Asked.Should().Equal("DRAM prices");
+        var stored = await StoredAsync();
+        stored.Select(d => d.Phrase).Should().BeEquivalentTo("DRAM prices", "HBM memory");
+        log.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("finished"));
+    }
+
+    [Fact]
+    public async Task Refresh_APhraseMeasuredOnAnEarlierDay_IsAskedAgain()
+    {
+        await _h.ListAsync("theme:memory", "MU");
+        var last = new DateOnly(2026, 11, 15);
+        _h.Coverage.Db.ThemeAttentionDays.Add(new ThemeAttentionDay
+        {
+            Theme = "theme:memory", Phrase = "HBM memory", Day = last.AddDays(-1), Articles = 4, TotalArticles = 1_000_000,
+            Source = "gdelt", MeasuredAt = Now.AddDays(-1),
+        });
+        await _h.Coverage.Db.SaveChangesAsync();
+        _gdelt.ByPhrase["HBM memory"] = Series(last, 4, 6);
+        _gdelt.ByPhrase["DRAM prices"] = Series(last, 3);
+
+        var summary = await Refresher(Options()).RefreshAsync();
+
+        summary.AlreadyMeasured.Should().Be(0);
+        _gdelt.Asked.Should().BeEquivalentTo("HBM memory", "DRAM prices");
+    }
+
+    [Fact]
+    public void Job_IsRetriedSeveralTimes_SoAThrottledPhraseGetsFreshPasses()
+    {
+        var retry = typeof(ThemeAttentionRefreshJob).GetMethod(nameof(ThemeAttentionRefreshJob.ExecuteAsync))!
+            .GetCustomAttributes(typeof(Hangfire.AutomaticRetryAttribute), false).Cast<Hangfire.AutomaticRetryAttribute>().Single();
+
+        retry.Attempts.Should().Be(ThemeAttentionRefreshJob.RetryAttempts).And.BeGreaterThanOrEqualTo(5);
     }
 
     [Fact]
