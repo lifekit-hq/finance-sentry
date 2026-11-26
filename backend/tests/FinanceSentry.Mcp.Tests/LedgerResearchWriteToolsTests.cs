@@ -125,6 +125,31 @@ public sealed class LedgerResearchWriteToolsTests
         captured.Rationale.Should().Be("undo");
     }
 
+    [Theory]
+    [InlineData(true, ThesisEventOrigin.Ledger)]
+    [InlineData(false, ThesisEventOrigin.User)]
+    public async Task RecordThesisReview_StampsTheCallersOrigin_AndCarriesVerdictRationaleAndEvidence(
+        bool serviceToken, ThesisEventOrigin expected)
+    {
+        var handler = new Mock<ICommandHandler<RecordThesisReviewCommand, RecordThesisReviewResult>>();
+        RecordThesisReviewCommand? captured = null;
+        handler.Setup(h => h.Handle(It.IsAny<RecordThesisReviewCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RecordThesisReviewCommand, CancellationToken>((c, _) => captured = c)
+            .ReturnsAsync((RecordThesisReviewResult)null!);
+        var thesisId = Guid.NewGuid();
+        var evidence = new ThesisEvidenceRefs(NewsArticleIds: ["n-7"]);
+
+        await new RecordThesisReviewTool(handler.Object, Identity, Caller(serviceToken))
+            .ExecuteAsync(thesisId, "no change", "Drawdown is sector-wide; DRAM pricing intact.", evidence);
+
+        captured!.UserId.Should().Be(UserId);
+        captured.ThesisId.Should().Be(thesisId);
+        captured.Verdict.Should().Be("no change");
+        captured.Rationale.Should().Be("Drawdown is sector-wide; DRAM pricing intact.");
+        captured.Evidence.Should().Be(evidence);
+        captured.Origin.Should().Be(expected);
+    }
+
     [Fact]
     public async Task Tools_ReturnNullWithoutAnIdentity()
     {

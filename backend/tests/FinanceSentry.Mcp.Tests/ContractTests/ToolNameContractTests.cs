@@ -83,6 +83,7 @@ public sealed class ToolNameContractTests
         "record_event_verdict",
         "record_ledger_correction",
         "record_risk_remeasurement",
+        "record_thesis_review",
         "register_thesis_source",
         "run_thesis_monitor",
         "promote_candidate",

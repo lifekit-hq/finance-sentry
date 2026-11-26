@@ -13,7 +13,7 @@ public sealed class ListThesisEventsTool(
     IIdentityResolver identity)
 {
     [McpServerTool(Name = "list_thesis_events")]
-    [Description("Lists the caller's price-stamped thesis/candidate lifecycle events (Created, Broken, Unbroken, Closed, Promoted, Rejected, Expired, Snapshot, Revised, Reverted), optionally filtered to one subject. Each event carries its origin (User or Ledger) and, for a thesis write, an audit payload: prior and new version, rationale, evidence references (a Revised event's id is what revert_thesis_revision takes).")]
+    [Description("Lists the caller's price-stamped thesis/candidate lifecycle events (Created, Broken, Unbroken, Closed, Promoted, Rejected, Expired, Snapshot, Revised, Reverted, Reviewed), optionally filtered to one subject. Each event carries its origin (User or Ledger) and, for a thesis write, an audit payload: prior and new version, rationale, evidence references (a Revised event's id is what revert_thesis_revision takes). A Reviewed event is a review that changed nothing: decisionNote holds the verdict, audit.rationale the reasoning.")]
     public async Task<IReadOnlyList<ThesisEventDto>> ExecuteAsync(
         [Description("Optional thesis/candidate id to filter to a single subject's event trail.")] Guid? subjectId = null,
         CancellationToken cancellationToken = default)
