@@ -11,7 +11,8 @@ using Microsoft.Extensions.Options;
 /// What one attention refresh did. <see cref="Note"/> says why a run that stored nothing is not a failure (switched off, or no
 /// phrase to ask).
 /// </summary>
-public sealed record AttentionRefreshSummary(bool Ran, int Themes, int Phrases, int DaysWritten, int Failed, int Unmeasured, string? Note = null)
+public sealed record AttentionRefreshSummary(
+    bool Ran, int Themes, int Phrases, int DaysWritten, int Failed, int Unmeasured, string? Note = null, int AlreadyMeasured = 0)
 {
     public static AttentionRefreshSummary Disabled { get; } = new(false, 0, 0, 0, 0, 0, "Catalyst:Enabled or Catalyst:AttentionEnabled is false");
 }
@@ -30,6 +31,12 @@ public sealed class ThemeAttentionRefreshException(string step, string message, 
 /// five seconds and a throttled phrase is retried after a wait (<see cref="IGdeltTimelineClient"/>). A phrase GDELT still will not
 /// answer is counted and logged and the others are still stored; the run then throws a <see cref="ThemeAttentionRefreshException"/>
 /// naming the step and the failed count, so the job ends Failed instead of leaving a stale measure looking current. No model is called.
+/// <para>
+/// A phrase already measured since the start of the run's UTC day is not asked again. GDELT answers only a minority of requests from
+/// this host whatever the spacing, so a run rarely gets every phrase; the job's retries then ask only the phrases still missing
+/// instead of re-asking all of them and losing a different share each time. A phrase GDELT answered with no articles stores no row,
+/// so it is asked again on a retry.
+/// </para>
 /// </summary>
 public sealed class ThemeAttentionRefresher(
     IReferenceUniverseReader reference,
@@ -67,7 +74,15 @@ public sealed class ThemeAttentionRefresher(
             var phrasesByTheme = _options.ThemePhrases
                 .ToDictionary(p => ReferenceListKeys.Theme(p.Key), p => p.Value, StringComparer.Ordinal);
 
-            int phrases = 0, written = 0, failed = 0, unmeasured = 0;
+            step = "read-measured";
+            var dayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
+            var measuredToday = (await repository.ListDaysAsync(
+                    null, DateOnly.FromDateTime(dayStart.UtcDateTime).AddDays(-Math.Max(1, _options.GdeltTimespanDays)), ct))
+                .Where(d => d.MeasuredAt >= dayStart)
+                .Select(d => (d.Theme, d.Phrase))
+                .ToHashSet();
+
+            int phrases = 0, written = 0, failed = 0, unmeasured = 0, alreadyMeasured = 0;
             foreach (var theme in themes)
             {
                 if (!phrasesByTheme.TryGetValue(theme, out var words) || words.Count == 0)
@@ -80,6 +95,12 @@ public sealed class ThemeAttentionRefresher(
                 foreach (var phrase in words.Where(w => !string.IsNullOrWhiteSpace(w)).Select(w => w.Trim()).Distinct(StringComparer.OrdinalIgnoreCase))
                 {
                     phrases++;
+                    if (measuredToday.Contains((theme, phrase)))
+                    {
+                        alreadyMeasured++;
+                        continue;
+                    }
+
                     IReadOnlyList<GdeltDay> volume;
                     step = "fetch-volume";
                     try
@@ -112,8 +133,8 @@ public sealed class ThemeAttentionRefresher(
             step = "prune";
             await repository.PruneAsync(DateOnly.FromDateTime(now.UtcDateTime).AddDays(-_options.AttentionRetentionDays), ct);
             logger.LogInformation(
-                "Theme attention: {Themes} theme(s), {Phrases} phrase(s) asked, {Days} day(s) written, {Failed} failed, {Unmeasured} theme(s) without a phrase",
-                themes.Count, phrases, written, failed, unmeasured);
+                "Theme attention: {Themes} theme(s), {Phrases} phrase(s), {AlreadyMeasured} already measured today, {Days} day(s) written, {Failed} failed, {Unmeasured} theme(s) without a phrase",
+                themes.Count, phrases, alreadyMeasured, written, failed, unmeasured);
 
             if (phrases == 0)
             {
@@ -129,7 +150,7 @@ public sealed class ThemeAttentionRefresher(
                     step, $"Theme attention could not read {failed} of {phrases} phrase(s); the others were stored.");
             }
 
-            return new AttentionRefreshSummary(true, themes.Count, phrases, written, failed, unmeasured);
+            return new AttentionRefreshSummary(true, themes.Count, phrases, written, failed, unmeasured, AlreadyMeasured: alreadyMeasured);
         }
         catch (Exception ex) when (ex is not ThemeAttentionRefreshException and not OperationCanceledException)
         {
