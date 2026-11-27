@@ -3,7 +3,7 @@
 # Build context: repository root.
 
 # Stage 1: Build
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-alpine AS build
 WORKDIR /src
 
 # Restore into the layer filesystem (not a cache mount): a cache mount's contents are
