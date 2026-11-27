@@ -31,6 +31,12 @@ RUN dotnet publish src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Rel
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
+# apk upgrade first: the aspnet base image lags Alpine security releases (e.g. openssl), and the CI
+# Trivy gate fails the image build on any fixable HIGH/CRITICAL finding — the api image does the same.
+# APK_REFRESH (a daily key from the build-image action) keeps the registry cache from serving a stale layer.
+ARG APK_REFRESH
+RUN apk upgrade --no-cache
+
 COPY --from=build /app/publish .
 
 ENV DOTNET_RUNNING_IN_CONTAINER=true

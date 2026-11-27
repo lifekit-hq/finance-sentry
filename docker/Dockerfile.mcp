@@ -36,7 +36,12 @@ WORKDIR /app
 # spec 048). The api image installs it for the same reason.
 # tzdata: get_macro_calendar resolves each release in its publisher's zone (America/New_York,
 # Europe/Berlin) to derive eventAt/status (#1091); alpine ships no zone database without it.
-RUN apk add --no-cache krb5-libs tzdata
+# apk upgrade first: the aspnet base image lags Alpine security releases (e.g. openssl), and the CI
+# Trivy gate fails the image build on any fixable HIGH/CRITICAL finding — the api image does the same.
+# APK_REFRESH (a daily key from the build-image action) keeps the registry cache from serving a stale layer.
+ARG APK_REFRESH
+RUN apk upgrade --no-cache \
+    && apk add --no-cache krb5-libs tzdata
 
 COPY --from=build /app/publish .
 
