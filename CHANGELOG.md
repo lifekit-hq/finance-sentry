@@ -5,6 +5,38 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.23.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.22.0...v1.23.0) (2026-11-27)
+
+
+### Features
+
+* **holdings:** chart allocation drift and concentration over time in the risk picture ([#1543](https://github.com/lifekit-hq/finance-sentry/issues/1543)) ([0ad2414](https://github.com/lifekit-hq/finance-sentry/commit/0ad241434750f25897b01ed47e21d131373e1e70))
+* **holdings:** show cost of investing in brokerage and crypto growth cards ([#1541](https://github.com/lifekit-hq/finance-sentry/issues/1541)) ([21152d6](https://github.com/lifekit-hq/finance-sentry/commit/21152d6fb9302571f35f591b591c9266104ee6f7))
+* **holdings:** show income received at book level ([#1540](https://github.com/lifekit-hq/finance-sentry/issues/1540)) ([37df3b5](https://github.com/lifekit-hq/finance-sentry/commit/37df3b551fb054d5b8f7b10479b7a8b134032742))
+
+
+### Bug Fixes
+
+* **docker:** pin libxml2 to the CVE-2026-11979 fix and refresh apk layers daily in every image ([#1559](https://github.com/lifekit-hq/finance-sentry/issues/1559)) ([2cae51c](https://github.com/lifekit-hq/finance-sentry/commit/2cae51cde3f566e121c543e926081bc3fccb8a7f)), closes [#1558](https://github.com/lifekit-hq/finance-sentry/issues/1558)
+* **research:** evaluate price_drawdown and price_return per quarter or year ([#1552](https://github.com/lifekit-hq/finance-sentry/issues/1552)) ([c1f0b76](https://github.com/lifekit-hq/finance-sentry/commit/c1f0b76b365db8809dd6ece49a58b75ab3b8264c))
+* **research:** keep AVOID with a trend-only note and compute valuation IsStale from price age ([#1535](https://github.com/lifekit-hq/finance-sentry/issues/1535)) ([6ebedac](https://github.com/lifekit-hq/finance-sentry/commit/6ebedace4a7f2b2619af39e46b00a3a8676a7504))
+* **research:** let theme attention retries converge and stop duplicate long-running Hangfire runs ([#1555](https://github.com/lifekit-hq/finance-sentry/issues/1555)) ([d3aaf43](https://github.com/lifekit-hq/finance-sentry/commit/d3aaf43866b8ab3b42c430deb17f8bf31a5cb069))
+* **research:** log ThemeAttentionRefreshJob failures with job and step, and ease GDELT throttling ([#1547](https://github.com/lifekit-hq/finance-sentry/issues/1547)) ([2233b3a](https://github.com/lifekit-hq/finance-sentry/commit/2233b3aa0dc22d3ca471ec2173a54f42ee073f4c))
+* **research:** pace the sec-edgar client under the SEC rate limit so fundamentals fetches stop tripping the circuit breaker ([#1521](https://github.com/lifekit-hq/finance-sentry/issues/1521)) ([#1536](https://github.com/lifekit-hq/finance-sentry/issues/1536)) ([e1fd581](https://github.com/lifekit-hq/finance-sentry/commit/e1fd58173d92bf83f6c6468c37a3b319da33e89a))
+* **research:** record a no-change thesis review on the thesis event trail ([#1553](https://github.com/lifekit-hq/finance-sentry/issues/1553)) ([782cc9f](https://github.com/lifekit-hq/finance-sentry/commit/782cc9f39f22aabf8fff15dbfc854980fdf6cdcf))
+
+
+### Refactoring
+
+* **alerts:** fold the Liquidity module into Alerts ([#1531](https://github.com/lifekit-hq/finance-sentry/issues/1531)) ([#1539](https://github.com/lifekit-hq/finance-sentry/issues/1539)) ([84381c5](https://github.com/lifekit-hq/finance-sentry/commit/84381c58f5ca2cc4b698f1bc8c4833b50fdce3cf))
+
+
+### Documentation
+
+* add CONTEXT.md domain glossary ([#1542](https://github.com/lifekit-hq/finance-sentry/issues/1542)) ([#1545](https://github.com/lifekit-hq/finance-sentry/issues/1545)) ([7b54004](https://github.com/lifekit-hq/finance-sentry/commit/7b5400468a8cbc4b5ae7f0a51c9803b1e62692d6))
+* **readme:** list the real verdict words instead of Buy, Hold, Avoid ([#1551](https://github.com/lifekit-hq/finance-sentry/issues/1551)) ([49f9a48](https://github.com/lifekit-hq/finance-sentry/commit/49f9a4842102166cfad58a5453997fc74314f303))
+* **specs:** set 859 web-push status to Implemented to match app-state ([#1530](https://github.com/lifekit-hq/finance-sentry/issues/1530)) ([#1538](https://github.com/lifekit-hq/finance-sentry/issues/1538)) ([5bb4088](https://github.com/lifekit-hq/finance-sentry/commit/5bb4088b00feef2253753bb3cc2861bcf473114a))
+
 ## [1.22.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.21.0...v1.22.0) (2026-11-22)
 
 
