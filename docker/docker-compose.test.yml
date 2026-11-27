@@ -5,6 +5,21 @@
 # so the container's 127.0.0.1 is its own loopback and a test's fake connection string cannot reach a
 # service on the box. No Docker socket is passed in: container-backed tests skip themselves
 # (run them on the host, or in CI, where a daemon is reachable). mem_limit matches the production host's per-build-container limit.
+#
+# Test projects run one at a time (#1556). `dotnet test FinanceSentry.sln` starts every test project's
+# host at once (-maxcpucount:1 in Directory.Build.rsp limits build nodes, not test runs), and those hosts
+# together go past 2 GB: the container was OOM-killed with the integration suite left out entirely.
+# FinanceSentry.Tests.Integration then runs as two test-host processes: the Auth namespace and the rest.
+# Every WebApplicationFactory host the suite builds stays reachable until its test host exits: EF Core's
+# process-wide internal service-provider cache keeps each host's DbContext, and through it the whole
+# host (OpenTelemetry metric storage included), even after the factory is disposed. So the GC heap
+# grows with the number of hosts one process builds. The GC heap hard limit in a container is 75% of
+# mem_limit (1536 MB at 2g). Measured GC heap peak, committed after GC (2026-11-27, 10 cores, 1047 tests):
+#   whole suite in one process    2089 MB  -> out of memory at 2g (would leave ~9% headroom even at 3g)
+#   Auth namespace                 954 MB  (cgroup peak 736 MB)
+#   everything else               1081 MB  (cgroup peak 847 MB)
+# xUnit parallelism only changes how fast the heap fills (one collection at a time still reached
+# 1266 MB, 2.3x slower). If a half nears 1536 MB, split it again rather than raising mem_limit.
 services:
   backend-tests:
     image: mcr.microsoft.com/dotnet/sdk:10.0
@@ -23,7 +38,20 @@ services:
     command:
       - sh
       - -c
-      - dotnet restore FinanceSentry.sln && dotnet build FinanceSentry.sln --no-restore -c Release && dotnet test FinanceSentry.sln --no-build -c Release
+      - >-
+        dotnet restore FinanceSentry.sln &&
+        dotnet build FinanceSentry.sln --no-restore -c Release || exit 1;
+        rc=0;
+        for p in tests/*/*.csproj; do
+        case $$p in *FinanceSentry.Tests.Integration*) continue ;; esac;
+        dotnet test $$p --no-build -c Release || rc=1;
+        done;
+        int=tests/FinanceSentry.Tests.Integration/FinanceSentry.Tests.Integration.csproj;
+        dotnet test $$int --no-build -c Release
+        --filter 'FullyQualifiedName!~FinanceSentry.Tests.Integration.Auth.' || rc=1;
+        dotnet test $$int --no-build -c Release
+        --filter 'FullyQualifiedName~FinanceSentry.Tests.Integration.Auth.' || rc=1;
+        exit $$rc
 
 volumes:
   fs-backend-tests-nuget:
