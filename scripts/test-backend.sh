@@ -1,5 +1,6 @@
 #!/bin/sh
-# Full backend build + test in a 2 GB SDK container (docker/docker-compose.test.yml).
+# Full backend build + test in a 2 GB SDK container (docker/docker-compose.test.yml). The integration
+# suite runs as two test-host processes to fit that limit; the measured peaks are in the compose file.
 # Without Docker: cd backend && dotnet test FinanceSentry.sln -c Release (same limits via Directory.Build.rsp).
 set -e
 cd "$(dirname "$0")/../docker"
