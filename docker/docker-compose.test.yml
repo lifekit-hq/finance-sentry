@@ -6,9 +6,10 @@
 # service on the box. No Docker socket is passed in: container-backed tests skip themselves
 # (run them on the host, or in CI, where a daemon is reachable). mem_limit matches the production host's per-build-container limit.
 #
-# FinanceSentry.Tests.Integration runs after the solution run, alone in the container, as two test-host
-# processes: Auth namespace and the rest (#1556). Inside the solution run its test host shares the 2 GB
-# with the other test projects, which `dotnet test` runs concurrently, and gets killed.
+# Test projects run one at a time (#1556). `dotnet test FinanceSentry.sln` starts every test project's
+# host at once (-maxcpucount:1 in Directory.Build.rsp limits build nodes, not test runs), and those hosts
+# together go past 2 GB: the container was OOM-killed with the integration suite left out entirely.
+# FinanceSentry.Tests.Integration then runs as two test-host processes: the Auth namespace and the rest.
 # Every WebApplicationFactory host the suite builds stays reachable until its test host exits: EF Core's
 # process-wide internal service-provider cache keeps each host's DbContext, and through it the whole
 # host (OpenTelemetry metric storage included), even after the factory is disposed. So the GC heap
@@ -40,12 +41,17 @@ services:
       - >-
         dotnet restore FinanceSentry.sln &&
         dotnet build FinanceSentry.sln --no-restore -c Release &&
-        dotnet test FinanceSentry.sln --no-build -c Release
-        --filter 'FullyQualifiedName!~FinanceSentry.Tests.Integration.' &&
-        dotnet test tests/FinanceSentry.Tests.Integration/FinanceSentry.Tests.Integration.csproj --no-build -c Release
-        --filter 'FullyQualifiedName~FinanceSentry.Tests.Integration.&FullyQualifiedName!~FinanceSentry.Tests.Integration.Auth.' &&
-        dotnet test tests/FinanceSentry.Tests.Integration/FinanceSentry.Tests.Integration.csproj --no-build -c Release
-        --filter 'FullyQualifiedName~FinanceSentry.Tests.Integration.Auth.'
+        rc=0;
+        for p in tests/*/*.csproj; do
+        case $$p in *FinanceSentry.Tests.Integration*) continue ;; esac;
+        dotnet test $$p --no-build -c Release || rc=1;
+        done;
+        int=tests/FinanceSentry.Tests.Integration/FinanceSentry.Tests.Integration.csproj;
+        dotnet test $$int --no-build -c Release
+        --filter 'FullyQualifiedName!~FinanceSentry.Tests.Integration.Auth.' || rc=1;
+        dotnet test $$int --no-build -c Release
+        --filter 'FullyQualifiedName~FinanceSentry.Tests.Integration.Auth.' || rc=1;
+        exit $$rc
 
 volumes:
   fs-backend-tests-nuget:
