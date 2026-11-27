@@ -28,7 +28,7 @@ RUN dotnet build src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj -c Release --no-
 RUN dotnet publish src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine AS runtime
 WORKDIR /app
 
 # krb5-libs: without it Npgsql writes two raw "Cannot load library libgssapi_krb5.so.2" lines to

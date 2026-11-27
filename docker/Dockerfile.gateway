@@ -28,7 +28,7 @@ RUN dotnet build src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Relea
 RUN dotnet publish src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine AS runtime
 WORKDIR /app
 
 # apk upgrade first: the aspnet base image lags Alpine security releases (e.g. openssl), and the CI
