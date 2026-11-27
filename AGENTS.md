@@ -11,7 +11,7 @@ cd backend && dotnet restore FinanceSentry.sln
 dotnet build FinanceSentry.sln --no-restore -c Release
 
 # Run tests — no filter, no -m flags (`backend/Directory.Build.rsp` pins one build node).
-# `scripts/test-backend.sh` runs the same in a 2 GB SDK container (docker/docker-compose.test.yml),
+# `scripts/test-backend.sh` runs each test project one at a time in a 2 GB SDK container (docker/docker-compose.test.yml),
 # the production host's per-build limit. CI runs the full solution too; container-backed tests
 # report themselves as Skipped where no Docker daemon is reachable.
 dotnet test FinanceSentry.sln --no-build -c Release
