@@ -1,7 +1,8 @@
 #!/bin/sh
 # Full backend build + test in a 2 GB SDK container (docker/docker-compose.test.yml). The integration
 # suite runs as two test-host processes to fit that limit; the measured peaks are in the compose file.
-# Without Docker: cd backend && dotnet test FinanceSentry.sln -c Release (same limits via Directory.Build.rsp).
+# Without Docker: build, then run each tests/*/*.csproj with --no-build one at a time, as the compose command
+# does; an unfiltered `dotnet test FinanceSentry.sln` starts every test host at once.
 set -e
 cd "$(dirname "$0")/../docker"
 docker run --rm -u 0 -v fs-backend-tests-nuget:/nuget mcr.microsoft.com/dotnet/sdk:10.0 chown "$(id -u):$(id -g)" /nuget >/dev/null 2>&1 || true

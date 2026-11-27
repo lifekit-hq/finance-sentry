@@ -40,7 +40,7 @@ services:
       - -c
       - >-
         dotnet restore FinanceSentry.sln &&
-        dotnet build FinanceSentry.sln --no-restore -c Release &&
+        dotnet build FinanceSentry.sln --no-restore -c Release || exit 1;
         rc=0;
         for p in tests/*/*.csproj; do
         case $$p in *FinanceSentry.Tests.Integration*) continue ;; esac;
